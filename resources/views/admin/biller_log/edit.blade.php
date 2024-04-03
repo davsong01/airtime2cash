@@ -160,7 +160,6 @@
                                                                                 <fieldset class="form-group">
                                                                                     <label for="api">API to use</label>
                                                                                     <select class="form-control" name="api" id="api" required>
-                                                                                        <option value="">Select</option>
                                                                                         @foreach ($apis as $item)
                                                                                             <option value="{{ $item->id  }}" {{ $product->api_id == $item->id ? 'selected' : ''}}>{{ $item->name }}</option>
                                                                                         @endforeach

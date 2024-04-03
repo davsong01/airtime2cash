@@ -135,7 +135,6 @@
                                                                                 <fieldset class="form-group">
                                                                                     <label for="helperText">API to use</label>
                                                                                     <select class="form-control" name="api" id="api" required>
-                                                                                        <option value="">Select</option>
                                                                                         @foreach ($apis as $item)
                                                                                             <option value="{{ $item->id  }}" {{ old('api') == $item->id ? 'selected' : ''}}>{{ $item->name }}</option>
                                                                                         @endforeach

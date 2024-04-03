@@ -86,7 +86,7 @@ class Controller extends BaseController
         }
 
         if (env('ENT') == 'local') {
-            $path = "/Applications/MAMP/htdocs/kingsvtu/public";
+            $path = "/Applications/MAMP/htdocs/2cash/public";
         } else {
             $path = '/home/kingntxc/portal.kingsvtu.ng';
         }

@@ -6,7 +6,7 @@ use App\Http\Requests;
 use App\Models\Variation;
 use App\Http\Controllers\Controller;
 
-class VtpassController extends Controller
+class KingsVtuController extends Controller
 {
     public function getVariations($product)
     {

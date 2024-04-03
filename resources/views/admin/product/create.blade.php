@@ -121,46 +121,18 @@
                                                                                     <label for="description">Description</label>
                                                                                     <textarea class="form-control" id="description" name="description" rows="3" placeholder="Description" value="{{ old('description')}}"></textarea>
                                                                                 </fieldset>
-                                                                                <fieldset class="form-group">
-                                                                                    <label for="seo_title">SEO Title</label>
-                                                                                    <input type="text" class="form-control" id="seo_title"  name="seo_title" placeholder="Enter SEO Title" value="{{ old('seo_title')}}">
-                                                                                </fieldset>
-                                                                                <fieldset class="form-group">
-                                                                                    <label for="seo_keywords">SEO Keywords</label>
-                                                                                    <input type="text" class="form-control"  name="seo_keywords" placeholder="Enter SEO Keywords" id="seo_keywords" value="{{ old('seo_keywords')}}">
-                                                                                </fieldset>
-                                                                                 <fieldset class="form-group">
-                                                                                    <label for="seo_description">SEO Description</label>
-                                                                                    <textarea class="form-control" id="seo_description" rows="3" name="seo_description" placeholder="SEO Description">{{ old('seo_description') }}</textarea>
-                                                                                </fieldset>
-                                                                               
+                                                                                
                                                                             </div>
                                                                             <div class="col-md-6">
                                                                                 <fieldset class="form-group">
                                                                                     <label for="helperText">API to use</label>
                                                                                     <select class="form-control" name="api" id="api" required>
-                                                                                        <option value="">Select</option>
                                                                                         @foreach ($apis as $item)
                                                                                             <option value="{{ $item->id  }}" {{ old('api') == $item->id ? 'selected' : ''}}>{{ $item->name }}</option>
                                                                                         @endforeach
                                                                                     </select>
                                                                                 </fieldset>
-                                                                                <fieldset class="form-group">
-                                                                                    <label for="servercode">Server Code/Server Token</label>
-                                                                                    <input type="text" class="form-control" name="servercode" placeholder="Enter servercode" id="servercode" value="{{ old('servercode')}}">
-                                                                                </fieldset>
-                                                                                <fieldset class="form-group">
-                                                                                    <label for="multistep">Use Multistep</label>
-                                                                                    <select class="form-control tiny" name="multistep" id="multistep">
-                                                                                        <option value="">Select</option>
-                                                                                        <option value="yes" {{ old('multistep') == 'yes' ? 'selected' : ''}}>Yes</option>
-                                                                                        <option value="no" {{ old('multistep') == 'no' ? 'selected' : ''}}>No</option> 
-                                                                                    </select>
-                                                                                </fieldset>
-                                                                                <fieldset class="form-group">
-                                                                                    <label for="ussd_string">USSD String</label>
-                                                                                    <input type="text" class="form-control tiny" id="ussd_string" name="ussd_string"  value="{{ old('ussd_string') }}">
-                                                                                </fieldset>
+                                                                               
                                                                                 <fieldset class="form-group">
                                                                                     <label for="status">Status</label>
                                                                                     <select class="form-control" name="status" id="status" required>
@@ -200,10 +172,22 @@
                                                                                     <input type="number" class="form-control tiny" id="min" name="min"  value="{{ old('min') }}">
                                                                                 </fieldset>
                                                                                 <fieldset class="form-group">
-                                                                                    <label for="max">Maimum Amount</label>
+                                                                                    <label for="max">Maximum Amount</label>
                                                                                     <input type="number" class="form-control tiny" id="max" name="max"  value="{{ old('max') }}">
                                                                                 </fieldset>
-                                                                                
+                                                                                <fieldset class="form-group">
+                                                                                    <label for="seo_title">SEO Title</label>
+                                                                                    <input type="text" class="form-control" id="seo_title"  name="seo_title" placeholder="Enter SEO Title" value="{{ old('seo_title')}}">
+                                                                                </fieldset>
+                                                                                <fieldset class="form-group">
+                                                                                    <label for="seo_keywords">SEO Keywords</label>
+                                                                                    <input type="text" class="form-control"  name="seo_keywords" placeholder="Enter SEO Keywords" id="seo_keywords" value="{{ old('seo_keywords')}}">
+                                                                                </fieldset>
+                                                                                <fieldset class="form-group">
+                                                                                    <label for="seo_description">SEO Description</label>
+                                                                                    <textarea class="form-control" id="seo_description" rows="3" name="seo_description" placeholder="SEO Description">{{ old('seo_description') }}</textarea>
+                                                                                </fieldset>
+                                                                               
                                                                                 <input type="hidden" value="product.store" name="route">
                                                                             </div>
                                                                             <div class="col-md-12">

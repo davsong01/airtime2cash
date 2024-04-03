@@ -18,7 +18,7 @@ class RoleSeeder extends Seeder
             'Dashboard',
             'Announcement',
             'Catalogue',
-            'API Providers',
+            'API Provider',
             'Categories',
             "Email Management",
             'Products',

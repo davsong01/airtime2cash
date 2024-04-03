@@ -164,29 +164,11 @@
                                                                                 <fieldset class="form-group">
                                                                                     <label for="api">API to use</label>
                                                                                     <select class="form-control" name="api" id="api" required>
-                                                                                        <option value="">Select</option>
                                                                                         @foreach ($apis as $item)
                                                                                             <option value="{{ $item->id  }}" {{ $product->api_id == $item->id ? 'selected' : ''}}>{{ $item->name }}</option>
                                                                                         @endforeach
                                                                                     </select>
                                                                                 </fieldset>
-                                                                                <fieldset class="form-group">
-                                                                                    <label for="servercode">Server Code/Server Token</label>
-                                                                                    <input type="text" class="form-control" name="servercode" placeholder="Enter servercode" id="servercode" value="{{ $product->servercode ?? old('servercode')}}">
-                                                                                </fieldset>
-                                                                                <fieldset class="form-group">
-                                                                                    <label for="multistep">Use Multistep</label>
-                                                                                    <select class="form-control tiny" name="multistep" id="multistep">
-                                                                                        <option value="">Select</option>
-                                                                                        <option value="yes" {{ $product->multistep == 'yes' ? 'selected' : ''}}>Yes</option>
-                                                                                        <option value="no" {{ $product->multistep == 'no' ? 'selected' : ''}}>No</option> 
-                                                                                    </select>
-                                                                                </fieldset>
-                                                                                <fieldset class="form-group">
-                                                                                    <label for="ussd_string">USSD String</label>
-                                                                                    <input type="text" class="form-control tiny" id="ussd_string" name="ussd_string"  value="{{ $product->ussd_string }}">
-                                                                                </fieldset>
-                                                                                
                                                                                 <fieldset class="form-group">
                                                                                     <label for="status">Status</label>
                                                                                     <select class="form-control" name="status" id="status" required>

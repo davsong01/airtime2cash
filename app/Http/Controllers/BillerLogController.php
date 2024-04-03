@@ -106,8 +106,6 @@ class BillerLogController extends Controller
         //     "servercode" => $request->servercode,
         //     "quantity_graduation" => $request->quantity_graduation,
         //     "allow_subscription_type" => $request->allow_subscription_type,
-        //     'ussd_string' => $request->ussd_string,
-        //     'multistep' => $request->multistep,
         // ]);
 
         // return back()->with('message', 'Update Successfull');

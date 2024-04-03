@@ -61,13 +61,13 @@
                                                         <label for="public_key">Public key</label>
                                                         <input type="text" class="form-control" id="public_key" name="public_key" value="{{ $paymentgateway->public_key ?? old('public_key') }}" placeholder="Enter Public Key">
                                                     </fieldset>
-                                                   
-                                                </div>
-                                                <div class="col-md-6">
-                                                     <fieldset class="form-group">
+                                                    <fieldset class="form-group">
                                                         <label for="contract_id">Contract ID</label>
                                                         <input type="text" class="form-control" id="contract_id" name="contract_id" value="{{ $paymentgateway->contract_id ?? old('contract_id') }}" placeholder="Enter Contract Id">
                                                     </fieldset>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    
                                                     <fieldset class="form-group">
                                                         <label for="merchant_email">Merchant Email</label>
                                                         <input type="text" class="form-control" id="merchant_email" name="merchant_email" value="{{ $paymentgateway->merchant_email ?? old('merchant_email') }}" placeholder="Enter Merchant email">

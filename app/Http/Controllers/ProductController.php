@@ -47,8 +47,6 @@ class ProductController extends Controller
             "servercode" => "nullable",
             "image" => "required|mimes:jpeg,png|max:1024",
             "allow_subscription_type" => 'nullable',
-            'ussd_string' => 'nullable',
-            'multistep' => 'nullable',
             'referral_percentage' => 'nullable',
         ]);
 
@@ -90,7 +88,6 @@ class ProductController extends Controller
                 "servercode" => $request->servercode,
                 "allow_subscription_type" => $request->allow_subscription_type ?? 'no',
                 'ussd_string' => $request->ussd_string,
-                'multistep' => $request->multistep,
                 'referral_percentage' => $request->referral_percentage,
             ]
         );

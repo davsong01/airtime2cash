@@ -12,6 +12,7 @@
                         <div class="col-md-12">
                             @include('layouts.alerts')
                         </div>
+                        @if(!empty($customer))
                         <div class="col-xl-3 col-12 dashboard-users">
                             <a href="{{ route('customers.edit', $customer->customer_id)}}">
                             <div class="card text-center">
@@ -26,6 +27,7 @@
                             </div>
                             </a>
                         </div>
+                        @endif
                         <div class="col-xl-3 col-12 dashboard-users">
                             <div class="card text-center">
                                 <div class="card-content">

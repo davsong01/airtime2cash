@@ -12,7 +12,7 @@
                                 <ol class="breadcrumb p-0 mb-0">
                                     <li class="breadcrumb-item"><a href="/"><i class="bx bx-home-alt"></i></a>
                                     </li>
-                                    <li class="breadcrumb-item"><a href="{{ route('api.index') }}">API Providers</a>
+                                    <li class="breadcrumb-item"><a href="{{ route('api.index') }}">API Provider</a>
                                     </li>
                                     <li class="breadcrumb-item active">Edit {{ $api->name }}
                                     </li>
@@ -44,11 +44,6 @@
                                                         <input type="text" class="form-control" id="name" name="name" value="{{ $api->name ?? old('name') }}" placeholder="Enter name" required>
                                                     </fieldset>
                                                     <fieldset class="form-group">
-                                                        <label for="slug">Slug</label>
-                                                        <input type="text" class="form-control" name="slug" value="{{ $api->slug ?? old('slug') }}" placeholder="Enter slug" id="slug" required>
-                                                    </fieldset>
-                                                   
-                                                    <fieldset class="form-group">
                                                         <label for="warning_threshold_status">Warning Threshold Status</label>
                                                         <select class="form-control" name="warning_threshold_status" id="warning_threshold_status" required>
                                                             <option value="">Select</option>
@@ -56,11 +51,11 @@
                                                             <option value="inactive" {{ $api->warning_threshold_status == 'inactive' ? 'selected' : ''}}>InActive</option>
                                                         </select>
                                                     </fieldset>
-                                                     <fieldset class="form-group">
+                                                    <fieldset class="form-group">
                                                         <label for="warning_threshold">Balance Warning Threshold</label>
                                                         <input type="number" class="form-control" name="warning_threshold" value="{{ $api->warning_threshold ?? old('warning_threshold') }}" placeholder="Enter warning threshold" id="warning_threshold">
                                                     </fieldset>
-                                                     <fieldset class="form-group">
+                                                    <fieldset class="form-group">
                                                         <label for="sandbox_base_url">Sandbox Base URL</label>
                                                         <input type="text" class="form-control" name="sandbox_base_url" value="{{ $api->sandbox_base_url }}" placeholder="Enter sandbox base url" id="sandbox_base_url">
                                                     </fieldset>
@@ -78,10 +73,7 @@
                                                             <option value="inactive" {{ $api->status == 'inactive' ? 'selected' : ''}}>InActive</option>
                                                         </select>
                                                     </fieldset>
-                                                    <fieldset class="form-group">
-                                                        <label for="file_name">File Name</label>
-                                                        <input type="text" class="form-control" name="file_name" value="{{ $api->file_name ?? old('file_name') }}" placeholder="Enter file name" id="file_name" required>
-                                                    </fieldset>
+                                                    
                                                     <fieldset class="form-group">
                                                         <label for="api_key">API Key</label>
                                                         <input type="text" class="form-control" name="api_key" value="{{ $api->api_key }}" placeholder="Enter api key" id="api_key">

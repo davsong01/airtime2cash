@@ -161,19 +161,15 @@ use App\Models\PaymentGateway;
                                                                             <label for="support_link">Support Link</label>
                                                                             <input type="text" class="form-control" id="support_link" name="support_link" value="{{ $settings->support_link ?? old('support_link') }}" placeholder="Support Link">
                                                                         </fieldset>
-                                                                        <fieldset class="form-group">
-                                                                            <label for="api_documentation_link">API Documentation Link</label>
-                                                                            <input type="text" class="form-control" id="api_documentation_link" name="api_documentation_link" value="{{ $settings->api_documentation_link ?? old('api_documentation_link') }}" placeholder="API Documentation Link">
-                                                                        </fieldset>
                                                                         
                                                                         <fieldset class="form-group">
                                                                             <label for="seo_description">SEO Description</label>
                                                                             <textarea class="form-control" id="seo_description" rows="3" name="seo_description" value="{{ $settings->seo_description ?? old('seo_description') }}" placeholder="SEO Description" required>{{ $settings->seo_description ?? old('seo_description') }}</textarea>
                                                                         </fieldset>
-                                                                        <fieldset class="form-group">
+                                                                        {{-- <fieldset class="form-group">
                                                                             <label for="google_ad_code">Google Ad Code</label>
                                                                             <textarea class="form-control" id="google_ad_code" rows="3" name="google_ad_code" value="{{ $settings->google_ad_code ?? old('google_ad_code') }}" placeholder="Google ad code">{{ $settings->google_ad_code ?? old('google_ad_code') }}</textarea>
-                                                                        </fieldset>
+                                                                        </fieldset> --}}
                                                                     </div>
                                                                     <div class="col-md-12">
                                                                         <button class="btn btn-primary" type="submit">Update</button>

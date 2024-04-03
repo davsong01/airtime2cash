@@ -24,10 +24,9 @@
                                 <ol class="breadcrumb p-0 mb-0">
                                     <li class="breadcrumb-item"><a href="/"><i class="bx bx-home-alt"></i></a>
                                     </li>
-                                    <li class="breadcrumb-item"><a href="{{ route('api.index') }}">API Providers</a>
+                                    <li class="breadcrumb-item"><a href="{{ route('api.index') }}">API Provider</a>
                                     </li>
-                                    <li class="breadcrumb-item active">All API Providers
-                                    </li>
+                                    
                                 </ol>
                             </div>
                         </div>
@@ -40,22 +39,15 @@
                     <div class="row">
                         <div class="col-12">
                             <div class="card">
-                                <div class="card-header">
-                                    <h4 class="card-title">All API Providers</h4> <br>
-                                    <a href="{{ route('api.create') }}"><button id="addRow" class="btn btn-primary mb-2 d-flex align-items-center"><i class="bx bx-plus"></i>&nbsp; Add Provider</button></a>
-                                    @include('layouts.alerts')
-                                </div>
+                                
                                 <div class="card-content">
                                     <div class="card-body card-dashboard">
                                         <div class="table-responsive">
-                                            <table class="table table-striped dataex-html5-selectors">
+                                            <table class="table table-striped">
                                                 <thead>
                                                     <tr>
                                                         <th>Name</th>
-                                                        <th>Products</th>
-                                                        <th>File Name</th>
                                                         <th>Status</th>
-                                                        <th>Date Added</th>
                                                         @if(hasAccess('api.edit') || hasAccess('api.balance'))
                                                         <th>Actions</th>
                                                         @endif
@@ -65,10 +57,7 @@
                                                     @foreach ( $apis as $api )
                                                     <tr>
                                                         <td>{{ $api->name }}</td>
-                                                        <td>{{ $api->products_count }}</td>
-                                                        <td>{{ $api->file_name }}</td>
                                                         <td style="color:{{ $api->status == 'active' ? 'green' : 'red'}}">{{ ucfirst($api->status) }}</td>
-                                                        <td>{{ $api->created_at }}</td>
                                                         @if(hasAccess('api.edit') || hasAccess('api.balance'))
                                                         <td>
                                                             @if(hasAccess('api.edit'))

@@ -26,8 +26,7 @@
                                     </li>
                                     <li class="breadcrumb-item"><a href="{{ route('category.index') }}">Payment Gateways</a>
                                     </li>
-                                    <li class="breadcrumb-item active">Payment Gateways
-                                    </li>
+                                    
                                 </ol>
                             </div>
                         </div>
@@ -41,14 +40,12 @@
                         <div class="col-12">
                             <div class="card">
                                 <div class="card-header">
-                                    <h4 class="card-title">Payment Gateways</h4> <br>
-                                    {{-- <a href="{{ route('paymentgateway.create') }}"><button id="addRow" class="btn btn-primary mb-2 d-flex align-items-center"><i class="bx bx-plus"></i>&nbsp; Add Payment Gateway</button></a> --}}
                                     @include('layouts.alerts')
                                 </div>
                                 <div class="card-content">
                                     <div class="card-body card-dashboard">
                                         <div class="table-responsive">
-                                            <table class="table table-striped dataex-html5-selectors">
+                                            <table class="table table-striped">
                                                 <thead>
                                                     <tr>
                                                         <th>Name</th>

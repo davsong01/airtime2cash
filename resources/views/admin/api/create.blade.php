@@ -12,7 +12,7 @@
                                 <ol class="breadcrumb p-0 mb-0">
                                     <li class="breadcrumb-item"><a href="/"><i class="bx bx-home-alt"></i></a>
                                     </li>
-                                    <li class="breadcrumb-item"><a href="{{ route('api.index') }}">API Providers</a>
+                                    <li class="breadcrumb-item"><a href="{{ route('api.index') }}">API Provider</a>
                                     </li>
                                     <li class="breadcrumb-item active">Add API Provider
                                     </li>
