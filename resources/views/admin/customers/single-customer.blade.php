@@ -400,7 +400,7 @@ use App\Models\BlackList;
                                                                 @endif
                                                             </fieldset>
                                                         </div>
-                                                        {{-- <div class="col-md-6">
+                                                        <div class="col-md-6">
                                                             <fieldset class="form-group">
                                                                 @if(kycStatus('IDCARD', $user->customer->id)['status'] == 'verified')
                                                                 <label for="IDCARD">ID Card</label><span class="verified"><i class="fa fa-check"></i> Verifiedd</span> <br>
@@ -411,7 +411,7 @@ use App\Models\BlackList;
                                                                 <input type="date" name="IDCARD"  class="form-control" value="{{ kycStatus('IDCARD', $user->customer->id)['value'] }}" required>
                                                                 @endif
                                                             </fieldset>
-                                                        </div> --}}
+                                                        </div>
                                                         <div class="col-md-6">
                                                             <fieldset class="form-group">
                                                                 @if(kycStatus('BVN', $user->customer->id)['status'] == 'verified')

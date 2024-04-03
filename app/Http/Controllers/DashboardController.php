@@ -330,13 +330,13 @@ class DashboardController extends Controller
             "LGA" => "nullable",
             "DOB" => "nullable",
             "BVN" => "nullable|string|min:11|max:11",
-            // "IDCARD" => "sometimes|image|max:500",
+            "IDCARD" => "sometimes|image|max:1024",
             "IDCARDTYPE" => "nullable"
         ]);
 
-        // if (!empty($request->IDCARD)) {
-        //     $input['IDCARD'] = $this->uploadFile($request->IDCARD, 'kyc');
-        // }
+        if (!empty($request->IDCARD)) {
+            $input['IDCARD'] = $this->uploadFile($request->IDCARD, 'kyc');
+        }
 
         $instantVerify = ['FIRST_NAME', 'LAST_NAME', 'MIDDLE_NAME', 'DOB', 'PHONE_NUMBER', 'COUNTRY', 'STATE', 'LGA', 'DOB', 'IDCARD', 'IDCARDTYPE'];
         foreach ($input as $key => $value) {
@@ -385,7 +385,7 @@ class DashboardController extends Controller
             return back()->with('error', 'Error: ' . $error);
         }
     }
-
+    
     public function updateKycData($key, $value, $customer_id, $status)
     {
         $check = KycData::where(['customer_id' => $customer_id, 'key' => $key, 'status' => 'verified'])->first();

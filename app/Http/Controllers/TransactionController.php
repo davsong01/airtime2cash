@@ -219,7 +219,7 @@ class TransactionController extends Controller
                 $wallet = new WalletController();
                 $request['type'] = 'credit';
                 $wallet->logWallet($request);
-                $failure_reason = $query['message'] ?? null;
+                $failure_reason = $query['error'] ?? $query['message'];
 
                 // Update Customer Wallet
                 $wallet->updateCustomerWallet(auth()->user(), $request['total_amount'], 'credit');
@@ -264,7 +264,7 @@ class TransactionController extends Controller
             $wallet = new WalletController();
             $request['type'] = 'credit';
             $wallet->logWallet($request);
-            $failure_reason = $query['message'] ?? null;
+            $failure_reason = $query['error'] ?? $query['message'];
 
             // Update Customer Wallet
             $wallet->updateCustomerWallet(auth()->user(), $request['total_amount'], 'credit');
