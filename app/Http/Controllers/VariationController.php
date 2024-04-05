@@ -12,15 +12,46 @@ class VariationController extends Controller
 {
     public function pullVariations(Product $product)
     {
-        $api = $product->api;
-        Session::put('page', '1');
+        $variations = app("App\Http\Controllers\Providers\KingsVtuController")->getVariations($product->slug);
+        
+        if (isset($variations['status']) && $variations['status'] == 'success') {
+            $variations = $variations['data']['variations'] ?? [];
+            if (!empty($variations)) {
+                foreach ($variations as $key => $variation) {
+                    $variation = Variation::updateOrCreate([
+                        'product_id' => $product->id,
+                        'category_id' => $product->category_id,
+                        'api_id' => $product->api_id,
+                        'api_name' =>  $variation['name'],
+                        'slug' => $variation['variation_slug'],
+                    ], [
+                        'product_id' => $product->id,
+                        'category_id' => $product->category_id,
+                        'api_id' => $product->api_id,
+                        'api_name' =>  $variation['name'] ?? null,
+                        'slug' => $variation['variation_slug'] ?? null,
+                        'system_name' =>  $variation['name'],
+                        'fixed_price' => $variation['fixed_price'],
+                        'api_price' => $variation['price'],
+                        'system_price' => $variation['price'],
+                        'min' => $variation['min'] ?? null,
+                        'max' => $variation['max'] ?? null,
+                        'verifiable' => $variation['verifiable'] ?? null,
+                        'unique_element' => $variation['unique_element'] ?? null,
+                        'status' => 'inactive'
+                    ]);
+                }
 
-        // Get Variations from Filename
-        $variations = app("App\Http\Controllers\Providers\\" . $api->file_name)->getVariations($product);
+                return back()->with('message', 'Variations successfully pulled, please proceed to update variations');
+            } else {
+                return back()->with('error', 'Variations could not be pulled from provider');
+            }
+        } else {
+            return back()->with('error', 'Error while pulling categories' . $variations['errors'] ?? '');
+        }
 
-        return back()->with('message', 'Variations pulled successfully');
+        return view('admin.category.index', compact('categories'));
     }
-
     public function getCustomerVariations(Product $product)
     {
         $variations = Variation::where('product_id', $product->id)->where('status', 'active')->orderBy('system_price', 'ASC')->get();
@@ -83,13 +114,10 @@ class VariationController extends Controller
                 'api_price' => $request->api_price[$variation],
                 'system_name' => $request->system_name[$variation],
                 'slug' => $request->slug[$variation],
-                'ussd_string' => $request->ussd_string[$variation],
                 'system_price' => $request->system_price[$variation],
                 'fixed_price' => $request->fixed_price[$variation],
                 'min' => $request->min[$variation] ?? null,
                 'max' => $request->max[$variation] ?? null,
-                'ussd_string' => $request->ussd_string[$variation] ?? null,
-                'multistep' => $request->multistep[$variation] ?? null,
                 'status' => $request->status[$variation],
             ];
 
@@ -124,8 +152,6 @@ class VariationController extends Controller
                     'system_price' => $request->system_price[$key],
                     'min' => $request->minimum_amount[$key] ?? null,
                     'max' => $request->maximum_amount[$key] ?? null,
-                    'ussd_string' => $request->ussd_string[$key] ?? null,
-                    'multistep' => $request->multistep[$key] ?? null,
                     'status' => $request->status[$key]
                 ]);
 

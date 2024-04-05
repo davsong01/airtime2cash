@@ -147,18 +147,7 @@
                                                                                     <label for="description">Description</label>
                                                                                     <textarea style="height: 117px !important" class="form-control" id="description" name="description" rows="3" placeholder="Description" value="{{ $product->description ??  old('description')}}"></textarea>
                                                                                 </fieldset>
-                                                                                <fieldset class="form-group">
-                                                                                    <label for="seo_title">SEO Title</label>
-                                                                                    <input type="text" class="form-control" id="seo_title"  name="seo_title" placeholder="Enter SEO Title" value="{{ $product->seo_title ?? old('seo_title')}}">
-                                                                                </fieldset>
-                                                                                <fieldset class="form-group">
-                                                                                    <label for="seo_keywords">SEO Keywords</label>
-                                                                                    <input type="text" class="form-control"  name="seo_keywords" placeholder="Enter SEO Keywords" id="seo_keywords" value="{{ $product->seo_keywords ?? old('seo_keywords')}}">
-                                                                                </fieldset>
-                                                                                <fieldset class="form-group">
-                                                                                    <label for="seo_description">SEO Description</label>
-                                                                                    <textarea class="form-control" id="seo_description" rows="3" name="seo_description" value="{{ $product->seo_description ?? old('seo_description') }}" placeholder="SEO Description">{{ $product->seo_description ?? old('seo_description') }}</textarea>
-                                                                                </fieldset>
+                                                                                
                                                                             </div>
                                                                             <div class="col-md-6">
                                                                                 <fieldset class="form-group">
@@ -204,7 +193,18 @@
                                                                                     <label for="max">Maimum Amount ({!! getSettings()['currency']!!})</label>
                                                                                     <input type="number" class="form-control tiny" id="max" name="max"  value="{{ $product->max }}">
                                                                                 </fieldset>
-                                                                                
+                                                                                <fieldset class="form-group">
+                                                                                    <label for="seo_title">SEO Title</label>
+                                                                                    <input type="text" class="form-control" id="seo_title"  name="seo_title" placeholder="Enter SEO Title" value="{{ $product->seo_title ?? old('seo_title')}}">
+                                                                                </fieldset>
+                                                                                <fieldset class="form-group">
+                                                                                    <label for="seo_keywords">SEO Keywords</label>
+                                                                                    <input type="text" class="form-control"  name="seo_keywords" placeholder="Enter SEO Keywords" id="seo_keywords" value="{{ $product->seo_keywords ?? old('seo_keywords')}}">
+                                                                                </fieldset>
+                                                                                <fieldset class="form-group">
+                                                                                    <label for="seo_description">SEO Description</label>
+                                                                                    <textarea class="form-control" id="seo_description" rows="3" name="seo_description" value="{{ $product->seo_description ?? old('seo_description') }}" placeholder="SEO Description">{{ $product->seo_description ?? old('seo_description') }}</textarea>
+                                                                                </fieldset>
                                                                                 @if($product->has_variations == 'yes')
                                                                                 @endif
                                                                                 <input type="hidden" value="page1" name="route">
@@ -227,15 +227,13 @@
 
                                                                         @include('admin.product.add_variations_form')
                                                                     </div>
-
-                                                                        @if($product->variations->count() < 1)
-                                                                            <a href="{{ route('variations.pull', $product->id) }}" class="btn btn-primary mb-2 d-flex align-items-center"><i class="bx bx-plus"></i>&nbsp; Pull Variations</a>
-                                                                        @else
-                                                                            <a style="width:fit-content;" href="{{ route('variations.pull', $product->id) }}" class="btn btn-info mb-2 mt-1 d-flex align-items-center"><i class="bx bx-plus"></i>&nbsp; Re Pull Variations</a>
+                                                                        
+                                                                        <a style="width:fit-content;" href="{{ route('variations.pull', $product->id) }}" class="btn btn-info mb-2 mt-1 d-flex align-items-center"><i class="bx bx-plus"></i>&nbsp; Pull Variations</a>
+                                                                        @if($product->variations->count() > 0)
 
                                                                             <form action="{{route('variations.update', $product->id)}}" method="POST" enctype="multipart/form-data">
                                                                                 @csrf
-                                                                               
+                                                                            
                                                                                 @foreach($product->variations as $variation)
                                                                                 <div class="row" style="margin-bottom:10px">
                                                                                     <div class="col-md-3">
@@ -284,22 +282,7 @@
                                                                                             </select>
                                                                                         </fieldset>
                                                                                     </div>
-                                                                                    <div class="col-md-2">
-                                                                                        <fieldset class="form-group">
-                                                                                            <label for="multistep">Use Multistep</label>
-                                                                                            <select class="form-control tiny" name="multistep[{{ $variation->id }}]" id="multistep">
-                                                                                                <option value="">Select</option>
-                                                                                                <option value="yes" {{ $variation->multistep == 'yes' ? 'selected' : ''}}>Yes</option>
-                                                                                                <option value="no" {{ $variation->multistep == 'no' ? 'selected' : ''}}>No</option> 
-                                                                                            </select>
-                                                                                        </fieldset>
-                                                                                    </div>
-                                                                                    <div class="col-md-4">
-                                                                                        <fieldset class="form-group">
-                                                                                            <label for="ussd_string">USSD String</label>
-                                                                                            <input type="text" class="form-control tiny" id="ussd_string" name="ussd_string[{{ $variation->id }}]"  value="{{ $variation->ussd_string }}">
-                                                                                        </fieldset>
-                                                                                    </div>
+                                                                                    
                                                                                     <div class="col-md-2">
                                                                                         <fieldset class="form-group">
                                                                                             <label for="min">Min Amount</label>
@@ -415,22 +398,7 @@
                     </select>
                 </fieldset>
             </div>
-            <div class="col-md-2">
-                <fieldset class="form-group">
-                    <label for="multistep">Use Multistep</label>
-                    <select class="form-control tiny" name="multistep[]" id="multistep">
-                        <option value="">Select</option>
-                        <option value="yes" {{ old('multistep') == 'yes' ? 'selected' : ''}}>Yes</option>
-                        <option value="no" {{ old('multistep') == 'no' ? 'selected' : ''}}>No</option> 
-                    </select>
-                </fieldset>
-            </div>
-            <div class="col-md-4">
-                <fieldset class="form-group">
-                    <label for="ussd_string">USSD String</label>
-                    <input type="text" class="form-control tiny" id="ussd_string" name="ussd_string[]"  value="{{ old('ussd_string') }}">
-                </fieldset>
-            </div>
+            
             <div class="col-md-2">
                 <fieldset class="form-group">
                     <label for="min">Min Amount</label>

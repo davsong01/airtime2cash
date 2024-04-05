@@ -16,6 +16,45 @@ class CategoryController extends Controller
         return view('admin.category.index', compact('categories'));
     }
 
+    public function pullCategories()
+    {
+        $categories = app("App\Http\Controllers\Providers\KingsVtuController")->getCategories();
+        if (isset($categories['status']) && $categories['status'] == 'success') {
+            $categories = $categories['data'] ?? [];
+            if(!empty($categories)){
+                foreach ($categories as $key=>$category) {
+                    Category::updateOrCreate(
+                        [
+                            "name" => $category['display_name'],
+                            "display_name" => $category['display_name'],
+                            "slug" => $category['slug'],
+                            "icon" => $category['icon'] ?? null,
+                            "unique_element" => $category['unique_element'] ?? '',
+                        ], [
+                        "name" => $category['display_name'],
+                        "icon" => $category['icon'] ?? null,
+                        "display_name" => $category['display_name'],
+                        "slug" => $category['slug'],
+                        "status" => 'inactive',
+                        "order" => $key + 1,
+                        "description" => $category['description'],
+                        "unique_element" => $category['unique_element'] ?? '',
+                        "discount_type" => $category['discount_type'] ?? '',
+                    ]);
+                }
+
+                return back()->with('message', 'Categories successfully pulled, please proceed to update categories');
+            }else{
+                return back()->with('error', 'Categories could not be pulled from provider');
+            }
+        } else {
+            return back()->with('error', 'Error while pulling categories'.$categories['errors'] ?? '');
+        }
+        
+        return view('admin.category.index', compact('categories'));
+    }
+
+
     public function create()
     {
         return view('admin.category.create');

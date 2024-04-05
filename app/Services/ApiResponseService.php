@@ -170,7 +170,7 @@ class ApiResponseService
         ];
     
         // Get Api
-        $verify = app("App\Http\Controllers\Providers\\" . $file_name)->verify($data);
+        $verify = app("App\Http\Controllers\Providers\KingsVtuController")->verify($data);
         
         if (isset($verify) && $verify['status_code'] == 1) {
             if (isset($verify['raw_response'])) {

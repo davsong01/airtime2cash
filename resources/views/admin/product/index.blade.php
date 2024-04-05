@@ -42,7 +42,11 @@
                                 @include('layouts.alerts')
                                 <div class="card-header">
                                     <h4 class="card-title">All products</h4> <br>
-                                    <a href="{{ route('product.create') }}"><button id="addRow" class="btn btn-primary mb-2 d-flex align-items-center"><i class="bx bx-plus"></i>&nbsp; Add Product</button></a>
+                                    @if($products->count() < 1)
+                                    <a href="{{ route('product.pull') }}"><button id="addRow" class="btn btn-primary mb-2 d-flex align-items-center"><i class="bx bx-plus"></i>&nbsp; Pull Products</button></a>
+                                    @else      
+                                    <a href="{{ route('product.repull') }}"><button id="addRow" class="btn btn-primary mb-2 d-flex align-items-center"><i class="bx bx-plus"></i>&nbsp; RePull Products</button></a>
+                                    @endif
                                 </div>
                                 <div class="card-content">
                                     <div class="card-body card-dashboard">
@@ -66,12 +70,11 @@
                                                         <td><img src="{{asset($product->image)}}" alt="{{$product->image}}" style="width: 50px;float:left">{{ $product->name }}</td>
                                                         <td>{{ $product->category->name }} <br>
                                                         </td>
-                                                       
+                                                    
                                                         <td>
                                                             All: {{ $product->variations->count() }} <br>
                                                             <span style="color:green">Active: {{ $product->variations->where('status','active')->count() }}</span>
                                                         </td>
-                                                        <td>{{ $product->api->name }}</td>
                                                         <td>{{ $product->status }}</td>
                                                         <td>{{ $product->created_at }}</td>
                                                         @if(hasAccess('product.edit'))

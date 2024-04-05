@@ -2,59 +2,56 @@
 
 namespace App\Http\Controllers\Providers;
 
+use App\Models\API;
 use App\Http\Requests;
 use App\Models\Variation;
 use App\Http\Controllers\Controller;
+use App\Models\Category;
 
 class KingsVtuController extends Controller
 {
-    public function getVariations($product)
+    public $api;
+    public function __construct(){
+        $this->api = API::first();
+    }
+
+    public function getCategories(){
+        $url = $this->api->live_base_url;
+        $url = $url . "category";
+        
+        $headers = [
+            'Content-Type' => 'application/json',
+            'Accept' =>  'application/json',
+        ];
+
+        return $this->basicApiCall($url, [], $headers, 'GET');
+        
+    }
+
+    public function getProducts($category_slug)
     {
-        $url = env('ENV') != 'local' ? $product->api->sandbox_base_url : $product->api->live_base_url;
-        $url = $url . "service-variations?serviceID=" . $product->slug;
+        $url = $this->api->live_base_url;
+        $url = $url . "products/".$category_slug;
 
         $headers = [
             'Content-Type' => 'application/json',
             'Accept' =>  'application/json',
-            'api_key' => $product->api->api_key,
-            'public_key' => $product->api->public_key,
         ];
 
-        $variations = $this->basicApiCall($url, [], $headers, 'GET');
+        return $this->basicApiCall($url, [], $headers, 'GET');
+    }
 
-        if (isset($variations['response_description']) && $variations['response_description'] == '000') {
-            // $deleteExistingVariations = Variation::where('product_id', $product->id)->delete();
+    public function getVariations($product_slug)
+    {
+        $url = $this->api->live_base_url;
+        $url = $url . "variations/" . $product_slug;
 
-            $variations = $variations['content']['variations'] ?? $variations['content']['varations'];
-            foreach ($variations as $variation) {
-                // if(in_array($variation['variation_code'], $existingVariations)){
-                // }else{
-                Variation::updateOrCreate([
-                    'product_id' => $product['id'],
-                    'category_id' => $product['category_id'],
-                    'api_id' => $product['api']['id'],
-                    'api_name' => $variation['name'],
-                    'slug' => $variation['variation_code'],
-                ], [
-                    'product_id' => $product['id'],
-                    'category_id' => $product['category_id'],
-                    'api_id' => $product['api']['id'],
-                    'api_name' => $variation['name'],
-                    'slug' => $variation['variation_code'],
-                    'system_name' => $variation['name'],
-                    'fixed_price' => $variation['fixedPrice'],
-                    'api_price' => $variation['variation_amount'],
-                    'system_price' => $variation['variation_amount'],
-                    'min' => $variation['minimum_amount'] ?? null,
-                    'max' => $variation['maximum_amount'] ?? null
-                ]);
-                // }
-            }
+        $headers = [
+            'Content-Type' => 'application/json',
+            'Accept' =>  'application/json',
+        ];
 
-            return true;
-        } else {
-            return false;
-        }
+        return $this->basicApiCall($url, [], $headers, 'GET');
     }
 
     public function query($request, $api, $variation, $product)

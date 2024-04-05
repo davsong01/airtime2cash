@@ -91,6 +91,12 @@
                                         class="menu-item" data-i18n="Input">Pending Emails</span></a>
                             </li>
                         @endif
+                        @if (in_array('email.setup', $allowedRoutes) || in_array(1, auth()->user()->admin->roleIds()))
+                            <li class="{{ Route::is('email.setup') ? 'active' : '' }}"><a
+                                    href="{{ route('email.setup') }}"><i class="bx bx-right-arrow-alt"></i><span
+                                        class="menu-item" data-i18n="Input">Email Setup</span></a>
+                            </li>
+                        @endif
                     </ul>
                 </li>
             @endif

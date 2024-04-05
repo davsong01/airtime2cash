@@ -18,6 +18,47 @@ class ProductController extends Controller
         return view('admin.product.index', compact('products'));
     }
 
+    public function pullProducts()
+    {
+        
+        $categories = Category::all();
+        foreach ($categories as $category) {
+            $products = app("App\Http\Controllers\Providers\KingsVtuController")->getProducts($category->slug);
+            
+            if (isset($products['status']) && $products['status'] == 'success') {
+                $products = $products['data']['products'] ?? [];
+                if (!empty($products)) {
+                    foreach ($products as $key => $product) {
+                        Product::updateOrCreate(
+                            [
+                                "name" => $product['display_name'],
+                                "category_id" => $category->id,
+                                "display_name" => $product['display_name'],
+                                "slug" => $product['slug'],
+                                "has_variations" => $product['has_variations'] ?? null,
+                            ],
+                            [
+                                "name" => $product['display_name'],
+                                "display_name" => $product['display_name'],
+                                "slug" => $product['slug'],
+                                "status" => 'inactive',
+                                "description" => $product['description'] ?? null,
+                                "min" => $product['min'] ?? null,
+                                "max" => $product['max'] ?? null,
+                                "allow_quantity" => $product['allow_quantity'] ?? null,
+                                "fixed_price" => $product['fixed_price'] ?? null,
+                                "allow_subscription_type" => $product['allow_subscription_type'] ?? null,
+                            ]
+                        );
+                    }
+
+                } 
+            } 
+        }
+
+        return back()->with('message', 'Products successfully pulled, please proceed to update products');
+    }
+
     public function create()
     {
         $categories = Category::where('status', 'active')->get();
@@ -44,7 +85,6 @@ class ProductController extends Controller
             "has_variations" => "required",
             "fixed_price" => "nullable",
             "system_price" => "nullable",
-            "servercode" => "nullable",
             "image" => "required|mimes:jpeg,png|max:1024",
             "allow_subscription_type" => 'nullable',
             'referral_percentage' => 'nullable',
@@ -87,7 +127,6 @@ class ProductController extends Controller
                 "max" => $request->max,
                 "servercode" => $request->servercode,
                 "allow_subscription_type" => $request->allow_subscription_type ?? 'no',
-                'ussd_string' => $request->ussd_string,
                 'referral_percentage' => $request->referral_percentage,
             ]
         );
@@ -154,9 +193,6 @@ class ProductController extends Controller
             "quantity_graduation" => 'nullable',
             "min" => 'nullable',
             "max" => 'nullable',
-            "servercode" => "nullable",
-            'ussd_string' => 'nullable',
-            'multistep' => 'nullable',
             "allow_subscription_type" => "nullable",
             'referral_percentage' => 'nullable',
 
@@ -187,8 +223,7 @@ class ProductController extends Controller
             "servercode" => $request->servercode,
             "quantity_graduation" => $request->quantity_graduation,
             "allow_subscription_type" => $request->allow_subscription_type,
-            'ussd_string' => $request->ussd_string,
-            'multistep' => $request->multistep,
+            
             'referral_percentage' => $request->referral_percentage,
         ]);
 

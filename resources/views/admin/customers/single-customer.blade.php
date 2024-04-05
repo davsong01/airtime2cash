@@ -259,16 +259,24 @@ use App\Models\BlackList;
                                                     </tr>
                                                 </thead>
                                                 <tbody>
+                                                 
+                                                    @if($downlines->count() > 0)
                                                     @foreach ($downlines as $ref)
                                                         <tr>
-                                                            <td>{{ ucfirst($ref->referredCustomer->user->firstname) . ' ' . ucfirst($ref->referredCustomer->user->lastname) }}
+                                                            <td>
+                                                                @if(isset($ref->referredCustomer->user->firstname))
+                                                                {{ ucfirst($ref->referredCustomer->user->firstname) . ' ' . ucfirst($ref->referredCustomer->user->lastname) }}
+                                                                @else   
+                                                                N/A
+                                                                @endif
                                                             </td>
-                                                            <td>{{ $ref->referredCustomer->user->email }}</td>
-                                                            <td>{{ $ref->referredCustomer->user->phone }}</td>
+                                                            <td>{{ $ref->referredCustomer->user->email ?? ''}}</td>
+                                                            <td>{{ $ref->referredCustomer->user->phone ?? ''}}</td>
                                                             <td>{!! getSettings()->currency . number_format($ref->total) !!}</td>
                                                             <td>{{ $ref->created_at->toDateTimeString() }}</td>
                                                         </tr>
                                                     @endforeach
+                                                    @endif
                                                 </tbody>
 
                                             </table>

@@ -75,9 +75,6 @@ class BillerLogController extends Controller
         //     "quantity_graduation" => 'nullable',
         //     "min" => 'nullable',
         //     "max" => 'nullable',
-        //     "servercode" => "nullable",
-        //     'ussd_string' => 'nullable',
-        //     'multistep' => 'nullable',
         //     "allow_subscription_type" => "nullable"
         // ]);
 
@@ -103,7 +100,6 @@ class BillerLogController extends Controller
         //     "max" => $request->max,
         //     "system_price" => $request->system_price,
         //     "allow_quantity" => $request->allow_quantity,
-        //     "servercode" => $request->servercode,
         //     "quantity_graduation" => $request->quantity_graduation,
         //     "allow_subscription_type" => $request->allow_subscription_type,
         // ]);

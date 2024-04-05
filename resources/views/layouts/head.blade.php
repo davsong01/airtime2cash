@@ -23,6 +23,7 @@
     <link rel="stylesheet" type="text/css" href="{{ asset('app-assets/css/components.css') }}">
     <link rel="stylesheet" type="text/css" href="{{ asset('app-assets/css/themes/dark-layout.css') }}">
     <link rel="stylesheet" type="text/css" href="{{ asset('app-assets/css/themes/semi-dark-layout.css') }}">
+    {{-- @include('layouts/css/semi-dark-layout') --}}
     <!-- END: Theme CSS-->
 
     <!-- BEGIN: Page CSS-->
@@ -70,12 +71,33 @@
         }
 
         .main-menu.menu-dark .navigation li a {
-            color: white;
+            /* color: {{ getSettings()->primary_color }}; */
             font-weight: lighter;
         }
 
+        .main-menu.menu-fixed.menu-dark.menu-accordion {
+            /* background: {{ getSettings()->secondary_color }} !important; */
+        }
+
+        body.vertical-layout.vertical-menu-modern .main-menu.menu-dark {
+            /* border-right: 1px solid {{ getSettings()->primary_color }}; */
+        }
+
+        body.semi-dark-layout .main-menu-content .navigation-main .active .menu-title, body.semi-dark-layout .main-menu-content .navigation-main .active i {
+            /* color: red; */
+            /* color:#5A8DEE */
+        }
+
+        .main-menu.menu-dark .navigation > li.active:not(.sidebar-group-active) > a {
+            /* background:  {{ getSettings()->active_hover_color }}; */
+            /* opacity: 0.1; */
+            
+        }
+            
+        
+
         .svg svg{
-            fill: white;
+            fill: {{ getSettings()->primary_color }};
         }
     </style>
     @yield('page-css')

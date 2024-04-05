@@ -22,11 +22,9 @@ class APIController extends Controller
     {
         $this->validate($request, [
             "name" => "required",
-            "slug" => "required",
             "warning_threshold_status" => "nullable",
             "warning_threshold" => "nullable",
             "status" => "required",
-            "file_name" => "required",
             "api_key" => "nullable",
             "sandbox_base_url" => "nullable",
             "live_base_url" => "nullable",
@@ -36,11 +34,9 @@ class APIController extends Controller
 
         API::updateOrCreate([
             "name" => $request->name,
-            "slug" => $request->slug,
             "warning_threshold_status" => $request->warning_threshold_status,
             "warning_threshold" => $request->warning_threshold,
             "status" => $request->status,
-            "file_name" => $request->file_name,
             "api_key" => $request->api_key,
             "secret_key" => $request->secret_key,
             "public_key" => $request->public_key,
@@ -60,11 +56,9 @@ class APIController extends Controller
     {
         $this->validate($request, [
             "name" => "required",
-            "slug" => "required",
             "warning_threshold_status" => "nullable",
             "warning_threshold" => "nullable",
             "status" => "required",
-            "file_name" => "required",
             "api_key" => "nullable",
             "secret_key" => "nullable",
             "public_key" => "nullable",
@@ -74,11 +68,9 @@ class APIController extends Controller
 
         $api->update([
             "name" => $request->name,
-            "slug" => $request->slug,
             "warning_threshold_status" => $request->warning_threshold_status,
             "warning_threshold" => $request->warning_threshold,
             "status" => $request->status,
-            "file_name" => $request->file_name,
             "api_key" => $request->api_key,
             "secret_key" => $request->secret_key,
             "public_key" => $request->public_key,
@@ -91,8 +83,7 @@ class APIController extends Controller
 
     public function getBalance(API $api)
     {
-        $file_name = $api->file_name;
-        $res = app("App\Http\Controllers\Providers\\" . $file_name)->balance($api);
+        $res = app("App\Http\Controllers\Providers\KingsVtuController")->balance($api);
         
         return response()->json($res);
     }

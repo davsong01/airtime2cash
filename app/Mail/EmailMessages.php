@@ -28,12 +28,16 @@ class EmailMessages extends Mailable
      */
     public function envelope(): Envelope
     {
-        // dd(env('MAIL_FROM_ADDRESS'),$this->data);
+        $from_address = $this->data['provider']['MAIL_FROM_ADDRESS'] ?? env('MAIL_FROM_ADDRESS');
+        $from_name = $this->data['provider']['MAIL_FROM_NAME'] ?? env('MAIL_FROM_NAME');
+        $mail_to_address = $this->data['provider']['MAIL_REPLY_TO_ADDRESS'] ?? env('MAIL_REPLY_TO_ADDRESS');
+        $mail_reply_to_name = $this->data['provider']['MAIL_REPLY_TO_NAME'] ?? env('MAIL_REPLY_TO_NAME');
+        
         return new Envelope(
-            from: new Address(env('MAIL_FROM_ADDRESS'), env('MAIL_FROM_NAME')),
-            // replyTo: [
-            //     new Address(env('MAIL_TO_ADDRESS'), env('MAIL_REPLY_TO_NAME')),
-            // ],
+            from: new Address($from_address, $from_name),
+            replyTo: [
+                new Address($mail_to_address, $mail_reply_to_name),
+            ],
             
             subject: $this->data['subject'],
         );
@@ -44,7 +48,6 @@ class EmailMessages extends Mailable
      */
     public function content(): Content
     {
-       
         return new Content(
             markdown: 'emails.empty_template',
             with: [

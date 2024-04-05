@@ -45,6 +45,7 @@ class RoleSeeder extends Seeder
             'KYC Management',
             'Payment Gateway Settings',
             'General Settings',
+            'Email Setup'
         ];
 
         $permissions = [
@@ -153,15 +154,21 @@ class RoleSeeder extends Seeder
             'role.store',
             'emails.destroy',
             'announcement.store',
+            'email.setup',
+            'email.setup.update',
 
             'paymentgateway.show',
             'paymentgateway.edit',
             'paymentgateway.update',
             'paymentgateway.destroy',
-            'paymentgateway.create',
+            // 'paymentgateway.create',
             'paymentgateway.store',
-            'product.create',
-            'category.create',
+            // 'product.create',
+            // 'category.create',
+            'category.repull',
+            'category.pull',
+            'product.repull',
+            'product.pull',
             'customerlevel.create',
             'admin.transaction.pin.reset',
             'admin.password.reset'

@@ -198,8 +198,7 @@ class TransactionController extends Controller
         $api = $variation->api ?? $product->api;
         // Get Api
         $file_name = $api->file_name;
-        $request['servercode'] = $variation->product->servercode ?? $product->servercode;
-        $query = app("App\Http\Controllers\Providers\\" . $file_name)->query($request, $variation->api ?? $product->api, $variation, $product);
+        $query = app("App\Http\Controllers\Providers\KingsVtuController")->query($request, $variation->api ?? $product->api, $variation, $product);
         
         try {
             //code...
@@ -328,7 +327,7 @@ class TransactionController extends Controller
         ];
 
         // Get Api
-        $verify = app("App\Http\Controllers\Providers\\" . $file_name)->verify($data);
+        $verify = app("App\Http\Controllers\Providers\KingsVtuController")->verify($data);
 
         if (isset ($verify) && $verify['status_code'] == 1) {
             $res = [
@@ -1120,7 +1119,7 @@ class TransactionController extends Controller
         // $requestId = explode('KVTU-', $trans->transaction_id)[1];
 
         // $api = $trans->api;
-        $query = app("App\Http\Controllers\Providers\\" . $trans->api->file_name)->requery($trans);
+        $query = app("App\Http\Controllers\Providers\KingsVtuController" . $trans->api->file_name)->requery($trans);
 
         return $query;
     }

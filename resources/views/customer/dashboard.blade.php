@@ -16,6 +16,7 @@
                         <div class="col-md-12">
                             @include('layouts.alerts')
                         </div>
+                        @if(!empty($customer))
                         <div class="col-md-6 col-12 dashboard-greetings">
                             <div class="card" style="min-height: 310px;">
                                 <div class="card-header">
@@ -38,6 +39,7 @@
                                 </div>
                             </div>
                         </div>
+                        @endif
                         <!-- Greetings Content Starts -->
                         <div class="col-md-6 col-12 dashboard-greetings">
                             <div class="card" style="min-height: 325px;">

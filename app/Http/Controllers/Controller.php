@@ -8,6 +8,7 @@ use App\Models\EmailLog;
 use App\Models\BillerLog;
 use App\Mail\EmailMessages;
 use App\Models\GeneralSetting;
+use App\Models\EmailApiSetting;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Routing\Controller as BaseController;
@@ -281,12 +282,33 @@ class Controller extends BaseController
 
     public function sendEmailReal($current)
     {
+        $provider = EmailApiSetting::first();
+       
+        if(!empty($provider)){
+            config([
+                'mail.driver' => $provider->MAIL_DRIVER,
+                'mail.host' => $provider->MAIL_HOST,
+                'mail.port' => $provider->MAIL_PORT,
+                'mail.encryption' => $provider->MAIL_ENCRYPTION,
+                'mail.username' => $provider->MAIL_USERNAME,
+                'mail.password' => $provider->MAIL_PASSWORD,
+                'mail.replyToName' => $provider->MAIL_REPLY_TO_NAME,
+                'mail.replyToAddress' => $provider->MAIL_REPLY_TO_ADDRESS,
+                'mail.from' => [
+                    'address' => $provider->MAIL_FROM_ADDRESS,
+                    'name' => $provider->MAIL_FROM_NAME,
+                ],
+            ]);
+            $current['provider'] = $provider->toArray();
+        }
+        
         try {
             Mail::to($current['recipient'])->send(new EmailMessages([
                 'subject' => $current['subject'],
                 'body' => $current['content'],
+                'provider' => $current['provider'] ?? [],
             ]));
-
+            
             return [
                 'message' => 'success',
             ];

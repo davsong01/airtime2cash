@@ -133,7 +133,7 @@ class AdminController extends Controller
         $data['request']['product_slug'] = $request->product;
         $data['api'] = $api;
         $product = Product::where('slug', $request->product)->first();
-        $verify = app("App\Http\Controllers\Providers\\" . $api->file_name)->verify($data, true);
+        $verify = app("App\Http\Controllers\Providers\KingsVtuController")->verify($data, true);
         
         if (isset($verify) && $verify['status_code'] == 1) {
             if (isset($verify['raw_response'])) {

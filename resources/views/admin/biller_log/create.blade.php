@@ -141,22 +141,6 @@
                                                                                     </select>
                                                                                 </fieldset>
                                                                                 <fieldset class="form-group">
-                                                                                    <label for="servercode">Server Code/Server Token</label>
-                                                                                    <input type="text" class="form-control" name="servercode" placeholder="Enter servercode" id="servercode" value="{{ old('servercode')}}">
-                                                                                </fieldset>
-                                                                                <fieldset class="form-group">
-                                                                                    <label for="multistep">Use Multistep</label>
-                                                                                    <select class="form-control tiny" name="multistep" id="multistep">
-                                                                                        <option value="">Select</option>
-                                                                                        <option value="yes" {{ old('multistep') == 'yes' ? 'selected' : ''}}>Yes</option>
-                                                                                        <option value="no" {{ old('multistep') == 'no' ? 'selected' : ''}}>No</option> 
-                                                                                    </select>
-                                                                                </fieldset>
-                                                                                <fieldset class="form-group">
-                                                                                    <label for="ussd_string">USSD String</label>
-                                                                                    <input type="text" class="form-control tiny" id="ussd_string" name="ussd_string"  value="{{ old('ussd_string') }}">
-                                                                                </fieldset>
-                                                                                <fieldset class="form-group">
                                                                                     <label for="status">Status</label>
                                                                                     <select class="form-control" name="status" id="status" required>
                                                                                         <option value="">Select</option>

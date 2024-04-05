@@ -13,6 +13,7 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\EmailApiController;
 use App\Http\Controllers\EmailLogController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\BillerLogController;
@@ -110,11 +111,18 @@ Route::middleware('auth')->group(function () {
 // Admin
 Route::middleware(['auth', 'verified', 'admin', 'ipcheck', 'adminRoute'])->prefix('admin')->group(function () {
     Route::resource('product', ProductController::class);
+    Route::get('pull-product', [ProductController::class, 'pullProducts'])->name('product.pull');
+    Route::get('repull-product', [ProductController::class, 'pullProducts'])->name('product.repull');
+
     Route::get('duplicate-product/{product}', [ProductController::class, 'duplicateProduct'])->name('duplicate.product');
     Route::resource('api', APIController::class);
     Route::get('api-balance/{api}', [APIController::class, 'getBalance'])->name('api.balance');
 
     Route::resource('category', CategoryController::class);
+    Route::get('pull-categories', [CategoryController::class, 'pullCategories'])->name('category.pull');
+    Route::get('repull-categories', [CategoryController::class, 'pullCategories'])->name('category.repull');
+
+    
     Route::resource('customer-blacklist', BlackListController::class);
     Route::resource('announcement', AnnouncementController::class);
     Route::get('emails/send/{count?}', [EmailLogController::class, 'sendMail'])->name('emails.send');
@@ -126,6 +134,9 @@ Route::middleware(['auth', 'verified', 'admin', 'ipcheck', 'adminRoute'])->prefi
     Route::get('emails/clear', [EmailLogController::class, 'sweep'])->name('emails.sweep');
     Route::get('emails', [EmailLogController::class, 'index'])->name('emails.index');
     Route::get('black-list-status', [BlackListController::class, 'status'])->name('black.list.status');
+
+    Route::get('setup-emails', [EmailApiController::class, 'edit'])->name('email.setup');
+    Route::post('setup-emails', [EmailApiController::class, 'update'])->name('email.setup.update');
 
     // transactions route
     Route::get('transactions', [TransactionController::class, 'transView'])->name('admin.trans');

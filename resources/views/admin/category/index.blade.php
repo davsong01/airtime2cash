@@ -42,7 +42,12 @@
                             <div class="card">
                                 <div class="card-header">
                                     <h4 class="card-title">All Categories</h4> <br>
-                                    <a href="{{ route('category.create') }}"><button id="addRow" class="btn btn-primary mb-2 d-flex align-items-center"><i class="bx bx-plus"></i>&nbsp; Add Category</button></a>
+                                   
+                                    @if($categories->count() < 1)
+                                        <a href="{{ route('category.pull') }}"><button id="addRow" class="btn btn-primary mb-2 d-flex align-items-center"><i class="bx bx-plus"></i>&nbsp; Pull Categories</button></a>
+                                    @else    
+                                        <a href="{{ route('category.repull') }}"><button id="addRow" class="btn btn-primary mb-2 d-flex align-items-center"><i class="bx bx-plus"></i>&nbsp; Repull Categories</button></a>
+                                    @endif
                                     @include('layouts.alerts')
                                 </div>
                                 <div class="card-content">
