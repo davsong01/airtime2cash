@@ -3,8 +3,10 @@
 namespace Database\Seeders;
 
 use App\Models\Role;
+use App\Models\Category;
 use App\Models\RolePermission;
 use Illuminate\Database\Seeder;
+use App\Http\Controllers\Controller;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 
 class RoleSeeder extends Seeder
@@ -171,7 +173,8 @@ class RoleSeeder extends Seeder
             'product.pull',
             'customerlevel.create',
             'admin.transaction.pin.reset',
-            'admin.password.reset'
+            'admin.password.reset',
+            'admin.airtime.2.cash.log'
         ];
 
         // RolePermission::truncate();
@@ -208,5 +211,61 @@ class RoleSeeder extends Seeder
             'permissions' => "1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,115,116,117,118,119,120,121",
             'status' => 'active'
         ]);
+
+        // Airtime to cash category
+        Category::UpdateOrCreate([
+            "slug" => 'airtime2cash',
+            "type" => 'airtime2cash',
+        ],[
+            "name" => 'Airtime to Cash',
+            "icon" => '',
+            "display_name" => 'Airtime to Cash',
+            "slug" => 'airtime2cash',
+            "type" => 'airtime2cash',
+            "status" => 'active',
+            "order" => 1000,
+            "unique_element" => 'phone',
+            "discount_type" => 'percentage',
+        ]);
+
+        // Banks
+        $url = "https://sagecloud.ng/api/v2/merchant/authorization";
+        $payload = [
+            "email" => "Xpino.net@gmail.com",
+	        "password" =>  "XPINOxpino"
+        ];
+        $control = new Controller();
+        $login = $control->basicApiCall($url, json_encode($payload), []);
+        
+        if(!empty($login) && $login['success'] == true){
+            $token = $login['data']['token']['access_token'] ?? null;
+        }
+
+        if(!empty($token)){
+            $url = "https://sagecloud.ng/api/v2/transfer/get-transfer-data";
+
+            $headers = [
+                "Content-Type: application/json",
+                "Authorization: Bearer " . $token . "",
+            ];
+
+            $callBanks =  $control->basicApiCall($url, json_encode($payload), $headers, 'GET');
+
+            if (!empty($callBanks) && $callBanks['success'] == true) {
+                $banks = $login['banks'] ?? null;
+
+                if (!empty($banks)) {
+                    foreach($banks as $bank){
+                        Bank::updateOrCreate([
+                            "cbn_code" => "755",
+                        ],[
+                            "cbn_code" => "755",
+                            "bank_name" => "AB MicroFinance Bank"
+                        ]);
+                    }
+                }
+            }
+        }
+
     }
 }

@@ -25,6 +25,7 @@ return new class extends Migration
                 $table->string('display_name')->nullable();
                 $table->string('seo_title')->nullable();
                 $table->string('order')->nullable();
+                $table->string('type')->default('general');
                 $table->timestamps();
             });
         }

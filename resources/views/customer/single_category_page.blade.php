@@ -314,7 +314,8 @@
     });
 
     $(document).ready(function () {
-
+        $("#amount").val('');
+        $('#product').val('');
         var variations = [];
 
         $('#product').on('change', function () {

@@ -71,11 +71,14 @@ use App\Models\BlackList;
                                             </svg>
                                         </div>
                                     @endif
-                                    <h5 class="card-title mt-1">
+                                    <h5 class="card-title mt-1" style="text-align:center !important">
                                         {{ ucfirst($user->firstname) . ' ' . ucfirst($user->middlename) . ' ' . ucfirst($user->lastname) }}
                                         ({{ $user->customer->customer_level ?? 'Level 1' }})</h5>
-                                        Email: <br><a href="mailto:{{ $user->email }}">{{ $user->email }}</a> <br>
-                                        Phone: <br>{{ $user->phone }}
+                                        <p style="text-align:center !important">
+                                            Email: <br><a href="mailto:{{ $user->email }}">{{ $user->email }}</a> <br>
+                                            Phone: <br>{{ $user->phone }}
+
+                                        </p>
                                 </div>
                             </div>
                             <div class="col-sm-10">
@@ -174,13 +177,13 @@ use App\Models\BlackList;
                                                         <option value="delete" @selected($user->status == 'delete')>Delete</option>
                                                     </select>
                                                 </fieldset>
-                                        
+                                                
                                                 <fieldset class="form-group">
                                                     <label for="customerlevel">Customer Level</label>
                                                     <select name="customerlevel" class="form-control" id="customerlevel">
                                                         <option value="">Select Customerlevel</option>
                                                         @foreach ($customerLevels as $level)
-                                                        <option value="{{ $level->id }}" {{$user->customer->customer_level == $level->id ? 'selected':''}}>{{ $level->name}} {{ $level->make_api_level == 'yes' ? '(API ACCESS)' : ''}}</option>
+                                                        <option value="{{ $level->id }}" {{$user->customer->customer_level == $level->id ? 'selected':''}}>{{ $level->name}}</option>
                                                         @endforeach
                                                     </select>
                                                 </fieldset>

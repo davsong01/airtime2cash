@@ -19,6 +19,7 @@ return new class extends Migration
                 $table->integer('callback_url')->nullable();
                 $table->double('referal_wallet', 11,2)->nullable();
                 $table->double('wallet', 11,2)->nullable();
+                $table->double('a2cashwallet', 11,2)->nullable();
                 $table->integer('app_version')->nullable();
                 $table->timestamps();
             });

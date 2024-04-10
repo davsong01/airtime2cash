@@ -107,7 +107,7 @@ if (!function_exists("verifiableUniqueElements")) {
 if (!function_exists("getCategories")) {
     function getCategories()
     {
-        return Category::where('status', 'active')->orderBy('order', 'ASC')->get();
+        return Category::where('status', 'active')->where('type', 'general')->orderBy('order', 'ASC')->get();
     }
 }
 

@@ -25,6 +25,9 @@ return new class extends Migration
                 $table->string('image')->nullable();
                 $table->text('description')->nullable();
                 $table->string('has_variations')->default('no');
+                $table->text('instruction')->nullable(); // Used for airtime to cash products
+                $table->double('rate')->nullable(); // Used for airtime to cash products
+                $table->string('type')->default('general');
                 $table->string('api_id');
                 $table->string('allow_meter_validation')->default('no');
 

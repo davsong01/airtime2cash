@@ -68,6 +68,10 @@
                                     href="{{ route('product.index') }}"><i class="bx bx-right-arrow-alt"></i><span
                                         class="menu-item" data-i18n="Input">Products</span></a>
                             </li>
+                            <li class="{{ Route::is('airtime2cash.*') ? 'active' : '' }}"><a
+                                    href="{{ route('airtime2cash.index') }}"><i class="bx bx-right-arrow-alt"></i><span
+                                        class="menu-item" data-i18n="Input">Airtime to Cash</span></a>
+                            </li>
                         @endif
                     </ul>
                 </li>
@@ -190,6 +194,13 @@
                                     href="{{ route('admin.walletfundinglog') }}"><i
                                         class="bx bx-right-arrow-alt"></i><span class="menu-item">Wallet Funding
                                         Log</span></a>
+                            </li>
+                        @endif
+                        @if (in_array('admin.airtime.2.cash.log', $allowedRoutes) || in_array(1, auth()->user()->admin->roleIds()))
+                            <li class="{{ Route::is('admin.airtime.2.cash.log') ? 'active' : '' }}"><a
+                                    href="{{ route('admin.airtime.2.cash.log') }}"><i
+                                        class="bx bx-right-arrow-alt"></i><span class="menu-item">A2Cash
+                                        Transactions</span></a>
                             </li>
                         @endif
                         @if (in_array('admin.walletlog', $allowedRoutes) || in_array(1, auth()->user()->admin->roleIds()))

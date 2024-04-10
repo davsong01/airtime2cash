@@ -83,7 +83,7 @@ class APIController extends Controller
 
     public function getBalance(API $api)
     {
-        $res = app("App\Http\Controllers\Providers\KingsVtuController")->balance($api);
+        $res = app("App\Http\Controllers\Providers\KingsVtuController")->balance();
         
         return response()->json($res);
     }

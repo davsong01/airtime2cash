@@ -244,8 +244,17 @@ class KingsVtuController extends Controller
         return $format;
     }
 
-    public function balance($api, $no_format = null)
+    public function balance($no_format = null)
     {
+        $url = $this->api->live_base_url;
+        $url = $url . "category";
+        
+        $headers = [
+            'Content-Type' => 'application/json',
+            'Accept' =>  'application/json',
+        ];
+
+
         try {
             $url = env('ENV') == 'local' ? $api->sandbox_base_url : $api->live_base_url;
             $url = $url . "balance";

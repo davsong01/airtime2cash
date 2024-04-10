@@ -57,7 +57,7 @@ class ApiResponseService
 
     public function getCategories(){
         try {
-            $categories = Category::where('status', 'active')->orderBy('order', 'ASC')->select('display_name','status','slug', 'description')->get();
+            $categories = Category::where('status', 'active')->where('type', 'general')->orderBy('order', 'ASC')->select('display_name','status','slug', 'description')->get();
             return $this->responseService->formatServiceResponse("success", "Retrieved successfully", [], $categories);
         } catch (\Throwable $err) {
             $errorMessage = env("ENT") == "live" ? "Internal Server Exception" : $err->getMessage();
@@ -70,7 +70,7 @@ class ApiResponseService
             'products' => function ($query) {
                 return $query->where('status', 'active');
             }
-        ])->where('status', 'active')->where('slug', $slug)->first();
+        ])->where('type','general')->where('status', 'active')->where('slug', $slug)->first();
 
         if (empty($category)) {
             return $this->responseService->formatServiceResponse("error", '', ['Invalid slug provided'], null);
@@ -88,7 +88,7 @@ class ApiResponseService
 
 
     public function getVariationsByProductSlug($slug){
-        $product = Product::where('slug',$slug)->where('status','active')->where('has_variations','yes')->first();
+        $product = Product::where('slug',$slug)->where('status','active')->where('has_variations','yes')->where('type', 'general')->first();
         if(empty($product)) return $this->responseService->formatServiceResponse("error", '', ['Invalid product slug provided'], null);
         
         $variations = Variation::select('id','product_id','slug','category_id','system_price as price','system_name as name','min','max','fixed_price')->where('product_id', $product->id)->where('status', 'active')->orderBy('id', 'DESC')->get();

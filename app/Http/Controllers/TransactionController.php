@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Validator;
 use App\Http\Controllers\WalletController;
+use App\Models\Airtime2CashTransactions;
 use App\Models\BillerLog;
 use App\Models\PaymentGateway;
 
@@ -34,6 +35,25 @@ class TransactionController extends Controller
     
         if (!empty($category) && $category->status == 'active') {
             return view('customer.single_category_page', compact('category'));
+        } else {
+            return back();
+        }
+    }
+
+    public function airtimeToCash(){
+        $category = Category::with([
+            'products' => function ($query) {
+                return $query->where('status', 'active')->get();
+            }
+        ])->where('status', 'active')->where('type','airtime2cash')->first();
+        
+        foreach($category->products as $product){
+            $discount = Discount::where('product_id', $product->id)->where('customer_level', auth()->user()->customer->level->id)->first();
+            $product->discounted_rate = (!empty($discount) && $discount->price < $product->rate) ? $discount->price : $product->rate; 
+        }
+        
+        if (!empty($category) && $category->status == 'active') {
+            return view('customer.airtime2cash_page', compact('category'));
         } else {
             return back();
         }
@@ -177,10 +197,102 @@ class TransactionController extends Controller
         return redirect(route('transaction.status', $transaction->transaction_id));
     }
 
+    public function initializeAirtime2CashTransaction(Request $request)
+    {
+        $product = Product::where('id', $request->product)->first();
+        
+        if (empty($product)) {
+            return back()->with('error', 'The selected product/service does not seem to exist, kindly check your selection');
+        }
+        
+        $discount = Discount::where('product_id', $product->id)->where('customer_level', auth()->user()->customer->level->id)->first();
+        $product->discounted_rate = (!empty($discount) && $discount->price < $product->rate) ? $discount->price : $product->rate;
+
+        $max = $product->max;
+        $min = $product->min;
+        $rate = $product->discounted_rate;
+        $amount = $this->removeCharsInAmount($request->amount);
+        
+        $amount_charged = ($rate / 100) * $amount;
+        $amount_paid = $amount - $amount_charged ;
+
+        if ($amount > 0 && $amount >= $min && $amount <= $max) {
+            $amount = $amount - (($rate / 100) * $amount);
+        }else{
+            return back()->with('error', 'Invalid amount entered');
+        }
+
+        $transaction_id = 'A2C-'.$this->generateRequestId();
+        
+        $transaction = [
+            'amount_charged' => $amount_charged,
+            'amount_paid' => $amount_paid,
+            'charge_rate' => $rate,
+            'product_id' => $product->id,
+            'customer_id' => auth()->user()->customer->id,
+            'type' => 'credit',
+            'transaction_id' => $transaction_id,
+            'total_amount' => $amount_charged + $amount_paid,
+            'phone_numbers' => $request->phone,
+            'payment_method' => $request->payment_method,
+        ];
+        
+       
+        // Process Transaction
+        try {
+            $log = Airtime2CashTransactions::updateOrCreate(['transaction_id' => $transaction_id],
+            $transaction);
+        } catch (\Throwable $th) {
+            \Log::error(['Transaction Error' => 'Message: ' . $th->getMessage() . ' File: ' . $th->getFile() . ' Line: ' . $th->getLine()]);
+            return back()->with('error', 'An error occured, please try again later');
+        }
+
+        // Log Transaction Email
+        $subject = "Airtime2Cash Transaction Alert";
+        $body = '<p>Hello! ' . auth()->user()->name . ',</p>';
+        $body .= '<p style="line-height: 2.0;">You have just indicated a request to convert your airtime to cash on ' . config('app.name') . ' <br> Please find below the details of the transaction: <br>
+            <strong>Amount Charged:</strong> ' .getSettings()->currency . number_format($log->amount_charged, 2). '<br>
+            <strong>Amount to Receive:</strong> ' . getSettings()->currency . number_format($log->amount_paid, 2) . '<br>
+            <strong>Charge Rate:</strong> ' . number_format($log->charge_rate) . '%<br>
+            <strong>Total Credit to transfer:</strong> ' . getSettings()->currency . number_format($log->total_amount, 2) . '<br>
+            <strong>Phone Numbers:</strong> ' . $log->phone_numbers . '<br>
+            <strong>Transaction ID:</strong> ' . $log->transaction_id . '<br>
+            <strong>Network:</strong> ' . $product->name . '<br>
+            <strong>Payment Method:</strong> ' . $log->payment_method . '<br>
+            <strong>Transaction Date:</strong> ' . date("M jS, Y g:iA", strtotime($log->created_at)) . '<br><br>
+            Warm Regards. (' . config('app.name') . ')<br/>
+            </p>';
+        $email = $request->email;
+        logEmails($email, $subject, $body);
+
+        $string = "Hello Admin, I want to convert Airtime to cash on ". config('app.name'). ". Please find below details of the transaction below:".
+        
+        '*Name:* ' .auth()->user()->name. '
+        *Amount Charged:* ' .getSettings()->currency . number_format($log->amount_charged, 2). '
+        *Amount to Receive:* ' . getSettings()->currency . number_format($log->amount_paid, 2) . '
+        *Charge Rate:* ' . number_format($log->charge_rate) . '
+        *Total Credit to transfer:* ' . getSettings()->currency . number_format($log->total_amount, 2) . '
+        *Phone Numbers:* ' . $log->phone_numbers . '
+        *Transaction ID:* ' . $log->transaction_id . '
+        *Network:* ' . $product->name . '
+        *Payment Method:* ' . $log->payment_method . '
+        *Transaction Date:* ' . date("M jS, Y g:iA", strtotime($log->created_at)) . '';
+
+        $string = "https://api.whatsapp.com/send?phone=" . getSettings()->whatsapp_number . "&text=".urlencode($string);
+    
+        return redirect()->away($string);
+    }
+
     public function transactionStatus($transaction_id)
     {
         $transaction = TransactionLog::where('transaction_id', $transaction_id)->first();
         return view('customer.transaction_status', compact('transaction'));
+    }
+
+    public function Airtime2CashTransactionStatus($transaction_id)
+    {
+        $transaction = Airtime2CashTransactions::where('transaction_id', $transaction_id)->first();
+        return view('customer.airtime_2_cash_transaction_status', compact('transaction'));
     }
 
     public function transactionReceipt($transaction_id)
@@ -191,6 +303,17 @@ class TransactionController extends Controller
         return $pdf->download($transaction['transaction_id'] . '.pdf');
         // return view('customer.receipts.transaction_receipt', compact('transaction'));
     }
+
+    public function airtime2CashTransactionReceipt($transaction_id)
+    {
+        $transaction = Airtime2CashTransactions::with(['product:id,name,image', 'customer'])->where('id', $transaction_id)->first()->toArray();
+    
+        $pdf = Pdf::loadView('customer.receipts.airtime2cash_transaction_receipt', ['transaction' => $transaction])->setPaper('a4', 'portrait');
+        return $pdf->download($transaction['transaction_id'] . '.pdf');
+        // return view('customer.receipts.airtime2cash_transaction_receipt', compact('transaction'));
+    }
+
+    
 
     public function processTransaction($request, $transaction, $product, $variation)
     {
@@ -561,10 +684,41 @@ class TransactionController extends Controller
         }
 
         $transactions = $transactions->orderBy('created_at', 'DESC')->paginate(20);
-
-        $products = Product::where('status', 'active')->get();
+       
+        $products = Product::where('status', 'active')->where('type', 'general')->get();
         return view('customer.mytransactions', compact('transactions', 'products'));
     }
+
+    public function customerAirtime2CashTransactionHistory(Request $request)
+    {
+        $transactions = Airtime2CashTransactions::with(['product', 'customer'])->where('customer_id', auth()->user()->customer->id);
+        
+        if (!empty($request->product_id)) {
+            $transactions = $transactions->where('product_id', $request->product_id);
+        }
+
+        if (!empty($request->transaction_id)) {
+            $transactions = $transactions->where('transaction_id', $request->transaction_id);
+        }
+
+        if (!empty($request->status)) {
+            $transactions = $transactions->where('status', $request->status);
+        }
+
+        if (!empty($request->from) && !empty($request->to)) {
+            $from = $request->from . " 00:00:00";
+            $to = $request->to . " 23:59:59";
+            $transactions = $transactions->whereBetween('created_at', [$from, $to]);
+        }
+
+        $transactions = $transactions->orderBy('created_at', 'DESC')->paginate(20);
+
+        $products = Product::where('type', 'airtime2cash')->where('status', 'active')->orderBy('created_at', 'DESC')->get();
+
+        return view('customer.airtime_to_cash_transactions', compact('transactions', 'products'));
+    }
+
+    
 
     public function showTransactionReportPage(Request $request, ExcelService $export)
     {
@@ -688,7 +842,7 @@ class TransactionController extends Controller
         }
 
 
-        $products = Product::where('status', 'active')->get();
+        $products = Product::where('status', 'active')->where('type','geneeral')->get();
         $categories = Category::where('status', 'active')->get();
         return view('customer.reports', compact('products', 'categories'));
     }
@@ -784,7 +938,7 @@ class TransactionController extends Controller
         $totalTransFailed = $transactionsF->where('status', 'failed')->sum('amount');
         $totalTransAttention = $transactionsA->where('status', 'attention-required')->sum('amount');
         $products = Product::all();
-
+        
         if ($request->email) {
             $transactions = $transactions->where('customer_email', $request->email);
         }
@@ -920,6 +1074,56 @@ class TransactionController extends Controller
         ]);
     }
 
+    public function airtimeToCashTransactions(Request $request)
+    {
+        $transactions = Airtime2CashTransactions::with(['product','customer'])->latest();
+        $transactionsS = clone $transactions;
+        $transactionsA = clone $transactions;
+        $transactionsF = clone $transactions;
+        $transactionsP = clone $transactions;
+        $totalTransSuccess = $transactionsS->whereIn('status', ['approved'])->sum('amount_paid');
+        $totalTransFailed = $transactionsF->where('status', 'declined')->sum('amount_paid');
+        $totalProfit = $transactionsA->where('status', 'approved')->sum('amount_charged');
+        $totalPending = $transactionsP->where('status', 'pending')->sum('amount_charged');
+        
+        if ($request->email) {
+            $user = User::where('email', $request->email)->first();
+            if (!empty($user)) {
+                $customer = $user->customer;
+                $id = $customer->id;
+                $transactions = $transactions->where('customer_id', $id);
+            }
+        }
+
+        if ($request->transaction_id) {
+            $transactions = $transactions->where('transaction_id', $request->transaction_id);
+        }
+
+        if ($request->type) {
+            $transactions = $transactions->where('type', $request->type);
+        }
+
+        if ($request->from) {
+            $time = $request->from . ' 00:00:00';
+            $transactions = $transactions->where('created_at', '>', $time);
+        }
+        if ($request->to) {
+            $time = $request->to . ' 00:00:00';
+            $transactions = $transactions->where('created_at', $time);
+        }
+
+        $transactions = $transactions->paginate(20);
+
+        return view('admin.transaction.airtime2cash_transactions', [
+            'transactions' => $transactions,
+            'success' => $totalTransSuccess,
+            'failed' => $totalTransFailed,
+            'total_profit' => $totalProfit,
+            'totalPending' => $totalPending,
+            'query' => $request->query(),
+        ]);
+    }
+
     public function walletEarningView(Request $request)
     {
         $transactions = ReferralEarning::latest();
@@ -978,6 +1182,11 @@ class TransactionController extends Controller
     public function singleTransactionView(TransactionLog $transaction)
     {
         return view('admin.transaction.single_transaction', compact('transaction'));
+    }
+
+    public function singleAirtimeTransactionView(Airtime2CashTransactions $transaction)
+    {
+        return view('admin.transaction.single_airtime2cash_transaction', compact('transaction'));
     }
 
     function debitCustomerPage()
@@ -1115,12 +1324,48 @@ class TransactionController extends Controller
         $trans = TransactionLog::find($transactionlog);
 
         if (!$trans) return ['status' => 'failed', 'message' => 'Transaction not found!'];
-
-        // $requestId = explode('KVTU-', $trans->transaction_id)[1];
-
-        // $api = $trans->api;
         $query = app("App\Http\Controllers\Providers\KingsVtuController" . $trans->api->file_name)->requery($trans);
 
         return $query;
+    }
+
+    public function approveAirtime2CashTransactions(Airtime2CashTransactions $transaction){
+        $transaction->update([
+            'status' => 'approved',
+            'approved_by' => auth()->user()->admin->id,
+        ]);
+
+        $subject = "Airtime2Cash Transaction Update";
+        $body = '<p>Hello! ' . $transaction->customer->user->name . ',</p>';
+        $body .= '<p style="line-height: 2.0;">Your Transaction with transaction ID : <strong>'.$transaction->transaction_id.'</strong> has been updated to: '.ucfirst($transaction->status).'<br><strong>Date Updated:</strong> ' . date("M jS, Y g:iA", strtotime($transaction->updated_at)) . '<br><br>
+            Warm Regards. (' . config('app.name') . ')<br/>
+            </p>';
+        $email = $transaction->customer->user->email;
+        
+        logEmails($email, $subject, $body);
+
+        return back()->with('message', 'Operation successful');
+    }
+
+    public function declineAirtime2CashTransactions(Request $request, Airtime2CashTransactions $transaction)
+    {
+        $transaction->update([
+            'status' => 'declined',
+            'approved_by' => auth()->user()->admin->id,
+            'decline_reason' => $request->decline_reason,
+        ]);
+
+        $subject = "Airtime2Cash Transaction Update";
+        $body = '<p>Hello! ' . $transaction->customer->user->name . ',</p>';
+        $body .= '<p style="line-height: 2.0;">Your Transaction with transaction ID : <strong>' . $transaction->transaction_id . '</strong> has been updated to: ' . ucfirst($transaction->status) . '<br><strong>Date Updated:</strong> ' . date("M jS, Y g:iA", strtotime($transaction->updated_at)) . '<br>
+        Decline Reason: '. $transaction->decline_reason.'<br><br>
+            Warm Regards. (' . config('app.name') . ')<br/>
+            </p>';
+        $email = $transaction->customer->user->email;
+
+        logEmails($email, $subject, $body);
+
+        return back()->with('message', 'Operation successful');
+
     }
 }

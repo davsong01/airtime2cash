@@ -14,7 +14,7 @@ class ProductController extends Controller
 {
     public function index()
     {
-        $products = Product::with(['api', 'variations'])->orderBy('created_at', 'DESC')->get();
+        $products = Product::with(['api', 'variations'])->where('type','general')->orderBy('created_at', 'DESC')->get();
         return view('admin.product.index', compact('products'));
     }
 
@@ -61,7 +61,7 @@ class ProductController extends Controller
 
     public function create()
     {
-        $categories = Category::where('status', 'active')->get();
+        $categories = Category::where('status', 'active')->where('type', 'general')->get();
         $apis = API::where('status', 'active')->get();
         $customerlevel = CustomerLevel::orderBy('order', 'ASC')->get();
 
@@ -162,7 +162,7 @@ class ProductController extends Controller
 
     public function edit(Product $product)
     {
-        $categories = Category::where('status', 'active')->get();
+        $categories = Category::where('status', 'active')->where('type', 'general')->get();
         $variations = Variation::where('product_id', $product->id)->where('api_id', $product->api_id)->get();
         $apis = API::where('status', 'active')->get();
         $customerlevel = CustomerLevel::orderBy('order', 'ASC')->get();
@@ -172,7 +172,6 @@ class ProductController extends Controller
 
     public function update(Product $product, Request $request)
     {
-
         $this->validate($request, [
             "name" => "required",
             "display_name" => "required",
@@ -229,8 +228,8 @@ class ProductController extends Controller
 
         $productLevel = $request->productlevel;
         // $productLevel = array_filter($request->productlevel);
-        // dd($productLevel);
-        if (count($productLevel) > 0 && isset($product)) {
+
+        if (isset($productLevel) && count($productLevel) > 0 && isset($product)) {
             foreach ($productLevel as $key => $price) {
                 Discount::updateOrCreate([
                     'customer_level' => $key,
