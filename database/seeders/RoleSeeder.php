@@ -232,35 +232,35 @@ class RoleSeeder extends Seeder
         $url = "https://sagecloud.ng/api/v2/merchant/authorization";
         $payload = [
             "email" => "Xpino.net@gmail.com",
-	        "password" =>  "XPINOxpino"
+	        "password" =>  "XPINOxpino!"
         ];
         $control = new Controller();
-        $login = $control->basicApiCall($url, json_encode($payload), []);
+        $login = $control->basicApiCall($url, $payload, []);
         
         if(!empty($login) && $login['success'] == true){
             $token = $login['data']['token']['access_token'] ?? null;
         }
 
         if(!empty($token)){
-            $url = "https://sagecloud.ng/api/v2/transfer/get-transfer-data";
+            $url2 = "https://sagecloud.ng/api/v2/transfer/get-transfer-data";
 
             $headers = [
                 "Content-Type: application/json",
                 "Authorization: Bearer " . $token . "",
             ];
 
-            $callBanks =  $control->basicApiCall($url, json_encode($payload), $headers, 'GET');
-
+            $callBanks = $control->basicApiCall($url2, [], $headers, 'GET');
+            dd($callBanks);
             if (!empty($callBanks) && $callBanks['success'] == true) {
                 $banks = $login['banks'] ?? null;
-
+                
                 if (!empty($banks)) {
                     foreach($banks as $bank){
                         Bank::updateOrCreate([
-                            "cbn_code" => "755",
+                            "cbn_code" => $bank->cbn_code,
                         ],[
-                            "cbn_code" => "755",
-                            "bank_name" => "AB MicroFinance Bank"
+                            "cbn_code" => $bank->cbn_code,
+                            "bank_name" => $bank->bank_name
                         ]);
                     }
                 }

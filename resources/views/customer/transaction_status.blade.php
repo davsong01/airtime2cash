@@ -110,7 +110,7 @@
                                                                 </div>
                                                             </div>
                                                             <div class="row" >
-                                                                <div class="col-md-9">
+                                                                <div class="col-md-12">
                                                                     <div class="card-body trans-details">
                                                                         <div class="mb-2 card-head align-items-center">
                                                                             <h4 class="card-title mb-0">Transaction Details</h4>

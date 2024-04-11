@@ -118,26 +118,38 @@
                                                                             </fieldset>
                                                                         </div>
                                                                         <div class="col-md-12" id="payment-div" style="display:none">
-                                                                        <fieldset class="form-group">
-                                                                            <label for="payment_method">Select Payment Method </label>
-                                                                            <select class="form-control" name="payment_method" id="payment_method" required>
-                                                                                <option value="">Select</option>
-                                                                                <option value="Transfer to Wallet">Transfer to Wallet ({!! getSettings()['currency'] !!}0 charges)</option>
-                                                                                {{-- <option value="Transfer to Bank Account">Transfer to Bank Account ({!! getSettings()['currency'] !!}40 transfer charge applies)</option> --}}
-                                                                            </select>
-                                                                            <div class="footnote">
-                                                                                <small>Where should your payment go to. If you select bank transfer, please ensure that you have entered your bank account details here</small>
-                                                                            </div>
-                                                                        </fieldset>
-                                                                    </div>
-                                                                        {{-- @if (auth()->user()->transaction_pin)
-                                                                        <div class="col-md-6">
                                                                             <fieldset class="form-group">
-                                                                                <label for="transaction_pin">Transaction PIN</label><span class="reset-pin"><a href="{{ route('customer.reset.pin') }}"> Reset Transaction Pin</a></span>
-                                                                                <input type="password" class="form-control" id="transaction_pin" name="transaction_pin" required>
+                                                                                <label for="payment_method">Select Payment Method </label>
+                                                                                <select class="form-control" name="payment_method" id="payment_method" required>
+                                                                                    <option value="">Select</option>
+                                                                                    <option value="Transfer to Wallet">Transfer to Wallet ({!! getSettings()['currency'] !!}0 charges)</option>
+                                                                                    <option value="Transfer to Bank Account">Transfer to Bank Account ({!! getSettings()['currency'] !!}40 transfer charge applies)</option>
+                                                                                </select>
+                                                                                <div class="footnote">
+                                                                                    <small>Where should your payment go to. If you select bank transfer, please ensure that you have entered your bank account details here</small>
+                                                                                </div>
                                                                             </fieldset>
                                                                         </div>
-                                                                        @endif --}}
+                                                                        <div class="col-md-12" id="bank-details-div" style="display:none">
+                                                                            <fieldset class="form-group">
+                                                                                <label for="payment_method">Select Bank </label>
+                                                                                <select class="form-control" name="bank" id="bank">
+                                                                                    <option value="">Select</option>
+                                                                                    @foreach(App\Models\Bank::all() as $bank)
+                                                                                    <option value="{{ $bank->cbn_code }}">{{ $bank->bank_name }}</option>
+                                                                                    @endforeach
+                                                                                </select>
+                                                                            </fieldset>
+                                                                            <fieldset class="form-group">
+                                                                                <label for="receive" class="">Account Number</label>
+                                                                                <input class="form-control" id="account_number" name="account_number" type="text">
+                                                                            </fieldset>
+                                                                            <fieldset class="form-group">
+                                                                                <label for="receive" class="">Account Name</label>
+                                                                                <input class="form-control" id="account_name" name="account_name" type="text">
+                                                                            </fieldset>
+                                                                            <small class="footnote" style="color:red">Please ensure that bank details entered are correct to enable us complete the transaction</small>
+                                                                        </div>
                                                                     </div>
                                                                 </form>
                                                                     <button id="buy-buttonx"style="margin-top:4px" class="btn btn-primary" type="submit" onclick="submitForm()">PROCEED </button>
@@ -214,7 +226,8 @@
     $(document).ready(function () {
         $("#amount").val('');
         $('#product').val('');
-        $('#amount-div').hide()
+        $('#amount-div').hide();
+        $('#payment_method').val('');
 
         $('#product').on('change', function () {
             var fixed_price = $('#product').find(':selected').data('fixed_price');
@@ -269,6 +282,27 @@
             }
         });
 
+        $('#payment_method').on('change', function () {
+            if($('#payment_method').val() == 'Transfer to Bank Account'){
+                $('#bank-details-div').show()
+                $("#bank").attr({
+                    "required": '',
+                });
+                $("#account_number").attr({
+                    "required": '',
+                });
+                $("#account_name").attr({
+                    "required": '',
+                });
+            }else{
+                $('#bank-details-div').hide()
+                $("#bank").removeAttr('required');
+                $("#account_number").removeAttr('required');
+                $("#account_name").removeAttr('required');
+            }
+            var fixed_price = $('#product').find(':selected').data('fixed_price');
+        });
+        
         $("#amount").keyup(function(){        
             var rate = parseInt($('#rate').val());
             var amount = parseInt($('#amount').val());

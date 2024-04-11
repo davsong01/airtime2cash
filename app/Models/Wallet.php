@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\TransactionLog;
 use Illuminate\Database\Eloquent\Model;
+use App\Models\Airtime2CashTransactions;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Wallet extends Model
@@ -18,5 +19,10 @@ class Wallet extends Model
     public function customer()
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    public function airtime2cash()
+    {
+        return $this->belongsTo(Airtime2CashTransactions::class, 'transaction_id', 'transaction_id');
     }
 }

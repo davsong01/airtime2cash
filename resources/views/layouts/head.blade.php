@@ -1,3 +1,4 @@
+use Illuminate\Support\Facades\Auth;
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
@@ -101,5 +102,8 @@
         }
     </style>
     @yield('page-css')
-    {{-- {!! getSettings()->google_ad_code !!} --}}
+    @if(Auth::check() && auth()->user()->type == 'customer')
+    {{-- Google ads --}}
+    {!! getSettings()->google_ad_code !!}
+    @endif
 </head>

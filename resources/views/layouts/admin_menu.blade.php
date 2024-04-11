@@ -175,7 +175,10 @@
                     </ul>
                 </li>
             @endif
-
+            @if (in_array('A2Cash Management', $allowedMenu) || in_array(1, auth()->user()->admin->roleIds()))
+                <li class="{{ Request::path() == 'admin.airtime.2.cash.log' ? 'active' : '' }}"><a href="{{ route('admin.airtime.2.cash.log') }}"><svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24"><path fill="white" d="M480-120q-138 0-240.5-91.5T122-440h82q14 104 92.5 172T480-200q117 0 198.5-81.5T760-480q0-117-81.5-198.5T480-760q-69 0-129 32t-101 88h110v80H120v-240h80v94q51-64 124.5-99T480-840q75 0 140.5 28.5t114 77q48.5 48.5 77 114T840-480q0 75-28.5 140.5t-77 114q-48.5 48.5-114 77T480-120Zm112-192L440-464v-216h80v184l128 128-56 56Z"/></svg><span class="menu-title">&nbsp;A2Cash Management</span></a>
+                </li>
+            @endif
             @if (in_array('Financials', $allowedMenu) || in_array(1, auth()->user()->admin->roleIds()))
                 <li class="nav-item"><a href="#"><svg fill="white" xmlns="http://www.w3.org/2000/svg"
                             height="24" viewBox="0 -960 960 960" width="24">
@@ -196,13 +199,7 @@
                                         Log</span></a>
                             </li>
                         @endif
-                        @if (in_array('admin.airtime.2.cash.log', $allowedRoutes) || in_array(1, auth()->user()->admin->roleIds()))
-                            <li class="{{ Route::is('admin.airtime.2.cash.log') ? 'active' : '' }}"><a
-                                    href="{{ route('admin.airtime.2.cash.log') }}"><i
-                                        class="bx bx-right-arrow-alt"></i><span class="menu-item">A2Cash
-                                        Transactions</span></a>
-                            </li>
-                        @endif
+                        
                         @if (in_array('admin.walletlog', $allowedRoutes) || in_array(1, auth()->user()->admin->roleIds()))
                             <li class="{{ Route::is('admin.walletlog') ? 'active' : '' }}"><a
                                     href="{{ route('admin.walletlog') }}"><i class="bx bx-right-arrow-alt"></i><span

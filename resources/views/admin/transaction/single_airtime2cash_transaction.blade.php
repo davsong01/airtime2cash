@@ -97,6 +97,9 @@
                                                                 <div class="col-md-4">
                                                                     <strong>Status:</strong>
                                                                     <span style="color:{{ $color }}"><strong>{{ ucfirst($transaction->status) }}</strong></span><br>
+                                                                    @if(!empty($transaction->description))
+                                                                    <strong>Description:</strong> {{$transaction->description}} <br>
+                                                                    @endif
                                                                     @if(!empty($transaction->decline_reason))
                                                                     <strong>Decline Reason:</strong> {{$transaction->decline_reason}}
                                                                     @endif
@@ -137,7 +140,7 @@
                                                                     <strong>Bank Name: </strong>{{ $transaction->bank_name }}<br>
                                                                     <strong>Bank Code: </strong>{{ $transaction->bank_code }}<br>
                                                                     <strong>Account Name: </strong>{{ $transaction->account_name }}<br>
-                                                                    <strong>Account Number: </strong>{{ $transaction->bank_number }}
+                                                                    <strong>Account Number: </strong>{{ $transaction->account_number }}
                                                                     @endif
                                                                 </div>
                                                                 

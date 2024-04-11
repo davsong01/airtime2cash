@@ -169,7 +169,6 @@
                                                     <strong>Total Amount: </strong>{!! getSettings()->currency. number_format($transaction->total_amount,2) !!} <br>
                                                     <strong>Initial Balance: </strong>{!! getSettings()->currency. number_format($transaction->balance_before, 2) !!} <br>
                                                     <strong>Final Balance: </strong>{!! getSettings()->currency. number_format($transaction->balance_after, 2) !!} <br>
-                                                   
                                                     </small>
                                                 </td>
                                                 <td>
@@ -179,10 +178,12 @@
                                                     @if($transaction->variation)
                                                     <strong>Variation: </strong>{{ $transaction->variation->system_name ?? 'null'}} <br>
                                                     @endif
+                                                    @if(!empty($transaction->api))
                                                     <strong>Provider: </strong>{{ $transaction->api->name }} <br>
+                                                    @endif
                                                     <strong>Convenience: </strong>{!! getSettings()->currency. number_format($transaction->provider_charge, 2) !!} <br>
                                                     <strong>Discount: </strong>{!! getSettings()->currency. number_format($transaction->discount, 2) !!} <br>
-                                                   
+                                                
 
                                                     </small>
                                                 </td>
@@ -190,9 +191,15 @@
 
                                                 @if(hasAccess('admin.single.transaction.view'))
                                                 <td>
+                                                    @if($transaction->reason == 'Airtime2Cash Payment')
+                                                    <a class="btn btn-primary btn-sm mr-1 mb-1" href="{{ route('admin.single.airtime2cash.transaction.view', $transaction->airtime2cash->id) }}">
+                                                        <i class="fa fa-eye"></i><span class="align-middle ml-25">View</span>
+                                                    </a>
+                                                    @else
                                                     <a class="btn btn-primary btn-sm mr-1 mb-1" href="{{ route('admin.single.transaction.view', $transaction->id) }}">
                                                         <i class="fa fa-eye"></i><span class="align-middle ml-25">View</span>
                                                     </a>
+                                                    @endif
                                                 </td>
                                                 @endif
                                             </tr>

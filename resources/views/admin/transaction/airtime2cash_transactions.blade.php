@@ -15,14 +15,13 @@
                                 <!-- chart-statistics-1 -->
                                 <div id="donut-success-chart"></div>
                                 <!-- data -->
-                               
                                 <div class="statistics-data my-auto">
                                     <div class="statistics">
                                         <span
                                             class="font-medium-2 mr-50 text-bold-600">{!! getSettings()->currency. number_format($success) !!}</span>
                                             <br>
                                             <span
-                                            class="text-success">Sucessful</span>
+                                            class="text-success">Approved</span>
                                     </div>
                                 </div>
                             </div>
@@ -49,7 +48,7 @@
                                 <div class="statistics-data my-auto">
                                     <div class="statistics">
                                         <s!!an
-                                            class="font-medium-2 mr-50 text-bold-600">{!! getSettings()->currency. number_format($totalPending) !!}</s!!an><br><span
+                                            class="font-medium-2 mr-50 text-bold-600">{!! number_format($totalPending) !!}</s!!an><br><span
                                             class="text-warning">Pending</span>
                                     </div>
                                 
@@ -65,7 +64,7 @@
                                 <div class="statistics-data my-auto">
                                     <div class="statistics">
                                         <s!!an
-                                            class="font-medium-2 mr-50 text-bold-600">{!! getSettings()->currency. number_format($failed) !!}</s!!an><br><span
+                                            class="font-medium-2 mr-50 text-bold-600">{!! number_format($failed) !!}</s!!an><br><span
                                             class="text-danger">Declined</span>
                                     </div>
                                 
@@ -158,7 +157,11 @@
                                                 <td>
                                                     <small>
                                                     <span style="color:crimson"><strong>TransactionID: </strong> {{ $transaction->transaction_id }}</span> <br>
-                                                    <span style="color:rgb(0, 145, 87)"><strong>Payment Method: </strong> {{ $transaction->payment_method }}
+                                                    <span style="color:rgb(0, 145, 87)"><strong>Payment Method: </strong> {{ $transaction->payment_method }} </span>
+                                                    
+                                                    @if (!empty($transaction->description))
+                                                        <br><span style="color:black"><strong>Description: </strong> {{ $transaction->description }}</span>
+                                                    @endif
                                                     </small>
                                                 </td>
                                                 <td>

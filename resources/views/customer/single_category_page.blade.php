@@ -46,7 +46,7 @@
                                                             @csrf
 
                                                             <div class="row">
-                                                                <div class="col-md-9">
+                                                                <div class="col-md-12">
                                                                     <div class="d-flex pb-1 justify-content-start align-items-center w-100">
                                                                         <img class="product-images" style="padding-right: 8px;height: 70px;" id="product-image" src="" alt="" class="product-image">
                                                                         <div>
@@ -155,10 +155,7 @@
                                                                   </form>
                                                                     <button id="buy-buttonx"style="margin-top:4px" class="btn btn-primary" type="submit" onclick="submitForm()">Buy now</button>
                                                                 </div>
-
-                                                                <div class="col-md-3" id="googleadgoeshere"></div>
                                                             </div>
-
                                                     </div>
                                                 </div>
                                             </div>

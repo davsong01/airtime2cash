@@ -24,7 +24,7 @@
                                 <!-- Nav Filled Starts -->
                                 <section id="nav-filled">
                                     <div class="row">
-                                        <div class="col-md-9">
+                                        <div class="col-md-12">
                                             <div class="card">
                                                 <div class="col-md-12"> 
                                                     <div class="card-header" style="padding:1.4rem 0.7rem">
@@ -55,9 +55,6 @@
                                                     </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                        <div class="col-md-3">
-                                            {!! getSettings()->google_ad_code !!}
                                         </div>
                                     </div>
                                 </section>

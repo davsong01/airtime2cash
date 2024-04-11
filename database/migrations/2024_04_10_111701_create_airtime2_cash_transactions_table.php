@@ -17,6 +17,7 @@ return new class extends Migration
             $table->double('amount_paid',11, 2)->nullable();
             $table->double('charge_rate',11, 2)->nullable();
             $table->double('total_amount', 11, 2)->nullable();
+            $table->string('description')->nullable();
             $table->integer('product_id');
             $table->integer('customer_id');
             $table->string('type')->default('credit');

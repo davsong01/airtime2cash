@@ -17,6 +17,10 @@ class WalletController extends Controller
         return $user->customer->referal_wallet ?? 0;
     }
 
+    public function airtime2cashBalance($user){
+        return $user->customer->a2cashwallet ?? 0;
+    }
+
     public function logWallet($data)
     {
         $wallet = Wallet::create([
@@ -47,6 +51,21 @@ class WalletController extends Controller
     }
 
     public function updateReferralWallet($user, $amount, $type)
+    {
+        if ($type == 'credit') {
+            $user->customer->update([
+                'referal_wallet' => $user->customer->referal_wallet + $amount,
+            ]);
+        } else {
+            $user->customer->update([
+                'referal_wallet' => $user->customer->referal_wallet - $amount,
+            ]);
+        }
+
+        return;
+    }
+
+    public function updatea2CashWallet($user, $amount, $type)
     {
         if ($type == 'credit') {
             $user->customer->update([

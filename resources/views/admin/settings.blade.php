@@ -166,10 +166,10 @@ use App\Models\PaymentGateway;
                                                                             <label for="seo_description">SEO Description</label>
                                                                             <textarea class="form-control" id="seo_description" rows="3" name="seo_description" value="{{ $settings->seo_description ?? old('seo_description') }}" placeholder="SEO Description" required>{{ $settings->seo_description ?? old('seo_description') }}</textarea>
                                                                         </fieldset>
-                                                                        {{-- <fieldset class="form-group">
+                                                                        <fieldset class="form-group">
                                                                             <label for="google_ad_code">Google Ad Code</label>
                                                                             <textarea class="form-control" id="google_ad_code" rows="3" name="google_ad_code" value="{{ $settings->google_ad_code ?? old('google_ad_code') }}" placeholder="Google ad code">{{ $settings->google_ad_code ?? old('google_ad_code') }}</textarea>
-                                                                        </fieldset> --}}
+                                                                        </fieldset>
                                                                     </div>
                                                                     <div class="col-md-12">
                                                                         <button class="btn btn-primary" type="submit">Update</button>

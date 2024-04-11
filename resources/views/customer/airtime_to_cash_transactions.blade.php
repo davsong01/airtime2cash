@@ -1,3 +1,6 @@
+<?php 
+use App\Models\Airtime2CashTransactions;
+?>
 @extends('layouts.app')
 @section('title', 'Transactions History')
 
@@ -19,6 +22,37 @@
     <div class="content-wrapper">
         <div class="card-title">
             Airtime to cash Transactions History
+        </div>
+        <div class="card-header">
+            <h5 class="card-title mb-2">Airtime to Cash Transactions</h5>
+            <div class="d-inline-block">
+                <!-- chart-1   -->
+                <div class="d-flex mb-75 market-statistics-2">
+                    <!-- chart statistics-2 -->
+                    <div id="donut-warning-chart"></div>
+                    <!-- data-2 -->
+                    <div class="statistics-data my-auto">
+                        <div class="statistics">
+                            <span class="font-medium-2 mr-50 text-bold-600">{{Airtime2CashTransactions::where(['customer_id' => auth()->user()->customer->id, 'type' => 'credit', 'status' => 'pending'])->count()}}</span><br><span class="text-warning">Pending Transaction</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+           
+            <div class="d-inline-block mx-3">
+                <!-- chart-2 -->
+                <div class="d-flex mb-75 market-statistics-2">
+                    <!-- chart statistics-2 -->
+                    <div id="donut-danger-chart"></div>
+                    <!-- data-2 -->
+                    <div class="statistics-data my-auto">
+                        <div class="statistics">
+                            <span class="font-medium-2 mr-50 text-bold-600">{{Airtime2CashTransactions::where(['customer_id' => auth()->user()->customer->id, 'type' => 'credit', 'status' => 'declined'])->count()}}</span><br><span
+                                class="text-danger">Declined Transaction</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
         <div class="content-body">
             <div class="row">

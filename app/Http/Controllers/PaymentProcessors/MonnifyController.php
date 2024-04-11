@@ -138,7 +138,7 @@ class MonnifyController extends Controller
             ]);
 
             $response = $this->basicApiCall($url, $payload, $headers, 'POST');
-
+            
             if (
                 $response && $response['responseCode'] == 0 &&
                 $response['responseMessage'] == 'success'
@@ -171,19 +171,20 @@ class MonnifyController extends Controller
                         'status' => 'success',
                         'data' => '',
                     ];
+                }else{
+                    $data = [
+                        'status' => 'failed',
+                        'data' => $response['responseMessage'] ?? 'No Accounts set by Provider',
+                    ];
                 }
 
-                $data = [
-                    'status' => 'failed',
-                    'data' => $response['responseMessage'] ?? 'No Accounts set by Provider',
-                ];
             } else {
                 $data = [
                     'status' => 'failed',
                     'data' => $response['responseMessage'] ?? 'no-response',
                 ];
             }
-
+            
             return $data;
         }
     }

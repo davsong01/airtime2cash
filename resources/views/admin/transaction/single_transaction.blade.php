@@ -177,7 +177,7 @@
                                                                         <strong>Variation:</strong>{{ $transaction->category->system_name }}
                                                                         @endif
                                                                     @endif
-                                                                    @if($transaction->category)
+                                                                    @if(!empty($transaction->api))
                                                                     <br>
                                                                     <strong>Provider:</strong>{{ $transaction->api->name }} <br>
                                                                     @endif

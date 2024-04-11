@@ -2,26 +2,27 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Bank;
 use App\Models\User;
 use App\Models\Wallet;
 use App\Models\Product;
 use App\Models\Category;
 use App\Models\Discount;
+use App\Models\BillerLog;
 use App\Models\BlackList;
 use App\Models\Variation;
-use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Http\Request;
+use App\Models\PaymentGateway;
 use App\Models\TransactionLog;
 use App\Services\ExcelService;
 use App\Models\ReferralEarning;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
+use App\Models\Airtime2CashTransactions;
 use Illuminate\Support\Facades\Validator;
 use App\Http\Controllers\WalletController;
-use App\Models\Airtime2CashTransactions;
-use App\Models\BillerLog;
-use App\Models\PaymentGateway;
+use Illuminate\Contracts\Database\Query\Builder;
 
 class TransactionController extends Controller
 {
@@ -41,6 +42,11 @@ class TransactionController extends Controller
     }
 
     public function airtimeToCash(){
+        $route = '<a style="color: yellow;" href="'. route("update.kyc.details").'">HERE</a>';
+        
+        if(auth()->user()->customer->kyc_status == 'unverified' ){
+            return back()->with('error', 'Airtime2Cash conversions is only available for fully verified clients, please click ' . $route .' to get verified');
+        }
         $category = Category::with([
             'products' => function ($query) {
                 return $query->where('status', 'active')->get();
@@ -221,9 +227,14 @@ class TransactionController extends Controller
         }else{
             return back()->with('error', 'Invalid amount entered');
         }
-
-        $transaction_id = 'A2C-'.$this->generateRequestId();
         
+        $transaction_id = 'A2C-'.$this->generateRequestId();
+        $bank = Bank::where('cbn_code', $request->bank)->first();
+        if(!empty($bank)){
+            $bank_name = $bank->bank_name;
+        }else{
+            $bank_name = '';
+        }
         $transaction = [
             'amount_charged' => $amount_charged,
             'amount_paid' => $amount_paid,
@@ -235,6 +246,11 @@ class TransactionController extends Controller
             'total_amount' => $amount_charged + $amount_paid,
             'phone_numbers' => $request->phone,
             'payment_method' => $request->payment_method,
+            'bank_code' => $request->bank,
+            'bank_name' => $bank_name,
+            'account_number' => $request->account_number,
+            'account_name' => $request->account_name,
+            // 'ip_address' => $request->ip,
         ];
         
        
@@ -258,7 +274,10 @@ class TransactionController extends Controller
             <strong>Phone Numbers:</strong> ' . $log->phone_numbers . '<br>
             <strong>Transaction ID:</strong> ' . $log->transaction_id . '<br>
             <strong>Network:</strong> ' . $product->name . '<br>
-            <strong>Payment Method:</strong> ' . $log->payment_method . '<br>
+            <strong>Payment Method:</strong> ' . $log-> payment_method . '<br>
+            <strong>Bank Name:</strong> ' . $log->bank_name . '<br>
+            <strong>Account Name:</strong> ' . $log->account_name . '<br>
+            <strong>Account Number:</strong> ' . $log->account_number. '<br>
             <strong>Transaction Date:</strong> ' . date("M jS, Y g:iA", strtotime($log->created_at)) . '<br><br>
             Warm Regards. (' . config('app.name') . ')<br/>
             </p>';
@@ -276,6 +295,9 @@ class TransactionController extends Controller
         *Transaction ID:* ' . $log->transaction_id . '
         *Network:* ' . $product->name . '
         *Payment Method:* ' . $log->payment_method . '
+        *Bank Name:* ' . $log->bank_name . '<br>
+        *Account Name:* ' . $log->account_name . '<br>
+        *Account Number:* ' . $log->account_number . '<br>
         *Transaction Date:* ' . date("M jS, Y g:iA", strtotime($log->created_at)) . '';
 
         $string = "https://api.whatsapp.com/send?phone=" . getSettings()->whatsapp_number . "&text=".urlencode($string);
@@ -617,6 +639,7 @@ class TransactionController extends Controller
             'amount' => $data['amount'],
             'balance_before' => $data['balance_before'],
             'balance_after' => $data['balance_after'] ?? ($data['balance_before'] - $data['total_amount']),
+            'descr' => $data['descr'] ?? null,
             'product_id' => $data['product_id'] ?? null,
             'product_name' => $data['product_name'] ?? null,
             'variation_id' => $data['variation_id'] ?? null,
@@ -633,7 +656,6 @@ class TransactionController extends Controller
             'account_number' => $data['account_number'] ?? null,
             'ip_address' => Session::get('ip_address') ?? null,
             'domain_name' => Session::get('domain_name') ?? null,
-            'descr' => $data['descr'] ?? null,
         ];
 
         $trans = TransactionLog::create($pre);
@@ -1014,7 +1036,6 @@ class TransactionController extends Controller
             $time = $request->to . ' 00:00:00';
             $transactions = $transactions->where('created_at', $time);
         }
-
         $transactions = $transactions->paginate(20);
 
         return view('admin.transaction.wallet_log', [
@@ -1049,7 +1070,7 @@ class TransactionController extends Controller
             $transactions = $transactions->where('transaction_id', $request->transaction_id);
         }
 
-        if ($request->type) {
+        if (!empty($transactions) && $request->type) {
             $transactions = $transactions->where('type', $request->type);
         }
 
@@ -1082,9 +1103,9 @@ class TransactionController extends Controller
         $transactionsF = clone $transactions;
         $transactionsP = clone $transactions;
         $totalTransSuccess = $transactionsS->whereIn('status', ['approved'])->sum('amount_paid');
-        $totalTransFailed = $transactionsF->where('status', 'declined')->sum('amount_paid');
+        $totalTransFailed = $transactionsF->where('status', 'declined')->count();
         $totalProfit = $transactionsA->where('status', 'approved')->sum('amount_charged');
-        $totalPending = $transactionsP->where('status', 'pending')->sum('amount_charged');
+        $totalPending = $transactionsP->where('status', 'pending')->count();
         
         if ($request->email) {
             $user = User::where('email', $request->email)->first();
@@ -1329,28 +1350,91 @@ class TransactionController extends Controller
         return $query;
     }
 
-    public function approveAirtime2CashTransactions(Airtime2CashTransactions $transaction){
-        $transaction->update([
-            'status' => 'approved',
-            'approved_by' => auth()->user()->admin->id,
-        ]);
+    public function approveAirtime2CashTransactions(Request $request, Airtime2CashTransactions $transaction){
+        //Update wallet balance if payment method is Transfer to Wallet
+        if($transaction->payment_method == 'Transfer to Wallet'){
+            // Get Wallet Balance
+            $wallet = new WalletController();
+            $balance = $wallet->getWalletBalance(auth()->user());
+            
+            // Log Wallet
+            $request['type'] = 'credit';
+            $request['customer_id'] = $transaction->customer_id;
+            $request['transaction_id'] = $transaction->transaction_id;
+            $request['request_id'] = $transaction->transaction_id;
+            $request['payment_method'] = 'wallet';
+            $request['ip_address'] = $this->getIpAddress();
+            $request['domain_name'] = $this->getDomainName();
+            $request['customer_email'] = $transaction->customer->user->email;
+            $request['customer_phone'] = $transaction->customer->user->phone;
+            $request['customer_name'] = $transaction->customer->user->firstname;
+            $request['product_id'] = $transaction->product_id;
+            $request['product_name'] = $transaction->product->name;
+            $request['unique_element'] = 'Airtime2Cash Payment';
+            $request['category_id'] = $transaction->product->category->id;
+            // $request['api_id'] = $variation->api->id ?? $product->api_id;
+            // $request['product_slug'] = $variation->product->slug ?? $product->slug;
+            // $request['variation_slug'] = $variation->slug ?? null;
+            $request['discount'] = 0;
+            $request['reason'] = 'Airtime2Cash Payment';
+            $request['status'] = 'delivered';
+            // $request['subscription_type'] = $variation->bouquet ?? 'change';
+            $request['unit_price'] = $transaction->amount_paid;
+            $request['quantity'] = 1;
+            $request['total_amount'] = $transaction->amount_paid;
+            $request['amount'] = $transaction->amount_paid;
+            $request['balance_before'] = $balance;
+            $request['balance_after'] = $balance + $transaction->amount_paid;
+            $request['descr'] = $transaction->description;
+            
+            // Log basic transaction
+            $transaction = $this->logTransaction($request->all());
+            // Log wallet
+            $wal = $wallet->logWallet($request->all());
+            
+            // Update Customer Wallet
+            $wallet->updateCustomerWallet($transaction->customer->user, $request['total_amount'], $request['type']);
 
-        $subject = "Airtime2Cash Transaction Update";
-        $body = '<p>Hello! ' . $transaction->customer->user->name . ',</p>';
-        $body .= '<p style="line-height: 2.0;">Your Transaction with transaction ID : <strong>'.$transaction->transaction_id.'</strong> has been updated to: '.ucfirst($transaction->status).'<br><strong>Date Updated:</strong> ' . date("M jS, Y g:iA", strtotime($transaction->updated_at)) . '<br><br>
-            Warm Regards. (' . config('app.name') . ')<br/>
-            </p>';
-        $email = $transaction->customer->user->email;
-        
-        logEmails($email, $subject, $body);
+            $status = 'success';
+            $error = '';
+        }else{
+            // Perform Transfer to bank actions
+            $status = 'success';
+            $error = '';
+        }
+    
+        try {
+            if($status == 'success'){
+                $transaction->update([
+                    'status' => 'approved',
+                    'description' => 'Airtime2Cash Request was approved and completed by ADMIN',
+                    'approved_by' => auth()->user()->admin->id,
+                ]);
 
-        return back()->with('message', 'Operation successful');
+                $subject = "Airtime2Cash Transaction Update";
+                $body = '<p>Hello! ' . $transaction->customer->user->name . ',</p>';
+                $body .= '<p style="line-height: 2.0;">Your Transaction with transaction ID : <strong>' . $transaction->transaction_id . '</strong> has been updated to: ' . ucfirst($transaction->status) . '<br><strong>Date Updated:</strong> ' . date("M jS, Y g:iA", strtotime($transaction->updated_at)) . '<br><br>
+                Warm Regards. (' . config('app.name') . ')<br/>
+                </p>';
+                $email = $transaction->customer->user->email;
+    
+                logEmails($email, $subject, $body);
+                return back()->with('message', 'Operation successful');
+
+            }else{
+                return back()->with('error', 'An error occured when performing action: '.$error);
+
+            }
+        } catch (\Throwable $th) {
+            return back()->with('error', 'An error occured when performing action: ' . $th->getMessage());
+        }
     }
 
     public function declineAirtime2CashTransactions(Request $request, Airtime2CashTransactions $transaction)
     {
         $transaction->update([
             'status' => 'declined',
+            'description' => 'Airtime2Cash Request was declined by ADMIN',
             'approved_by' => auth()->user()->admin->id,
             'decline_reason' => $request->decline_reason,
         ]);
