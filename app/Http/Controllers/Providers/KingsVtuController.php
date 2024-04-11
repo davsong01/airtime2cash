@@ -58,13 +58,13 @@ class KingsVtuController extends Controller
     {
         // Post data
         try {
-            $url = env('ENV') == 'local' ? $api->sandbox_base_url : $api->live_base_url;
+            $url = env('ENV') == 'local' ? $this->api->sandbox_base_url : $this->api->live_base_url;
             $url = $url . "pay";
 
             $headers = [
-                'api-key: ' . $api->api_key,
-                'public-key: ' . $api->public_key,
-                'secret-key: ' . $api->secret_key,
+                'api-key: ' . $this->api->api_key,
+                'public-key: ' . $this->api->public_key,
+                'secret-key: ' . $this->api->secret_key,
             ];
 
             $payload = [
@@ -148,41 +148,28 @@ class KingsVtuController extends Controller
 
         try {
             //code...
-            $this->balance($api);
-            // $this->fetchAndUpdateBalance($api);
-            $this->sendWarningEmail($api);
+            $this->balance($this->api);
+            // $this->fetchAndUpdateBalance($this->api);
+            $this->sendWarningEmail($this->api);
         } catch (\Throwable $th) {
             //throw $th;
         }
         return $format;
     }
 
-    // public function fetchAndUpdateBalance($api)
-    // {
-    //     $newBalance = $this->balance($api, 'no-format');
-
-    //     if (isset($newBalance['status']) && $newBalance['status'] == 'success') {
-    //         $api->update([
-    //             'balance' => $newBalance['balance'],
-    //         ]);
-    //     }
-
-    //     return $api;
-    // }
-
     public function requery($transaction)
     {
-        $api = $transaction->api;
+        $this->api = $transaction->api;
         $request_id = $transaction->reference_id;
 
         try {
-            $url = env('ENV') == 'local' ? $api->sandbox_base_url : $api->live_base_url;
+            $url = env('ENV') == 'local' ? $this->api->sandbox_base_url : $this->api->live_base_url;
             $url = $url . "requery";
 
             $headers = [
-                'api-key: ' . $api->api_key,
-                'public-key: ' . $api->public_key,
-                'secret-key: ' . $api->secret_key,
+                'api-key: ' . $this->api->api_key,
+                'public-key: ' . $this->api->public_key,
+                'secret-key: ' . $this->api->secret_key,
             ];
 
             $payload = [
@@ -256,25 +243,25 @@ class KingsVtuController extends Controller
 
 
         try {
-            $url = env('ENV') == 'local' ? $api->sandbox_base_url : $api->live_base_url;
-            $url = $url . "balance";
+            $url = env('ENV') == 'local' ? $this->api->sandbox_base_url : $this->api->live_base_url;
+            $url = $url . "get-balance";
 
             $headers = [
-                'api-key: ' . $api->api_key,
-                'public-key: ' . $api->public_key,
-                'secret-key: ' . $api->secret_key,
+                'api-key: ' . $this->api->api_key,
+                'public-key: ' . $this->api->public_key,
+                'secret-key: ' . $this->api->secret_key,
             ];
 
             $response = $this->basicApiCall($url, [], $headers, 'GET');
-
-            if (isset($response['code']) && $response['code'] == 1 && !empty($response['contents'])) {
+        
+            if (isset($response['status']) && $response['status'] == 'success' && !empty($response['data'])) {
                 $result = $response;
-                $balance = '#' . number_format($response['contents']['balance'], 2);
+                $balance = '#' . number_format($response['data']['wallet_balance'], 2);
                 $status = 'success';
                 $status_code = 1;
 
-                $api->update([
-                    'balance' => $response['contents']['balance'],
+                $this->api->update([
+                    'balance' => $response['data']['wallet_balance'],
                 ]);
             } else {
                 $status = 'failed';
@@ -312,7 +299,7 @@ class KingsVtuController extends Controller
         try {
             $url = env('ENV') == 'local' ? $data['api']->sandbox_base_url : $data['api']->live_base_url;
 
-            $url = $url . "merchant-verify";
+            $url = $url . "verify-biller";
 
             $headers = [
                 'api-key: ' . $data['api']->api_key,
@@ -321,28 +308,28 @@ class KingsVtuController extends Controller
             ];
 
             $payload = [
-                'serviceID' => $data['request']['product_slug'],
-                'type' => $data['request']['variation_name'],
+                'product_slug' => $data['request']['product_slug'],
+                'variation_slug' => $data['request']['variation_name'],
                 'billersCode' => $data['request']['unique_element'],
                 'url' => $url
             ];
 
             $response = $this->basicApiCall($url, $payload, $headers, 'POST');
             
-            if (isset($response['code']) && $response['code'] == 000 && !empty($response['content']) && !empty($response['content']['Customer_Name'])) {
+            if (isset($response['status']) && $response['status'] == 'success' && !empty($response['data']) && !empty($response['data']['Customer_Name'])) {
                 $message = '';
-                $message .= isset($response['content']['Customer_Name']) ? 'Account Name: ' . $response['content']['Customer_Name'] : '';
-                $message .= isset($response['content']['Address']) ? '<br/>Address: ' . $response['content']['Address'] : '';
-                $message .= isset($response['content']['Status']) ? '<br/>Status: ' . $response['content']['Status'] : '';
-                $message .= isset($response['content']['Meter_Number']) ? '<br/>Meter Number: ' . $response['content']['Meter_Number'] : '';
-                $message .= isset($response['content']['Meter_Type']) ? '<br/>Meter Type: ' . $response['content']['Meter_Type'] : '';
-                $message .= isset($response['content']['Customer_Arrears']) ? '<br/>Customer Arrears: ' . $response['content']['Customer_Arrears'] : '';
-                $message .= isset($response['content']['Customer_Account_Type']) ? '<br/>Customer Account Type: ' . $response['content']['Customer_Account_Type'] : '';
-                $message .= isset($response['content']['Min_Purchase_Amount']) ? '<br/>Minimum Purchase Amount: ' . $response['content']['Min_Purchase_Amount'] : '';
-                $message .= isset($response['content']['Customer_Number']) ? '<br/>Customer Number: ' . $response['content']['Customer_Number'] : '';
-                $message .= isset($response['content']['Current_Bouquet']) ? '<br/>Current Bouquet: ' . $response['content']['Current_Bouquet'] : '';
-                $message .= isset($response['content']['Renewal_Amount']) ? '<br/>Renewal Amount: ' . $response['content']['Renewal_Amount'] : '';
-                $message .= isset($response['content']['Due_Date']) ? '<br/>Due Date: ' . $response['content']['Due_Date'] : '';
+                $message .= isset($response['data']['Customer_Name']) ? 'Account Name: ' . $response['data']['Customer_Name'] : '';
+                $message .= isset($response['data']['Address']) ? '<br/>Address: ' . $response['data']['Address'] : '';
+                $message .= isset($response['data']['Status']) ? '<br/>Status: ' . $response['data']['Status'] : '';
+                $message .= isset($response['data']['Meter_Number']) ? '<br/>Meter Number: ' . $response['data']['Meter_Number'] : '';
+                $message .= isset($response['data']['Meter_Type']) ? '<br/>Meter Type: ' . $response['data']['Meter_Type'] : '';
+                $message .= isset($response['data']['Customer_Arrears']) ? '<br/>Customer Arrears: ' . $response['data']['Customer_Arrears'] : '';
+                $message .= isset($response['data']['Customer_Account_Type']) ? '<br/>Customer Account Type: ' . $response['data']['Customer_Account_Type'] : '';
+                $message .= isset($response['data']['Min_Purchase_Amount']) ? '<br/>Minimum Purchase Amount: ' . $response['data']['Min_Purchase_Amount'] : '';
+                $message .= isset($response['data']['Customer_Number']) ? '<br/>Customer Number: ' . $response['data']['Customer_Number'] : '';
+                $message .= isset($response['data']['Current_Bouquet']) ? '<br/>Current Bouquet: ' . $response['data']['Current_Bouquet'] : '';
+                $message .= isset($response['data']['Renewal_Amount']) ? '<br/>Renewal Amount: ' . $response['data']['Renewal_Amount'] : '';
+                $message .= isset($response['data']['Due_Date']) ? '<br/>Due Date: ' . $response['data']['Due_Date'] : '';
 
                 $final_response = [
                     'status' => 'success',
