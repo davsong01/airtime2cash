@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Bank;
 use App\Models\Role;
 use App\Models\Category;
 use App\Models\RolePermission;
@@ -250,17 +251,17 @@ class RoleSeeder extends Seeder
             ];
 
             $callBanks = $control->basicApiCall($url2, [], $headers, 'GET');
-            dd($callBanks);
+            
             if (!empty($callBanks) && $callBanks['success'] == true) {
-                $banks = $login['banks'] ?? null;
+                $banks = $callBanks['banks'] ?? null;
                 
                 if (!empty($banks)) {
                     foreach($banks as $bank){
                         Bank::updateOrCreate([
-                            "cbn_code" => $bank->cbn_code,
+                            "cbn_code" => $bank['cbn_code'],
                         ],[
-                            "cbn_code" => $bank->cbn_code,
-                            "bank_name" => $bank->bank_name
+                            "cbn_code" => $bank['cbn_code'],
+                            "bank_name" => $bank['bank_name']
                         ]);
                     }
                 }
