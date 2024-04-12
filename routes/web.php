@@ -174,6 +174,8 @@ Route::middleware(['auth', 'verified', 'admin', 'ipcheck', 'adminRoute'])->prefi
     Route::get('approve-airtime2cash-transaction/{transaction}', [TransactionController::class, 'approveAirtime2CashTransactions'])->name('admin.approve.airtime2cash.transaction');
     Route::post('decline-airtime2cash-transaction/{transaction}', [TransactionController::class, 'declineAirtime2CashTransactions'])->name('admin.decline.airtime2cash.transaction');
 
+    Route::post('verify-bank-details', [TransactionController::class, 'verifyBankDetails'])->name('admin.verify.bank.details');
+
     Route::get('customers/{status?}', [CustomerController::class, 'customers'])->name('customers');
     Route::get('customers-active/{status}', [CustomerController::class, 'customers'])->name('customers.active');
     Route::get('customers-suspended/{status}', [CustomerController::class, 'customers'])->name('customers.suspended');

@@ -145,7 +145,33 @@
                                                                 </div>
                                                                 
                                                             </div>
+                                                            @if($transaction->payment_method == 'Transfer to Bank Account')
                                                             <hr>
+                                                            <div class="row">
+                                                                <div class="col-md-6">
+                                                                    <div class="well">
+                                                                        <address>
+                                                                            <img src="{{url('/')}}/site/loading.gif" height="70" style="display:none; margin-left: auto; margin-right:auto;height:initial;" id="img_loading">
+                                                                            <div id="q_res" style="max-height:300px;overflow:scroll;word-wrap: break-word">
+                                                                            </div>
+                                                                        </address>
+                                                                    </div>
+                                                                    <a id="verify-bank-details" onclick="return confirm('Are you sure?')?queryBankDetails():'';" class="btn btn-success btn-sm" style="color:#fff;"><svg fill="white" xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24"><path d="M480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q65 0 123 19t107 53l-58 59q-38-24-81-37.5T480-800q-133 0-226.5 93.5T160-480q0 133 93.5 226.5T480-160q32 0 62-6t58-17l60 61q-41 20-86 31t-94 11Zm280-80v-120H640v-80h120v-120h80v120h120v80H840v120h-80ZM424-296 254-466l56-56 114 114 400-401 56 56-456 457Z"/></svg> Verify Bank Details</a>
+
+                                                                    
+                                                                </div>
+                                                                <div class="col-md-6">
+                                                                    <br><br>
+                                                                    <div class="validate-div" style="display:none;">
+                                                                        <address>
+                                                                            <img src="{{url('/')}}/site/loading.gif" height="70" style="margin-left: auto; margin-right:auto;height:initial" id="img_loading2">
+                                                                            <div id="q_res2" style="max-height:300px;overflow:scroll;word-wrap: break-word">
+                                                                            </div>
+                                                                        </address>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            @endif
                                                         </div>
                                                     </div>
                                                 </div>
@@ -155,8 +181,10 @@
                                 </section>
                             </div>
                         </div>
+                       
                     </div>
                 </div>
+                
             </section>
         </div>
     </div>
@@ -194,110 +222,93 @@
         </div>
     </div>
 </div>
+
 @endsection
 @section('page-script')
 <script src="{{ asset('app-assets/js/scripts/pages/dashboard-analytics.js') }}"></script>
 <script>
-    function queryCredit(id, type){
-		var tid = id;
-        if(type == 'credit'){
-			url = '{{url("/")}}/admin/query-wallet/'+tid+'?type=credit&tid='+tid;
-        }else{
-			url = '{{url("/")}}/admin/query-wallet/'+tid+'?type=debit&tid='+tid;
-        }
-		$.ajax({
-			url : url,
-			type : 'GET',
-			beforeSend: function (){
-				$('#q_res').hide();
-				$('#img_loading').show();
-				$('#validate-biller').html('Processing....');
-			},
-			success:function (data) {
-				$('#qw_debit').html('Query Debit <i class="fa fa-check"></i>');
-				$('#img_loading').hide();
-				$('#q_res').show();
-				$('#q_res').html(data.message);
-			}
-		});
-		e.preventDefault();
-	}
-
-    function queryStatus(id){
-		var tid = id;
-        url = '{{url("/")}}/admin/requery-transaction/'+tid;
-
-		$.ajax({
-			url : url,
-			type : 'GET',
-			beforeSend: function (){
-				$('#q_res').hide();
-				$('#img_loading').show();
-                $('.validate-div').show();
-				$('#img_loading2').show();
-				$('#qw_status').html('Processing....');
-			},
-			success:function (data) {
-				$('#qw_status').html('Requery Complete <i class="fa fa-check"></i>');
-				$('#img_loading').hide();
-				$('#q_res').show();
-				$('#q_res').html(data.message);
-
-                // $('#validate-div').show();
-                // $('#validate-biller').html('Validate Biller <i class="fa fa-check"></i>');
-				$('#img_loading2').hide();
-				$('#validate-div').show();
-				$('#q_res2').show();
-				$('#q_res2').html(JSON.stringify(data.api_response, null, 5));
-
-			}
-		});
-		e.preventDefault();
-	}
-
-    function validateBiller(variation_id, element, value){
-        var variation_id = variation_id;
-        var element = element;
-        var value = value;
-
-        var data = {
-            'variation':variation_id,
-            'unique_element':{{$transaction->unique_element}},
-            _token: {{ csrf_token() }},
+    function queryBankDetails(){
+        url = '{{route("admin.verify.bank.details")}}';
+        var formData =  {
+            transaction_id: {{ $transaction->id }},
+            bank_code: '{{$transaction->bank_code}}',
+            account_number:'{{$transaction->account_number}}',
         };
 
-        var url = "{{ route('admin.verify.post') }}";
 		$.ajax({
 			url : url,
 			type : 'POST',
-            data : data,
+            data: formData, 
 			beforeSend: function (){
-				$('.validate-div').show();
-				$('#img_loading2').show();
+				$('#q_res').hide();
+				$('#img_loading').show();
 				$('#validate-biller').html('Processing....');
 			},
-			success:function (data) {
-                console.log(data);
-				$('#validate-biller').html('Validate Biller <i class="fa fa-check"></i>');
-				$('#img_loading2').hide();
-				$('#validate-div').show();
-				$('#q_res2').show();
-				$('#q_res2').html(data.message);
+			success:function (data) { 
+				$('#qw_debit').html('Query Debit <i class="fa fa-check"></i>');
+				$('#img_loading').hide();
+				$('#q_res').show();
+				$('#q_res').html(JSON.stringify(data.message, null, 3));
 			}
 		});
 		e.preventDefault();
-    }
+	}
 
-    // $('#qw-transaction').click(function () {
-    //     let id = $(this).data('id')
-    //     $.ajax({
-	// 		url : `/admin/requery-transaction/${id}`,
+    // function queryStatus(id){
+	// 	var tid = id;
+    //     url = '{{url("/")}}/admin/requery-transaction/'+tid;
+
+	// 	$.ajax({
+	// 		url : url,
+	// 		type : 'GET',
+	// 		beforeSend: function (){
+	// 			$('#q_res').hide();
+	// 			$('#img_loading').show();
+    //             $('.validate-div').show();
+	// 			$('#img_loading2').show();
+	// 			$('#qw_status').html('Processing....');
+	// 		},
+	// 		success:function (data) {
+	// 			$('#qw_status').html('Requery Complete <i class="fa fa-check"></i>');
+	// 			$('#img_loading').hide();
+	// 			$('#q_res').show();
+	// 			$('#q_res').html(data.message);
+
+    //             // $('#validate-div').show();
+    //             // $('#validate-biller').html('Validate Biller <i class="fa fa-check"></i>');
+	// 			$('#img_loading2').hide();
+	// 			$('#validate-div').show();
+	// 			$('#q_res2').show();
+	// 			$('#q_res2').html(JSON.stringify(data.api_response, null, 5));
+
+	// 		}
+	// 	});
+	// 	e.preventDefault();
+	// }
+
+    // function validateBiller(variation_id, element, value){
+    //     var variation_id = variation_id;
+    //     var element = element;
+    //     var value = value;
+
+    //     var data = {
+    //         'variation':variation_id,
+    //         'unique_element':{{$transaction->unique_element}},
+    //         _token: {{ csrf_token() }},
+    //     };
+
+    //     var url = "{{ route('admin.verify.post') }}";
+	// 	$.ajax({
+	// 		url : url,
+	// 		type : 'POST',
+    //         data : data,
 	// 		beforeSend: function (){
 	// 			$('.validate-div').show();
 	// 			$('#img_loading2').show();
 	// 			$('#validate-biller').html('Processing....');
 	// 		},
 	// 		success:function (data) {
+    //             console.log(data);
 	// 			$('#validate-biller').html('Validate Biller <i class="fa fa-check"></i>');
 	// 			$('#img_loading2').hide();
 	// 			$('#validate-div').show();
@@ -305,8 +316,8 @@
 	// 			$('#q_res2').html(data.message);
 	// 		}
 	// 	});
-    // });
+	// 	e.preventDefault();
+    // }
+
 </script>
 @endsection
-
-{{-- $('#response').html(JSON.stringify(response.response, null, 3)); --}}

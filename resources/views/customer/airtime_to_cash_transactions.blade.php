@@ -38,7 +38,7 @@ use App\Models\Airtime2CashTransactions;
                     </div>
                 </div>
             </div>
-           
+        
             <div class="d-inline-block mx-3">
                 <!-- chart-2 -->
                 <div class="d-flex mb-75 market-statistics-2">
@@ -136,7 +136,7 @@ use App\Models\Airtime2CashTransactions;
                                                                 @elseif($transaction->status == 'pending')
                                                                     <span class="text-warning">{{ ucfirst($transaction->status) }}</span>
                                                                 @else
-                                                                    <span class="text-success">{{ ucfirst($transaction->descr) }}</span>
+                                                                    <span class="text-success">{{ ucfirst($transaction->status) }}</span>
                                                                 @endif)
                                                             </span> 
                                                         </small><br>
@@ -165,7 +165,7 @@ use App\Models\Airtime2CashTransactions;
                                                         <small>
                                                             {{ date("M jS, Y g:iA", strtotime($transaction->created_at)) }}
                                                         </small> <br>
-                                                    </div>
+                                                    
                                                         <small class="text-muted">
                                                             <a target="_blank" href="{{ route('airtime2cash.transaction.status', $transaction->transaction_id) }}" class="btn btn-sm btn-primary glow mt-md-2 mb-1">View</a></small> <small class="text-muted">
                                                             @if(in_array($transaction->status, ['approved']))

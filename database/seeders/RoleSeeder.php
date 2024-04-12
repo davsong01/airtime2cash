@@ -229,11 +229,14 @@ class RoleSeeder extends Seeder
             "discount_type" => 'percentage',
         ]);
 
-        // Banks
+        // Create new Settings here
+
+        // Create default user and admin
+        // Banks for airtime to cash
         $url = "https://sagecloud.ng/api/v2/merchant/authorization";
         $payload = [
-            "email" => "Xpino.net@gmail.com",
-	        "password" =>  "XPINOxpino!"
+            "email" => env('SAGECLOUD_EMAIL'),
+            "password" =>   env('SAGECLOUD_PASSWORD'),
         ];
         $control = new Controller();
         $login = $control->basicApiCall($url, $payload, []);

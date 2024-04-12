@@ -20,7 +20,6 @@ class ProductController extends Controller
 
     public function pullProducts()
     {
-        
         $categories = Category::all();
         foreach ($categories as $category) {
             $products = app("App\Http\Controllers\Providers\KingsVtuController")->getProducts($category->slug);
@@ -29,27 +28,23 @@ class ProductController extends Controller
                 $products = $products['data']['products'] ?? [];
                 if (!empty($products)) {
                     foreach ($products as $key => $product) {
-                        Product::updateOrCreate(
-                            [
-                                "name" => $product['display_name'],
-                                "category_id" => $category->id,
-                                "display_name" => $product['display_name'],
-                                "slug" => $product['slug'],
-                                "has_variations" => $product['has_variations'] ?? null,
-                            ],
-                            [
-                                "name" => $product['display_name'],
-                                "display_name" => $product['display_name'],
-                                "slug" => $product['slug'],
-                                "status" => 'inactive',
-                                "description" => $product['description'] ?? null,
-                                "min" => $product['min'] ?? null,
-                                "max" => $product['max'] ?? null,
-                                "allow_quantity" => $product['allow_quantity'] ?? null,
-                                "fixed_price" => $product['fixed_price'] ?? null,
-                                "allow_subscription_type" => $product['allow_subscription_type'] ?? null,
-                            ]
-                        );
+                        $allproducts = Product::pluck('slug')->toArray();
+                        if(!in_array($product['slug'], $allproducts)){
+                            Product::create(
+                                [
+                                    "name" => $product['display_name'],
+                                    "display_name" => $product['display_name'],
+                                    "slug" => $product['slug'],
+                                    "status" => 'inactive',
+                                    "description" => $product['description'] ?? null,
+                                    "min" => $product['min'] ?? null,
+                                    "max" => $product['max'] ?? null,
+                                    "allow_quantity" => $product['allow_quantity'] ?? null,
+                                    "fixed_price" => $product['fixed_price'] ?? null,
+                                    "allow_subscription_type" => $product['allow_subscription_type'] ?? null,
+                                ]
+                            );
+                        }
                     }
 
                 } 

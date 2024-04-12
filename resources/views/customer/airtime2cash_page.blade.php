@@ -135,7 +135,7 @@
                                                                                 <label for="payment_method">Select Bank </label>
                                                                                 <select class="form-control" name="bank" id="bank">
                                                                                     <option value="">Select</option>
-                                                                                    @foreach(App\Models\Bank::all() as $bank)
+                                                                                    @foreach($banks as $bank)
                                                                                     <option value="{{ $bank->cbn_code }}">{{ $bank->bank_name }}</option>
                                                                                     @endforeach
                                                                                 </select>
@@ -306,7 +306,7 @@
         $("#amount").keyup(function(){        
             var rate = parseInt($('#rate').val());
             var amount = parseInt($('#amount').val());
-            var min = parseInt($('#amount').attr('min'));
+            var min = parseInt($('#amount').attr('min')) ?? 50;
             var max = parseInt($('#amount').attr('max'));
             
             var receive = 0;
@@ -322,7 +322,6 @@
             }
         });
 
-        $('.select2').select2();
     });
 </script>
 

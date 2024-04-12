@@ -165,11 +165,11 @@
                                                                                 @endforeach
                                                                                 <fieldset class="form-group">
                                                                                     <label for="min">Minimun Amount</label>
-                                                                                    <input type="number" class="form-control tiny" id="min" name="min"  value="{{ old('min') }}">
+                                                                                    <input type="number" class="form-control tiny" id="min" name="min"  value="{{ old('min') }}" required>
                                                                                 </fieldset>
                                                                                 <fieldset class="form-group">
                                                                                     <label for="max">Maximum Amount</label>
-                                                                                    <input type="number" class="form-control tiny" id="max" name="max"  value="{{ old('max') }}">
+                                                                                    <input type="number" class="form-control tiny" id="max" name="max"  value="{{ old('max') }}" required>
                                                                                 </fieldset>
                                                                                 <fieldset class="form-group">
                                                                                     <label for="seo_title">SEO Title</label>

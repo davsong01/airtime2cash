@@ -318,11 +318,11 @@ class KingsVtuController extends Controller
             
             if (isset($response['status']) && $response['status'] == 'success' && !empty($response['data']) && !empty($response['data']['Customer_Name'])) {
                 $message = '';
-                $message .= isset($response['data']['Customer_Name']) ? 'Account Name: ' . $response['data']['Customer_Name'] : '';
+                $message .= isset($response['data']['Customer Name']) ? 'Account Name: ' . $response['data']['Customer_Name'] : '';
                 $message .= isset($response['data']['Address']) ? '<br/>Address: ' . $response['data']['Address'] : '';
                 $message .= isset($response['data']['Status']) ? '<br/>Status: ' . $response['data']['Status'] : '';
-                $message .= isset($response['data']['Meter_Number']) ? '<br/>Meter Number: ' . $response['data']['Meter_Number'] : '';
-                $message .= isset($response['data']['Meter_Type']) ? '<br/>Meter Type: ' . $response['data']['Meter_Type'] : '';
+                $message .= isset($response['data']['Meter Number']) ? '<br/>Meter Number: ' . $response['data']['Meter_Number'] : '';
+                $message .= isset($response['data']['Meter Type']) ? '<br/>Meter Type: ' . $response['data']['Meter_Type'] : '';
                 $message .= isset($response['data']['Customer_Arrears']) ? '<br/>Customer Arrears: ' . $response['data']['Customer_Arrears'] : '';
                 $message .= isset($response['data']['Customer_Account_Type']) ? '<br/>Customer Account Type: ' . $response['data']['Customer_Account_Type'] : '';
                 $message .= isset($response['data']['Min_Purchase_Amount']) ? '<br/>Minimum Purchase Amount: ' . $response['data']['Min_Purchase_Amount'] : '';
@@ -335,7 +335,7 @@ class KingsVtuController extends Controller
                     'status' => 'success',
                     'provider' => 'VTPASS',
                     'status_code' => '1',
-                    'customerName' => $response['content']['Customer_Name'] ?? '',
+                    'customerName' => $response['data']['Customer Name'] ?? '',
                     'customerAddress' => $response['content']['Address'] ?? '',
                     'message' => $message . ' <br/><br/>',
                     'title' => '<strong>Please confirm that the details are correct before you make payment</strong>',

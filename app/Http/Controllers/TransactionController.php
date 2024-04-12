@@ -57,9 +57,11 @@ class TransactionController extends Controller
             $discount = Discount::where('product_id', $product->id)->where('customer_level', auth()->user()->customer->level->id)->first();
             $product->discounted_rate = (!empty($discount) && $discount->price < $product->rate) ? $discount->price : $product->rate; 
         }
+
+        $banks = Bank::all();
         
         if (!empty($category) && $category->status == 'active') {
-            return view('customer.airtime2cash_page', compact('category'));
+            return view('customer.airtime2cash_page', compact('category','banks'));
         } else {
             return back();
         }
@@ -734,7 +736,7 @@ class TransactionController extends Controller
         }
 
         $transactions = $transactions->orderBy('created_at', 'DESC')->paginate(20);
-
+       
         $products = Product::where('type', 'airtime2cash')->where('status', 'active')->orderBy('created_at', 'DESC')->get();
 
         return view('customer.airtime_to_cash_transactions', compact('transactions', 'products'));
@@ -1399,6 +1401,51 @@ class TransactionController extends Controller
             $error = '';
         }else{
             // Perform Transfer to bank actions
+            $url = "https://sagecloud.ng/api/v2/merchant/authorization";
+            $payload = [
+                "email" => env('SAGECLOUD_EMAIL'),
+                "password" =>   env('SAGECLOUD_PASSWORD'),
+            ];
+
+
+            $control = new Controller();
+
+            $login = $control->basicApiCall($url, $payload, []);
+
+            if (!empty($login) && $login['success'] == true) {
+                $token = $login['data']['token']['access_token'] ?? null;
+            } else {
+                return response()->json([
+                    'message' => 'Could not verify account details at the moment, please try again later',
+                ]);
+            }
+
+            if (!empty($token)) {
+                $url2 = "https://sagecloud.ng/api/v2/transfer/fund-transfer";
+                $payload = [
+                    "bank_code" => $transaction->bank_code,
+                    "account_number" => $transaction->account_number,
+                    "reference" => $transaction->transaction_id,
+                    "account_name" => $transaction->account_name,
+                    "amount" => $transaction->amount_paid,
+                    "narration" => 'Transfer from '.config('app.name'),
+                ];
+
+                $headers = [
+                    "Content-Type: application/json",
+                    "Authorization: Bearer " . $token . "",
+                ];
+
+                $verify = $control->basicApiCall($url2, $payload, $headers);
+                dd($verify, $payload);
+                return response()->json([
+                    'message' => $verify,
+                ]);
+            } else {
+                return response()->json([
+                    'message' => 'Could not verify account details at the moment, please try again later',
+                ]);
+            }
             $status = 'success';
             $error = '';
         }
@@ -1451,5 +1498,48 @@ class TransactionController extends Controller
 
         return back()->with('message', 'Operation successful');
 
+    }
+
+    public function verifyBankDetails(Request $request){
+        $url = "https://sagecloud.ng/api/v2/merchant/authorization";
+        $payload = [
+            "email" => env('SAGECLOUD_EMAIL'),
+            "password" =>   env('SAGECLOUD_PASSWORD'),
+        ];
+        
+        $transaction = Airtime2CashTransactions::where('id', $request->transaction_id)->first();
+        $control = new Controller();
+        
+        $login = $control->basicApiCall($url, $payload, []);
+        
+        if (!empty($login) && $login['success'] == true) {
+            $token = $login['data']['token']['access_token'] ?? null;
+        }else{
+            return response()->json([
+                'message' => 'Could not verify account details at the moment, please try again later',
+            ]);
+        }
+        
+        if (!empty($token)) {
+            $url2 = "https://sagecloud.ng/api/v2/transfer/verify-bank-account";
+            $payload = [
+                "bank_code" => $request->bank_code,
+                "account_number" => $request->account_number
+            ];
+            $headers = [
+                "Content-Type: application/json",
+                "Authorization: Bearer " . $token . "",
+            ];
+
+            $verify = $control->basicApiCall($url2, $payload, $headers);
+
+            return response()->json([
+                'message' => $verify,
+            ]);
+        }else{
+            return response()->json([
+                'message' => 'Could not verify account details at the moment, please try again later',
+            ]);
+        }
     }
 }

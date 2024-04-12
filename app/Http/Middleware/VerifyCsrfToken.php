@@ -15,6 +15,7 @@ class VerifyCsrfToken extends Middleware
         'customer-verify',
         'customer-get-discount',
         'admin/verify-biller/*',
-        'log-p-callback/*'
+        'log-p-callback/*',
+        'admin/verify-bank-details'
     ];
 }

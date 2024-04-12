@@ -168,11 +168,11 @@
                                                                                 @endforeach
                                                                                 <fieldset class="form-group">
                                                                                     <label for="min">Minimun Amount ({!! getSettings()['currency']!!})</label>
-                                                                                    <input type="number" class="form-control tiny" id="min" name="min"  value="{{ $product->min }}">
+                                                                                    <input type="number" class="form-control tiny" id="min" name="min"  value="{{ $product->min }}" required>
                                                                                 </fieldset>
                                                                                 <fieldset class="form-group">
                                                                                     <label for="max">Maimum Amount ({!! getSettings()['currency']!!})</label>
-                                                                                    <input type="number" class="form-control tiny" id="max" name="max"  value="{{ $product->max }}">
+                                                                                    <input type="number" class="form-control tiny" id="max" name="max"  value="{{ $product->max }}" required>
                                                                                 </fieldset>
                                                                                 <fieldset class="form-group">
                                                                                     <label for="seo_title">SEO Title</label>

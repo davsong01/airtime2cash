@@ -23,24 +23,22 @@ class CategoryController extends Controller
             $categories = $categories['data'] ?? [];
             if(!empty($categories)){
                 foreach ($categories as $key=>$category) {
-                    Category::updateOrCreate(
-                        [
-                            "name" => $category['display_name'],
-                            "display_name" => $category['display_name'],
-                            "slug" => $category['slug'],
-                            "icon" => $category['icon'] ?? null,
-                            "unique_element" => $category['unique_element'] ?? '',
-                        ], [
-                        "name" => $category['display_name'],
-                        "icon" => $category['icon'] ?? null,
-                        "display_name" => $category['display_name'],
-                        "slug" => $category['slug'],
-                        "status" => 'inactive',
-                        "order" => $key + 1,
-                        "description" => $category['description'],
-                        "unique_element" => $category['unique_element'] ?? '',
-                        "discount_type" => $category['discount_type'] ?? '',
-                    ]);
+                    $categories = Category::pluck('slug')->toArray();
+                    if(!in_array($category['slug'], $categories)){
+                        Category::create(
+                            [
+                                "name" => $category['display_name'],
+                                "icon" => $category['icon'] ?? null,
+                                "display_name" => $category['display_name'],
+                                "slug" => $category['slug'],
+                                "order" => $key + 1,
+                                "description" => $category['description'],
+                                "unique_element" => $category['unique_element'] ?? '',
+                                "discount_type" => $category['discount_type'] ?? '',
+                            ]
+                        );
+                    }
+                    
                 }
 
                 return back()->with('message', 'Categories successfully pulled, please proceed to update categories');
