@@ -17,11 +17,9 @@
             <?php
                 $balance = auth()->user()->type == 'customer' ? getSettings()->currency .number_format(walletBalance(auth()->user()), 2) : 0;
             ?>
-            <li style="color: #fff;" class="navigation-header"><span>Wallet Balance</span><br>{!! $balance !!}</li>
-            <li style="color: #fff;" class="navigation-header"><span>Customer Level</span><br><strong>{{ auth()->user()->customer?->level?->name }}</strong></li>
-
-            
-            <li class=" navigation-header"><span>Make Payment</span></li>
+            <li style="" class="navigation-header customer-details"><span>Wallet Balance</span><br>{!! $balance !!}</li>
+            <li style="" class="navigation-header customer-details"><span>Customer Level</span><br><strong>{{ auth()->user()->customer?->level?->name }}</strong></li>
+            <li class="block-header-color navigation-header"><span>Make Payment</span></li>
             <?php $categories = getCategories() ?>
             @foreach($categories as $category)
                 <li class="{{ Request::path() == 'customer/'.$category->slug ? 'active' : '' }} svg"><a href="{{ route('open.transaction.page', $category->slug)}}">@if($category->icon){!! $category->icon !!}@else <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24"><path d="M880-720v480q0 33-23.5 56.5T800-160H160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h640q33 0 56.5 23.5T880-720Zm-720 80h640v-80H160v80Zm0 160v240h640v-240H160Zm0 240v-480 480Z" fill="white"/></svg>@endif<span class="menu-title"> &nbsp;{{ $category->display_name }}</span></a>
@@ -32,7 +30,7 @@
                 </svg>
                 <span class="menu-title"> &nbsp;Airtime To Cash</span></a>
             </li>
-            <li class=" navigation-header"><span>Self Service</span></li>
+            <li class="block-header-color navigation-header"><span>Self Service</span></li>
             <li class="{{ Route::is('dashboard') ? 'active' : '' }} nav-item svg"><a href="{{ route('dashboard') }}"><svg
             xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" fill="white"
             width="24">

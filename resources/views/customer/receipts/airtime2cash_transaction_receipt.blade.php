@@ -154,7 +154,7 @@
 					<td>Status</td>
 					<td>{{ ucfirst($transaction['status']) }}</td>
 				</tr>
-				@if(!empty($transaction['decline_reason']) && $transaction->status == 'declined')
+				@if(!empty($transaction['decline_reason']) && $transaction['status'] == 'declined')
 				<tr class="item">
 					<td>Decline Reason</td>
 					<td>{{ $transaction['decline_reason'] }}</td>

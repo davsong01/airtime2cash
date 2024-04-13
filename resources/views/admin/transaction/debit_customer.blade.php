@@ -38,7 +38,7 @@
                                         <form action="{{route('admin.process.credit.debit')}}" method="POST" enctype="multipart/form-data">
                                             @csrf
                                             <div class="row">
-                                                <div class="col-md-6">
+                                                <div class="col-md-12">
                                                     <fieldset class="form-group">
                                                         <label for="email">Email</label>
                                                         <input type="email" class="form-control" id="email" name="email" value="{{ old('email') }}" placeholder="Enter customer email..." required>
@@ -54,7 +54,6 @@
                                                 </div>
                                                 <div class="col-md-12">
                                                 <button class="btn btn-primary" type="submit">Submit</button>
-
                                                 </div>
                                             </div>
                                         </form>

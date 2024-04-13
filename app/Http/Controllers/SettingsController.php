@@ -87,7 +87,7 @@ class SettingsController extends Controller
         if (!empty($request->favicon)) {
             $data['favicon'] = $this->uploadFile($request->favicon, 'site');
         }
-
+      
         $settings->update($data);
 
         return back()->with('message', 'Operation successful');

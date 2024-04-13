@@ -11,15 +11,14 @@ return new class extends Migration
      */
     public function up(): void
     {
-        if (!Schema::hasColumns('settings', ['primary_color', 'secondary_color', 'active_color','block_header_color','dasboard_customer_details_color', 'active_hover_color'])) {
+        if (!Schema::hasColumns('settings', ['menu_text_color', 'menu_background_color', 'active_color','text_header_color','dasboard_customer_details_color', 'active_hover_color'])) {
             Schema::table('settings', function (Blueprint $table) {
-                $table->string('primary_color')->default('#fff'); // Text color
-                $table->string('secondary_color')->default('#1a233a'); // Background color
-                $table->string('active_color')->default('#FFB43C'); // Hover and active color
-                $table->string('active_hover_color')->default('#5a8dee'); // Hover and active color
-                $table->string('block_header_color')->default('#bac0c7'); // Hover and active color
-                $table->string('dasboard_customer_details_color')->default('#fff'); // Hover and active color
-                
+                $table->string('menu_text_color')->default('#fffff'); // Text color
+                $table->string('menu_background_color')->default('#1a233a'); // Background color
+                $table->string('active_color')->default('#FFB43C');
+                $table->string('text_header_color')->default('#bac0c7');
+                $table->string('dasboard_customer_details_color')->default('#fffff');
+                $table->string('active_hover_color')->default('#5a8dee');
             });
         }
     }
@@ -31,12 +30,12 @@ return new class extends Migration
     {
         if (Schema::hasColumns('settings', ['primary_color', 'secondary_color', 'active_color', 'dasboard_customer_details_color'])) {
             Schema::table('settings', function (Blueprint $table) {
-                $table->dropColumn("primary_color");
-                $table->dropColumn("secondary_color");
+                $table->dropColumn("menu_text_color");
+                $table->dropColumn("menu_background_color");
                 $table->dropColumn("active_color");
-                $table->dropColumn("active_hover_color");
-                $table->dropColumn("block_header_color");
+                $table->dropColumn("text_header_color");
                 $table->dropColumn("dasboard_customer_details_color");
+                $table->dropColumn("active_hover_color");
             }); 
         }
     }

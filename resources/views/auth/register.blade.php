@@ -52,7 +52,7 @@
                         <div class="form-group mb-50 mt-2 ">
                             <div class="checkbox checkbox-success checkbox-glow">
                                 <input type="checkbox" id="checkboxGlow3" name="privacy" required>
-                                <label for="checkboxGlow3"><p>I agree to the <a target="_blank" href="https://kingsvtu.ng/privacy-policy">privacy policy</a> of {{ config('app.name')}}</p></label>
+                                <label for="checkboxGlow3"><p>I agree to the <a target="_blank" href="https://airtime2cash.com/terms-of-service/">TERMS OF SERVICE</a> of {{ config('app.name')}}</p></label>
                             </div>
                         </div>
 

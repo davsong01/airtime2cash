@@ -270,6 +270,6 @@ class RoleSeeder extends Seeder
                 }
             }
         }
-
+        
     }
 }

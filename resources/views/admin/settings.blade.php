@@ -22,7 +22,7 @@ use App\Models\PaymentGateway;
                                             <div class="col-sm-12">
                                                 <div class="card">
                                                     <div class="card-header">
-                                                        <h4 class="card-title">Settings</h4>
+                                                        <h4 class="card-title">App Settings</h4>
                                                         @include('layouts.alerts')
                                                     </div>
                                                     <div class="card-content">
@@ -171,6 +171,55 @@ use App\Models\PaymentGateway;
                                                                             <textarea class="form-control" id="google_ad_code" rows="3" name="google_ad_code" value="{{ $settings->google_ad_code ?? old('google_ad_code') }}" placeholder="Google ad code">{{ $settings->google_ad_code ?? old('google_ad_code') }}</textarea>
                                                                         </fieldset>
                                                                     </div>
+                                                                </div>
+                                                                <div class="row">
+                                                                    <div class="col-md-12">
+                                                                        <h4 class="card-title">Theme Settings</h4>
+                                                                    </div>
+                                                                </div>
+
+                                                                <div class="row">
+                                                                    
+                                                                    <div class="col-md-6">
+                                                                        <fieldset class="form-group">
+                                                                            <label for="">Menu Text color</label>
+                                                                            <input class="form-control" type="color" name="menu_text_color" value="{{ getSettings()->menu_text_color ??  old('menu_text_color') }}">
+                                                                        </fieldset>
+                                                                        
+                                                                    </div>
+                                                                    <div class="col-md-6">
+                                                                        <fieldset class="form-group">
+                                                                            <label for="">Menu Background color</label>
+                                                                            <input class="form-control" type="color" name="menu_background_color" value="{{ getSettings()->menu_background_color ??  old('menu_background_color') }}">
+                                                                        </fieldset>
+                                                                    </div>
+                                                                    <div class="col-md-6">
+                                                                        <fieldset class="form-group">
+                                                                            <label for="">Menu Active Color</label>
+                                                                            <input class="form-control" type="color" name="active_color" value="{{ getSettings()->active_color ??  old('active_color') }}">
+                                                                        </fieldset>
+                                                                    </div>
+                                                                    <div class="col-md-6">
+                                                                        <fieldset class="form-group">
+                                                                            <label for="">Text Header Color</label>
+                                                                            <input class="form-control" type="color" name="block_header_color" value="{{ getSettings()->block_header_color ??  old('block_header_color') }}">
+                                                                        </fieldset>
+                                                                    </div>
+                                                                    <div class="col-md-6">
+                                                                        <fieldset class="form-group">
+                                                                            <label for="">Dashboard Customer Details Color</label>
+                                                                            <input class="form-control" type="color" name="dasboard_customer_details_color" value="{{ getSettings()->dasboard_customer_details_color ??  old('dasboard_customer_details_color') }}">
+                                                                        </fieldset>
+                                                                    </div>
+                                                                    <div class="col-md-6">
+                                                                        <fieldset class="form-group">
+                                                                            <label for="">Active Hover Color</label>
+                                                                            <input class="form-control" type="color" name="active_hover_color" value="{{ getSettings()->active_hover_color ??  old('active_hover_color') }}">
+                                                                        </fieldset>
+                                                                    </div>
+                                                                    
+                                                                </div>
+                                                                <div class="row">
                                                                     <div class="col-md-12">
                                                                         <button class="btn btn-primary" type="submit">Update</button>
                                                                     </div>
@@ -184,7 +233,6 @@ use App\Models\PaymentGateway;
                                     </section>
                                     <!-- Nav Filled Ends -->
                                 </div>
-                               
                             </div>
                         </div>
                     </div>
@@ -195,6 +243,10 @@ use App\Models\PaymentGateway;
 @endsection
 @section('page-script')
 <script src="{{ asset('app-assets/js/scripts/pages/dashboard-analytics.js') }}"></script>
+ <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-colorpicker/2.5.3/js/bootstrap-colorpicker.min.js"></script>
+    <script>
+        $('.colorpicker').colorpicker();
+    </script>
 <script>
     $('#referral_system_status').on('change', function (e) {
         var referral_system_status = $('#referral_system_status').val();
