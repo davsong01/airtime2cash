@@ -88,9 +88,9 @@ class Controller extends BaseController
         }
 
         if (env('ENT') == 'local') {
-            $path = "/Applications/MAMP/htdocs/2cash/public";
+            $path =  env('LOCAL_STORAGE_PATH');
         } else {
-            $path = '/home/kingntxc/portal.kingsvtu.ng';
+            $path = env('LIVE_STORAGE_PATH');
         }
 
         // 

@@ -19,9 +19,10 @@ class CheckIpMiddleware
         $domain = $_SERVER['SERVER_NAME'];
 
         if (substr($domain, 0, 4) === 'www.') $domain = substr($domain, 4, strlen($domain));
-
-        $allowed_domains = ['127.0.0.1', 'portal.kingsvtu.ng'];
-        $allowed_ips = ['102.88.36.93', '127.0.0.1'];
+       
+        $allowed_domains = explode(",", env('ALLOWED_DOMAINS'));
+        
+        $allowed_ips = explode(",", env('ALLOWED_IPS'));
 
         $ip = 'Initial';
 
