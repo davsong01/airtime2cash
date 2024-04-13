@@ -123,7 +123,7 @@
                                                                                 <select class="form-control" name="payment_method" id="payment_method" required>
                                                                                     <option value="">Select</option>
                                                                                     <option value="Transfer to Wallet">Transfer to Wallet ({!! getSettings()['currency'] !!}0 charges)</option>
-                                                                                    <option value="Transfer to Bank Account">Transfer to Bank Account ({!! getSettings()['currency'] !!}40 transfer charge applies)</option>
+                                                                                    <option value="Transfer to Bank Account">Transfer to Bank Account ({!! getSettings()['currency'] !!}{{env('BANK_TRANSFER_CHARGES')}} transfer charge applies)</option>
                                                                                 </select>
                                                                                 <div class="footnote">
                                                                                     <small>Where should your payment go to. If you select bank transfer, please ensure that you have entered your bank account details here</small>

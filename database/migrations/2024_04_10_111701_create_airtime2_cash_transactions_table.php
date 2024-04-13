@@ -31,6 +31,7 @@ return new class extends Migration
             $table->string('bank_code')->nullable();
             $table->string('account_name')->nullable();
             $table->string('account_number')->nullable();
+            $table->text('bank_transfer_api_response')->nullable();
             $table->timestamps();
         });
     }

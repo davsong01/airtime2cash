@@ -43,7 +43,7 @@ class Controller extends BaseController
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 
         $response = curl_exec($ch);
-        \Log::info(['response' => $response, 'url' => $url, 'method' => $method]);
+        // \Log::info(['response' => $response, 'url' => $url, 'method' => $method]);
         return json_decode($response, true);
     }
 
