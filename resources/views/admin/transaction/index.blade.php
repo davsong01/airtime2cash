@@ -174,7 +174,7 @@
                                                 <td>
                                                     <small>
                                                     <strong>Product: </strong>{{ $transaction->product_name }} <br>
-                                                    <strong>Category: </strong>{{ $transaction->category->display_name }} <br>
+                                                    <strong>Category: </strong>{{ $transaction->category->name ?? null}} <br>
                                                     @if($transaction->variation)
                                                     <strong>Variation: </strong>{{ $transaction->variation->system_name ?? 'null'}} <br>
                                                     @endif

@@ -1344,11 +1344,11 @@ class TransactionController extends Controller
     public function requery($transactionlog = null)
     {
         if (!$transactionlog) return ['status' => 'failed'];
-
+        
         $trans = TransactionLog::find($transactionlog);
 
         if (!$trans) return ['status' => 'failed', 'message' => 'Transaction not found!'];
-        $query = app("App\Http\Controllers\Providers\KingsVtuController" . $trans->api->file_name)->requery($trans);
+        $query = app("App\Http\Controllers\Providers\KingsVtuController")->requery($trans);
 
         return $query;
     }

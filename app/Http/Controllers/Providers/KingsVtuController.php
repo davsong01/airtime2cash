@@ -59,7 +59,7 @@ class KingsVtuController extends Controller
         // Post data
         try {
             $url = env('ENV') == 'local' ? $this->api->sandbox_base_url : $this->api->live_base_url;
-            $url = $url . "pay";
+            $url = $url . "query";
 
             $headers = [
                 'api-key: ' . $this->api->api_key,
@@ -69,8 +69,8 @@ class KingsVtuController extends Controller
 
             $payload = [
                 'subscription_type' => $request['subscription_type'],
-                'serviceID' => $request['product_slug'],
-                'variation_code' => $request['variation_name'],
+                'variation_slug' => $request['variation_slug'] ?? 'nill',
+                'product_slug' => $request['product_slug'],
                 'request_id' => $request['request_id'],
                 'type' => $request['type'] ?? null,
                 'billersCode' => $request['unique_element'],
@@ -78,6 +78,7 @@ class KingsVtuController extends Controller
                 'amount' => $request['amount'],
                 'url' => $url
             ];
+
             
             $response = $this->basicApiCall($url, $payload, $headers, 'POST');
             
@@ -85,19 +86,19 @@ class KingsVtuController extends Controller
             $failCodes = ['016'];
 
             $extra_info = array_filter([
-                "Token Amount" => $response["tokenAmount"] ?? null,
-                "Exchange Reference" => $response["exchangeReference"] ?? null,
-                "Reset Token" => $response["resetToken"] ?? null,
-                "Configure Token" => $response["configureToken"] ?? null,
-                "Units" => $response["units"] ?? null,
-                "Fix Charge Amount" => $response["fixChargeAmount"] ?? null,
-                "Tariff" => $response["tariff"] ?? null,
-                "Tax Amount" => $response["taxAmount"] ?? null,
-                "KCT 1" => $response["KCT 1"] ?? null,
-                "KCT 2" => $response["KCT 2"] ?? null
+                "Token Amount" => $response['content']["tokenAmount"] ?? null,
+                "Exchange Reference" => $response['content']["exchangeReference"] ?? null,
+                "Reset Token" => $response['content']["resetToken"] ?? null,
+                "Configure Token" => $response['content']["configureToken"] ?? null,
+                "Units" => $response['content']["units"] ?? null,
+                "Fix Charge Amount" => $response['content']["fixChargeAmount"] ?? null,
+                "Tariff" => $response['content']["tariff"] ?? null,
+                "Tax Amount" => $response['content']["taxAmount"] ?? null,
+                "KCT 1" => $response['content']["KCT 1"] ?? null,
+                "KCT 2" => $response['content']["KCT 2"] ?? null
             ]);
 
-            if (isset($response['code']) && in_array($response['code'], $successCodes)) {
+            if (isset($response['status']) == 'success') {
                 // success
                 $format = [
                     'status' => 'success',
@@ -109,18 +110,6 @@ class KingsVtuController extends Controller
                     'status_code' => 1,
                     'extras' => $response['purchased_code'] ?? null,
                     'extra_info' => !empty($extra_info) ? $extra_info : [],
-                ];
-            } elseif (isset($response['code']) && in_array($response['code'], $failCodes)) {
-                // fail
-                $format = [
-                    'status' => 'failed',
-                    'user_status' => 'failed',
-                    'description' => 'Transaction failed',
-                    'api_response' => $response,
-                    'message' => $response['response_description'] ?? null,
-                    'payload' => $payload,
-                    'status_code' => 0,
-                    'extras' => $response['purchased_code'] ?? null
                 ];
             } else {
                 // attention required
@@ -164,7 +153,7 @@ class KingsVtuController extends Controller
 
         try {
             $url = env('ENV') == 'local' ? $this->api->sandbox_base_url : $this->api->live_base_url;
-            $url = $url . "requery";
+            $url = $url . "re-query";
 
             $headers = [
                 'api-key: ' . $this->api->api_key,
@@ -178,15 +167,15 @@ class KingsVtuController extends Controller
             ];
 
             $response = $this->basicApiCall($url, $payload, $headers, 'POST');
-           
+            
             $successCodes = ['000'];
             $failCodes = ['016'];
             
-            if (isset($response) && isset($response['code']) && in_array($response['code'], $successCodes)) {
+            if (isset($response['status']) && $response['status'] == 'success') {
                 // success
                 $format = [
                     'status' => 'success',
-                    'api_status' => $response['content']['transactions']['status'],
+                    'api_status' => $response['status'],
                     'user_status' => 'delivered',
                     'api_response' => $response,
                     'message' => $response['response_description'] ?? null,
@@ -198,7 +187,7 @@ class KingsVtuController extends Controller
                 // fail
                 $format = [
                     'status' => 'failed',
-                    'api_status' => $response['content']['transactions']['status'],
+                    'api_status' => $response['content']['status'],
                     'user_status' => 'failed',
                     'api_response' => $response,
                     'message' => $response['response_description'] ?? null,

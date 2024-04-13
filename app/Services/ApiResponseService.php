@@ -196,167 +196,170 @@ class ApiResponseService
     }
 
     public function initializeTransaction(Request $request){
-        $blacklist = app('App\Http\Controllers\TransactionController')->bounceBlacklist($request->phone ?? $request->unique_element, auth()->user()->email, $request->email);
+        try {
+            //code...
+            $blacklist = app('App\Http\Controllers\TransactionController')->bounceBlacklist($request->phone ?? $request->unique_element, auth()->user()->email, $request->email);
 
-        if ($blacklist) {
-            return $this->responseService->formatServiceResponse("error", '', ['Account blacklisted!, kindly reach out to support!'], null);
-        }
+            if ($blacklist) {
+                return $this->responseService->formatServiceResponse("error", '', ['Account blacklisted!, kindly reach out to support!'], null);
+            }
 
-        // Get product
-        $product = Product::where('slug', $request->product_slug)->first();
-        $category = $product->category_id;
-        
-        if (empty($product)) {
-            return $this->responseService->formatServiceResponse("error", '', ['Invalid product slug!, kindly try again!'], null);
-        }
-        // Log external API
-        $element = $product->category->unique_element;
-        $request['unique_element'] = $request->unique_element ?? $request->$element;
+            // Get product
+            $product = Product::where('slug', $request->product_slug)->first();
+            $category = $product->category_id;
+            
+            if (empty($product)) {
+                return $this->responseService->formatServiceResponse("error", '', ['Invalid product slug!, kindly try again!'], null);
+            }
+            // Log external API
+            $element = $product->category->unique_element;
+            $request['unique_element'] = $request->unique_element ?? $request->$element;
 
-        if ($product->has_variations == 'yes') {
-            $variation = Variation::where('slug', $request->variation_slug)->where('product_id', $product->id)->first();
-            if ($variation->fixed_price == 'Yes') {
-                $request['amount'] = $variation->system_price;
-            } elseif ($product->allow_subscription_type == 'yes' && $variation->category->unique_element == 'iuc_number') {
-                if (!empty($request->bouquet) && $request->bouquet == 'renew') {
-                    $req = new Request([
-                        'unique_element' => $request['unique_element'],
-                        'variation' => $variation->id,
-                    ]);
-                    $res = app('App\Http\Controllers\TransactionController')->verify($req);
-                    if (isset($res['renewal_amount'])) {
-                        $request['amount'] = $res['renewal_amount'];
+            if ($product->has_variations == 'yes') {
+                $variation = Variation::where('slug', $request->variation_slug)->where('product_id', $product->id)->first();
+                if ($variation->fixed_price == 'Yes') {
+                    $request['amount'] = $variation->system_price;
+                } elseif ($product->allow_subscription_type == 'yes' && $variation->category->unique_element == 'iuc_number') {
+                    if (!empty($request->bouquet) && $request->bouquet == 'renew') {
+                        $req = new Request([
+                            'unique_element' => $request['unique_element'],
+                            'variation' => $variation->id,
+                        ]);
+                        $res = app('App\Http\Controllers\TransactionController')->verify($req);
+                        if (isset($res['renewal_amount'])) {
+                            $request['amount'] = $res['renewal_amount'];
+                        } else {
+                            $request['amount'] = $variation->system_price;
+                        }
                     } else {
                         $request['amount'] = $variation->system_price;
                     }
                 } else {
-                    $request['amount'] = $variation->system_price;
+                    if (empty($request['amount'])) {
+                        return $this->responseService->formatServiceResponse("error", '', ['Amount is required for purchase of '.$product->name.'!'], null);
+                    }else{
+                        $request['amount'] = app('App\Http\Controllers\TransactionController')->removeCharsInAmount($request->amount);
+                    }
+
+                    if($request['amount'] < $variation->min && !empty($variation->min)){
+                        return $this->responseService->formatServiceResponse("error", '', ['You cannot purchase below ' .$variation->min. ' for this product!'], null);
+                    }
+
+                    if ($request['amount'] > $variation->max && !empty($variation->max)) {
+                        return $this->responseService->formatServiceResponse("error", '', ['You cannot purchase above ' . $variation->max . ' for this product!'], null);
+                    }
                 }
             } else {
-                if (empty($request['amount'])) {
-                    return $this->responseService->formatServiceResponse("error", '', ['Amount is required for purchase of '.$product->name.'!'], null);
-                }else{
+                if ($product->fixed_price == 'yes') {
+                    $request['amount'] = $product->system_price;
+                } else {
+                    if (empty($request['amount'])) {
+                        return $this->responseService->formatServiceResponse("error", '', ['Amount is required for purchase of ' . $product->name . '!'], null);
+                    }
+
                     $request['amount'] = app('App\Http\Controllers\TransactionController')->removeCharsInAmount($request->amount);
                 }
 
-                if($request['amount'] < $variation->min && !empty($variation->min)){
-                    return $this->responseService->formatServiceResponse("error", '', ['You cannot purchase below ' .$variation->min. ' for this product!'], null);
+                if ($request['amount'] < $product->min && !empty($product->min)) {
+                    return $this->responseService->formatServiceResponse("error", '', ['You cannot purchase below ' . $product->min . ' for this product!'], null);
                 }
-
-                if ($request['amount'] > $variation->maxx && !empty($variation->max)) {
-                    return $this->responseService->formatServiceResponse("error", '', ['You cannot purchase above ' . $variation->max . ' for this product!'], null);
+            
+                if ($request['amount'] > $product->max && !empty($product->max)) {
+                    return $this->responseService->formatServiceResponse("error", '', ['You cannot purchase above ' . $product->max . ' for this product!'], null);
                 }
             }
-        } else {
-            if ($product->fixed_price == 'yes') {
-                $request['amount'] = $product->system_price;
+        
+
+            // Verify Meter
+            if ($product->allow_meter_validation) {
+                // $meterValidation = app('App\Http\Controllers\TransactionController')->validateMeter($product);
+                // if (isset($meterValidation) && $meterValidation['code'] == 0) {
+                //     return back()->with('error', $meterValidation['error']);
+                // }
+            }
+
+            $request['discount'] = 0;
+            
+            if ($product->has_variations == 'yes') {
+                $discount = app('App\Http\Controllers\TransactionController')->getDiscount($variation, 'variation', $request['amount'], 'yes');
             } else {
-                if (empty($request['amount'])) {
-                    return $this->responseService->formatServiceResponse("error", '', ['Amount is required for purchase of ' . $product->name . '!'], null);
+                $discount = app('App\Http\Controllers\TransactionController')->getDiscount($product, 'product', $request['amount'], 'yes');
+            }
+            
+            $discountedAmount = $discount['discounted_price'];
+            $disCountApplied = $discount['discount_applied'];
+
+            $request['quantity'] = $request->quantity ?? 1;
+            $request['total_amount'] = $discountedAmount * $request['quantity'];
+            $request['discount'] = $disCountApplied * $request['quantity'];
+
+            // Get Wallet Balance
+            $wallet = new WalletController();
+            $balance = $wallet->getWalletBalance(auth()->user());
+            
+            if ($balance < $request['total_amount']) {
+                return back()->with('error', 'Insufficient Wallet Balance, Please try again');
+            }
+
+            // Log Wallet
+            $request['type'] = 'debit';
+            $request['customer_id'] = auth()->user()->customer->id;
+            $request['payment_method'] = 'wallet';
+            $request['balance_before'] = $balance;
+            $request['ip_address'] = app('App\Http\Controllers\Controller')->getIpAddress();
+            $request['domain_name'] = app('App\Http\Controllers\Controller')->getDomainName();
+            $request['customer_email'] = auth()->user()->email;
+            $request['customer_phone'] = auth()->user()->phone;
+            $request['customer_name'] = auth()->user()->firstname;
+            $request['variation_id'] = $variation->id ?? null;
+            $request['product_id'] = $product->id;
+            $request['product_name'] = $product->name;
+            $request['variation_name'] = $variation->slug ?? null;
+            $request['category_id'] = $product->category->id;
+            $request['api_id'] = $variation->api->id ?? $product->api_id;
+            $request['product_slug'] = $variation->product->slug ?? $product->slug;
+            $request['variation_slug'] = $variation->slug ?? null;
+            $request['network'] = $variation->network ?? null;
+            $request['reason'] = 'Product Purchase';
+            $request['subscription_type'] = $variation->bouquet ?? 'change';
+
+            // Check request id format
+            $check = TransactionLog::where('reference_id', $request->request_id)->first();
+            if(!empty($check)){
+                return $this->responseService->formatServiceResponse("failed", '', ['DUPLICATE REQUEST ID DETECTED'], null);
+            }
+
+            if (app('App\Http\Controllers\Controller')->checkRequestIDFormat($request->request_id) == false) {
+                $log = "IMPROPER REQUEST ID";
+                //get full message
+                if (strlen($request->request_id) < 13) {
+                    $log .= "- DOES NOT CONTAIN DATE";
+                } elseif (!is_numeric(substr($request->request_id, 0, 8))) {
+                    $log .= ": IMPROPER DATE FORMAT – FIRST 8 CHARACTERS MUST BE DATE (TODAY’S DATE – YYYYMMDD)";
+                } elseif (substr($request->request_id, 0, 8) != date("Ymd")) {
+                    $log .= "- NOT TODAY’S DATE – FIRST 8 CHARACTERS MUST BE TODAY’S DATE IN THIS FORMAT: YYYYMMDD";
+                } elseif (substr($request->request_id, 8, 2) != date("H")) {
+                    $log .= "-  INCORRECT TIME – MAKE SURE YOU ARE USING GMT+1 AND YOUR HOUR IS IN 24 HOURLY FORMAT";
                 }
+                return $this->responseService->formatServiceResponse("failed", '', [$log], null);
 
-                $request['amount'] = app('App\Http\Controllers\TransactionController')->removeCharsInAmount($request->amount);
             }
 
-            if ($request['amount'] < $product->min && !empty($product->min)) {
-                return $this->responseService->formatServiceResponse("error", '', ['You cannot purchase below ' . $product->min . ' for this product!'], null);
-            }
+            $request['request_id'] = $request->request_id;
+            $request['transaction_id'] = 'KVTU-' .  $request['request_id'];
+            $request['unique_element'] = $request->billersCode;
 
-            if ($request['amount'] > $product->maxx && !empty($product->max)) {
-                return $this->responseService->formatServiceResponse("error", '', ['You cannot purchase above ' . $product->max . ' for this product!'], null);
-            }
+            // Log basic transaction
+            $transaction = app('App\Http\Controllers\TransactionController')->logTransaction($request->all());
+
+            // Log wallet
+            $wal = $wallet->logWallet($request->all());
+
+            // Update Customer Wallet
+            $wallet->updateCustomerWallet(auth()->user(), $request['total_amount'], $request['type']);
+        } catch (\Throwable $th) {
+            
         }
-        
-
-        // Verify Meter
-        if ($product->allow_meter_validation) {
-            // $meterValidation = app('App\Http\Controllers\TransactionController')->validateMeter($product);
-            // if (isset($meterValidation) && $meterValidation['code'] == 0) {
-            //     return back()->with('error', $meterValidation['error']);
-            // }
-        }
-
-        $request['discount'] = 0;
-        
-        if ($product->has_variations == 'yes') {
-            $discount = app('App\Http\Controllers\TransactionController')->getDiscount($variation, 'variation', $request['amount'], 'yes');
-        } else {
-            $discount = app('App\Http\Controllers\TransactionController')->getDiscount($product, 'product', $request['amount'], 'yes');
-        }
-        
-        $discountedAmount = $discount['discounted_price'];
-        $disCountApplied = $discount['discount_applied'];
-
-        $request['quantity'] = $request->quantity ?? 1;
-        $request['total_amount'] = $discountedAmount * $request['quantity'];
-        $request['discount'] = $disCountApplied * $request['quantity'];
-
-
-        // Get Wallet Balance
-        $wallet = new WalletController();
-        $balance = $wallet->getWalletBalance(auth()->user());
-        
-        if ($balance < $request['total_amount']) {
-            return back()->with('error', 'Insufficient Wallet Balance, Please try again');
-        }
-
-        // Log Wallet
-        $request['type'] = 'debit';
-        $request['customer_id'] = auth()->user()->customer->id;
-        $request['payment_method'] = 'wallet';
-        $request['balance_before'] = $balance;
-        $request['ip_address'] = app('App\Http\Controllers\Controller')->getIpAddress();
-        $request['domain_name'] = app('App\Http\Controllers\Controller')->getDomainName();
-        $request['customer_email'] = auth()->user()->email;
-        $request['customer_phone'] = auth()->user()->phone;
-        $request['customer_name'] = auth()->user()->firstname;
-        $request['variation_id'] = $variation->id ?? null;
-        $request['product_id'] = $product->id;
-        $request['product_name'] = $product->name;
-        $request['variation_name'] = $variation->slug ?? null;
-        $request['category_id'] = $product->category->id;
-        $request['api_id'] = $variation->api->id ?? $product->api_id;
-        $request['product_slug'] = $variation->product->slug ?? $product->slug;
-        $request['variation_slug'] = $variation->slug ?? null;
-        $request['network'] = $variation->network ?? null;
-        $request['reason'] = 'Product Purchase';
-        $request['subscription_type'] = $variation->bouquet ?? 'change';
-
-        // Check request id format
-        $check = TransactionLog::where('reference_id', $request->request_id)->first();
-        if(!empty($check)){
-            return $this->responseService->formatServiceResponse("failed", '', ['DUPLICATE REQUEST ID DETECTED'], null);
-        }
-
-        if (app('App\Http\Controllers\Controller')->checkRequestIDFormat($request->request_id) == false) {
-            $log = "IMPROPER REQUEST ID";
-            //get full message
-            if (strlen($request->request_id) < 13) {
-                $log .= "- DOES NOT CONTAIN DATE";
-            } elseif (!is_numeric(substr($request->request_id, 0, 8))) {
-                $log .= ": IMPROPER DATE FORMAT – FIRST 8 CHARACTERS MUST BE DATE (TODAY’S DATE – YYYYMMDD)";
-            } elseif (substr($request->request_id, 0, 8) != date("Ymd")) {
-                $log .= "- NOT TODAY’S DATE – FIRST 8 CHARACTERS MUST BE TODAY’S DATE IN THIS FORMAT: YYYYMMDD";
-            } elseif (substr($request->request_id, 8, 2) != date("H")) {
-                $log .= "-  INCORRECT TIME – MAKE SURE YOU ARE USING GMT+1 AND YOUR HOUR IS IN 24 HOURLY FORMAT";
-            }
-            return $this->responseService->formatServiceResponse("failed", '', [$log], null);
-
-        }
-
-        $request['request_id'] = $request->request_id;
-        $request['transaction_id'] = 'KVTU-' .  $request['request_id'];
-        $request['unique_element'] = $request->billersCode;
-
-        // Log basic transaction
-        $transaction = app('App\Http\Controllers\TransactionController')->logTransaction($request->all());
-
-        // Log wallet
-        $wal = $wallet->logWallet($request->all());
-
-        // Update Customer Wallet
-        $wallet->updateCustomerWallet(auth()->user(), $request['total_amount'], $request['type']);
-
         // Process Transaction
         try {
             //code...
