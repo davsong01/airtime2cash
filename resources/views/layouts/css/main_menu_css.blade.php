@@ -5,6 +5,14 @@
 <style>
     /* Main Menu Base */
     /* -------------- */
+    body.semi-dark-layout .main-menu-content .navigation-main {
+      background-color: {{ getSettings()->menu_background_color }} !important;
+    }
+     body.vertical-layout.vertical-menu-modern .main-menu.menu-dark {
+      border-right: 1px solid  {{ getSettings()->menu_background_color }} !important;
+      background:  {{ getSettings()->menu_background_color }} !important;
+    }
+
     .menu-title{
       color: {{ getSettings()->menu_text_color }} !important;
     }

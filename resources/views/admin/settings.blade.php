@@ -211,13 +211,13 @@ use App\Models\PaymentGateway;
                                                                             <input class="form-control" type="color" name="dasboard_customer_details_color" value="{{ getSettings()->dasboard_customer_details_color ??  old('dasboard_customer_details_color') }}">
                                                                         </fieldset>
                                                                     </div>
-                                                                    <div class="col-md-6">
+                                                                    {{-- <div class="col-md-6">
                                                                         <fieldset class="form-group">
                                                                             <label for="">Active Hover Color</label>
                                                                             <input class="form-control" type="color" name="active_hover_color" value="{{ getSettings()->active_hover_color ??  old('active_hover_color') }}">
                                                                         </fieldset>
                                                                     </div>
-                                                                    
+                                                                     --}}
                                                                 </div>
                                                                 <div class="row">
                                                                     <div class="col-md-12">
