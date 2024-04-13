@@ -142,7 +142,7 @@ use App\Models\PaymentGateway;
                                                                                 <fieldset class="form-group">
                                                                                     <label for="dashboard_logo">Dashboard Logo</label>
                                                                                     <div class="custom-file">
-                                                                                        <input type="file" style="height:auto;width:120px" accept="image/*" class="custom-file-input" id="dashboard_logo" name="dashboard_logo">
+                                                                                        <input type="file" style="height:auto;width:120px;max-width: 100%;" accept="image/*" class="custom-file-input" id="dashboard_logo" name="dashboard_logo">
                                                                                         <label class="custom-file-label" for="dashboard_logo">Replace Dashboard Logo</label>
                                                                                     </div>
                                                                                 </fieldset>

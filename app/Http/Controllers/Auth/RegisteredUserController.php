@@ -58,7 +58,11 @@ class RegisteredUserController extends Controller
         $user->update([
             'api_key' =>  strrev(md5($user->username)),
         ]);
-        event(new Registered($user));
+
+        try {
+            //code...
+            event(new Registered($user));
+        } catch (\Throwable $th) {}
 
         $customer = Customer::create([
             'user_id' => $user->id,
