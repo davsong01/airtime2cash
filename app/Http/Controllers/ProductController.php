@@ -32,6 +32,7 @@ class ProductController extends Controller
                         if(!in_array($product['slug'], $allproducts)){
                             Product::create(
                                 [
+                                    "category_id" => $category->id,
                                     "name" => $product['display_name'],
                                     "display_name" => $product['display_name'],
                                     "slug" => $product['slug'],
@@ -42,6 +43,8 @@ class ProductController extends Controller
                                     "allow_quantity" => $product['allow_quantity'] ?? null,
                                     "fixed_price" => $product['fixed_price'] ?? null,
                                     "allow_subscription_type" => $product['allow_subscription_type'] ?? null,
+                                    "has_variations" => $product['has_variations'] ?? null,
+                                    "image" => $product['image'] ?? null ,
                                 ]
                             );
                         }
@@ -194,8 +197,10 @@ class ProductController extends Controller
 
         if (!empty($request->image)) {
             $image = $this->uploadFile($request->image, 'products');
+            $image = url('/').'/'.$image;
+        }else{
+            $image = $product->image;
         }
-
         $product->update([
             "name" => $request->name,
             "display_name" => $request->display_name,

@@ -160,7 +160,7 @@
                                                                                 @foreach($customerlevel as $level)
                                                                                 <fieldset class="form-group">
                                                                                     <label for="name">{{ $level->name }} Charge Rate (%)</label>
-                                                                                    <input type="number" class="form-control tiny" id="productlevel" name="productlevel[{{ $level->id }}]"  value="">
+                                                                                    <input type="number" class="form-control tiny" id="productlevel" name="productlevel[{{ $level->id }}]"  value="" required>
                                                                                 </fieldset>
                                                                                 @endforeach
                                                                                 <fieldset class="form-group">

@@ -2,7 +2,7 @@
     <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-xl" role="document">
         <div class="modal-content">
             <div class="modal-header bg-primary">
-                <h5 class="modal-title white" id="myModalLabel160">Add Variations for {{ $product->name }}</h5>
+                {{-- <h5 class="modal-title white" id="myModalLabel160">Add Variations for {{ $product->name }}</h5> --}}
                 <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                     <i class="bx bx-x"></i>
                 </button>

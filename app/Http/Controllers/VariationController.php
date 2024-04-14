@@ -13,16 +13,12 @@ class VariationController extends Controller
     public function pullVariations(Product $product)
     {
         $variations = app("App\Http\Controllers\Providers\KingsVtuController")->getVariations($product->slug);
-        
+       
         if (isset($variations['status']) && $variations['status'] == 'success') {
             $variations = $variations['data']['variations'] ?? [];
             if (!empty($variations)) {
                 foreach ($variations as $key => $variation) {
                     $variation = Variation::updateOrCreate([
-                        'product_id' => $product->id,
-                        'category_id' => $product->category_id,
-                        'api_id' => $product->api_id,
-                        'api_name' =>  $variation['name'],
                         'slug' => $variation['variation_slug'],
                     ], [
                         'product_id' => $product->id,

@@ -18,7 +18,7 @@
                 $balance = auth()->user()->type == 'customer' ? getSettings()->currency .number_format(walletBalance(auth()->user()), 2) : 0;
             ?>
             <li style="" class="navigation-header customer-details"><span>Wallet Balance</span><br>{!! $balance !!}</li>
-            <li style="" class="navigation-header customer-details"><span>Customer Level</span><br><strong>{{ auth()->user()->customer?->level?->name }}</strong></li>
+            {{-- <li style="" class="navigation-header customer-details"><span>Customer Level</span><br><strong>{{ auth()->user()->customer?->level?->name }}</strong></li> --}}
             <li class="block-header-color navigation-header"><span>Make Payment</span></li>
             <?php $categories = getCategories() ?>
             @foreach($categories as $category)
@@ -44,7 +44,7 @@
 
             <li class="svg {{ Route::is('downlines.*') ? 'active' : '' }} svg"><a href="{{ route('downlines')}}"><svg fill="white" xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24"><path d="M560-440q-50 0-85-35t-35-85q0-50 35-85t85-35q50 0 85 35t35 85q0 50-35 85t-85 35ZM280-320q-33 0-56.5-23.5T200-400v-320q0-33 23.5-56.5T280-800h560q33 0 56.5 23.5T920-720v320q0 33-23.5 56.5T840-320H280Zm80-80h400q0-33 23.5-56.5T840-480v-160q-33 0-56.5-23.5T760-720H360q0 33-23.5 56.5T280-640v160q33 0 56.5 23.5T360-400Zm440 240H120q-33 0-56.5-23.5T40-240v-440h80v440h680v80ZM280-400v-320 320Z"/></svg><span class="menu-title">&nbsp;Referral Earnings</span></a></li>
 
-            <li class="svg {{ Request::path() == 'customer-level-upgrade' ? 'active' : '' }}"><a href="{{ route('customer.level.upgrade')}}"><svg xmlns="http://www.w3.org/2000/svg" fill="white" height="24" viewBox="0 -960 960 960" width="24"><path d="M280-160v-80h400v80H280Zm160-160v-327L336-544l-56-56 200-200 200 200-56 56-104-103v327h-80Z"/></svg><span class="menu-title">&nbsp;Upgrade Account</span></a></li>
+            {{-- <li class="svg {{ Request::path() == 'customer-level-upgrade' ? 'active' : '' }}"><a href="{{ route('customer.level.upgrade')}}"><svg xmlns="http://www.w3.org/2000/svg" fill="white" height="24" viewBox="0 -960 960 960" width="24"><path d="M280-160v-80h400v80H280Zm160-160v-327L336-544l-56-56 200-200 200 200-56 56-104-103v327h-80Z"/></svg><span class="menu-title">&nbsp;Upgrade Account</span></a></li> --}}
 
             <li class="svg {{ Route::is('customer.load.wallet') ? 'active' : '' }}"><a href="{{ route('customer.load.wallet')}}"><svg xmlns="http://www.w3.org/2000/svg" height="24" fill="white" viewBox="0 -960 960 960" width="24"><path d="M200-200v-560 560Zm0 80q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v100h-80v-100H200v560h560v-100h80v100q0 33-23.5 56.5T760-120H200Zm320-160q-33 0-56.5-23.5T440-360v-240q0-33 23.5-56.5T520-680h280q33 0 56.5 23.5T880-600v240q0 33-23.5 56.5T800-280H520Zm280-80v-240H520v240h280Zm-160-60q25 0 42.5-17.5T700-480q0-25-17.5-42.5T640-540q-25 0-42.5 17.5T580-480q0 25 17.5 42.5T640-420Z"/></svg><span class="menu-title">&nbsp;Fund Wallet</span></a></li>
             

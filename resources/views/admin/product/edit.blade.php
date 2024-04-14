@@ -50,7 +50,7 @@
                                                     <div class="card-header">
                                                         @include('layouts.alerts')
                                                         <h4 class="card-title">Edit {{$product->name}}</h4>
-                                                        <img src="{{asset($product->image)}}" alt="" style="width: 70px;">
+                                                        <img src="{!! $product->image !!}" alt="" style="width: 70px;">
                                                     </div>
                                                     <div class="card-content">
                                                         <div class="card-body">
@@ -221,9 +221,9 @@
                                                                         {{-- Manual ADD Variations --}}
                                                                         <div class="modal-primary mr-1 mb-1 d-inline-block">
                                                                         <!-- Button trigger for primary themes modal -->
-                                                                        <button type="button" class="btn btn-outline-primary" data-toggle="modal" data-target="#primary">
+                                                                        {{-- <button type="button" class="btn btn-outline-primary" data-toggle="modal" data-target="#primary">
                                                                             Add Variations
-                                                                        </button>
+                                                                        </button> --}}
 
                                                                         @include('admin.product.add_variations_form')
                                                                     </div>

@@ -158,7 +158,7 @@
                                                                                 </fieldset>
                                                                                 <fieldset class="form-group">
                                                                                     <label for="name">@if($product->category->discount_type == 'flat') Charge Rate ({!! getSettings()['currency']!!}) @else Charge Rate (%) @endif</label>
-                                                                                    <input type="number" class="form-control tiny" id="rate" name="rate"  value="{{ $product->rate }}">
+                                                                                    <input type="number" class="form-control tiny" id="rate" name="rate"  value="{{ $product->rate }}" required>
                                                                                 </fieldset>
                                                                                 @foreach($customerlevel as $level)
                                                                                 <fieldset class="form-group">
@@ -201,11 +201,11 @@
                                                                         {{-- Manual ADD Variations --}}
                                                                         <div class="modal-primary mr-1 mb-1 d-inline-block">
                                                                         <!-- Button trigger for primary themes modal -->
-                                                                        <button type="button" class="btn btn-outline-primary" data-toggle="modal" data-target="#primary">
+                                                                        {{-- <button type="button" class="btn btn-outline-primary" data-toggle="modal" data-target="#primary">
                                                                             Add Variations
-                                                                        </button>
+                                                                        </button> --}}
 
-                                                                        @include('admin.product.add_variations_form')
+                                                                        {{-- @include('admin.product.add_variations_form') --}}
                                                                     </div>
                                                                         
                                                                         <a style="width:fit-content;" href="{{ route('variations.pull', $product->id) }}" class="btn btn-info mb-2 mt-1 d-flex align-items-center"><i class="bx bx-plus"></i>&nbsp; Pull Variations</a>
