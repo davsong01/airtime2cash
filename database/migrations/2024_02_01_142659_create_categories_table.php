@@ -15,7 +15,7 @@ return new class extends Migration
             Schema::create('categories', function (Blueprint $table) {
                 $table->id();
                 $table->string('name');
-                $table->string('icon')->nullable();
+                $table->text('icon')->nullable();
                 $table->string('status')->default('inactive');
                 $table->string('slug');
                 $table->string('unique_element')->default('phone');
@@ -30,7 +30,6 @@ return new class extends Migration
             });
         }
     }
-
     /**
      * Reverse the migrations.
      */
