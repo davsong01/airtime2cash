@@ -44,7 +44,7 @@ class Controller extends BaseController
 
         $response = curl_exec($ch);
        
-        \Log::info(['response' => $response, 'url' => $url, 'method' => $method, 'headers'=> $headers]);
+        // \Log::info(['response' => $response, 'url' => $url, 'method' => $method, 'headers'=> $headers]);
         return json_decode($response, true);
     }
 

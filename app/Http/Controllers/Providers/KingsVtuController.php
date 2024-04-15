@@ -79,7 +79,6 @@ class KingsVtuController extends Controller
                 'url' => $url
             ];
 
-            
             $response = $this->basicApiCall($url, $payload, $headers, 'POST');
 
             $extra_info = array_filter([
@@ -95,7 +94,8 @@ class KingsVtuController extends Controller
                 "KCT 2" => $response['content']["KCT 2"] ?? null
             ]);
 
-            if (isset($response['data']['status']) && $response['data']['status'] == 'success') {
+            $successTatus = ['success', 'delivered'];
+            if (isset($response['data']['status']) && in_array($response['data']['status'], $successTatus)) {
                 // success
                 $format = [
                     'status' => 'success',
