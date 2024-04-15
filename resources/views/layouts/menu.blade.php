@@ -18,7 +18,7 @@
                 $balance = auth()->user()->type == 'customer' ? getSettings()->currency .number_format(walletBalance(auth()->user()), 2) : 0;
             ?>
             <li style="" class="navigation-header customer-details"><span>Wallet Balance</span><br>{!! $balance !!}</li>
-            {{-- <li style="" class="navigation-header customer-details"><span>Customer Level</span><br><strong>{{ auth()->user()->customer?->level?->name }}</strong></li> --}}
+            <li style="" class="navigation-header customer-details"><span>Customer Level</span><br><strong>{{ auth()->user()->customer?->level?->name }}</strong></li>
             <li class="block-header-color navigation-header"><span>Make Payment</span></li>
             <?php $categories = getCategories() ?>
             @foreach($categories as $category)

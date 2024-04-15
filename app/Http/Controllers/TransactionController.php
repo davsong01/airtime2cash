@@ -277,15 +277,15 @@ class TransactionController extends Controller
             <strong>Transaction ID:</strong> ' . $log->transaction_id . '<br>
             <strong>Network:</strong> ' . $product->name . '<br>
             <strong>Payment Method:</strong> ' . $log-> payment_method . '<br>
-            <strong>Bank Name:</strong> ' . $log->bank_name . '<br>
-            <strong>Account Name:</strong> ' . $log->account_name . '<br>
-            <strong>Account Number:</strong> ' . $log->account_number. '<br>
             <strong>Transaction Date:</strong> ' . date("M jS, Y g:iA", strtotime($log->created_at)) . '<br><br>
             Warm Regards. (' . config('app.name') . ')<br/>
             </p>';
         $email = $request->email;
         logEmails($email, $subject, $body);
 
+        // <strong>Bank Name:</strong> ' . $log->bank_name . '<br>
+        // <strong>Account Name:</strong> ' . $log->account_name . '<br>
+        // <strong>Account Number:</strong> ' . $log->account_number. '<br>
         $string = "Hello Admin, I want to convert Airtime to cash on ". config('app.name'). ". Please find below details of the transaction below:".
         
         '*Name:* ' .auth()->user()->name. '
@@ -297,13 +297,12 @@ class TransactionController extends Controller
         *Transaction ID:* ' . $log->transaction_id . '
         *Network:* ' . $product->name . '
         *Payment Method:* ' . $log->payment_method . '
-        *Bank Name:* ' . $log->bank_name . '<br>
-        *Account Name:* ' . $log->account_name . '<br>
-        *Account Number:* ' . $log->account_number . '<br>
         *Transaction Date:* ' . date("M jS, Y g:iA", strtotime($log->created_at)) . '';
 
         $string = "https://api.whatsapp.com/send?phone=" . getSettings()->whatsapp_number . "&text=".urlencode($string);
-    
+        // *Bank Name:* ' . $log->bank_name . '<br>
+        // *Account Name:* ' . $log->account_name . '<br>
+        // *Account Number:* ' . $log->account_number . '<br>
         return redirect()->away($string);
     }
 
@@ -1552,8 +1551,8 @@ class TransactionController extends Controller
                 "Authorization: Bearer " . $token . "",
             ];
 
-            $verify = $control->basicApiCall($url2, $payload, $headers);
-
+            $verify = $control->basicApiCall($url2, json_encode($payload), $headers);
+            
             return response()->json([
                 'message' => $verify,
             ]);
