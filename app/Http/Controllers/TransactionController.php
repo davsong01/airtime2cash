@@ -1453,7 +1453,7 @@ class TransactionController extends Controller
                     "Authorization: Bearer " . $token . "",
                 ];
 
-                $verify = $control->basicApiCall($url2, $payload, $headers);
+                $verify = $control->basicApiCall($url2, json_encode($payload), $headers);
                 
                 $transaction->update(['bank_transfer_api_response' => array_merge(['Action: ' => 'TRANSFER'], $verify ?? ['Response:' => 'NO RESPONSE'])]);
                 
