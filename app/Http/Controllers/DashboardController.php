@@ -459,7 +459,7 @@ class DashboardController extends Controller
         }
 
         $requestId = $controller->generateRequestId();
-        $tid = 'KVTU-' . $requestId;
+        $tid = 'A2C-' . $requestId;
         $customer = auth()->user()->customer;
 
         try {

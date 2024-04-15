@@ -2,18 +2,19 @@
 
 namespace App\Http\Controllers\Auth;
 
-use App\Http\Controllers\Controller;
-use App\Models\Customer;
-use App\Models\KycData;
 use App\Models\User;
-use App\Providers\RouteServiceProvider;
-use Illuminate\Auth\Events\Registered;
-use Illuminate\Http\RedirectResponse;
+use App\Models\KycData;
+use App\Models\Customer;
+use Illuminate\View\View;
 use Illuminate\Http\Request;
+use App\Models\EmailApiSetting;
+use Illuminate\Validation\Rules;
+use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rules;
-use Illuminate\View\View;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Auth\Events\Registered;
+use App\Providers\RouteServiceProvider;
 
 class RegisteredUserController extends Controller
 {
@@ -61,6 +62,25 @@ class RegisteredUserController extends Controller
 
         try {
             //code...
+            $provider = EmailApiSetting::first();
+
+            if (!empty($provider)) {
+                config([
+                    'mail.driver' => $provider->MAIL_DRIVER,
+                    'mail.host' => $provider->MAIL_HOST,
+                    'mail.port' => $provider->MAIL_PORT,
+                    'mail.encryption' => $provider->MAIL_ENCRYPTION,
+                    'mail.username' => $provider->MAIL_USERNAME,
+                    'mail.password' => $provider->MAIL_PASSWORD,
+                    'mail.replyToName' => $provider->MAIL_REPLY_TO_NAME,
+                    'mail.replyToAddress' => $provider->MAIL_REPLY_TO_ADDRESS,
+                    'mail.from' => [
+                        'address' => $provider->MAIL_FROM_ADDRESS,
+                        'name' => $provider->MAIL_FROM_NAME,
+                    ],
+                ]);
+                $current['provider'] = $provider->toArray();
+            }
             event(new Registered($user));
         } catch (\Throwable $th) {}
 

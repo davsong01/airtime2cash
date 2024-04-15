@@ -161,7 +161,7 @@ class TransactionController extends Controller
         $request_id = $this->generateRequestId();
         $request['type'] = 'debit';
         $request['customer_id'] = auth()->user()->customer->id;
-        $request['transaction_id'] = 'KVTU-' . $request_id;
+        $request['transaction_id'] = 'A2C-' . $request_id;
         $request['request_id'] = $request_id;
         $request['payment_method'] = 'wallet';
         $request['balance_before'] = $balance;
@@ -1254,7 +1254,7 @@ class TransactionController extends Controller
         }
 
         $requestId = $controller->generateRequestId();
-        $tid = 'KVTU-' . $requestId;
+        $tid = 'A2C-' . $requestId;
         $reason = $type == 'debit' ? 'ADMIN-DEBIT' : 'ADMIN-CREDIT';
         try {
             //code...
@@ -1354,7 +1354,7 @@ class TransactionController extends Controller
     }
 
     public function changeTransactionMethod(Request $request, Airtime2CashTransactions $transaction){
-       
+    
         $transaction->update([
             'payment_method' => $request->payment_method,
             'bank_code' => $request->bank ?? $transaction->bank_code,

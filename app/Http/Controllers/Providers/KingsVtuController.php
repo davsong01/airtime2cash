@@ -81,9 +81,6 @@ class KingsVtuController extends Controller
 
             
             $response = $this->basicApiCall($url, $payload, $headers, 'POST');
-            
-            $successCodes = ['000'];
-            $failCodes = ['016'];
 
             $extra_info = array_filter([
                 "Token Amount" => $response['content']["tokenAmount"] ?? null,
@@ -98,7 +95,7 @@ class KingsVtuController extends Controller
                 "KCT 2" => $response['content']["KCT 2"] ?? null
             ]);
 
-            if (isset($response['status']) == 'success') {
+            if (isset($response['status']) && $response['status'] == 'success') {
                 // success
                 $format = [
                     'status' => 'success',

@@ -57,10 +57,10 @@
                                                         <label for="secret_key">Secret key</label>
                                                         <input type="text" class="form-control" id="secret_key" name="secret_key" value="{{ $paymentgateway->secret_key ?? old('secret_key') }}" placeholder="Enter Secret Key">
                                                     </fieldset>
-                                                    <fieldset class="form-group">
+                                                    {{-- <fieldset class="form-group">
                                                         <label for="public_key">Public key</label>
                                                         <input type="text" class="form-control" id="public_key" name="public_key" value="{{ $paymentgateway->public_key ?? old('public_key') }}" placeholder="Enter Public Key">
-                                                    </fieldset>
+                                                    </fieldset> --}}
                                                     <fieldset class="form-group">
                                                         <label for="contract_id">Contract ID</label>
                                                         <input type="text" class="form-control" id="contract_id" name="contract_id" value="{{ $paymentgateway->contract_id ?? old('contract_id') }}" placeholder="Enter Contract Id">

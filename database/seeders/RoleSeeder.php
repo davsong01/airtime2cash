@@ -231,7 +231,13 @@ class RoleSeeder extends Seeder
 
         // Create new Settings here
 
+        // Create Annoucements
+        DB::statement("INSERT INTO `announcements` (`id`, `title`, `status`, `type`, `message`, `created_at`, `updated_at`) VALUES
+        (1, 'Pop-up Announcement', 'inactive', 'popup', '<p>sdd</p>', '2024-04-14 20:00:10', '2024-04-14 20:00:10'),
+        (2, 'Scroll Announcement', 'inactive', 'scroll', '<p>sddsds</p>', '2024-04-14 20:00:10', '2024-04-14 20:00:10');");
+        
         // Create default user and admin
+        
         // Banks for airtime to cash
         $url = "https://sagecloud.ng/api/v2/merchant/authorization";
         $payload = [
