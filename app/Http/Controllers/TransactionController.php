@@ -344,7 +344,6 @@ class TransactionController extends Controller
         $failure_reason = '';
         $api = $variation->api ?? $product->api;
         // Get Api
-        $file_name = $api->file_name;
         $query = app("App\Http\Controllers\Providers\KingsVtuController")->query($request, $variation->api ?? $product->api, $variation, $product);
         
         try {
@@ -359,6 +358,16 @@ class TransactionController extends Controller
                 ];
 
                 $user_status = 'success';
+                $balance_after = $request['balance_before'] - $request['total_amount'];
+            } else  if (isset($query) && $query['status_code'] == 2) {
+                $user = auth()->user();
+                // $this->referralReward($user->referral, $request['total_amount'], $user->customer->id, $request['transaction_id'], $product->referral_percentage);
+                $res = [
+                    'status' => $query['status'],
+                    'message' => 'Transaction Pending!',
+                ];
+
+                $user_status = 'pending';
                 $balance_after = $request['balance_before'] - $request['total_amount'];
             } else if (isset ($query) && $query['status_code'] == 0) {
                 // Log wallet
@@ -456,8 +465,7 @@ class TransactionController extends Controller
 
         $product = $variation->product;
         $api = $variation->api;
-        $file_name = $variation->api->file_name;
-
+        
         $request['product_name'] = $product->name ?? null;
         $request['variation_name'] = $variation->slug ?? null;
         $request['category_id'] = $product->category->id ?? null;

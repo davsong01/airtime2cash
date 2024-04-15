@@ -95,7 +95,7 @@ class KingsVtuController extends Controller
                 "KCT 2" => $response['content']["KCT 2"] ?? null
             ]);
 
-            if (isset($response['status']) && $response['status'] == 'success') {
+            if (isset($response['data']['status']) && $response['data']['status'] == 'success') {
                 // success
                 $format = [
                     'status' => 'success',
@@ -107,6 +107,16 @@ class KingsVtuController extends Controller
                     'status_code' => 1,
                     'extras' => $response['purchased_code'] ?? null,
                     'extra_info' => !empty($extra_info) ? $extra_info : [],
+                ];
+            }else if (isset($response['data']['status']) && $response['data']['status'] == 'failed') {
+                $format = [
+                    'status' => 'failed',
+                    'user_status' => 'failed',
+                    'api_response' => $response,
+                    'description' => 'Transaction failed',
+                    'message' => 'Transaction failed',
+                    'payload' => $payload,
+                    'status_code' => 0,
                 ];
             } else {
                 // attention required
