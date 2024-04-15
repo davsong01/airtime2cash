@@ -142,14 +142,14 @@ use App\Models\PaymentGateway;
                                                                                 <fieldset class="form-group">
                                                                                     <label for="dashboard_logo">Dashboard Logo</label>
                                                                                     <div class="custom-file">
-                                                                                        <input type="file" style="height:auto;width:120px;max-width: 100%;" accept="image/*" class="custom-file-input" id="dashboard_logo" name="dashboard_logo">
+                                                                                        <input type="file" style="height:auto;width:100%;max-width: 100%;" accept="image/*" class="custom-file-input" id="dashboard_logo" name="dashboard_logo">
                                                                                         <label class="custom-file-label" for="dashboard_logo">Replace Dashboard Logo</label>
                                                                                     </div>
                                                                                 </fieldset>
                                                                             </div>
                                                                             <div class="col-md-4">
                                                                                 @if(!empty(getSettings()->dashboard_logo))
-                                                                                    <img style="height:62px;width:auto" src="{{ asset(getSettings()->dashboard_logo)}}" alt="">
+                                                                                    <img style="height:auto;width:100%;max-width: 100%" src="{{ asset(getSettings()->dashboard_logo)}}" alt="">
                                                                                 @endif
                                                                             </div>
                                                                         </div>
