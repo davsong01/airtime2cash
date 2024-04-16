@@ -92,7 +92,7 @@ class PaymentController extends Controller
     public function analyzeCallbackResponse()
     {
         try {
-            DB::beginTransaction();
+            
             $calls = ReservedAccountCallback::where(['status' => 'pending'])->orderBy('id', 'ASC')
                 ->take(5)
                 ->get()
@@ -107,19 +107,21 @@ class PaymentController extends Controller
             ReservedAccountCallback::whereIn('id', $ids)->update(['status' => $tlk]);
             
             $calls = ReservedAccountCallback::where(['status' => $tlk])->get()->toArray();
-
+            
             foreach ($calls as $call) {
+                // DB::beginTransaction();
+                
                 $decodeCall = json_decode($call['raw'], true);
                 $account = ReservedAccountNumber::with('customer')->where('account_number', $call['account_number'])->first();
                 $provider = PaymentGateway::where('id', $call['provider_id'])->first();
-
+                
                 if (!$account) {
                     continue;
                 }
 
                 $customer = $account->customer;
                 $user = $account->customer->user;
-
+                
                 if ($call['provider_id'] == 1) {
                     $payment_type = $call['payment_method'];
 
@@ -130,6 +132,7 @@ class PaymentController extends Controller
                     }
 
                     $analyze = app('App\Http\Controllers\PaymentProcessors\MonnifyController')->verifyTransaction($call['transaction_reference']);
+                    
                     ReservedAccountCallback::where('id', $call['id'])->update(['raw_requery' => json_encode($analyze['data'])]);
 
                     if (isset($analyze) && $analyze['status'] == 'success') {
@@ -201,7 +204,7 @@ class PaymentController extends Controller
 
                 //
                 ReservedAccountCallback::where('id', $call['id'])->update(['status' => 'analyzed']);
-                DB::commit();
+                // DB::commit();
             }
         } catch (\Throwable $th) {
             DB::rollBack();
@@ -290,5 +293,13 @@ class PaymentController extends Controller
     {
         $calls = ReservedAccountCallback::orderBy('status', 'DESC')->paginate();
         return view('admin.transaction.raw_callbacks', compact('calls'));
+    }
+
+    public function resetCallBackResponse(ReservedAccountCallback $callback)
+    {
+        $callback->status = 'pending';
+        $callback->save();
+
+        return back()->with('message', 'Operation Successful');
     }
 }

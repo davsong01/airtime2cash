@@ -9,6 +9,7 @@
                     <div class="card-header">
                         <!-- head -->
                         <h5 class="card-title mb-2">Raw Callbacks</h5>
+                        @include('layouts.alerts')
                         <div class="d-inline-block">
                             <!-- chart-1   -->
                             <div class="d-flex market-statistics-1">
@@ -45,10 +46,10 @@
                                                 <a class="btn btn-primary btn-sm mr-1 mb-1" href="{{ route('admin.single.transaction.view', $call->transaction->id) }}">
                                                     <i class="fa fa-eye"></i><span class="align-middle ml-25">View Transaction</span>
                                                 </a>
-                                                {{-- @else
-                                                <a class="btn btn-primary btn-sm mr-1 mb-1" href="{{ route('admin.single.transaction.view', $call->transaction->id) }}">
-                                                    <i class="fa fa-eye"></i><span class="align-middle ml-25">Analyze Manually Transaction</span>
-                                                </a> --}}
+                                                @else
+                                                <a class="btn btn-primary btn-sm mr-1 mb-1" href="{{ route('callback.reset', $call->id) }}">
+                                                    <i class="fa fa-eye"></i><span class="align-middle ml-25">Reset</span>
+                                                </a>
                                                 @endif
                                             </td>
                                             
