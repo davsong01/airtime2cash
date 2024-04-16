@@ -52,116 +52,120 @@
                                                     <div class="card-body">
                                                         <form action="{{route('initialize.airtime2cashtransaction')}}" method="POST"  id="initialize">
                                                             @csrf
-
                                                             <div class="row">
-                                                                <div class="col-md-6">
+                                                                <div class="col-md-6 order-2 order-sm-1">
                                                                     <h5>Airtime to Cash</h5>
-                                                                    <div class="d-flex pb-1 justify-content-start align-items-center w-100">
-                                                                        <img class="product-images product-image" style="padding-right: 8px;height: 70px;" id="product-image" src="" alt="">
-                                                                        <div>
-                                                                            <h5 id="product-title" style="color:#174159;padding-top: 19px;"><strong></strong>
-                                                                            </h5>
-                                                                            <p style="" id="product-description" style="line-height: 1.4;"></p>
+                                                                        <div class="d-flex pb-1 justify-content-start align-items-center w-100">
+                                                                            <img class="product-images product-image" style="padding-right: 8px;height: 70px;" id="product-image" src="" alt="">
+                                                                            <div>
+                                                                                <h5 id="product-title" style="color:#174159;padding-top: 19px;"><strong></strong>
+                                                                                </h5>
+                                                                                <p style="" id="product-description" style="line-height: 1.4;"></p>
+                                                                            </div>
                                                                         </div>
-                                                                    </div>
-                                                                    <div class="row">
-                                                                        <div class="col-md-12">
-                                                                            <fieldset class="form-group">
-                                                                                <label for="product">Select Network Provider</label>
-
-                                                                                <select class="form-control js-example-basic-single" name="product" id="product" required>
-                                                                                    <option value="">Select</option>
-                                                                                    @foreach ($category->products as $item)
-                                                                                        <option value="{{ $item->id  }}" data-discounted_rate = {{ $item->discounted_rate }} data-allow_quantity="{{ $item->allow_quantity }}" data-min="{{ $item->min}}" data-max="{{$item->max}}" data-system_price="{{ $item->system_price }}" data-fixed_price="{{ $item->fixed_price}}" data-image="{{ asset($item->image) }}" data-name="{{ $item->name }}" data-instruction="{{ $item->instruction }}" data-rate="{{ $item->rate }}" data-description="{{ $item->description }}" {{ old('product') == $item->id ? 'selected' : ''}} {{ old('product') == $item->id ? 'selected' : ''}}>{{ $item->display_name }}</option>
-                                                                                    @endforeach
-                                                                                </select>
-                                                                                <div class="footnote">
-                                                                                    <small>This clearly tells us the network you wish to convert.</small>
-                                                                                </div>
-                                                                            </fieldset>
+                                                                        <div class="row">
+                                                                            <div class="col-md-12">
+                                                                                <fieldset class="form-group">
+                                                                                    <label for="product">Select Network Provider</label>
+                                                                                    <select class="form-control js-example-basic-single" name="product" id="product" required>
+                                                                                        <option value="">Select</option>
+                                                                                        @foreach ($category->products as $item)
+                                                                                            <option value="{{ $item->id }}" data-discounted_rate = {{ $item->discounted_rate }} data-allow_quantity="{{ $item->allow_quantity }}" data-min="{{ $item->min}}" data-max="{{$item->max}}" data-system_price="{{ $item->system_price }}" data-fixed_price="{{ $item->fixed_price}}" data-image="{{ asset($item->image) }}" data-name="{{ $item->name }}" data-instruction="{{ $item->instruction }}" data-rate="{{ $item->rate }}" data-description="{{ $item->description }}" {{ old('product') == $item->id ? 'selected' : ''}} {{ old('product') == $item->id ? 'selected' : ''}}>{{ $item->display_name }}</option>
+                                                                                        @endforeach
+                                                                                    </select>
+                                                                                    <div class="footnote">
+                                                                                        <small>This clearly tells us the network you wish to convert.</small>
+                                                                                    </div>
+                                                                                </fieldset>
+                                                                            </div>
+                                                                            <div class="col-md-12" id="rate-div" style="display:none">
+                                                                                <fieldset class="form-group">
+                                                                                    <label for="rate" class="">Charge Rate (%)</label>
+                                                                                    <input class="form-control" id="rate" name="rate" required="" type="number" disabled>
+                                                                                </fieldset>
+                                                                            </div>
+                                                                            <div class="col-md-12">
+                                                                                <fieldset class="form-group">
+                                                                                    <label for="email">Email Address</label>
+                                                                                    <input type="text" class="form-control" id="email" name="email" value="{{ auth()->user()->email ?? old('email')}}" required>
+                                                                                </fieldset>
+                                                                            </div>
+                                                                            <div class="col-md-12">
+                                                                                <fieldset class="form-group">
+                                                                                    <label for="phone">Phone Number(s)</label>
+                                                                                    <input type="text" class="form-control" id="phone" name="phone" value="{{ old('phone')}}" required>
+                                                                                    <div class="footnote">
+                                                                                        <small>We need to know the phone number(s) you are sending from so as to confirm when your airtime gets to us. Seperate each number with a coma</small>
+                                                                                    </div>
+                                                                                </fieldset>
+                                                                            </div>
+                                                                            <div class="col-md-12">
+                                                                                <fieldset class="form-group" id="amount-div">
+                                                                                    <label for="amount" class="">Airtime Amount to sell {!! getSettings()['currency'] !!}</label>
+                                                                                    <input class="form-control" id="amount" name="amount" placeholder="Enter Amount to sell" required="" type="number" required>
+                                                                                    <div class="footnote">
+                                                                                        <small>Type amount in Naira.</small><small style="color:red" id="airtime-range"></small>
+                                                                                    </div>
+                                                                                </fieldset>
+                                                                            </div>
+                                                                            
+                                                                            <div class="col-md-12" id="receive-div" style="display:none">
+                                                                                <fieldset class="form-group">
+                                                                                    <label for="receive" class="">Amount to receive  {!! getSettings()['currency'] !!}</label>
+                                                                                    <input class="form-control" id="receive" name="receive" required="" type="number" disabled>
+                                                                                </fieldset>
+                                                                            </div>
+                                                                            <div class="col-md-12" id="payment-div" style="display:none">
+                                                                                <fieldset class="form-group">
+                                                                                    <label for="payment_method">Select Payment Method </label>
+                                                                                    <select class="form-control" name="payment_method" id="payment_method" required>
+                                                                                        <option value="">Select</option>
+                                                                                        <option value="Transfer to Bank Account">PAYMENT TO MY BANK ACCOUNT</option>
+                                                                                        <option value="Transfer to Wallet">PAYMENT TO MY AIRTIME2CASH WALLET</option>
+                                                                                    </select>
+                                                                                    <div class="footnote">
+                                                                                        <small>Where should your payment go to. If you select bank transfer, please ensure that you have entered your bank account details here</small>
+                                                                                    </div>
+                                                                                </fieldset>
+                                                                            </div>
+                                                                            <div class="col-md-12" id="bank-details-div" style="display:none">
+                                                                                <fieldset class="form-group">
+                                                                                    <label for="payment_method">Select Bank </label>
+                                                                                    <select class="form-control" name="bank" id="bank">
+                                                                                        <option value="">Select</option>
+                                                                                        @foreach($banks as $bank)
+                                                                                        <option value="{{ $bank->cbn_code }}">{{ $bank->bank_name }}</option>
+                                                                                        @endforeach
+                                                                                    </select>
+                                                                                </fieldset>
+                                                                                <fieldset class="form-group">
+                                                                                    <label for="receive" class="">Account Number</label>
+                                                                                    <input class="form-control" id="account_number" name="account_number" type="text">
+                                                                                </fieldset>
+                                                                                <fieldset class="form-group">
+                                                                                    <label for="receive" class="">Account Name</label>
+                                                                                    <input class="form-control" id="account_name" name="account_name" type="text">
+                                                                                </fieldset>
+                                                                                <small class="footnote" style="color:red">Please ensure that bank details entered are correct to enable us complete the transaction</small>
+                                                                            </div>
                                                                         </div>
-                                                                        <div class="col-md-12" id="rate-div" style="display:none">
-                                                                            <fieldset class="form-group">
-                                                                                <label for="rate" class="">Charge Rate (%)</label>
-                                                                                <input class="form-control" id="rate" name="rate" required="" type="number" disabled>
-                                                                            </fieldset>
-                                                                        </div>
-                                                                        <div class="col-md-12">
-                                                                            <fieldset class="form-group">
-                                                                                <label for="email">Email Address</label>
-                                                                                <input type="text" class="form-control" id="email" name="email" value="{{ auth()->user()->email ?? old('email')}}" required>
-                                                                            </fieldset>
-                                                                        </div>
-                                                                        <div class="col-md-12">
-                                                                            <fieldset class="form-group">
-                                                                                <label for="phone">Phone Number(s)</label>
-                                                                                <input type="text" class="form-control" id="phone" name="phone" value="{{ old('phone')}}" required>
-                                                                                <div class="footnote">
-                                                                                    <small>We need to know the phone number(s) you are sending from so as to confirm when your airtime gets to us. Seperate each number with a coma</small>
-                                                                                </div>
-                                                                            </fieldset>
-                                                                        </div>
-                                                                        <div class="col-md-12">
-                                                                            <fieldset class="form-group" id="amount-div">
-                                                                                <label for="amount" class="">Airtime Amount to sell {!! getSettings()['currency'] !!}</label>
-                                                                                <input class="form-control" id="amount" name="amount" placeholder="Enter Amount to sell" required="" type="number" required>
-                                                                                <div class="footnote">
-                                                                                    <small>Type amount in Naira.</small><small style="color:red" id="airtime-range"></small>
-                                                                                </div>
-                                                                            </fieldset>
-                                                                        </div>
-                                                                        
-                                                                        <div class="col-md-12" id="receive-div" style="display:none">
-                                                                            <fieldset class="form-group">
-                                                                                <label for="receive" class="">Amount to receive  {!! getSettings()['currency'] !!}</label>
-                                                                                <input class="form-control" id="receive" name="receive" required="" type="number" disabled>
-                                                                            </fieldset>
-                                                                        </div>
-                                                                        <div class="col-md-12" id="payment-div" style="display:none">
-                                                                            <fieldset class="form-group">
-                                                                                <label for="payment_method">Select Payment Method </label>
-                                                                                <select class="form-control" name="payment_method" id="payment_method" required>
-                                                                                    <option value="">Select</option>
-                                                                                    <option value="Transfer to Bank Account">PAYMENT TO MY BANK ACCOUNT</option>
-                                                                                    <option value="Transfer to Wallet">PAYMENT TO MY AIRTIME2CASH WALLET</option>
-                                                                                </select>
-                                                                                <div class="footnote">
-                                                                                    <small>Where should your payment go to. If you select bank transfer, please ensure that you have entered your bank account details here</small>
-                                                                                </div>
-                                                                            </fieldset>
-                                                                        </div>
-                                                                        <div class="col-md-12" id="bank-details-div" style="display:none">
-                                                                            <fieldset class="form-group">
-                                                                                <label for="payment_method">Select Bank </label>
-                                                                                <select class="form-control" name="bank" id="bank">
-                                                                                    <option value="">Select</option>
-                                                                                    @foreach($banks as $bank)
-                                                                                    <option value="{{ $bank->cbn_code }}">{{ $bank->bank_name }}</option>
-                                                                                    @endforeach
-                                                                                </select>
-                                                                            </fieldset>
-                                                                            <fieldset class="form-group">
-                                                                                <label for="receive" class="">Account Number</label>
-                                                                                <input class="form-control" id="account_number" name="account_number" type="text">
-                                                                            </fieldset>
-                                                                            <fieldset class="form-group">
-                                                                                <label for="receive" class="">Account Name</label>
-                                                                                <input class="form-control" id="account_name" name="account_name" type="text">
-                                                                            </fieldset>
-                                                                            <small class="footnote" style="color:red">Please ensure that bank details entered are correct to enable us complete the transaction</small>
-                                                                        </div>
-                                                                    </div>
-                                                                </form>
+                                                                    
                                                                     <button id="buy-buttonx"style="margin-top:4px" class="btn btn-primary" type="submit" onclick="submitForm()">PROCEED </button>
                                                                 </div>
-                                                                <div class="col-md-6">   
+                                                                <div class="col-md-6 order-1 order-sm-2">   
                                                                     <div id="instruction-div" style="display: none">
                                                                         <p style="background-color: rgb(220, 227, 231);padding: 15px;border-radius: 5px;margin-bottom: 15px;color: rgb(40, 83, 107);">Instructions</p>
                                                                         <p id="instruction"></p>
-                                                                    </div>                                                                 
+                                                                        <div class="form-group mb-50 mt-2 ">
+                                                                            <div class="checkbox checkbox-success checkbox-glow">
+                                                                                <input type="checkbox" id="agreement" name="agreement" required>
+                                                                                <label for="agreement"><p>I have read and agree to these instructions</p></label>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div> 
                                                                 </div>
                                                             </div>
-
+                                                        </form>
                                                     </div>
                                                 </div>
                                             </div>
@@ -205,14 +209,18 @@
         // Loop through each input and perform validation
         for (var i = 0; i < inputs.length; i++) {
             var input = inputs[i];
-
             // Check if the input is required and empty
             if (input.hasAttribute("required") && input.value.trim() === "") {
-                alert("Please fill all inputs");
+                alert("The " + input.name + " field is required" );
                 return;
             }
         }
-
+    
+        if ($('#agreement').prop('checked') == false){
+            return alert('You must agree to the instructions');
+            $("#agreement").focus();
+        }
+        
         if ($("#payment_method").val() === "") {
             alert("Please fill all inputs");
             return;
@@ -230,6 +238,7 @@
         $('#payment_method').val('');
 
         $('#product').on('change', function () {
+            $('#agreement').prop('checked', false);
             var fixed_price = $('#product').find(':selected').data('fixed_price');
             var system_price = $('#product').find(':selected').data('system_price');
             var discounted_rate = $('#product').find(':selected').data('discounted_rate');

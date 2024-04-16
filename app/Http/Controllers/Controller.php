@@ -130,7 +130,6 @@ class Controller extends BaseController
     public function sendTransactionEmail($transaction, $user)
     {
         if (getSettings()->transaction_email_notification == 'yes') {
-            
             $variation_name =  isset($transaction->variation) ? ' | ' . $transaction->variation->system_name : '';
             $product =  $transaction->product->name ?? '' .  $variation_name;
             $extras = isset($transaction->extras) ? $transaction->extras : '';
@@ -176,7 +175,7 @@ class Controller extends BaseController
             <br>Warm Regards. (' . config('app.name') . ')<br/>
             </p>';
 
-            $email = $user->email ?? 'noreply@kingsvtu.com';
+            $email = $user->email ?? 'noreply@airtime2cash.com';
             logEmails($email, $subject, $body);
         }
     }

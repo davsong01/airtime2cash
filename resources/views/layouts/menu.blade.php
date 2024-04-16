@@ -33,6 +33,16 @@
                 </svg>
                 <span class="menu-title"> &nbsp;Airtime To Cash</span></a>
             </li>
+
+            <?php
+                $wallet2bank = App\Models\Product::where('id', env('TRANSFER_TO_BANK_PRODUCT_ID'))->first();
+            ?>
+            @if($wallet2bank)
+            <li class="{{ Route::is('wallet-to-bank.*') ? 'active' : '' }} svg"><a target="_blank" href="{{ route('wallet-to-bank', $wallet2bank->slug )}}">
+                <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24"><path d="M200-280v-280h80v280h-80Zm240 0v-280h80v280h-80ZM80-640v-80l400-200 400 200v80H80Zm179-80h442L480-830 259-720ZM80-120v-80h482q2 21 5 40.5t9 39.5H80Zm600-310v-130h80v90l-80 40ZM800 0q-69-17-114.5-79.5T640-218v-102l160-80 160 80v102q0 76-45.5 138.5T800 0Zm-29-120 139-138-42-42-97 95-39-39-42 43 81 81ZM259-720h442-442Z"/></svg>
+                <span class="menu-title"> &nbsp;{{ $wallet2bank->display_name }}</span></a>
+            </li>
+            @endif
             <li class="block-header-color navigation-header"><span>Self Service</span></li>
             <li class="{{ Route::is('dashboard') ? 'active' : '' }} nav-item svg"><a href="{{ route('dashboard') }}"><svg
             xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" fill="white"

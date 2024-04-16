@@ -67,6 +67,26 @@ class TransactionController extends Controller
         }
     }
 
+    public function walletToBank($slug)
+    {
+        $route = '<a style="color: yellow;" href="' . route("update.kyc.details") . '">HERE</a>';
+        
+        if (auth()->user()->customer->kyc_status == 'unverified') {
+            return back()->with('error', 'Wallet to bank conversion is only available for fully verified clients, please click ' . $route . ' to get verified');
+        }
+
+        $product = Product::where('slug', $slug)->first();
+        $banks = Bank::all();
+        
+        if(walletBalance(auth()->user()) <= env('BANK_TRANSFER_CHARGES')){
+            return back()->with('error', 'You need above '. getSettings()['currency'] . number_format(env('BANK_TRANSFER_CHARGES')). ' wallet balance to use this feature!');
+        }
+        if (!empty($product) && $product->status == 'active') {
+            return view('customer.wallet2bank_transfer_page', compact('product', 'banks'));
+        } else {
+            return back();
+        }
+    }
 
     public function initializeTransaction(Request $request)
     {
@@ -237,6 +257,7 @@ class TransactionController extends Controller
         }else{
             $bank_name = '';
         }
+        
         $transaction = [
             'amount_charged' => $amount_charged,
             'amount_paid' => $amount_paid,
@@ -286,9 +307,9 @@ class TransactionController extends Controller
         // <strong>Bank Name:</strong> ' . $log->bank_name . '<br>
         // <strong>Account Name:</strong> ' . $log->account_name . '<br>
         // <strong>Account Number:</strong> ' . $log->account_number. '<br>
-        $string = "Hello Admin, I want to convert Airtime to cash on ". config('app.name'). ". Please find below details of the transaction below:".
+        $string = 'Hello Admin, I want to convert Airtime to cash on '. config("app.name"). '. Please find below details of the transaction below: 
         
-        '*Name:* ' .auth()->user()->name. '
+        *Name:* ' .auth()->user()->name. '
         *Amount Charged:* ' .getSettings()->currency . number_format($log->amount_charged, 2). '
         *Amount to Receive:* ' . getSettings()->currency . number_format($log->amount_paid, 2) . '
         *Charge Rate:* ' . number_format($log->charge_rate) . '
@@ -299,11 +320,148 @@ class TransactionController extends Controller
         *Payment Method:* ' . $log->payment_method . '
         *Transaction Date:* ' . date("M jS, Y g:iA", strtotime($log->created_at)) . '';
 
+        if($log->payment_method == 'Transfer to Bank Account'){
+            $string .= '
+            *Bank Name:* ' . $log->bank_name . '
+            *Account Name:* ' . $log->account_name . '
+            *Account Number:* ' . $log->account_number . '';
+        }
+        
         $string = "https://api.whatsapp.com/send?phone=" . getSettings()->whatsapp_number . "&text=".urlencode($string);
-        // *Bank Name:* ' . $log->bank_name . '<br>
-        // *Account Name:* ' . $log->account_name . '<br>
-        // *Account Number:* ' . $log->account_number . '<br>
+        // dd($string);
         return redirect()->away($string);
+    }
+
+    public function initializeWalletToBankTransaction(Request $request, Product $product)
+    {
+        if (empty($product)) {
+            return back()->with('error', 'The selected product/service does not seem to exist, kindly try again');
+        }
+
+        $max =  walletBalance(auth()->user()) - env('BANK_TRANSFER_CHARGES');
+        $min = 1;
+        $rate = $product->discounted_rate;
+        $amount = $this->removeCharsInAmount($request->amount);
+        
+        if ($amount <= $min) {
+            return back()->with('error', 'Invalid amount entered');
+        }
+
+        if ($amount > $max) {
+            return back()->with('error', 'Invalid amount entered');
+        }
+
+        $bank = Bank::where('cbn_code', $request->bank)->first();
+        
+        if (!empty($bank)) {
+            $bank_name = $bank->bank_name;
+        } else {
+            return back()->with('error', 'Invalid bank selected');
+        }
+
+        $request['quantity'] = 1;
+        $request['total_amount'] = $amount + env('BANK_TRANSFER_CHARGES');
+        $request['amount'] = $amount ;
+        
+        // Get Wallet Balance
+        $balance = walletBalance(auth()->user());
+        
+        if ($balance < $request['total_amount']) {
+            return back()->with('error', 'Insufficient Wallet Balance, Please try again');
+        }
+
+        // $transaction_id = 'W2B-' . $this->generateRequestId(); 
+        // $transaction = [
+        //     'amount_charged' => $amount,
+        //     'amount_paid' => $amount,
+        //     'charge_rate' => env('BANK_TRANSFER_CHARGES'),
+        //     'product_id' => $product->id,
+        //     'customer_id' => auth()->user()->customer->id,
+        //     'type' => 'debit',
+        //     'transaction_id' => $transaction_id,
+        //     'total_amount' => $request['total_amount'],
+        //     'payment_method' => 'Wallet2Bank',
+        //     'bank_code' => $request->bank_code,
+        //     'bank_name' => $request->bank_name,
+        //     'account_number' => $request->account_number,
+        //     'account_name' => $request->account_name,
+        // ];
+        $request_id = $this->generateRequestId();
+        $request['type'] = 'debit';
+        $request['customer_id'] = auth()->user()->customer->id;
+        $request['transaction_id'] = 'W2B-' . $request_id;
+        $request['request_id'] = $request_id;
+        $request['payment_method'] = 'wallet';
+        $request['balance_before'] = $balance;
+        $request['balance_after'] = $balance;
+        $request['ip_address'] = $this->getIpAddress();
+        $request['domain_name'] = $this->getDomainName();
+        $request['customer_email'] = auth()->user()->email;
+        $request['customer_phone'] = auth()->user()->phone;
+        $request['customer_name'] = auth()->user()->firstname;
+        $request['product_id'] = $product->id;
+        $request['product_name'] = $product->name;
+        $request['category_id'] = $product->category->id;
+        $request['reason'] = 'Wallet to Bank Transfer';
+        $request['unique_element'] = 'Wallet2Bank';
+        $request['discount'] = 0;
+        
+        
+        // Process Transaction
+        try {
+            // Log basic transaction
+            $wallet = new WalletController();
+            $transaction = $this->logTransaction($request->all());
+
+            // Log wallet
+            $wallet->logWallet($request->all());
+
+            // Update Customer Wallet
+            $wallet->updateCustomerWallet(auth()->user(), $request['total_amount'], $request['type']);
+
+            $transfer = $this->transferToBankAccount($request->bank_code, $request->account_number, $request->account_name, $amount);
+            
+            if(isset($transfer['status']) && $transfer['status'] == 'success'){
+                $user_status = 'success';
+                $status = 'success';
+                $description = 'Wallet to Bank Transfer transaction was completed';
+                $api_response = $transfer['api_response'] ?? null;
+                $balance_after = $request['balance_before'] - $request['total_amount'];
+
+            } else{
+                $wallet = new WalletController();
+                $request['type'] = 'credit';
+                $wallet->logWallet($request);
+
+                $status = 'failed';
+                $failure_reason = 'Wallet to Bank Transfer transaction could not be completed';
+
+                // Update Customer Wallet
+                $wallet->updateCustomerWallet(auth()->user(), $request['total_amount'], 'credit');
+                $balance_after = $request['balance_before'];
+                $user_status = 'failed';
+                $description = 'Wallet to Bank Transfer transaction could not be completed';
+                $api_response = $transfer['api_response'] ?? null;
+            }
+
+            $transaction->update([
+                'balance_after' => $balance_after,
+                'request_data' => '',
+                'api_response' => $api_response ?? null,
+                'failure_reason' => $failure_reason,
+                'status' => $status ?? '',
+                'descr' => $description ?? null,
+                'user_status' => $user_status ?? null
+            ]);
+
+            $this->sendTransactionEmail($transaction, auth()->user());
+            return redirect(route('transaction.status', $transaction->transaction_id));
+
+        } catch (\Throwable $th) {
+            \Log::error(['Transaction Error' => 'Message: ' . $th->getMessage() . ' File: ' . $th->getFile() . ' Line: ' . $th->getLine()]);
+            return back()->with('error', 'An error occured, please try again later');
+        }
+
     }
 
     public function transactionStatus($transaction_id)
@@ -1417,57 +1575,7 @@ class TransactionController extends Controller
             $error = '';
         }else{
             // Perform Transfer to bank actions
-            $status = 'failed';
-            $error = 'failed';
-            $url = "https://sagecloud.ng/api/v2/merchant/authorization";
-            $payload = [
-                "email" => env('SAGECLOUD_EMAIL'),
-                "password" =>   env('SAGECLOUD_PASSWORD'),
-            ];
-
-            $control = new Controller();
-
-            $login = $control->basicApiCall($url, $payload, []);
-            
-            $transaction->update(['bank_transfer_api_response' => array_merge(['Action: '=>'LOGIN'], $login)]);
-           
-            if (!empty($login) && $login['success'] == true) {
-                $token = $login['data']['token']['access_token'] ?? null;
-            } else {
-                return back()->with('error', 'Could not complete bank transfer at the moment, please try again later');
-            }
-
-            if (!empty($token)) {
-                $url2 = "https://sagecloud.ng/api/v2/transfer/fund-transfer";
-                $payload = [
-                    "bank_code" => $transaction->bank_code,
-                    "account_number" => $transaction->account_number,
-                    "reference" => $transaction->transaction_id,
-                    "account_name" => $transaction->account_name,
-                    "amount" => $transaction->amount_paid - env('BANK_TRANSFER_CHARGES'),
-                    "narration" => 'Transfer from '.config('app.name'),
-                ];
-                
-                $headers = [
-                    "Content-Type: application/json",
-                    "Authorization: Bearer " . $token . "",
-                ];
-
-                $verify = $control->basicApiCall($url2, json_encode($payload), $headers);
-                
-                $transaction->update(['bank_transfer_api_response' => array_merge(['Action: ' => 'TRANSFER'], $verify ?? ['Response:' => 'NO RESPONSE'])]);
-                
-                if (!empty($verify) && $verify['success'] == true && $verify['status'] == 'success') {
-                    $status = $verify['status'];
-                    $error = '';
-                }else{
-                    $error = 'Could not fetch response from transfer provider';
-                }
-                
-            } else {
-                return back()->with('error', 'Could not complete bank transfer at the moment, please try again later');
-            }
-            
+            $status = 'success';
         }
         
         try {
@@ -1495,8 +1603,108 @@ class TransactionController extends Controller
         } catch (\Throwable $th) {
             return back()->with('error', 'An error occured when performing action: ' . $th->getMessage());
         }
-    }
 
+    }
+    
+    public function transferToBankAccount($bank_code, $account_number, $account_name, $amount, $transaction = null){
+        $status = 'failed';
+        $error = 'failed';
+        $control = new Controller();
+
+        $url = "https://sagecloud.ng/api/v2/merchant/authorization";
+        $payload = [
+            "email" => env('SAGECLOUD_EMAIL'),
+            "password" =>   env('SAGECLOUD_PASSWORD'),
+        ];
+
+        $login = $control->basicApiCall($url, $payload, []);
+
+        if (!empty($login) && $login['success'] == true) {
+            $token = $login['data']['token']['access_token'] ?? null;
+            $api_response = $login;
+
+        } else {
+            $error = 'Could not complete bank transfer at the moment, please try again later';
+            $api_response = $login ?? 'NO RESPONSE WHEN LOGGING IN';
+            $status = 'failed';
+        }
+
+        if (!empty($token)) {
+            // Get balance
+            $balanceUrl = "https://sagecloud.ng/api/v2/wallet/balance";
+            $headers = [
+                "Content-Type: application/json",
+                "Authorization: Bearer " . $token . "",
+            ];
+
+            $balance = $control->basicApiCall($balanceUrl, [], $headers, 'GET');
+
+            if (!empty($balance) && $balance['success'] == true && $balance['status'] == 'success') {
+                $status = $balance['status'];
+                $error = '';
+                $real_balance = $balance['general_wallet']['balance'] ?? null;
+                $api_response = $balance ?? 'NO RESPONSE';
+
+            } else {
+                $error = 'Could not fetch response from transfer provider';
+                $api_response = $balance ?? 'NO RESPONSE WHEN CHECKING BALANCE';
+                $status = 'failed';
+            }
+
+            // End get balance
+            if($real_balance < $amount){
+                $error = 'Not Enough balance to carry out transaction. ';
+                $status = 'failed';
+
+            }else{
+                $url2 = "https://sagecloud.ng/api/v2/transfer/fund-transfer";
+                $payload = [
+                    "bank_code" => $bank_code,
+                    "account_number" => $account_number,
+                    "reference" => $transaction->transaction_id ?? $this->generateRequestId(),
+                    "account_name" => $account_name,
+                    "amount" => $amount - env('BANK_TRANSFER_CHARGES'),
+                    "narration" => 'Transfer from ' . config('app.name'),
+                ];
+    
+                $headers = [
+                    "Content-Type: application/json",
+                    "Authorization: Bearer " . $token . "",
+                ];
+    
+                $verify = $control->basicApiCall($url2, json_encode($payload), $headers);
+                
+                $transaction->update(['bank_transfer_api_response' => array_merge(['Action: ' => 'TRANSFER'], $verify ?? ['Response:' => 'NO RESPONSE'])]);
+    
+                if (!empty($verify) && $verify['success'] == true && $verify['status'] == 'success') {
+                    $status = $verify['status'];
+                    $error = '';
+                    $api_response = $verify ?? 'NO RESPONSE';
+                } else {
+                    $status = 'failed';
+                    $error = 'Could not fetch response from transfer provider';
+                    $api_response = $verify ?? 'NO RESPONSE';
+                }
+            }
+        } else {
+            $error = 'Could not complete bank transfer at the moment, please try again later';
+            $status = 'failed';
+            $api_response = $token ?? 'NO RESPONSE';
+        }
+
+        if (!empty($transaction)) {
+            $transaction->update([
+                'bank_transfer_api_response' => $error. ' | API_RESPONSE: '. json_encode($api_response),
+                'description' => $status == 'success' ? 'Wallet to bank transfer of '. $amount .' was successful' : 'We could not complete this transaction'
+            ]);
+        }
+
+        return [
+            'error' => $error,
+            'status' => $status,
+            'api_response' => $api_response ?? ''
+        ];   
+    }
     public function declineAirtime2CashTransactions(Request $request, Airtime2CashTransactions $transaction)
     {
         $transaction->update([

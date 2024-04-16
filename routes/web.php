@@ -73,13 +73,16 @@ Route::middleware(['auth', 'verified', 'tpin', 'ipcheck'])->group(function () {
     // Route::post('change-pin', [HomeController::class, 'processResetPin'])->name('pin.process.reset');
     Route::get('customer/{slug}', [TransactionController::class, 'showProductsPage'])->name('open.transaction.page');
     Route::get('airtime-to-cash', [TransactionController::class, 'airtimeToCash'])->name('airtime-to-cash');
+    Route::get('wallet-to-bank/{sluhg}', [TransactionController::class, 'walletToBank'])->name('wallet-to-bank');
     
     Route::get('customer-get-variations/{product}', [VariationController::class, 'getCustomerVariations'])->name('get.customer.variations');
 
     Route::middleware(['kyc'])->group(function () {
         Route::post('customer-initialize-transaction', [TransactionController::class, 'initializeTransaction'])->name('initialize.transaction');
         Route::post('customer-initialize-airtime2cash-transaction', [TransactionController::class, 'initializeAirtime2CashTransaction'])->name('initialize.airtime2cashtransaction');
+        Route::post('customer-initialize-wallet2banktransaction/{product}', [TransactionController::class, 'initializeWalletToBankTransaction'])->name('initialize.wallet2banktransaction');
         
+
         Route::get('customer-transactions', [TransactionController::class, 'customerTransactionHistory'])->name('customer.transaction.history');
         Route::get('customer-a2c-transactions', [TransactionController::class, 'customerAirtime2CashTransactionHistory'])->name('customer.airtime2cash.transaction.history');
         
