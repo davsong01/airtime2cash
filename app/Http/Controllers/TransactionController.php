@@ -49,7 +49,9 @@ class TransactionController extends Controller
         }
         $category = Category::with([
             'products' => function ($query) {
-                return $query->where('status', 'active')->get();
+                return $query->where('status', 'active')
+                ->where('type', 'airtime2cash')
+                ->get();
             }
         ])->where('status', 'active')->where('type','airtime2cash')->first();
         
@@ -79,7 +81,7 @@ class TransactionController extends Controller
         $banks = Bank::all();
         
         if(walletBalance(auth()->user()) <= env('BANK_TRANSFER_CHARGES')){
-            return back()->with('error', 'You need above '. getSettings()['currency'] . number_format(env('BANK_TRANSFER_CHARGES')). ' wallet balance to use this feature!');
+            return redirect(route('dashboard'))->with('error', 'You need above '. getSettings()['currency'] . number_format(env('BANK_TRANSFER_CHARGES')). ' wallet balance to use this feature!');
         }
         if (!empty($product) && $product->status == 'active') {
             return view('customer.wallet2bank_transfer_page', compact('product', 'banks'));
@@ -367,7 +369,7 @@ class TransactionController extends Controller
         $balance = walletBalance(auth()->user());
         
         if ($balance < $request['total_amount']) {
-            return back()->with('error', 'Insufficient Wallet Balance, Please try again');
+            return redirect(route('dashboard'))->with('error', 'Insufficient Wallet Balance, Please try again');
         }
 
         // $transaction_id = 'W2B-' . $this->generateRequestId(); 
@@ -409,6 +411,8 @@ class TransactionController extends Controller
         
         // Process Transaction
         try {
+            DB::beginTransaction();
+
             // Log basic transaction
             $wallet = new WalletController();
             $transaction = $this->logTransaction($request->all());
@@ -419,7 +423,14 @@ class TransactionController extends Controller
             // Update Customer Wallet
             $wallet->updateCustomerWallet(auth()->user(), $request['total_amount'], $request['type']);
 
-            $transfer = $this->transferToBankAccount($request->bank_code, $request->account_number, $request->account_name, $amount);
+            if(env('ENT') == 'local'){
+                $transfer = [
+                    'status' => 'success',
+                    'api_response' => 'local Successful response from API',
+                ];
+            }else{
+                $transfer = $this->transferToBankAccount($request->bank_code, $request->account_number, $request->account_name, $amount, $transaction);
+            }
             
             if(isset($transfer['status']) && $transfer['status'] == 'success'){
                 $user_status = 'success';
@@ -448,17 +459,21 @@ class TransactionController extends Controller
                 'balance_after' => $balance_after,
                 'request_data' => '',
                 'api_response' => $api_response ?? null,
-                'failure_reason' => $failure_reason,
+                'failure_reason' => $failure_reason ?? null,
                 'status' => $status ?? '',
                 'descr' => $description ?? null,
                 'user_status' => $user_status ?? null
             ]);
 
+            
+            DB::commit();
             $this->sendTransactionEmail($transaction, auth()->user());
+
             return redirect(route('transaction.status', $transaction->transaction_id));
 
         } catch (\Throwable $th) {
-            \Log::error(['Transaction Error' => 'Message: ' . $th->getMessage() . ' File: ' . $th->getFile() . ' Line: ' . $th->getLine()]);
+            DB::rollBack();
+            // \Log::error(['Transaction Error' => 'Message: ' . $th->getMessage() . ' File: ' . $th->getFile() . ' Line: ' . $th->getLine()]);
             return back()->with('error', 'An error occured, please try again later');
         }
 
@@ -1511,10 +1526,14 @@ class TransactionController extends Controller
         if (!$transactionlog) return ['status' => 'failed'];
         
         $trans = TransactionLog::find($transactionlog);
-
         if (!$trans) return ['status' => 'failed', 'message' => 'Transaction not found!'];
-        $query = app("App\Http\Controllers\Providers\KingsVtuController")->requery($trans);
 
+        if($trans->product->type == 'wallet2bank'){
+            $query = app("App\Http\Controllers\Providers\SageController")->requery($trans);
+        }else{
+            $query = app("App\Http\Controllers\Providers\KingsVtuController")->requery($trans);
+        }
+        
         return $query;
     }
 
@@ -1661,7 +1680,7 @@ class TransactionController extends Controller
                 $payload = [
                     "bank_code" => $bank_code,
                     "account_number" => $account_number,
-                    "reference" => $transaction->transaction_id ?? $this->generateRequestId(),
+                    "reference" => $transaction->transaction_id,
                     "account_name" => $account_name,
                     "amount" => $amount - env('BANK_TRANSFER_CHARGES'),
                     "narration" => 'Transfer from ' . config('app.name'),

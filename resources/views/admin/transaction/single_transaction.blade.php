@@ -327,7 +327,7 @@
 				$('#validate-biller').html('Processing....');
 			},
 			success:function (data) {
-				$('#qw_debit').html('Query Debit <i class="fa fa-check"></i>');
+				$('#qw_debit').html('Query '+type+' <i class="fa fa-check"></i>');
 				$('#img_loading').hide();
 				$('#q_res').show();
 				$('#q_res').html(data.message);
