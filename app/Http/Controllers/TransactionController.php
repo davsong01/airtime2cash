@@ -472,8 +472,8 @@ class TransactionController extends Controller
             return redirect(route('transaction.status', $transaction->transaction_id));
 
         } catch (\Throwable $th) {
+            \Log::error(['Transaction Error' => 'Message: ' . $th->getMessage() . ' File: ' . $th->getFile() . ' Line: ' . $th->getLine()]);
             DB::rollBack();
-            // \Log::error(['Transaction Error' => 'Message: ' . $th->getMessage() . ' File: ' . $th->getFile() . ' Line: ' . $th->getLine()]);
             return back()->with('error', 'An error occured, please try again later');
         }
 
