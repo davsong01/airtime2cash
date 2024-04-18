@@ -498,7 +498,7 @@ class DashboardController extends Controller
             $wallet = new WalletController();
             $wallet->logWallet([
                 'type' => 'credit',
-                'amount' => $amount,
+                'total_amount' => $amount,
                 'payment_method' => 'REFERRAL',
                 'reason' => 'REFFERAL BALANCE WITHDRAWN TO WALLET',
                 'transaction_id' => $tid,

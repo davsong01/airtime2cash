@@ -187,9 +187,8 @@ class PaymentController extends Controller
                         'descr' => 'Wallet Funding Via Account: ' . $call['account_number'] . ' of ' . getSettings()->currency . number_format($amount, 2) . ' was successful',
                     ]);
 
-
                     $request['type'] = 'credit';
-                    $request['amount'] = $amount;
+                    $request['total_amount'] = $amount;
                     $request['transaction_id'] = $transaction->transaction_id;
                     $request['reason'] = 'WALLET FUNDING Via Reserved account';
 
@@ -242,6 +241,7 @@ class PaymentController extends Controller
                 $request['customer_id'] = auth()->user()->customer->id;
                 $request['type'] = 'credit';
                 $request['amount'] = $paid;
+                $request['total_amount'] = $paid;
                 $request['transaction_id'] = $transaction->transaction_id;
                 $request['reason'] = 'WALLET FUNDING';
 

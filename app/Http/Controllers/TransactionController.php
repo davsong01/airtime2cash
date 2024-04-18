@@ -443,7 +443,7 @@ class TransactionController extends Controller
                 $wallet = new WalletController();
                 $request['type'] = 'credit';
                 $wallet->logWallet($request);
-
+                
                 $status = 'failed';
                 $failure_reason = 'Wallet to Bank Transfer transaction could not be completed';
 
@@ -1464,7 +1464,7 @@ class TransactionController extends Controller
                 $wallet->logWallet([
                     'customer_id' => $user->customer->id,
                     'type' => $type,
-                    'amount' => $amount,
+                    'total_amount' => $amount,
                     'reason' => $reason,
                     'transaction_id' => $tid,
                     'payment_method' => 'ADMIN-FUNDING',
