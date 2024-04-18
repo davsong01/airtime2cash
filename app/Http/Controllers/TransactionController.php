@@ -372,22 +372,6 @@ class TransactionController extends Controller
             return redirect(route('dashboard'))->with('error', 'Insufficient Wallet Balance, Please try again');
         }
 
-        // $transaction_id = 'W2B-' . $this->generateRequestId(); 
-        // $transaction = [
-        //     'amount_charged' => $amount,
-        //     'amount_paid' => $amount,
-        //     'charge_rate' => env('BANK_TRANSFER_CHARGES'),
-        //     'product_id' => $product->id,
-        //     'customer_id' => auth()->user()->customer->id,
-        //     'type' => 'debit',
-        //     'transaction_id' => $transaction_id,
-        //     'total_amount' => $request['total_amount'],
-        //     'payment_method' => 'Wallet2Bank',
-        //     'bank_code' => $request->bank_code,
-        //     'bank_name' => $request->bank_name,
-        //     'account_number' => $request->account_number,
-        //     'account_name' => $request->account_name,
-        // ];
         $request_id = $this->generateRequestId();
         $request['type'] = 'debit';
         $request['customer_id'] = auth()->user()->customer->id;
@@ -1069,15 +1053,7 @@ class TransactionController extends Controller
                         $current = $customer->referal_wallet;
     
                         $sum = $current + $cal;
-                        $this->logEarnings(
-                            'credit',
-                            $customer->id,
-                            $customer_id,
-                            $cal,
-                            $current,
-                            $sum,
-                            $transaction_id,
-                        );
+                        $this->logEarnings('credit',$customer->id,$customer_id,$cal,$current,$sum,$transaction_id);
                         $customer->referal_wallet = $sum;
                         $customer->save();
                         $host = env('APP_URL');

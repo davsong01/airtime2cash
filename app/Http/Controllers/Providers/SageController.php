@@ -106,12 +106,9 @@ class SageController extends Controller
                 ];
             }
         }else{
-
+            return null;
         }
 
-        
-        
-        return $format;
     }
 
     public function verify($token, $bank_code, $account_number)
@@ -126,7 +123,7 @@ class SageController extends Controller
             "Authorization: Bearer " . $token . "",
         ];
 
-        return this->control->basicApiCall($url, json_encode($payload), $headers);
+        return $this->control->basicApiCall($url, json_encode($payload), $headers);
             
     }
 }
