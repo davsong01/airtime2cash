@@ -1714,7 +1714,7 @@ class TransactionController extends Controller
         if (!empty($transaction)) {
             $transaction->update([
                 'bank_transfer_api_response' => $error. ' | API_RESPONSE: '. json_encode($api_response),
-                'description' => $status == 'success' ? 'Wallet to bank transfer of '. $amount .' was successful' : 'We could not complete this transaction'
+                'descr' => $status == 'success' ? 'Wallet to bank transfer of '. $amount .' was successful' : 'We could not complete this transaction'
             ]);
         }
 
