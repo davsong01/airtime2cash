@@ -42,7 +42,7 @@
                                                         {{ $customer->user->phone }}
                                                 </P>
                                             </td>
-                                            <td style="color:{{$customer->kyc_status == 'verified' ? 'green' : 'red'}}">{{ ucfirst($customer->kyc_status) }}</td>
+                                            <td style="">{{ ucfirst($customer->kyc_status) }}</td>
                                             <td>
                                                 <a href="{{ route('customers.edit', $customer->user->id) }}"><button type="button" class="btn btn-info btn-sm mr-1 mb-1"><i class="fa fa-edit"></i><span class="align-middle ml-25">View</span></button>
                                                 </a>

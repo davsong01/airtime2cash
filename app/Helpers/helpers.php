@@ -22,6 +22,7 @@ if (!function_exists("logEmails")) {
                 'recipient' => $email_to,
                 'content' => $body,
             ]);
+           
         } catch (\Exception $e) {}
     }
 }

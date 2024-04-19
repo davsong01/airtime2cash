@@ -20,6 +20,15 @@ use App\Models\BlackList;
             margin-left: 5px;
         }
 
+        .declined{
+            color: red !important;
+            font-size: 13px;
+            margin-top: -6px;
+            display: inline-block;
+            margin-left: 5px;
+        }
+
+
         .select2-container {
             width: 100% !important;
         }
@@ -285,158 +294,167 @@ use App\Models\BlackList;
                                             </table>
                                         </div>
                                         <div class="tab-pane" id="kyc" aria-labelledby="about-tab" role="tabpanel">
-                                            <h1>KYC Data</h1>
-                                            <form action="{{ route('admin.customer.update.kyc', $user->customer->id) }}" method="POST">
+                                            {{-- <div class="card-header"> --}}
+                                               
+                                            {{-- </div> --}}
+                                           
+                                            <form action="{{ route('admin.customer.update.kyc', $user->customer->id) }}" method="POST" onsubmit="return confirm('Are you sure you want to update these details?');" enctype="multipart/form-data">
                                                 @csrf
                                                 <div class="card-content">
                                                     <div class="row">
                                                         <div class="col-md-6">
+                                                            <h1>KYC Data</h1>
+                                                            <h5 class="primary">General KYC Status: <button class="btn btn-primary btn-sm">{{ getFinalKycStatus($user->customer->id) }}</button> </h5>
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            {{-- @if(getFinalKycStatus($user->customer->id) == 'unverified' || getFinalKycStatus($user->customer->id) == 'declined') --}}
+                                                            <a onclick="return confirm('You are about to approve KYC details');" href="{{ route('admin.customer.approve.kyc', $user->customer->id) }}" class="btn btn-dark btn-sm"><i class="fa fa-check"></i> Approve and create reserved accounts</a>
+                                                            <a onclick="return confirm('You are about to decline KYC details');" href="{{ route('admin.customer.decline.kyc', $user->customer->id) }}" class="btn btn-danger btn-sm"><i class="fa fa-times"></i> Decline</a>
+                                                            {{-- @endif --}}
+                                                        </div>
+                                                        <hr>
+                                                        <div class="col-md-6">   
                                                             <fieldset class="form-group">
                                                                 @if(kycStatus('FIRST_NAME', $user->customer->id)['status'] == 'verified')
                                                                 <label for="FIRST_NAME">First Name</label><span class="verified"><i class="fa fa-check"></i> Verified</span>
-                                                                <input type="text" class="form-control" value="{{ kycStatus('FIRST_NAME', $user->customer->id)['value'] }}" disabled>
+                                                                
                                                                 @else
-                                                                <label for="FIRST_NAME">First Name</label><span class="unverified"><i class="fa fa-times"></i>Unverified</span>
-                                                                <input type="text" name="FIRST_NAME" class="form-control" value="{{ $user->firstname }}" required>
+                                                                    @if(kycStatus('FIRST_NAME', $user->customer->id)['status'] == 'declined')
+                                                                    <label for="FIRST_NAME">First Name</label><span class="declined"><i class="fa fa-times"></i> Declined</span>
+                                                                    @else
+                                                                    <label for="FIRST_NAME">First Name</label><span class="unverified"><i class="fa fa-times"></i> Not Verified</span>
+                                                                    @endif
+                                                                   
                                                                 @endif
+                                                                <input type="text" class="form-control" name="FIRST_NAME" value="{{ kycStatus('FIRST_NAME', $user->customer->id)['value'] }}">
                                                             </fieldset>
                                                         </div>
-
-                                                        <div class="col-md-6">
+                                                        
+                                                        <div class="col-md-6">   
                                                             <fieldset class="form-group">
                                                                 @if(kycStatus('MIDDLE_NAME', $user->customer->id)['status'] == 'verified')
                                                                 <label for="MIDDLE_NAME">Middle Name</label><span class="verified"><i class="fa fa-check"></i> Verified</span>
-                                                                <input type="text" class="form-control" value="{{ kycStatus('MIDDLE_NAME', $user->customer->id)['value'] }}">
+                                                                
+                                                                @else 
+                                                                @if(kycStatus('MIDDLE_NAME', $user->customer->id)['status'] == 'declined')
+                                                                <label for="MIDDLE_NAME">Middle Name</label><span class="declined"><i class="fa fa-times"></i> Declined</span>
                                                                 @else
-                                                                <label for="MIDDLE_NAME">Middle Name</label><span class="unverified"><i class="fa fa-times"></i>Unverified</span>
-                                                                <input type="text" name="MIDDLE_NAME" class="form-control" value="{{ $user->middlename }}">
+                                                                <label for="MIDDLE_NAME">Middle Name</label><span class="unverified"><i class="fa fa-times"></i> Not Verified</span>
                                                                 @endif
+                                                                @endif
+                                                                <input type="text" class="form-control" name="MIDDLE_NAME" value="{{ kycStatus('MIDDLE_NAME', $user->customer->id)['value'] }}">
                                                             </fieldset>
                                                         </div>
-                                                        <div class="col-md-6">
+                                                        <div class="col-md-6">   
                                                             <fieldset class="form-group">
                                                                 @if(kycStatus('LAST_NAME', $user->customer->id)['status'] == 'verified')
                                                                 <label for="LAST_NAME">Last Name</label><span class="verified"><i class="fa fa-check"></i> Verified</span>
-                                                                <input type="text" class="form-control" value="{{ kycStatus('LAST_NAME', $user->customer->id)['value'] }}">
+                                                                
+                                                                @else 
+                                                                @if(kycStatus('LAST_NAME', $user->customer->id)['status'] == 'declined')
+                                                                <label for="LAST_NAME">Last Name</label><span class="declined"><i class="fa fa-times"></i> Declined</span>
                                                                 @else
-                                                                <label for="lastname">Last Name</label><span class="unverified"><i class="fa fa-times"></i>Unverified</span>
-                                                                <input type="text" name="LAST_NAME"  class="form-control" value="{{ $user->lastname }}">
+                                                                <label for="LAST_NAME">Last Name</label><span class="unverified"><i class="fa fa-times"></i> Not Verified</span>
                                                                 @endif
+                                                                @endif
+                                                                <input type="text" class="form-control" name="LAST_NAME" value="{{ kycStatus('LAST_NAME', $user->customer->id)['value'] }}">
                                                             </fieldset>
                                                         </div>
-                                                        <div class="col-md-6">
+                                                        <div class="col-md-6">   
                                                             <fieldset class="form-group">
                                                                 <label for="email">Email Address</label><span class="verified"><i class="fa fa-check"></i> Verified</span>
-                                                                <input autocomplete="false" class="form-control" value="{{ $user->email }}">
+                                                                <input autocomplete="false" class="form-control" disabled value="{{ $user->email }}">
                                                             </fieldset>
                                                         </div>
-                                                        <div class="col-md-6">
+                                                        <div class="col-md-6">   
                                                             <fieldset class="form-group">
                                                                 @if(kycStatus('PHONE_NUMBER', $user->customer->id)['status'] == 'verified')
                                                                 <label for="PHONE_NUMBER">Phone Number</label><span class="verified"><i class="fa fa-check"></i> Verified</span>
-                                                                <input type="text" class="form-control" value="{{ kycStatus('PHONE_NUMBER', $user->customer->id)['value'] }}">
-                                                                @else
-                                                                <label for="lastname">Phone Number</label><span class="unverified"><i class="fa fa-times"></i>Unverified</span>
-                                                                <input type="text" name="PHONE_NUMBER" class="form-control" value="{{ $user->phone }}">
-                                                                @endif
-                                                            </fieldset>
-                                                        </div>
-                                                        <div class="col-md-6">
-                                                            <fieldset class="form-group">
-                                                                @if(kycStatus('COUNTRY', $user->customer->id)['status'] == 'verified')
-                                                                <label for="COUNTRY">Country</label><span class="verified"><i class="fa fa-check"></i> Verified</span>
-                                                                <input type="text" name="COUNTRY" class="form-control" value="{{ kycStatus('COUNTRY', $user->customer->id)['value']}}">
-                                                                @else
-                                                                <label for="COUNTRY">Country</label><span class="unverified"><i class="fa fa-times"></i>Unverified</span>
-                                                                <select name="COUNTRY" id="country" class="form-control">
-                                                                    <option value="">Select...</option>
-                                                                    <option value="Nigeria">Nigeria</option>
-                                                                </select>
-                                                                @endif
-                                                            </fieldset>
-                                                        </div>
-                                                        <div class="col-md-6">
-                                                            <fieldset class="form-group">
-                                                                @if(kycStatus('STATE', $user->customer->id)['status'] == 'verified')
-                                                                <label for="STATE">State</label><span class="verified"><i class="fa fa-check"></i> Verified</span>
-                                                                <input type="text" class="form-control" value="{{ kycStatus('STATE', $user->customer->id)['value'] }}"/>
-                                                                @else
-                                                                <label for="STATE">State</label><span class="unverified"><i class="fa fa-times"></i>Unverified</span>
-                                                                <select name="STATE" id="state" class="form-control">
-                                                                    @foreach (getStates() as $state)
-                                                                        <option value="{{$state}}"  {{ kycStatus('STATE', $user->customer->id)['value'] ? 'selected' : '' }}>{{$state}}</option>
-                                                                    @endforeach
-                                                                </select>
-                                                                @endif
-                                                            </fieldset>
-                                                        </div>
-                                                        <div class="col-md-6">
-                                                            <fieldset class="form-group">
-                                                                @if(kycStatus('LGA', $user->customer->id)['status'] == 'verified')
-                                                                <label for="LGA">Local Government Area</label>
-                                                                <span class="verified"><i class="fa fa-check"></i> Verified</span>
-                                                                <input type="text" class="form-control" value="{{ kycStatus('LGA', $user->customer->id)['value'] }}"/>
-                                                                @else
-                                                                <label for="LGA">Local Government Area</label><span class="unverified"><i class="fa fa-times"></i>Unverified</span>
-                                                                <select id="lga" name="LGA" class="form-control" required>
-                                                                    <option value="">Select</option>
-                                                                    @if (!empty($lgas))
-                                                                        @foreach ($lgas as $item)
-                                                                            <option value="{{$item}}" {{ kycStatus('LGA', $user->customer->id)['value'] == $item ? 'selected' : '' }}>{{$item}}</option>
-                                                                        @endforeach
-                                                                    @endif
-                                                                </select>
-                                                                @endif
-                                                            </fieldset>
-                                                        </div>
-                                                        <div class="col-md-6">
-                                                            <fieldset class="form-group">
-                                                                @if(kycStatus('DOB', $user->customer->id)['status'] == 'verified')
-                                                                <label for="DOB">Date of Birth</label><span class="verified"><i class="fa fa-check"></i> Verified</span>
-                                                                <input type="date" class="form-control" value="{{ kycStatus('DOB', $user->customer->id)['value'] }}">
-                                                                @else
-                                                                <label for="lastname">Date of Birth (As associated with BVN)</label><span class="unverified"><i class="fa fa-times"></i>Unverified</span>
-                                                                <input type="date" name="DOB"  class="form-control" value="{{ kycStatus('DOB', $user->customer->id)['value'] }}" required>
-                                                                @endif
-                                                            </fieldset>
-                                                        </div>
-                                                        <div class="col-md-6">
-                                                            <fieldset class="form-group">
-                                                                @if(kycStatus('IDCARDTYPE', $user->customer->id)['status'] == 'verified')
-                                                                <label for="IDCARDTYPE">ID Card Type</label><span class="verified"><i class="fa fa-check"></i> Verified</span>
-                                                                <input type="text" class="form-control" value="{{ kycStatus('IDCARDTYPE', $user->customer->id)['value'] }}">
-                                                                @else
-                                                                <label for="IDCARDTYPE">ID Card Type</label><span class="unverified"><i class="fa fa-times"></i>Unverified</span>
-                                                                <input type="date" name="IDCARDTYPE"  class="form-control" value="{{ kycStatus('IDCARDTYPE', $user->customer->id)['value'] }}" required>
-                                                                @endif
-                                                            </fieldset>
-                                                        </div>
-                                                        <div class="col-md-6">
-                                                            <fieldset class="form-group">
-                                                                @if(kycStatus('IDCARD', $user->customer->id)['status'] == 'verified')
-                                                                <label for="IDCARD">ID Card</label><span class="verified"><i class="fa fa-check"></i> Verifiedd</span> <br>
-                                                                <img style="width: 60px;cursor:zoom-in;" src="{{asset(kycStatus('IDCARD', $user->customer->id)['value'])}}" onclick="zoomImg(this)">
-                                                                @else
-                                                                <label for="IDCARD">ID Card</label><span class="unverified"><i class="fa fa-times"></i>Unverified</span>
                                                                 
-                                                                <input type="date" name="IDCARD"  class="form-control" value="{{ kycStatus('IDCARD', $user->customer->id)['value'] }}" required>
+                                                                @else 
+                                                                @if(kycStatus('PHONE_NUMBER', $user->customer->id)['status'] == 'declined')
+                                                                <label for="PHONE_NUMBER">Phone Number</label><span class="declined"><i class="fa fa-times"></i> Declined</span>
+                                                                @else
+                                                                <label for="PHONE_NUMBER">Phone Number</label><span class="unverified"><i class="fa fa-times"></i> Not Verified</span>
                                                                 @endif
+                                                                @endif
+                                                                <input type="text" class="form-control" name="PHONE_NUMBER" value="{{ kycStatus('PHONE_NUMBER', $user->customer->id)['value'] }}">
                                                             </fieldset>
                                                         </div>
-                                                        <div class="col-md-6">
+                                                        <div class="col-md-6">   
                                                             <fieldset class="form-group">
                                                                 @if(kycStatus('BVN', $user->customer->id)['status'] == 'verified')
-                                                                <label for="bvn">BVN</label><span class="verified"><i class="fa fa-check"></i> Verified</span>
-                                                                <input autocomplete="false" type="text" class="form-control" value="{{ kycStatus('BVN', $user->customer->id)['value'] }}">
+                                                                <label for="BVN">BVN</label><span class="verified"><i class="fa fa-check"></i> Verified</span>
+                                                                
+                                                                @else 
+                                                                @if(kycStatus('BVN', $user->customer->id)['status'] == 'declined')
+                                                                <label for="BVN">BVN</label><span class="declined"><i class="fa fa-times"></i> Declined</span>
                                                                 @else
-                                                                <label for="bvn">BVN</label><span class="unverified"><i class="fa fa-times"></i>Unverified</span>
-                                                                <input type="text" name="BVN"  class="form-control" value="{{kycStatus('BVN', $user->customer->id)['value'] }}" required>
+                                                                <label for="BVN">BVN</label><span class="unverified"><i class="fa fa-times"></i> Not Verified</span>
                                                                 @endif
+                                                                @endif
+                                                                <input type="text" name="BVN"  class="form-control" value="{{kycStatus('BVN', $user->customer->id)['value'] }}" maxlength="11" minlength="11">
                                                             </fieldset>
                                                         </div>
-                                                        <div class="col-md-12">
-                                                            <button class="btn btn-primary">Update</button>
+                                                        @if(kycStatus('IDCARDTYPE', $user->customer->id)['status'] == 'verified')
+                                                        <div class="col-md-6 mb-2"> 
+                                                            <label for="idcard">ID CARD TYPE</label><span class="verified"><i class="fa fa-check"></i> Verified</span>
+                                                                <select id="IDCARDTYPE" name="IDCARDTYPE" class="form-control">
+                                                                    <option value="">Select</option>
+                                                                    <option value="Nin Slip" {{(kycStatus('IDCARDTYPE', $user->customer->id)['value'] ==  "Nin Slip" ? 'selected' : '') }}>Nin Slip</option>
+                                                                    <option value="International Passport" {{(kycStatus('IDCARDTYPE', $user->customer->id)['value'] ==  "International Passport" ? 'selected' : '') }}>International Passport</option>
+                                                                    <option value="Driver's Licence" {{(kycStatus('IDCARDTYPE', $user->customer->id)['value'] ==  "Driver's Licence" ? 'selected' : '') }}>Driver's Licence</option>
+                                                                    <option value="Voter's Card" {{(kycStatus('IDCARDTYPE', $user->customer->id)['value'] ==  "Voter's Card" ? 'selected' : '') }}>Voter's Card</option>
+                                                                    <option value="Work/School ID" {{(kycStatus('IDCARDTYPE', $user->customer->id)['value'] ==  "Work/School ID" ? 'selected' : '') }}>Work/School ID</option>
+                                                                </select>
                                                         </div>
+                                                        @else 
+                                                        <div class="col-md-6">   
+                                                            <fieldset class="form-group">
+                                                                @if(kycStatus('IDCARD', $user->customer->id)['status'] == 'declined')
+                                                                <label for="IDCARD">ID Card Type</label><span class="declined"><i class="fa fa-times"></i> Declined</span>
+                                                                @else
+                                                                <label for="IDCARD">ID Card Type</label><span class="unverified"><i class="fa fa-times"></i> Not Verified</span>
+                                                                @endif
+                                                                
+                                                                <select id="IDCARDTYPE" name="IDCARDTYPE" class="form-control">
+                                                                    <option value="">Select</option>
+                                                                    <option value="Nin Slip" {{(kycStatus('IDCARDTYPE', $user->customer->id)['value'] ==  "Nin Slip" ? 'selected' : '') }}>Nin Slip</option>
+                                                                    <option value="International Passport" {{(kycStatus('IDCARDTYPE', $user->customer->id)['value'] ==  "International Passport" ? 'selected' : '') }}>International Passport</option>
+                                                                    <option value="Driver's Licence" {{(kycStatus('IDCARDTYPE', $user->customer->id)['value'] ==  "Driver's Licence" ? 'selected' : '') }}>Driver's Licence</option>
+                                                                    <option value="Voter's Card" {{(kycStatus('IDCARDTYPE', $user->customer->id)['value'] ==  "Voter's Card" ? 'selected' : '') }}>Voter's Card</option>
+                                                                    <option value="Work/School ID" {{(kycStatus('IDCARDTYPE', $user->customer->id)['value'] ==  "Work/School ID" ? 'selected' : '') }}>Work/School ID</option>
+                                                                </select>
+                                                            </fieldset>
+                                                        </div>
+                                                        @endif
+                                                        <div class="col-md-6">  
+                                                            
+                                                            <fieldset class="form-group">
+                                                                    @if(kycStatus('IDCARD', $user->customer->id)['status'] == 'verified')
+                                                                    <label for="IDCARD">ID Card </label> <small class="primary" style="font-weight: bold;">(Not more that 500 kilobytes)</small> <span class="verified"><i class="fa fa-times"></i> Verified</span> <br>
+                                                                    <img style="width: 60px;cursor:zoom-in;" src="{{asset(kycStatus('IDCARD', $user->customer->id)['value'])}}" onclick="zoomImg(this)">
+
+                                                                    @else
+                                                                    @if(kycStatus('IDCARD', $user->customer->id)['status'] == 'declined')
+                                                                    <label for="IDCARD">ID Card </label> <small class="primary" style="font-weight: bold;">(Not more that 500 kilobytes)</small> <span class="declined"><i class="fa fa-times"></i> Declined</span>
+                                                                    @else
+                                                                    <label for="IDCARD">ID Card </label> <small class="primary" style="font-weight: bold;">(Not more that 500 kilobytes)</small> <span class="unverified"><i class="fa fa-times"></i> Not Verified</span>
+                                                                    @endif
+
+                                                                    <label for="IDCARD">ID Card</label> <small class="primary" style="font-weight: bold;">(Not more that 500 kilobytes)</small> <span class="unverified"><i class="fa fa-times"></i> Not Verified</span> <br>
+                                                                    <img style="width: 60px;cursor:zoom-in;" src="{{asset(kycStatus('IDCARD', $user->customer->id)['value'])}}" onclick="zoomImg(this)">
+
+                                                                    @endif
+                                                                    </label>
+                                                                    <input type="file" name="IDCARD" accept="image/jpg, image/jpeg" class="form-control" value="{{ kycStatus('IDCARD', $user->customer->id)['value'] }}">
+                                                            </fieldset>
+                                                        </div>
+                                                       
+                                                        <div class="col-md-12"> 
+                                                            <button class="btn btn-primary" width="100%" type="submit">Update Customer details</button>
+                                                        </div>
+                                                        
                                                     </div>
                                                 </div>
                                             </form>
@@ -606,7 +624,6 @@ use App\Models\BlackList;
                                                                     Reset Transaction PIN
                                                                 </h5>
                                                                 <button type="button" class="btn btn-success" data-toggle="modal" data-target="#reset-transaction-pin">Click to reset transaction PIN</button>
-                                                                
                                                             </div>
                                                         </div>
                                                     </div>

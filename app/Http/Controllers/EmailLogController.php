@@ -17,7 +17,7 @@ class EmailLogController extends Controller
     }
 
     public function pending () {
-        $mails = EmailLog::where('status', 'pending')->orderBy('created_at')->paginate(50);
+        $mails = EmailLog::where('status', 'pending')->orderBy('created_at','desc')->paginate(50);
         return view('admin.emails.index', ['emails' => $mails]);
     }
 
