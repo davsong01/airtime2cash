@@ -394,6 +394,7 @@ class TransactionController extends Controller
         $request['reason'] = 'Wallet to Bank Transfer';
         $request['unique_element'] = 'Wallet2Bank';
         $request['discount'] = 0;
+        $request['provider_charge'] = env('BANK_TRANSFER_CHARGES') ?? null;
 
 
         // Process Transaction
@@ -1648,7 +1649,6 @@ class TransactionController extends Controller
                 $error = 'Not Enough balance to carry out transaction. ';
                 $status = 'failed';
             } else {
-                $status = 'failed';
                 $url2 = "https://sagecloud.ng/api/v2/transfer/fund-transfer";
                 $payload = [
                     "bank_code" => $bank_code,
@@ -1672,7 +1672,7 @@ class TransactionController extends Controller
 
                 $transaction->update([
                     'bank_transfer_api_response' => array_merge(['Action: ' => 'TRANSFER'], $verify ?? ['Response:' => 'NO RESPONSE']),
-                    'request_data' => json_encode($request_data ?? $payload),
+                    'request_data' => json_encode($request_data),
                     'api_response' =>array_merge(['Action: ' => 'TRANSFER'], $verify ?? ['Response:' => 'NO RESPONSE']),
                 ]);
 
@@ -1697,7 +1697,7 @@ class TransactionController extends Controller
                 'bank_transfer_api_response' => $error . ' | API_RESPONSE: ' . json_encode($api_response),
                 'api_response' => $error . ' | API_RESPONSE: ' . json_encode($api_response),
                 'descr' => $status == 'success' ? 'Wallet to bank transfer of ' . $amount . ' was successful' : 'We could not complete this transaction',
-                'request_data' => json_encode($request_data ?? $payload)
+                'request_data' => json_encode($request_data)
             ]);
         }
 

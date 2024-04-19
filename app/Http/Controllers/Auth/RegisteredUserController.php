@@ -60,9 +60,10 @@ class RegisteredUserController extends Controller
             'api_key' =>  strrev(md5($user->username)),
         ]);
 
+        $provider = EmailApiSetting::first();
+
         try {
             //code...
-            $provider = EmailApiSetting::first();
 
             if (!empty($provider)) {
                 config([
@@ -82,7 +83,9 @@ class RegisteredUserController extends Controller
                 $current['provider'] = $provider->toArray();
             }
             event(new Registered($user));
-        } catch (\Throwable $th) {}
+        } catch (\Throwable $th) {
+            \Log::error($th->getMessage(). ' Line: ' .$th->getLine(). ' Filename: ' .$th->getFile());
+        }
 
         $customer = Customer::create([
             'user_id' => $user->id,
@@ -102,9 +105,27 @@ class RegisteredUserController extends Controller
 
         try {
             //code...
+            if (!empty($provider)) {
+                config([
+                    'mail.driver' => $provider->MAIL_DRIVER,
+                    'mail.host' => $provider->MAIL_HOST,
+                    'mail.port' => $provider->MAIL_PORT,
+                    'mail.encryption' => $provider->MAIL_ENCRYPTION,
+                    'mail.username' => $provider->MAIL_USERNAME,
+                    'mail.password' => $provider->MAIL_PASSWORD,
+                    'mail.replyToName' => $provider->MAIL_REPLY_TO_NAME,
+                    'mail.replyToAddress' => $provider->MAIL_REPLY_TO_ADDRESS,
+                    'mail.from' => [
+                        'address' => $provider->MAIL_FROM_ADDRESS,
+                        'name' => $provider->MAIL_FROM_NAME,
+                    ],
+                ]);
+                $current['provider'] = $provider->toArray();
+            }
+
             $user->sendEmailVerificationNotification();
         } catch (\Throwable $th) {
-            //throw $th;
+            \Log::error($th->getMessage() . ' Line: ' . $th->getLine() . ' Filename: ' . $th->getFile());
         }
 
         return redirect(RouteServiceProvider::HOME);
