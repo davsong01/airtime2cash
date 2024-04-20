@@ -308,10 +308,10 @@ use App\Models\BlackList;
                                                             <h5 class="primary">General KYC Status: <button class="btn btn-primary btn-sm">{{ getFinalKycStatus($user->customer->id) }}</button> </h5>
                                                         </div>
                                                         <div class="col-md-6">
-                                                            @if(getFinalKycStatus($user->customer->id) == 'unverified' || getFinalKycStatus($user->customer->id) == 'declined')
+                                                            {{-- @if(getFinalKycStatus($user->customer->id) == 'unverified' || getFinalKycStatus($user->customer->id) == 'declined') --}}
                                                             <a onclick="return confirm('You are about to approve KYC details');" href="{{ route('admin.customer.approve.kyc', $user->customer->id) }}" class="btn btn-dark btn-sm"><i class="fa fa-check"></i> Approve and create reserved accounts</a>
                                                             <a onclick="return confirm('You are about to decline KYC details');" href="{{ route('admin.customer.decline.kyc', $user->customer->id) }}" class="btn btn-danger btn-sm"><i class="fa fa-times"></i> Decline</a>
-                                                            @endif
+                                                            {{-- @endif --}}
                                                         </div>
                                                         <hr>
                                                         <div class="col-md-6">   
@@ -451,7 +451,7 @@ use App\Models\BlackList;
                                                                     <input type="file" name="IDCARD" accept="image/jpg, image/jpeg" class="form-control" value="{{ kycStatus('IDCARD', $user->customer->id)['value'] }}">
                                                             </fieldset>
                                                         </div>
-                                                       
+                                                    
                                                         <div class="col-md-12"> 
                                                             <button class="btn btn-primary" width="100%" type="submit">Update Customer details</button>
                                                         </div>
