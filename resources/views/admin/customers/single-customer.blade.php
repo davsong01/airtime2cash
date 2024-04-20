@@ -433,7 +433,7 @@ use App\Models\BlackList;
                                                             
                                                             <fieldset class="form-group">
                                                                     @if(kycStatus('IDCARD', $user->customer->id)['status'] == 'verified')
-                                                                    <label for="IDCARD">ID Card </label> <small class="primary" style="font-weight: bold;">(Not more that 500 kilobytes)</small> <span class="verified"><i class="fa fa-times"></i> Verified</span> <br>
+                                                                    <label for="IDCARD">ID Card </label> <small class="primary" style="font-weight: bold;">(Not more that 500 kilobytes)</small> <span class="verified"><i class="fa fa-check"></i> Verified</span> <br>
                                                                     <img style="width: 60px;cursor:zoom-in;" src="{{asset(kycStatus('IDCARD', $user->customer->id)['value'])}}" onclick="zoomImg(this)">
 
                                                                     @else
