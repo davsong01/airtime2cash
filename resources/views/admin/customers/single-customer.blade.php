@@ -80,12 +80,13 @@ use App\Models\BlackList;
                                             </svg>
                                         </div>
                                     @endif
-                                    <h5 class="card-title mt-1" style="text-align:center !important">
-                                        {{ ucfirst($user->firstname) . ' ' . ucfirst($user->middlename) . ' ' . ucfirst($user->lastname) }}
-                                        ({{ $user->customer->customer_level ?? 'Level 1' }})</h5>
+                                    <h5 class="card-title" style="text-align:center !important">
+                                        {{ ucfirst($user->firstname) . ' ' . ucfirst($user->middlename) . ' ' . ucfirst($user->lastname) }}</h5> 
+                                        <small class="info"><strong>({{ $user->customer->level->name ?? 'Level 1' }})</strong></small>
+                                        
                                         <p style="text-align:center !important">
-                                            Email: <br><a href="mailto:{{ $user->email }}">{{ $user->email }}</a> <br>
-                                            Phone: <br>{{ $user->phone }}
+                                            Email: <br><small><a href="mailto:{{ $user->email }}">{{ $user->email }}</a></small> <br>
+                                            Phone: <br><small>{{ $user->phone }}</small>
 
                                         </p>
                                 </div>
@@ -307,10 +308,10 @@ use App\Models\BlackList;
                                                             <h5 class="primary">General KYC Status: <button class="btn btn-primary btn-sm">{{ getFinalKycStatus($user->customer->id) }}</button> </h5>
                                                         </div>
                                                         <div class="col-md-6">
-                                                            {{-- @if(getFinalKycStatus($user->customer->id) == 'unverified' || getFinalKycStatus($user->customer->id) == 'declined') --}}
+                                                            @if(getFinalKycStatus($user->customer->id) == 'unverified' || getFinalKycStatus($user->customer->id) == 'declined')
                                                             <a onclick="return confirm('You are about to approve KYC details');" href="{{ route('admin.customer.approve.kyc', $user->customer->id) }}" class="btn btn-dark btn-sm"><i class="fa fa-check"></i> Approve and create reserved accounts</a>
                                                             <a onclick="return confirm('You are about to decline KYC details');" href="{{ route('admin.customer.decline.kyc', $user->customer->id) }}" class="btn btn-danger btn-sm"><i class="fa fa-times"></i> Decline</a>
-                                                            {{-- @endif --}}
+                                                            @endif
                                                         </div>
                                                         <hr>
                                                         <div class="col-md-6">   
@@ -442,8 +443,8 @@ use App\Models\BlackList;
                                                                     <label for="IDCARD">ID Card </label> <small class="primary" style="font-weight: bold;">(Not more that 500 kilobytes)</small> <span class="unverified"><i class="fa fa-times"></i> Not Verified</span>
                                                                     @endif
 
-                                                                    <label for="IDCARD">ID Card</label> <small class="primary" style="font-weight: bold;">(Not more that 500 kilobytes)</small> <span class="unverified"><i class="fa fa-times"></i> Not Verified</span> <br>
-                                                                    <img style="width: 60px;cursor:zoom-in;" src="{{asset(kycStatus('IDCARD', $user->customer->id)['value'])}}" onclick="zoomImg(this)">
+                                                                    <br>
+                                                                    <img style="width: 60px;cursor:zoom-in;" src="{{ asset(kycStatus('IDCARD', $user->customer->id)['value'])}}" onclick="zoomImg(this)">
 
                                                                     @endif
                                                                     </label>
