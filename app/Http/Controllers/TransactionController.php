@@ -1278,6 +1278,10 @@ class TransactionController extends Controller
             $transactions = $transactions->where('transaction_id', $request->transaction_id);
         }
 
+        if ($request->status) {
+            $transactions = $transactions->where('status', $request->status);
+        }
+
         if ($request->type) {
             $transactions = $transactions->where('type', $request->type);
         }

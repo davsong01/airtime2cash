@@ -90,7 +90,7 @@ use App\Models\Airtime2CashTransactions;
                                                         <select class="form-control" name="status" id="status">
                                                             <option value="">Select</option>
                                                             <option value="pending" {{ \Request::get('status') == 'pending' ? 'selected' : ''}}>Pending</option>
-                                                            <option value="delivered" {{ \Request::get('status') == 'delivered' ? 'selected' : ''}}>Delivered</option>
+                                                            <option value="approved" {{ \Request::get('status') == 'approved' ? 'selected' : ''}}>Approved</option>
                                                             <option value="declined" {{ \Request::get('status') == 'declined' ? 'selected' : ''}}>Declined</option>
                                                         </select>
                                                     </fieldset>
