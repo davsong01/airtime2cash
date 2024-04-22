@@ -47,7 +47,7 @@
 
                                                             <div class="row">
                                                                 <div class="col-md-12">
-                                                                    <div class="d-flex pb-1 justify-content-start align-items-center w-100">
+                                                                    <div class="d-flex pb-1 justify-content-start align-items-center w-100" id="product-image-div" style="display:none !important">
                                                                         <img class="product-images" style="padding-right: 8px;height: 70px;" id="product-image" src="" alt="" class="product-image">
                                                                         <div>
                                                                             <h5 id="product-title" style="color:#174159;padding-top: 19px;"><strong></strong>
@@ -313,6 +313,7 @@
     $(document).ready(function () {
         $("#amount").val('');
         $('#product').val('');
+                
         var variations = [];
 
         $('#product').on('change', function () {
@@ -334,6 +335,8 @@
                 $('#quantity-div').hide();
                 $('#amount').hide();
                 $('#quantity').hide();
+                $('#product-image-div').hide();
+
                 return;
             }
 

@@ -55,7 +55,7 @@
                                                             <div class="row">
                                                                 <div class="col-md-6 order-2 order-sm-1">
                                                                     <h5>Airtime to Cash</h5>
-                                                                        <div class="d-flex pb-1 justify-content-start align-items-center w-100">
+                                                                        <div class="d-flex pb-1 justify-content-start align-items-center w-100" id="product-image-div" style="display:none !important">
                                                                             <img class="product-images product-image" style="padding-right: 8px;height: 70px;" id="product-image" src="" alt="">
                                                                             <div>
                                                                                 <h5 id="product-title" style="color:#174159;padding-top: 19px;"><strong></strong>
@@ -259,6 +259,7 @@
                 $('#receive').val('');
                 $('#payment_method').val('');
                 $('#amount-div').hide()
+                $('#product-image-div').hide();
 
                 return;
             }else{
