@@ -1255,15 +1255,15 @@ class TransactionController extends Controller
 
     public function airtimeToCashTransactions(Request $request)
     {
-        $transactions = Airtime2CashTransactions::with(['product', 'customer'])->latest();
+        $transactions = Airtime2CashTransactions::with(['product', 'customer'])->where('type','credit')->latest();
         $transactionsS = clone $transactions;
-        $transactionsA = clone $transactions;
-        $transactionsF = clone $transactions;
-        $transactionsP = clone $transactions;
+        $transactionsProfit = clone $transactions;
+        $transactionsFailed = clone $transactions;
+        $transactionsPending = clone $transactions;
         $totalTransSuccess = $transactionsS->whereIn('status', ['approved'])->sum('amount_paid');
-        $totalTransFailed = $transactionsF->where('status', 'declined')->count();
-        $totalProfit = $transactionsA->where('status', 'approved')->sum('amount_charged');
-        $totalPending = $transactionsP->where('status', 'pending')->count();
+        $totalTransFailed = $transactionsFailed->where('status', 'declined')->count();
+        $totalProfit = $transactionsProfit->where('status', 'approved')->sum('amount_charged');
+        $totalPending = $transactionsPending->where('status', 'pending')->count();
 
         if ($request->email) {
             $user = User::where('email', $request->email)->first();
