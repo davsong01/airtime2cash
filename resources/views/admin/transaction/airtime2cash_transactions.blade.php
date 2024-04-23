@@ -26,7 +26,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="d-inline-block mx-3">
+                        {{-- <div class="d-inline-block mx-3">
                             <!-- chart-2 -->
                             <div class="d-flex mb-75 market-statistics-2">
                                 <!-- chart statistics-2 -->
@@ -38,7 +38,7 @@
                                     </div>
                                 </div>
                             </div>
-                        </div>
+                        </div> --}}
                         <div class="d-inline-block mx-3">
                             <!-- chart-2 -->
                             <div class="d-flex mb-75 market-statistics-2">
