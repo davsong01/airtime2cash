@@ -49,7 +49,6 @@
                                                 <thead>
                                                     <tr>
                                                         <th>Name</th>
-                                                        <th>Status</th>
                                                         @if(hasAccess('paymentgateway.edit'))
                                                         <th>Actions</th>
                                                         @endif
@@ -59,7 +58,7 @@
                                                     @foreach ( $paymentgateway as $gateway )
                                                     <tr>
                                                         <td>{{ $gateway->name }}</td>
-                                                        <td style="color:{{ $gateway->status == 'active' ? 'green' : 'red'}}">{{ ucfirst($gateway->status) }}</td>
+                                                        <td><a href="{{ url('/').'/log-p-callback/'.$gateway->id }}">{{ url('/').'/log-p-callback/'.$gateway->id }}</a></td>
                                                         @if(hasAccess('paymentgateway.edit'))
                                                         <td>
                                                             <a href="{{ route('paymentgateway.edit', $gateway->id) }}"><button type="button" class="btn btn-primary btn-sm mr-1 mb-1"><i class="fa fa-edit"></i><span class="align-middle ml-25">View/Edit</span></button></a>

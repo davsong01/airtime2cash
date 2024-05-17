@@ -102,7 +102,12 @@ use App\Models\PaymentGateway;
                                                                     <div class="col-md-6">
                                                                         <fieldset class="form-group">
                                                                             <label for="">Payment Gateway</label>
-                                                                            <input type="text" class="form-control" id="" value="{{ PaymentGateway::where('status', 'active')->value('name') }}" disabled>
+                                                                            <select name="payment_gateway" class="form-control" id="payment_gateway" required>
+                                                                                <option value="">Select</option>
+                                                                                @foreach($payment_gateways as $gateway)
+                                                                                <option value="{{ $gateway->id }}" {{ $gateway->id == getSettings()->payment_gateway ? 'selected' : ''}}>{{$gateway->name}}</option>
+                                                                                @endforeach
+                                                                            </select>
                                                                         </fieldset>
                                                                         <div class="row">
                                                                             <div class="col-md-8">

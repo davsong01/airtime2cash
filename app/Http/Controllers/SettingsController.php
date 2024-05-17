@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Settings;
 use Illuminate\Http\Request;
+use App\Models\PaymentGateway;
 
 class SettingsController extends Controller
 {
@@ -64,7 +65,9 @@ class SettingsController extends Controller
             '$'
         ];
 
-        return view('admin.settings', compact('settings', 'currencies'));
+        $payment_gateways = PaymentGateway::all();
+
+        return view('admin.settings', compact('settings', 'currencies', 'payment_gateways'));
     }
 
     /**

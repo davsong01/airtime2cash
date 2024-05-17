@@ -51,6 +51,7 @@ class PaymentGatewayController extends Controller
     {
         $this->validate($request, [
             "name" => "required",
+            "slug" => "required",
             "password" => "nullable",
             "api_key" => "nullable",
             "secret_key" => "nullable",
@@ -60,11 +61,13 @@ class PaymentGatewayController extends Controller
             "base_url" => "nullable",
             "status" => "nullable",
             "charge" => "required",
-            "reserved_account_payment_charge" => "nullable"
+            "reserved_account_payment_charge" => "nullable",
+            "reserved_account_payment_charge_type" => "nullable",
         ]);
 
         $paymentgateway->update([
             "name" => $request->name,
+            "slug" => $request->slug,
             "password" => $request->password,
             "api_key" => $request->api_key,
             "secret_key" => $request->secret_key,
@@ -75,6 +78,8 @@ class PaymentGatewayController extends Controller
             "status" => $request->status,
             "charge" => $request->charge,
             "reserved_account_payment_charge" => $request->reserved_account_payment_charge,
+            'reserved_account_payment_charge_type' => $request->reserved_account_payment_charge_type,
+
         ]);
 
         return back()->with('message', 'Updated successfully');

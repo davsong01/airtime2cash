@@ -3,14 +3,17 @@
 use App\Models\KycData;
 use App\Models\Category;
 use App\Models\Customer;
+use App\Models\EmailLog;
 use App\Models\Settings;
 use App\Mail\EmailMessages;
-use App\Models\Announcement;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Arr;
-use App\Http\Controllers\WalletController;
-use App\Models\EmailLog;
+use App\Models\Announcement;
+use App\Models\PaymentGateway;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\WalletController;
+use App\Http\Controllers\PaymentProcessors\SquadController;
+use App\Http\Controllers\PaymentProcessors\MonnifyController;
 
 if (!function_exists("logEmails")) {
     function logEmails($email_to, $subject, $body)
@@ -27,45 +30,42 @@ if (!function_exists("logEmails")) {
     }
 }
 
-// if (!function_exists("sendEmail")) {
-//     function sendEmail($count, $single = false)
-//     {
-//         if ($single){
-//             $pendingMails = EmailLog::where('id', 'pending')->take($count);
-//         } else {
-//             $pendingMails = EmailLog::where('status', 'pending')->take($count);
-//         }
+if (!function_exists("extractKeyValuesFromMultiDimensionalArray")) {
+    function extractKeyValuesFromMultiDimensionalArray($search_column, $value_column, $arr): array
+    {
+        $modified = [];
+        if (!empty($arr) && !empty($arr)) {
+            foreach ($arr as $r) {
+                if (isset($r[$search_column]) && isset($r[$value_column])) {
+                    $modified[$r[$search_column]] = $r[$value_column];
+                }
+            }
+        }
+        return $modified;
+    }
+}
 
+if (!function_exists("createReservedAccount")) {
+    function createReservedAccount($data = null, $admin_id = null)
+    {
+        $provider = PaymentGateway::where('id', getSettings()->payment_gateway)->first();
+        $paymentGateway = $provider->slug;
+        $reserved = null;
+        if (!empty($paymentGateway)) {
+            if ($paymentGateway == 'monnify') {
+                $monnify = new MonnifyController($provider);
+                $reserved = $monnify->createReservedAccount($data, $admin_id);
+            }
 
-//         if ($pendingMails) {
-//             $clonePendingMail = clone $pendingMails;
-//             foreach (array_chunk($clonePendingMail->toArray(), 100) as $key => $value) {
-//                 $current = $pendingMails[$key];
-//                 sendEmailObject($current);
-//             }
-//         }
-//     }
-// }
+            if ($paymentGateway == 'squad') {
+                $squad = new SquadController($provider);
+                $reserved = $squad->createReservedAccount($data, $admin_id);
+            }
+        }
 
-// if (!function_exists('sendEmailObject')) {
-//     function sendEmailObject ($current) {
-//         try {
-//             Mail::to($current->recipient)->send(new EmailMessages([
-//                 'subject' => $current->subject,
-//                 'body' => $current->content,
-//             ]));
-
-//             $current->status = 'sent';
-//             $current->save();
-//             return true;
-//         } catch (\Throwable $th) {
-//             $current->status = 'failed';
-//             $current->save();
-//             return false;
-//         }
-//     }
-// }
-
+        return $reserved;
+    }
+}
 
 if (!function_exists("sendEmails")) {
     function sendEmails($email_to, $subject, $body)

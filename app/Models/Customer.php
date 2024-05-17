@@ -38,4 +38,9 @@ class Customer extends Model
     {
         return $this->hasMany(TransactionLog::class);
     }
+
+    public function multiplekycdata()
+    {
+        return $this->hasMany(KycData::class);
+    }
 }
