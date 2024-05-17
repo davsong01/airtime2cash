@@ -501,7 +501,6 @@ use App\Models\BlackList;
                                                                     <td>
                                                                         <div>
                                                                             <a onclick="return confirm('You are about to delete a reserved account!')"class="btn btn-danger btn-sm mr-1 mb-1" href="{{ route('reserved_account.delete', $account->id) }}"><i class="bx bxs-trash"></i><span class="align-middle ml-25">Delete</span></button></a>
-                                                                            @endif
                                                                         </div>
                                                                     </td>
                                                                 </tr>
