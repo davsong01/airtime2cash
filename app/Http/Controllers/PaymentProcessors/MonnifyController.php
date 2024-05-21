@@ -25,7 +25,7 @@ class MonnifyController extends Controller
 
         $url = 'https://api.monnify.com/api/v1/auth/login';
         $response = $this->basicApiCall($url, [], $headers, 'POST');
-
+        
         $accessToken = $response['responseBody']['accessToken'] ?? null;
 
         return $accessToken;
