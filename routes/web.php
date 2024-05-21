@@ -175,6 +175,7 @@ Route::middleware(['auth', 'verified', 'admin', 'ipcheck', 'adminRoute'])->prefi
     Route::get('single-airtime2cash-transaction-view/{transaction}', [TransactionController::class, 'singleAirtimeTransactionView'])->name('admin.single.airtime2cash.transaction.view');
     Route::get('query-wallet/{transactionlog?}', [TransactionController::class, 'queryWallet'])->name('admin.query.wallet');
     Route::get('requery-transaction/{transactionlog?}', [TransactionController::class, 'requery'])->name('admin.requery.transaction');
+    Route::get('requery-callback-analysis/{reference}', [TransactionController::class, 'requeryCallback'])->name('admin.requery.callback');
     
     Route::post('change-transaction-method/{transaction}', [TransactionController::class, 'changeTransactionMethod'])->name('admin.changetransactionmethod');
     Route::get('approve-airtime2cash-transaction/{transaction}', [TransactionController::class, 'approveAirtime2CashTransactions'])->name('admin.approve.airtime2cash.transaction');

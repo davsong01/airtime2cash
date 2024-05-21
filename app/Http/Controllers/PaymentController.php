@@ -8,6 +8,7 @@ use App\Models\TransactionLog;
 use Illuminate\Support\Facades\DB;
 use App\Models\ReservedAccountNumber;
 use App\Models\ReservedAccountCallback;
+use App\Http\Controllers\PaymentProcessors\SquadController;
 use App\Http\Controllers\PaymentProccessors\MonnifyController;
 
 class PaymentController extends Controller
@@ -105,17 +106,18 @@ class PaymentController extends Controller
             $tlk = 'PICKED-' . time();
             $ids = array_column($calls, 'id');
             ReservedAccountCallback::whereIn('id', $ids)->update(['status' => $tlk]);
-            
-            $calls = ReservedAccountCallback::where(['status' => $tlk])->get()->toArray();
+
+            $calls = ReservedAccountCallback::where(['status' => $tlk])->get();
             
             foreach ($calls as $call) {
                 // DB::beginTransaction();
                 
                 $decodeCall = json_decode($call['raw'], true);
                 $account = ReservedAccountNumber::with('customer')->where('account_number', $call['account_number'])->first();
-                $provider = PaymentGateway::where('id', $call['provider_id'])->first();
+                $provider = PaymentGateway::where('id', $call->provider_id)->first();
                 
                 if (!$account) {
+                    ReservedAccountCallback::whereIn('id', $ids)->update(['status' => 'no-account']);
                     continue;
                 }
 
@@ -123,7 +125,7 @@ class PaymentController extends Controller
                 $user = $account->customer->user;
                 
                 if ($call['provider_id'] == 1) {
-                    $payment_type = $call['payment_method'];
+                    $payment_type = $call->payment_method;
 
                     if ($payment_type === 'CARD') {
                         $extra_charge = getSettings()->card_funding_extra_charge > 0 ? getSettings()->card_funding_extra_charge : 0;
@@ -131,30 +133,45 @@ class PaymentController extends Controller
                         continue;
                     }
 
-                    $analyze = app('App\Http\Controllers\PaymentProcessors\MonnifyController')->verifyTransaction($call['transaction_reference']);
-                    
-                    ReservedAccountCallback::where('id', $call['id'])->update(['raw_requery' => json_encode($analyze['data'])]);
+                    $monnify = new MonnifyController($provider);
+                    $analyze = $monnify->verifyTransaction($call->transaction_reference);
+
+                    ReservedAccountCallback::where('id', $call->id)->update(['raw_requery' => json_encode($analyze['data'])]);
 
                     if (isset($analyze) && $analyze['status'] == 'success') {
                         $payment_method = $provider->name . '(' . $decodeCall['eventData']['paymentMethod'] . ')';
-                        $provider_charge = $provider->reserved_account_payment_charge ?? 0;
+        
                         // $provider_charge = $provider_charge + $extra_charge;
                         $original_amount = $analyze['data']['amountPaid'] ?? $decodeCall['eventData']['amountPaid'];
                         $transaction_id = $analyze['data']['transactionReference'] ?? $decodeCall['eventData']['transactionReference'];
                     }
                 }
 
+                if ($call->provider_id == 2) {
+                    $squad = new SquadController($provider);
+                    $analyze = $squad->verifyTransaction($call->transaction_reference);
+
+                    ReservedAccountCallback::where('id', $call->id)->update(['raw_requery' => json_encode($analyze['data'])]);
+
+                    if (isset($analyze) && $analyze['status'] == 'success') {
+                        $payment_method = $provider->name . '(BANK_TRANSFER)';
+
+                        $original_amount = $analyze['data']['principal_amount'];
+                        $transaction_id = $analyze['data']['transactionReference'] ?? $call->transaction_reference;
+                    } else {
+                        ReservedAccountCallback::whereIn('id', $ids)->update(['status' => 'no-payment']);
+                    }
+                }
+                
                 if (isset($analyze) && $analyze['status'] == 'success') {
                     // Log Transaction
                     $wallet = new WalletController();
                     $balance = $wallet->getWalletBalance($user);
                     $reference = $this->generateRequestId();
-                    // if (!empty($provider->reserved_account_payment_charge)) {
-                    //     // $provider_charge = ($provider->reserved_account_payment_charge / 100) * $original_amount;
-                    //     $provider_charge = $provider_charge;
-                    // } else {
-                    //     $provider_charge = 0;
-                    // }
+
+                    $provider_charge_setting = getPaymentGatewayReservedAccountCharge($provider->id) ?? 0;
+                    $provider_charge = calculatePaymentGatewayReservedAccountCharge($provider_charge_setting, $original_amount) ?? 0;
+                    
                     $amount = $original_amount - $provider_charge;
 
                     $request['type'] = 'credit';
@@ -202,7 +219,7 @@ class PaymentController extends Controller
                 }
 
                 //
-                ReservedAccountCallback::where('id', $call['id'])->update(['status' => 'analyzed']);
+                ReservedAccountCallback::where('id', $call->id)->update(['status' => 'analyzed']);
                 // DB::commit();
             }
         } catch (\Throwable $th) {

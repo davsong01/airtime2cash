@@ -18,11 +18,14 @@ use App\Services\ExcelService;
 use App\Models\ReferralEarning;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\DB;
+use App\Models\ReservedAccountCallback;
 use Illuminate\Support\Facades\Session;
 use App\Models\Airtime2CashTransactions;
 use Illuminate\Support\Facades\Validator;
 use App\Http\Controllers\WalletController;
 use Illuminate\Contracts\Database\Query\Builder;
+use App\Http\Controllers\PaymentProcessors\SquadController;
+use App\Http\Controllers\PaymentProcessors\MonnifyController;
 
 class TransactionController extends Controller
 {
@@ -1511,10 +1514,39 @@ class TransactionController extends Controller
         if ($trans->product->type == 'wallet2bank') {
             $query = app("App\Http\Controllers\Providers\SageController")->requery($trans);
         } else {
-            $query = app("App\Http\Controllers\Providers\KingsVtuController")->requery($trans);
+            if ($trans->reason == 'WALLET-FUNDING') {
+                if ($trans->wallet_funding_provider == 1) {
+                    $monnify = new MonnifyController($trans->provider);
+                    return $monnify->verifyTransaction($trans->transaction_reference);
+                }
+
+                if ($trans->wallet_funding_provider == 2) {
+                    $squad = new SquadController($trans->provider);
+                    return $squad->verifyTransaction($trans->transaction_reference);
+                }
+            }else{
+                $query = app("App\Http\Controllers\Providers\KingsVtuController")->requery($trans);
+            }
         }
 
         return $query;
+    }
+
+    
+    public function requeryCallback($reference)
+    {
+        $transaction = ReservedAccountCallback::where('transaction_reference', $reference)->first();
+        
+        if ($transaction->provider_id == 1) {
+            $monnify = new MonnifyController($transaction->gateway);
+            return $monnify->verifyTransaction($reference);
+        }
+
+        if ($transaction->wallet_funding_provider == 2) {
+            $squad = new SquadController($transaction->gateway);
+            return $squad->verifyTransaction($reference);
+        }
+
     }
 
     public function changeTransactionMethod(Request $request, Airtime2CashTransactions $transaction)

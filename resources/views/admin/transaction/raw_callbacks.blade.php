@@ -50,6 +50,10 @@
                                                 <a class="btn btn-primary btn-sm mr-1 mb-1" href="{{ route('callback.reset', $call->id) }}">
                                                     <i class="fa fa-eye"></i><span class="align-middle ml-25">Reset</span>
                                                 </a>
+
+                                                <a class="btn btn-info btn-sm mr-1 mb-1" href="{{ route('admin.requery.callback', $call->transaction_reference) }}">
+                                                    <i class="fa fa-eye"></i><span class="align-middle ml-25">Query</span>
+                                                </a>
                                                 @endif
                                             </td>
                                             
