@@ -1668,7 +1668,8 @@ class TransactionController extends Controller
             ];
 
             $balance = $control->basicApiCall($balanceUrl, [], $headers, 'GET');
-
+            $real_balance = 0;
+            
             if (!empty($balance) && $balance['success'] == true && $balance['status'] == 'success') {
                 $status = $balance['status'];
                 $error = '';
