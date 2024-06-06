@@ -1,3 +1,4 @@
+<?php use App\Models\Category; ?>
 @if (auth()->user()->email_verified_at)
 <div class="main-menu menu-fixed menu-dark menu-accordion" data-scroll-to-active="true">
     <div class="navbar-header">
@@ -20,7 +21,9 @@
             <li style="" class="navigation-header customer-details"><span>Wallet Balance</span><br>{!! $balance !!}</li>
             <li style="" class="navigation-header customer-details"><span>Customer Level</span><br><strong>{{ auth()->user()->customer?->level?->name }}</strong></li>
             <li class="block-header-color navigation-header"><span>Make Payment</span></li>
-            <?php $categories = getCategories() ?>
+            <?php $categories = getCategories() ;
+                $cash = Category::where('type', 'airtime2cash')->where('status','active')->first();
+            ?>
             @foreach($categories as $category)
                 <li class="{{ Request::path() == 'customer/'.$category->slug ? 'active' : '' }} svg">
                     <a href="{{ route('open.transaction.page', $category->slug)}}">@if($category->icon){!! $category->icon !!} @else <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24"><path d="M880-720v480q0 33-23.5 56.5T800-160H160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h640q33 0 56.5 23.5T880-720Zm-720 80h640v-80H160v80Zm0 160v240h640v-240H160Zm0 240v-480 480Z" fill="white"/></svg>
@@ -28,14 +31,15 @@
                     </a>
                 </li>
             @endforeach
+            @if($cash)
             <li class="{{ Route::is('airtime-to-cash') ? 'active' : '' }} svg"><a target="_blank" href="{{ route('airtime-to-cash')}}">
                 <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24"><path d="M760-120q-39 0-70-22.5T647-200H440q-66 0-113-47t-47-113q0-66 47-113t113-47h80q33 0 56.5-23.5T600-600q0-33-23.5-56.5T520-680H313q-13 35-43.5 57.5T200-600q-50 0-85-35t-35-85q0-50 35-85t85-35q39 0 69.5 22.5T313-760h207q66 0 113 47t47 113q0 66-47 113t-113 47h-80q-33 0-56.5 23.5T360-360q0 33 23.5 56.5T440-280h207q13-35 43.5-57.5T760-360q50 0 85 35t35 85q0 50-35 85t-85 35ZM200-680q17 0 28.5-11.5T240-720q0-17-11.5-28.5T200-760q-17 0-28.5 11.5T160-720q0 17 11.5 28.5T200-680Z"/>
                 </svg>
                 <span class="menu-title"> &nbsp;Airtime To Cash</span></a>
             </li>
-
+            @endif
             <?php
-                $wallet2bank = App\Models\Product::where('id', env('TRANSFER_TO_BANK_PRODUCT_ID'))->first();
+                $wallet2bank = App\Models\Product::where('id', env('TRANSFER_TO_BANK_PRODUCT_ID'))->where('status','active')->first();
             ?>
             @if($wallet2bank)
             <li class="{{ Route::is('wallet-to-bank.*') ? 'active' : '' }} svg"><a target="_blank" href="{{ route('wallet-to-bank', $wallet2bank->slug )}}">

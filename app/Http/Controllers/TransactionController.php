@@ -58,7 +58,7 @@ class TransactionController extends Controller
                     ->get();
             }
         ])->where('status', 'active')->where('type', 'airtime2cash')->first();
-
+    
         foreach ($category->products as $product) {
             $discount = Discount::where('product_id', $product->id)->where('customer_level', auth()->user()->customer->level->id)->first();
             $product->discounted_rate = (!empty($discount) && $discount->price < $product->rate) ? $discount->price : $product->rate;
