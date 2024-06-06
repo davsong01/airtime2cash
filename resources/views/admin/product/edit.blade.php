@@ -102,6 +102,7 @@
                                                                                         <label class="custom-file-label" for="image">Replace file</label>
                                                                                     </div>
                                                                                 </fieldset>
+                                                                                {{-- @if($product->type == 'general')) --}}
                                                                                 <fieldset class="form-group">
                                                                                     <label for="category">Category</label>
                                                                                     <select class="form-control" name="category" id="category" required>
@@ -111,6 +112,7 @@
                                                                                         @endforeach
                                                                                     </select>
                                                                                 </fieldset>
+                                                                                {{-- @endif --}}
                                                                                 <fieldset class="form-group">
                                                                                     <label for="name">Allow Quantity</label>
                                                                                     <select class="form-control" name="allow_quantity" id="allow_quantity">

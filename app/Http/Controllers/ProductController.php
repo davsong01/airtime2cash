@@ -14,7 +14,7 @@ class ProductController extends Controller
 {
     public function index()
     {
-        $products = Product::with(['api', 'variations'])->where('type','general')->orderBy('created_at', 'DESC')->get();
+        $products = Product::with(['api', 'variations'])->orderBy('created_at', 'DESC')->get();
         return view('admin.product.index', compact('products'));
     }
 
