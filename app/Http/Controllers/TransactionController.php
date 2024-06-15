@@ -413,8 +413,8 @@ class TransactionController extends Controller
 
             // Update Customer Wallet
             $wallet->updateCustomerWallet(auth()->user(), $request['total_amount'], $request['type']);
-
-            if (env('ENT') == 'local') {
+            
+            if (env('ENT') == 'elocal') {
                 $transfer = [
                     'status' => 'success',
                     'api_response' => 'local Successful response from API',
@@ -422,7 +422,7 @@ class TransactionController extends Controller
             } else {
                 $transfer = $this->transferToBankAccount($bank->cbn_code, $request->account_number, $request->account_name, $amount, $transaction);
             }
-
+            
             if (isset($transfer['status']) && $transfer['status'] == 'success') {
                 $user_status = 'success';
                 $status = 'success';
@@ -455,14 +455,14 @@ class TransactionController extends Controller
                 'user_status' => $user_status ?? null
             ]);
 
-
             DB::commit();
             $this->sendTransactionEmail($transaction, auth()->user());
-
+            
             return redirect(route('transaction.status', $transaction->transaction_id));
         } catch (\Throwable $th) {
             \Log::error(['Transaction Error' => 'Message: ' . $th->getMessage() . ' File: ' . $th->getFile() . ' Line: ' . $th->getLine()]);
             DB::rollBack();
+           
             return back()->with('error', 'An error occured, please try again later');
         }
     }
@@ -1641,6 +1641,7 @@ class TransactionController extends Controller
         $status = 'failed';
         $error = 'failed';
         $control = new Controller();
+        $request_data = null;
 
         $url = "https://sagecloud.ng/api/v2/merchant/authorization";
         $payload = [
@@ -1649,7 +1650,7 @@ class TransactionController extends Controller
         ];
 
         $login = $control->basicApiCall($url, $payload, []);
-
+        
         if (!empty($login) && $login['success'] == true) {
             $token = $login['data']['token']['access_token'] ?? null;
             $api_response = $login;
@@ -1695,11 +1696,12 @@ class TransactionController extends Controller
                     "amount" => $amount,
                     "narration" => 'Transfer from ' . config('app.name'),
                 ];
+
                 $request_data = [
                     'url' => $url2,
                     'payload' => $payload,
                 ];
-
+                
                 $headers = [
                     "Content-Type: application/json",
                     "Authorization: Bearer " . $token . "",
@@ -1737,7 +1739,7 @@ class TransactionController extends Controller
                 'request_data' => json_encode($request_data)
             ]);
         }
-
+        
         return [
             'error' => $error,
             'status' => $status,

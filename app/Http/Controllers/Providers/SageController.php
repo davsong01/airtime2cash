@@ -44,6 +44,7 @@ class SageController extends Controller
 
     public function transfer($token, $bank_code, $account_number,$account_name, $amount, $reference){
         $url = $this->base_url . "transfer/fund-transfer";
+        
         $payload = [
             "bank_code" => $bank_code,
             "account_number" => $account_number,
@@ -57,7 +58,7 @@ class SageController extends Controller
             "Content-Type: application/json",
             "Authorization: Bearer " . $token . "",
         ];
-
+        
         return $this->control->basicApiCall($url, json_encode($payload), $headers);
     }
 
