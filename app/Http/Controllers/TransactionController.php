@@ -370,7 +370,7 @@ class TransactionController extends Controller
         $request['quantity'] = 1;
         $request['total_amount'] = $amount + env('BANK_TRANSFER_CHARGES');
         $request['amount'] = $amount;
-
+        
         // Get Wallet Balance
         $balance = walletBalance(auth()->user());
 
@@ -771,20 +771,6 @@ class TransactionController extends Controller
             return $discount;
         }
     }
-
-    // public function getProductDiscount($product)
-    // {
-    //     $discount = 0;
-    //     $level = auth()->user()->customer->customer_level;
-
-    //     $findDiscount = Discount::where(['customer_level' => $level, 'product_id' => $product->id])->first();
-
-    //     if (!empty($findDiscount)) {
-    //         $discount = $findDiscount->price;
-    //     }
-
-    //     return $discount;
-    // }
 
     public function validateMeter()
     {
