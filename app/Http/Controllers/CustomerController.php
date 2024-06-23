@@ -17,7 +17,7 @@ class CustomerController extends Controller
 {
     function customers(Request $request, $status = null)
     {
-        $customers = User::where('type', '!=', 'admin');
+        $customers = User::where('type', '!=', 'admin')->orderby('id', 'DESC');
 
         if ($status) {
             if ($status == 'active') {
@@ -44,9 +44,33 @@ class CustomerController extends Controller
                 ->orWhere('phone', 'like', $key);
         }
 
-        $customers = $customers->latest()->get();
+        // $customers = $customers->latest()->get();
+        // $customers = User::orderby('id', 'DESC');
 
-        return view('admin.customers.index', ['customers' => $customers]);
+        if (!empty($request->email)) {
+            $customers = $customers->where('email', 'like', $request->email);
+        }
+
+        if (!empty($request->username)) {
+            $customers = $customers->where('username', 'like', $request->username);
+        }
+
+        if (!empty($request->mobile)) {
+            $customers = $customers->where('mobile', 'like', $request->mobile);
+        }
+
+        if (!empty($request->from) && !empty($request->to)) {
+            $from = $request->from . ' 00:00:00';
+            $to = $request->to . ' 23:59:59';
+
+            $customers = $customers->whereBetween('created_at', [$from, $to]);
+        }
+
+        $customers = $customers->paginate(100);
+
+        $customer_levels = CustomerLevel::all();
+
+        return view('admin.customers.index', ['customers' => $customers, 'customer_levels' => $customer_levels]);
     }
 
     public function addReservedAccounts(Request $request, Customer $customer)

@@ -21,6 +21,60 @@
                     </div>
 
                     <div class="card-body">
+                        <div class="col-md-12">
+                            <form action="{{ route('customers') }}" method="GET">
+                                {{-- @csrf --}}
+                                <div class="row gy-4">
+                                    <div class="col-md-3">
+                                        <div class="form-group" >
+                                            <label for="email" class="form-label">Email</label>
+                                            <input type="text" class="form-control" id="email" name="email" placeholder="Enter email" value="{{ \Request::get('email')}}">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-group" >
+                                            <label for="username" class="form-label">Username</label>
+                                            <input type="text" class="form-control" id="username" name="username" placeholder="Enter username" value="{{ \Request::get('username')}}">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <div class="form-group" >
+                                            <label for="mobile" class="form-label">Mobile Phone</label>
+                                            <input type="text" class="form-control" id="mobile" name="mobile" placeholder="Enter phone number" value="{{ \Request::get('mobile')}}">
+                                        </div>
+                                    </div>
+                                    {{-- <div class="col-md-3">
+                                        <div class="form-group">
+                                            <label for="level" class="form-label">Level</label>
+                                            <select class="form-control" name="level" id="level">
+                                                <option value="">Select</option>
+                                                @foreach($customer_levels as $level)
+                                                <option value="{{ $level->id }}" {{ \Request::get('level') == $level->id ? 'selected' : ''}}>{{ $level->name }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                    </div> --}}
+                                    
+                                    <div class="col-md-2">
+                                        <div class="form-group">
+                                            <label class="form-label" for="from">Joined From</label>
+                                            <input type="date" class="form-control" value="{{ \Request::get('from')}}" name="from">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <div class="form-group">
+                                            <label class="form-label" for="to">To</label>
+                                            <input type="date" class="form-control" value="{{ \Request::get('to')}}" name="to">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label for="" class="form-label"></label>
+                                        <input type="submit" class="form-control btn btn-primary mt-2" value="Search">
+                                    </div>
+                                </div>
+                            </form>
+                            <hr>
+                        </div>
                         <div class="table-responsive">
                             <table id="table-extended-success" class="table table-striped dataex-html5-selectors">
                                 <thead>
@@ -68,6 +122,8 @@
                             </table>
                             {{-- {{ $customers->render() }} --}}
                         </div>
+                        {!! $customers->appends($_GET)->links() !!}
+
                     </div>
                     <!-- datatable ends -->
                 </div>
