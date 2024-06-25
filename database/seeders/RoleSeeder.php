@@ -48,7 +48,8 @@ class RoleSeeder extends Seeder
             'KYC Management',
             'Payment Gateway Settings',
             'General Settings',
-            'Email Setup'
+            'Email Setup',
+            'Unverified Customers'
         ];
 
         $permissions = [
@@ -175,7 +176,9 @@ class RoleSeeder extends Seeder
             'customerlevel.create',
             'admin.transaction.pin.reset',
             'admin.password.reset',
-            'admin.airtime.2.cash.log'
+            'admin.airtime.2.cash.log',
+            'customers.unverified',
+            'customers.verify'
         ];
 
         // RolePermission::truncate();
@@ -232,9 +235,9 @@ class RoleSeeder extends Seeder
         // Create new Settings here
 
         // Create Annoucements
-        DB::statement("INSERT INTO `announcements` (`id`, `title`, `status`, `type`, `message`, `created_at`, `updated_at`) VALUES
-        (1, 'Pop-up Announcement', 'inactive', 'popup', '<p>sdd</p>', '2024-04-14 20:00:10', '2024-04-14 20:00:10'),
-        (2, 'Scroll Announcement', 'inactive', 'scroll', '<p>sddsds</p>', '2024-04-14 20:00:10', '2024-04-14 20:00:10');");
+        // DB::statement("INSERT INTO `announcements` (`id`, `title`, `status`, `type`, `message`, `created_at`, `updated_at`) VALUES
+        // (1, 'Pop-up Announcement', 'inactive', 'popup', '<p>sdd</p>', '2024-04-14 20:00:10', '2024-04-14 20:00:10'),
+        // (2, 'Scroll Announcement', 'inactive', 'scroll', '<p>sddsds</p>', '2024-04-14 20:00:10', '2024-04-14 20:00:10');");
         
         // Create default user and admin
         

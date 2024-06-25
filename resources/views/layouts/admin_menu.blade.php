@@ -133,6 +133,13 @@
                                         data-i18n="Input Groups">Blacklisted Customers</span></a>
                             </li>
                         @endif
+                        @if (in_array('customers.unverified', $allowedRoutes) || in_array(1, auth()->user()->admin->roleIds()))
+                            <li class="svg {{ Route::is('customers.unverified') ? 'active' : '' }}"><a
+                                    href="{{ route('customers.unverified', request()->array) }}"><i
+                                        class="bx bx-right-arrow-alt"></i><span class="menu-item"
+                                        data-i18n="Input Groups">Unverified Customers</span></a>
+                            </li>
+                        @endif
                         @if (in_array('customerlevel.index', $allowedRoutes) || in_array(1, auth()->user()->admin->roleIds()))
                             <li class="svg {{ Route::is('customerlevel.*') ? 'active' : '' }}"><a
                                     href="{{ route('customerlevel.index') }}"><i
