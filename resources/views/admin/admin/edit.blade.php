@@ -83,6 +83,12 @@
                                                         @endforeach
                                                 </fieldset>
                                             </fieldset>
+                                            <div class="form-group col-sm-6 col-12">
+                                                <label for="text-bold-600">New Password <small>(Leave empty to use current password)</small></label>
+                                                <input type="text" class="form-control" name="password"
+                                                    value="" placeholder="Enter new password"
+                                                    id="password" required>
+                                            </div>
                                             </div>
                                             <div class="">
                                                 <input type="hidden" value="{{ $admin->id }}" name="id" />
