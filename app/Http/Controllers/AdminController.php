@@ -109,7 +109,7 @@ class AdminController extends Controller
         $admin->admin->update([
             'permissions' => join(',', $request->roles),
         ]);
-
+        
         if ($admin) return back()->with('message', 'Account updated successfully!');
         else return back()->with('error', 'Account update failed!');
     }

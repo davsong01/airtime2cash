@@ -25,49 +25,90 @@ class DashboardController extends Controller
         $customer = $this->customerOfTheMonth();
         
         if (auth()->user()->type == 'admin') {
-            $transaction_debit = TransactionLog::join('wallets', 'wallets.transaction_id', '=', 'transaction_logs.transaction_id')
-                ->where('wallets.type', 'debit')->whereIn('status', ['success', 'delivered']);
-
-            $transaction_credit = TransactionLog::join('wallets', 'wallets.transaction_id', '=', 'transaction_logs.transaction_id')
-                ->where('wallets.type', 'credit')->whereIn('status', ['success', 'delivered']);
-
-            $debit = $transaction_debit->sum('total_amount');
-            $debit_count = $transaction_debit->count();
-
-            $credit = $transaction_credit->sum('total_amount');
-            $credit_count = $transaction_credit->count();
-
-            $referralC = ReferralEarning::where('type', 'credit');
-            $referral_credit = $referralC->sum('amount');
-            $referral_credit_count = $referralC->count();
-
-            $referralD = ReferralEarning::where('type', 'debit');
-            $referral_debit = $referralD->sum('amount');
-            $referral_debit_count = $referralD->count();
+            // Sum total wallet balance in a single query
             $total_wallet_balance = Customer::sum('wallet');
 
-            $kyc_verified = User::join('customers', 'customers.user_id', 'users.id')->where('users.type', 'customer')->where('kyc_status', 'verified')->count();
-            $active_customers = TransactionLog::distinct('customer_id')->count();
-            $customers = User::where('type', 'customer')->count();
+            // Count verified KYC customers
+            $kyc_verified = User::where('type', 'customer')
+                ->where('kyc_status', 'verified')
+                ->join('customers', 'customers.user_id', '=', 'users.id')
+                ->count();
 
+            // Count distinct active customers
+            $active_customers = TransactionLog::distinct('customer_id')->count('customer_id');
+
+            // Count total customers
+            $customers = User::where('type', 'customer')->count();
             $apis = API::get();
             
-            return view('admin.dashboard', compact('customer',  'credit', 'credit_count', 'debit', 'debit_count', 'referral_debit', 'referral_credit', 'referral_credit_count', 'referral_debit_count', 'kyc_verified', 'active_customers', 'customers', 'total_wallet_balance','apis'));
+            return view('admin.dashboard', compact('customer', 'kyc_verified', 'active_customers', 'customers', 'total_wallet_balance','apis'));
         } else {
             return view('customer.dashboard', compact('customer'));
         }
     }
 
+    public function dashboardWidgets($type)
+    {
+        $transactions = TransactionLog::join('wallets', 'wallets.transaction_id', '=', 'transaction_logs.transaction_id')
+        ->select(
+            DB::raw("SUM(CASE WHEN wallets.type = 'debit' AND status IN ('success', 'delivered') THEN total_amount ELSE 0 END) as total_debit"),
+            DB::raw("COUNT(CASE WHEN wallets.type = 'debit' AND status IN ('success', 'delivered') THEN 1 ELSE NULL END) as debit_count"),
+            DB::raw("SUM(CASE WHEN wallets.type = 'credit' AND status IN ('success', 'delivered') THEN total_amount ELSE 0 END) as total_credit"),
+            DB::raw("COUNT(CASE WHEN wallets.type = 'credit' AND status IN ('success', 'delivered') THEN 1 ELSE NULL END) as credit_count")
+        )->first();
+
+
+        if ($type == 'transactions') {
+            $debit = $transactions->total_debit;
+            $debit_count = $transactions->debit_count;
+            $credit = $transactions->total_credit;
+            $credit_count = $transactions->credit_count;
+
+            $res = [
+                'data' => '<span style="color:black">All: ' . getSettings()->currency . ' (' . number_format($credit + $debit) . ')</span><br><span style="color:green">Credit: ' . getSettings()->currency . number_format($credit) . '<small>(' . $credit_count . ')</small></span> <br><span style="color:red">Debit: ' . getSettings()->currency . number_format($debit) . ' <small>(' . $debit_count . ')</small></span><br>',
+            ];
+        }
+
+        if ($type == 'referrals') {
+            $referrals = ReferralEarning::select(
+                DB::raw("SUM(CASE WHEN type = 'credit' THEN amount ELSE 0 END) as total_referral_credit"),
+                DB::raw("COUNT(CASE WHEN type = 'credit' THEN 1 ELSE NULL END) as referral_credit_count"),
+                DB::raw("SUM(CASE WHEN type = 'debit' THEN amount ELSE 0 END) as total_referral_debit"),
+                DB::raw("COUNT(CASE WHEN type = 'debit' THEN 1 ELSE NULL END) as referral_debit_count")
+            )
+                ->first();
+
+            $referral_credit = $referrals->total_referral_credit;
+            $referral_credit_count = $referrals->referral_credit_count;
+            $referral_debit = $referrals->total_referral_debit;
+            $referral_debit_count = $referrals->referral_debit_count;
+
+            $res = [
+                'data' => '<span style="color:black">All: ' . getSettings()->currency . number_format($referral_credit + $referral_debit) . '(' . $referral_debit_count + $referral_credit_count . ') </span><br><span style="color:green">Credit: ' . getSettings()->currency . number_format($referral_credit) . '<small>(' . $referral_credit_count . ')</small></span> <br><span style="color:red">Debit: ' . getSettings()->currency . number_format($referral_debit) . '<small>(' . $referral_debit_count . ')</small></span><br>',
+            ];
+        }
+
+        return $res;
+    }
+
     public function customerOfTheMonth()
     {
         $firstdayofmonth = Carbon::today()->startOfMonth();
-
-        $count = TransactionLog::with('customer')->where('reason', 'Product Purchase')
-        ->whereIn('status',['completed','delivered','success'])
-        ->addSelect(DB::raw('SUM(total_amount) as total_amount, COUNT(id) as count,customer_id'))
+        if(env('ENT') == 'local'){
+            $count = TransactionLog::with('customer')->where('reason', 'Product Purchase')
+            ->whereIn('status', ['completed', 'delivered', 'success'])
+            ->addSelect(DB::raw('SUM(total_amount) as total_amount, COUNT(id) as count,customer_id'))
             ->groupBy('customer_id')
-            ->whereBetween('created_at', [$firstdayofmonth, Carbon::now()])
             ->orderBy('total_amount', 'DESC')->first();
+        }else{
+            $count = TransactionLog::with('customer')->where('reason', 'Product Purchase')
+            ->whereIn('status',['completed','delivered','success'])
+            ->addSelect(DB::raw('SUM(total_amount) as total_amount, COUNT(id) as count,customer_id'))
+                ->groupBy('customer_id')
+                ->whereBetween('created_at', [$firstdayofmonth, Carbon::now()])
+                ->orderBy('total_amount', 'DESC')->first();
+        }
+
         return $count;
     }
 
