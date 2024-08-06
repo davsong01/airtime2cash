@@ -88,6 +88,8 @@
                 <section id="dashboard-ecommerce">
                     <div class="row">
                         <div class="col-md-12">
+                            {!! getSettings()->google_dashboard_ad_code !!}
+                        <div class="col-md-12">
                             @include('layouts.alerts')
                         </div>
                         @if(!empty($customer))
