@@ -175,6 +175,10 @@ use App\Models\PaymentGateway;
                                                                             <label for="google_ad_code">Google Ad Code</label>
                                                                             <textarea class="form-control" id="google_ad_code" rows="3" name="google_ad_code" value="{{ $settings->google_ad_code ?? old('google_ad_code') }}" placeholder="Google ad code">{{ $settings->google_ad_code ?? old('google_ad_code') }}</textarea>
                                                                         </fieldset>
+                                                                        <fieldset class="form-group">
+                                                                            <label for="google_dashboard_ad_code">Google Dashboard Ad Code</label>
+                                                                            <textarea class="form-control" id="google_dashboard_ad_code" rows="5" name="google_dashboard_ad_code" value="{{ $settings->google_dashboard_ad_code ?? old('google_dashboard_ad_code') }}" placeholder="Google dashboard ad code">{{ $settings->google_dashboard_ad_code ?? old('google_dashboard_ad_code') }}</textarea>
+                                                                        </fieldset>
                                                                     </div>
                                                                 </div>
                                                                 <div class="row">

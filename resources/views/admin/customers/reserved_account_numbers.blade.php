@@ -71,6 +71,7 @@
                                                             {{$number->account_name}}<br>
                                                             {{$number->account_number}}<br>
                                                             {{$number->bank_name}}<br>
+                                                            <small><strong>Attached BVN: </strong>{{mask($number->bvn)}}</small> <br>
                                                             <span style="color:black">Provider:</span> {{$number->payment_gateway->name}}
                                                             </p>
                                                         </td>

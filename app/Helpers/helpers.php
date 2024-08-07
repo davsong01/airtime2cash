@@ -15,6 +15,13 @@ use App\Http\Controllers\WalletController;
 use App\Http\Controllers\PaymentProcessors\SquadController;
 use App\Http\Controllers\PaymentProcessors\MonnifyController;
 
+if (!function_exists("mask")) {
+    function mask($word, $a = 2, $b = 9, $c = 9, $d = 10)
+    {
+        return substr_replace($word, "*******", $a, $b) . substr($word, $c, $d);
+    }
+}
+
 if (!function_exists("logEmails")) {
     function logEmails($email_to, $subject, $body)
     {
