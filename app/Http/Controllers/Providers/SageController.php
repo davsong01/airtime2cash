@@ -9,25 +9,27 @@ class SageController extends Controller
 {
     public $base_url;
     public $email;
-    public $password;
+    public $secret_key;
+    public $public_key;
     public $control;
 
     public function __construct(){
-        $this->base_url = "https://sagecloud.ng/api/v2/";
-        $this->email = env('SAGECLOUD_EMAIL');
-        $this->password = env('SAGECLOUD_PASSWORD');
+        $this->base_url = env('SAGE_BASE_URL');
+        $this->secret_key = getSettings()->sage_secret_key;
+        $this->public_key = getSettings()->sage_public_key;
         $this->control = new Controller();
-
     }
 
     public function login(){
         $url = $this->base_url. "merchant/authorization";
-        $payload = [
-            "email" => $this->email,
-            "password" =>   $this->password,
+
+        $headers = [
+            "Authorization: Basic " . base64_encode($this->public_key . ':' . $this->secret_key)
         ];
 
-        return $this->control->basicApiCall($url, $payload, []);
+        $response = $this->basicApiCall($url, [], $headers, 'POST');
+
+        return $response;
     }
 
 
@@ -120,9 +122,11 @@ class SageController extends Controller
             "account_number" => $account_number
         ];
         $headers = [
-            "Content-Type: application/json",
-            "Authorization: Bearer " . $token . "",
+            "Content-Type" => "application/json",
+            "Authorization" => "Basic " . base64_encode($this->public_key . ":" . $this->secret_key),
         ];
+
+        dd($headers);
 
         return $this->control->basicApiCall($url, json_encode($payload), $headers);
             

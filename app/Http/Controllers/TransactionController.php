@@ -1629,13 +1629,7 @@ class TransactionController extends Controller
         $control = new Controller();
         $request_data = null;
 
-        $url = "https://sagecloud.ng/api/v2/merchant/authorization";
-        $payload = [
-            "email" => env('SAGECLOUD_EMAIL'),
-            "password" =>   env('SAGECLOUD_PASSWORD'),
-        ];
-
-        $login = $control->basicApiCall($url, $payload, []);
+        $login = app('App\Http\Controllers\Providers\SageController')->login();
         
         if (!empty($login) && $login['success'] == true) {
             $token = $login['data']['token']['access_token'] ?? null;
@@ -1648,7 +1642,7 @@ class TransactionController extends Controller
 
         if (!empty($token)) {
             // Get balance
-            $balanceUrl = "https://sagecloud.ng/api/v2/wallet/balance";
+            $balanceUrl = env('SAGE_BASE_URL')."wallet/balance";
             $headers = [
                 "Content-Type: application/json",
                 "Authorization: Bearer " . $token . "",
@@ -1756,17 +1750,8 @@ class TransactionController extends Controller
 
     public function verifyBankDetails(Request $request)
     {
-        $url = "https://sagecloud.ng/api/v2/merchant/authorization";
-        $payload = [
-            "email" => env('SAGECLOUD_EMAIL'),
-            "password" =>   env('SAGECLOUD_PASSWORD'),
-        ];
-
-        $transaction = Airtime2CashTransactions::where('id', $request->transaction_id)->first();
-        $control = new Controller();
-
-        $login = $control->basicApiCall($url, $payload, []);
-
+        $login = app('App\Http\Controllers\Providers\SageController')->login();
+        
         if (!empty($login) && $login['success'] == true) {
             $token = $login['data']['token']['access_token'] ?? null;
         } else {
@@ -1774,9 +1759,9 @@ class TransactionController extends Controller
                 'message' => 'Could not verify account details at the moment, please try again later',
             ]);
         }
-
+        
         if (!empty($token)) {
-            $url2 = "https://sagecloud.ng/api/v2/transfer/verify-bank-account";
+            $url2 =  env('SAGE_BASE_URL') . "transfer/verify-bank-account";
             $payload = [
                 "bank_code" => $request->bank_code,
                 "account_number" => $request->account_number
@@ -1786,7 +1771,7 @@ class TransactionController extends Controller
                 "Authorization: Bearer " . $token . "",
             ];
 
-            $verify = $control->basicApiCall($url2, json_encode($payload), $headers);
+            $verify = $this->basicApiCall($url2, json_encode($payload), $headers);
 
             return response()->json([
                 'message' => $verify,

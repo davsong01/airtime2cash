@@ -87,17 +87,13 @@ use App\Models\PaymentGateway;
                                                                             </select>
                                                                         </fieldset>
                                                                         <fieldset class="form-group">
-                                                                            <label for="referral_system_status">Referral System Status</label>
-                                                                            <select name="referral_system_status" class="form-control" id="referral_system_status">
-                                                                                <option value="">Select</option>
-                                                                                <option value="active"{{ $settings->referral_system_status == 'active' ? 'selected' : ''}}>Active</option>
-                                                                                <option value="inactive" {{ $settings->referral_system_status == 'inactive' ? 'selected' : ''}}>InActive</option>
-                                                                            </select>
+                                                                            <label for="sage_secret_key">Sage Secret Key</label>
+                                                                            <input type="text" class="form-control" name="sage_secret_key" value="{{ $settings->sage_secret_key }}">
                                                                         </fieldset>
-                                                                        {{-- <fieldset class="form-group" style="display:{{ $settings->referral_system_status == 'active' ? 'block' : 'none'}}" id="referral_percentage_div">
-                                                                            <label for="referral_percentage">Referral Percentage(%)</label>
-                                                                            <input type="number" class="form-control" id="referral_percentage" step="0.01" name="referral_percentage" value="{{ $settings->referral_percentage ?? old('referral_percentage') }}" placeholder="Enter percentage for referral earnings">
-                                                                        </fieldset> --}}
+                                                                        <fieldset class="form-group">
+                                                                            <label for="sage_public_key">Sage Public Key</label>
+                                                                            <input type="text" class="form-control" name="sage_public_key" value="{{ $settings->sage_public_key }}">
+                                                                        </fieldset>
                                                                     </div>
                                                                     <div class="col-md-6">
                                                                         <fieldset class="form-group">
