@@ -187,6 +187,7 @@
                                                                     <strong class="heads">Request Payload</strong> <br>
                                                                     <div>
                                                                         <code style="margin:10px 0">
+                                                                        
                                                                             {!! $transaction->request_data !!}
                                                                         </code>
 

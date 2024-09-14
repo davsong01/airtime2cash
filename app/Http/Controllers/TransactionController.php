@@ -447,7 +447,6 @@ class TransactionController extends Controller
 
             $transaction->update([
                 'balance_after' => $balance_after,
-                'request_data' => '',
                 'api_response' => $api_response ?? null,
                 'failure_reason' => $failure_reason ?? null,
                 'status' => $status ?? '',
@@ -1626,8 +1625,15 @@ class TransactionController extends Controller
     {
         $status = 'failed';
         $error = 'failed';
-        $control = new Controller();
-        $request_data = null;
+        
+        $request_data = [
+            $token ?? '',
+            $bank_code,
+            $account_number,
+            $account_name,
+            $amount,
+            $transaction->transaction_id
+        ];
 
         $login = app('App\Http\Controllers\Providers\SageController')->login();
         
@@ -1661,6 +1667,16 @@ class TransactionController extends Controller
                 $error = 'Not Enough balance to carry out transaction. ';
                 $status = 'failed';
             } else {
+                $request_data = [
+                    "token" => $token,
+                    "bank_code" => $bank_code,
+                    "account_number" => $account_number,
+                    "reference" => $transaction->transaction_id,
+                    "account_name" => $account_name,
+                    "amount" => $amount - env('BANK_TRANSFER_CHARGES'),
+                    "narration" => 'Transfer from ' . config('app.name'),
+                ];
+                
                 $verify = app('App\Http\Controllers\Providers\SageController')->transfer($token,$bank_code, $account_number, $account_name, $amount, $transaction->transaction_id);
                 
                 $transaction->update([
@@ -1668,7 +1684,7 @@ class TransactionController extends Controller
                     'request_data' => json_encode($request_data),
                     'api_response' =>array_merge(['Action: ' => 'TRANSFER'], $verify ?? ['Response:' => 'NO RESPONSE']),
                 ]);
-
+                
                 if (!empty($verify) && $verify['success'] == true && $verify['status'] == 'success') {
                     $status = $verify['status'];
                     $error = '';
@@ -1677,29 +1693,38 @@ class TransactionController extends Controller
                     $status = 'failed';
                     $error = 'Transfer Error ';
                     $api_response = $verify ?? 'NO RESPONSE';
-                    
                 }
+                
+                return [
+                    'error' => $error,
+                    'status' => $status,
+                    'request_data' => $request_data ?? '',
+                    'api_response' => $api_response ?? ''
+                ];
             }
         } else {
             $error = 'Could not complete bank transfer at the moment, please try again later';
             $status = 'failed';
             $api_response = $token ?? 'NO RESPONSE';
+
+            if (!empty($transaction)) {
+                $transaction->update([
+                    'bank_transfer_api_response' => $error . ' | API_RESPONSE: ' . json_encode($api_response),
+                    'api_response' => $error . ' | API_RESPONSE: ' . json_encode($api_response),
+                    'descr' => $status == 'success' ? 'Wallet to bank transfer of ' . $amount . ' was successful' : 'We could not complete this transaction',
+                    'request_data' => json_encode($request_data)
+                ]);
+            }
+
+            return [
+                'error' => $error,
+                'status' => $status,
+                'api_response' => $api_response ?? '',
+                'request_data' => $request_data ?? '',
+            ];
         }
 
-        if (!empty($transaction)) {
-            $transaction->update([
-                'bank_transfer_api_response' => $error . ' | API_RESPONSE: ' . json_encode($api_response),
-                'api_response' => $error . ' | API_RESPONSE: ' . json_encode($api_response),
-                'descr' => $status == 'success' ? 'Wallet to bank transfer of ' . $amount . ' was successful' : 'We could not complete this transaction',
-                'request_data' => json_encode($request_data)
-            ]);
-        }
         
-        return [
-            'error' => $error,
-            'status' => $status,
-            'api_response' => $api_response ?? ''
-        ];
     }
     public function declineAirtime2CashTransactions(Request $request, Airtime2CashTransactions $transaction)
     {

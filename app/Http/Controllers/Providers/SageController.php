@@ -55,13 +55,23 @@ class SageController extends Controller
             "amount" => $amount - env('BANK_TRANSFER_CHARGES'),
             "narration" => 'Transfer from ' . config('app.name'),
         ];
-        
+
         $headers = [
             "Content-Type: application/json",
             "Authorization: Bearer " . $token . "",
         ];
+
+        if (env('ENT') == 'local') {
+            $response = [
+                'success' => true,
+                'status' => 'success',
+                'message' => 'all done'
+            ];
+        } else {
+            $response = $this->control->basicApiCall($url, json_encode($payload), $headers);
+        }
         
-        return $this->control->basicApiCall($url, json_encode($payload), $headers);
+        return $response;
     }
 
     public function requery($transaction)
@@ -125,10 +135,10 @@ class SageController extends Controller
             "Content-Type" => "application/json",
             "Authorization" => "Basic " . base64_encode($this->public_key . ":" . $this->secret_key),
         ];
+       
+        $response = $this->control->basicApiCall($url, json_encode($payload), $headers);
 
-        dd($headers);
-
-        return $this->control->basicApiCall($url, json_encode($payload), $headers);
+        return $response;
             
     }
 }
