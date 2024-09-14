@@ -55,7 +55,7 @@ class SageController extends Controller
             "amount" => $amount - env('BANK_TRANSFER_CHARGES'),
             "narration" => 'Transfer from ' . config('app.name'),
         ];
-
+        
         $headers = [
             "Content-Type: application/json",
             "Authorization: Bearer " . $token . "",

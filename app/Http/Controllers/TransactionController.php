@@ -1642,15 +1642,9 @@ class TransactionController extends Controller
 
         if (!empty($token)) {
             // Get balance
-            $balanceUrl = env('SAGE_BASE_URL')."wallet/balance";
-            $headers = [
-                "Content-Type: application/json",
-                "Authorization: Bearer " . $token . "",
-            ];
-
-            $balance = $control->basicApiCall($balanceUrl, [], $headers, 'GET');
+            $balance = app('App\Http\Controllers\Providers\SageController')->walletBalance($token);
             $real_balance = 0;
-            
+           
             if (!empty($balance) && $balance['success'] == true && $balance['status'] == 'success') {
                 $status = $balance['status'];
                 $error = '';
@@ -1667,28 +1661,8 @@ class TransactionController extends Controller
                 $error = 'Not Enough balance to carry out transaction. ';
                 $status = 'failed';
             } else {
-                $url2 = "https://sagecloud.ng/api/v2/transfer/fund-transfer";
-                $payload = [
-                    "bank_code" => $bank_code,
-                    "account_number" => $account_number,
-                    "reference" => $transaction->transaction_id,
-                    "account_name" => $account_name,
-                    "amount" => $amount,
-                    "narration" => 'Transfer from ' . config('app.name'),
-                ];
-
-                $request_data = [
-                    'url' => $url2,
-                    'payload' => $payload,
-                ];
+                $verify = app('App\Http\Controllers\Providers\SageController')->transfer($token,$bank_code, $account_number, $account_name, $amount, $transaction->transaction_id);
                 
-                $headers = [
-                    "Content-Type: application/json",
-                    "Authorization: Bearer " . $token . "",
-                ];
-
-                $verify = $control->basicApiCall($url2, json_encode($payload), $headers);
-
                 $transaction->update([
                     'bank_transfer_api_response' => array_merge(['Action: ' => 'TRANSFER'], $verify ?? ['Response:' => 'NO RESPONSE']),
                     'request_data' => json_encode($request_data),
@@ -1703,6 +1677,7 @@ class TransactionController extends Controller
                     $status = 'failed';
                     $error = 'Transfer Error ';
                     $api_response = $verify ?? 'NO RESPONSE';
+                    
                 }
             }
         } else {
