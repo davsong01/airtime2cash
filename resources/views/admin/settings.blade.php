@@ -6,245 +6,270 @@ use App\Models\PaymentGateway;
 @endsection
 @section('content')
 <!-- Content wrapper -->
- <div class="app-content content">
-        <div class="content-overlay"></div>
-        <div class="content-wrapper">
-            <div class="content-body">
-                <!-- Basic Inputs start -->
-                <section id="basic-input">
-                    <div class="row">
-                        <div class="col-md-12">
-                            <div class="card">
-                                <div class="content-body">
-                                    <!-- Nav Filled Starts -->
-                                    <section id="nav-filled">
-                                        <div class="row">
-                                            <div class="col-sm-12">
-                                                <div class="card">
-                                                    <div class="card-header">
-                                                        <h4 class="card-title">App Settings</h4>
-                                                        @include('layouts.alerts')
-                                                    </div>
-                                                    <div class="card-content">
-                                                        <div class="card-body">
-                                                            <form action="{{route('settings.update')}}" method="POST" enctype="multipart/form-data">
-                                                                @csrf
-                                                                <div class="row">
-                                                                    <div class="col-md-6">
-                                                                        <fieldset class="form-group">
-                                                                            <label for="official_email">Official Email</label>
-                                                                            <input type="text" class="form-control" id="official_email" name="official_email" value="{{ $settings->official_email ?? old('official_email') }}" placeholder="Official email">
-                                                                        </fieldset>
-                                                                        <fieldset class="form-group">
-                                                                            <label for="whatsapp_number">Whatsapp Number</label>
-                                                                            <input type="text" class="form-control" id="whatsapp_number" name="whatsapp_number" value="{{ $settings->whatsapp_number ?? old('whatsapp_number') }}" placeholder="Whatsapp number">
-                                                                        </fieldset>
-                                                                        <fieldset class="form-group">
-                                                                            <label for="login_email_notification">Customer Login Email Notification</label>
-                                                                            <select name="login_email_notification" class="form-control" id="login_email_notification" required>
-                                                                                <option value="">Select</option>
-                                                                                <option value="yes" {{ $settings->login_email_notification == 'yes' ? 'selected' : ''}}>Yes</option>
-                                                                                <option value="no" {{ $settings->login_email_notification == 'no' ? 'selected' : ''}}>No</option>
-                                                                                
-                                                                            </select>
-                                                                        </fieldset>
-                                                                        <fieldset class="form-group">
-                                                                            <label for="transaction_email_notification">Transaction Email Notification</label>
-                                                                            <select name="transaction_email_notification" class="form-control" id="transaction_email_notification" required>
-                                                                                <option value="">Select</option>
-                                                                                <option value="yes" {{ $settings->transaction_email_notification == 'yes' ? 'selected' : ''}}>Yes</option>
-                                                                                <option value="no" {{ $settings->transaction_email_notification == 'no' ? 'selected' : ''}}>No</option>
-                                                                                
-                                                                            </select>
-                                                                        </fieldset>
-                                                                        <fieldset class="form-group">
-                                                                            <label for="currency">Currency</label>
-                                                                            <select name="currency" class="form-control" id="currency" required>
-                                                                                <option value="">Select</option>
-                                                                                @foreach($currencies as $currency)
-                                                                                    <option value="{{ $currency }}" {{ $currency == $settings->currency ? 'selected' : ''}}>{!! $currency !!}</option>
-                                                                                @endforeach
-                                                                            </select>
-                                                                        </fieldset>
-                                                                        <fieldset class="form-group">
-                                                                            <label for="allow_fund_with_card" style="color:blue">Allow Wallet Funding with card</label>
-                                                                            <select name="allow_fund_with_card" class="form-control" id="allow_fund_with_card">
-                                                                                <option value="">Select</option>
-                                                                                <option value="yes"{{ $settings->allow_fund_with_card == 'yes' ? 'selected' : ''}}>Yes</option>
-                                                                                <option value="no" {{ $settings->allow_fund_with_card == 'no' ? 'selected' : ''}}>No</option>
-                                                                            </select>
-                                                                        </fieldset>
-                                                                        <fieldset class="form-group">
-                                                                            <label for="card_funding_extra_charge" style="color:blue">Card Funding Extra Charge({!! getSettings()->currency !!})</label>
-                                                                            <input type="number" name="card_funding_extra_charge" value="{{ $settings->card_funding_extra_charge ?? old('card_funding_extra_charge') }}" class="form-control">
-                                                                        </fieldset>
-                                                                        <fieldset class="form-group">
-                                                                            <label for="allow_fund_with_reserved_account">Allow Wallet Funding with reserved account</label>
-                                                                            <select name="allow_fund_with_reserved_account" class="form-control" id="allow_fund_with_reserved_account">
-                                                                                <option value="">Select</option>
-                                                                                <option value="yes"{{ $settings->allow_fund_with_reserved_account == 'yes' ? 'selected' : ''}}>Yes</option>
-                                                                                <option value="no" {{ $settings->allow_fund_with_reserved_account == 'no' ? 'selected' : ''}}>No</option>
-                                                                            </select>
-                                                                        </fieldset>
-                                                                        <fieldset class="form-group">
-                                                                            <label for="sage_secret_key">Sage Secret Key</label>
-                                                                            <input type="text" class="form-control" name="sage_secret_key" value="{{ $settings->sage_secret_key }}">
-                                                                        </fieldset>
-                                                                        <fieldset class="form-group">
-                                                                            <label for="sage_public_key">Sage Public Key</label>
-                                                                            <input type="text" class="form-control" name="sage_public_key" value="{{ $settings->sage_public_key }}">
-                                                                        </fieldset>
-                                                                    </div>
-                                                                    <div class="col-md-6">
-                                                                        <fieldset class="form-group">
-                                                                            <label for="">Payment Gateway</label>
-                                                                            <select name="payment_gateway" class="form-control" id="payment_gateway" required>
-                                                                                <option value="">Select</option>
-                                                                                @foreach($payment_gateways as $gateway)
-                                                                                <option value="{{ $gateway->id }}" {{ $gateway->id == getSettings()->payment_gateway ? 'selected' : ''}}>{{$gateway->name}}</option>
-                                                                                @endforeach
-                                                                            </select>
-                                                                        </fieldset>
-                                                                        <div class="row">
-                                                                            <div class="col-md-8">
-                                                                                <fieldset class="form-group">
-                                                                                    <label for="logo">Logo</label>
-                                                                                    <div class="custom-file">
-                                                                                        <input type="file" accept="image/*" class="custom-file-input" id="logo" name="logo">
-                                                                                        <label class="custom-file-label" for="image">Replace Logo</label>
-                                                                                    </div>
-                                                                                </fieldset>
-                                                                            </div>
-                                                                            <div class="col-md-4">
-                                                                                @if(!empty(getSettings()->logo))
-                                                                                    <img style="height:auto;width:120px" src="{{ asset(getSettings()->logo)}}" alt="">
-                                                                                @endif
-                                                                            </div>
-                                                                        </div>
-                                                                        <div class="row">
-                                                                            <div class="col-md-8">
-                                                                                <fieldset class="form-group">
-                                                                                    <label for="favicon">Favicon</label>
-                                                                                    <div class="custom-file">
-                                                                                        <input type="file" accept="image/*" class="custom-file-input" id="favicon" name="favicon">
-                                                                                        <label class="custom-file-label" for="image">Replace Favicon</label>
-                                                                                    </div>
-                                                                                </fieldset>
-                                                                            </div>
-                                                                            <div class="col-md-4">
-                                                                                @if(!empty(getSettings()->favicon))
-                                                                                    <img style="height:62px;width:auto" src="{{ asset(getSettings()->favicon)}}" alt="">
-                                                                                @endif
-                                                                            </div>
-                                                                        </div>
-                                                                        
-                                                                        <div class="row">
-                                                                            <div class="col-md-8">
-                                                                                <fieldset class="form-group">
-                                                                                    <label for="dashboard_logo">Dashboard Logo</label>
-                                                                                    <div class="custom-file">
-                                                                                        <input type="file" style="height:auto;width:100%;max-width: 100%;" accept="image/*" class="custom-file-input" id="dashboard_logo" name="dashboard_logo">
-                                                                                        <label class="custom-file-label" for="dashboard_logo">Replace Dashboard Logo</label>
-                                                                                    </div>
-                                                                                </fieldset>
-                                                                            </div>
-                                                                            <div class="col-md-4">
-                                                                                @if(!empty(getSettings()->dashboard_logo))
-                                                                                    <img style="height:auto;width:100%;max-width: 100%" src="{{ asset(getSettings()->dashboard_logo)}}" alt="">
-                                                                                @endif
-                                                                            </div>
-                                                                        </div>
-                                                                        <fieldset class="form-group">
-                                                                            <label for="seo_title">SEO Title</label>
-                                                                            <input type="text" class="form-control" id="seo_title" name="seo_title" value="{{ $settings->seo_title ?? old('seo_title') }}" placeholder="SEO Title">
-                                                                        </fieldset>
-                                                                        <fieldset class="form-group">
-                                                                            <label for="support_link">Support Link</label>
-                                                                            <input type="text" class="form-control" id="support_link" name="support_link" value="{{ $settings->support_link ?? old('support_link') }}" placeholder="Support Link">
-                                                                        </fieldset>
-                                                                        
-                                                                        <fieldset class="form-group">
-                                                                            <label for="seo_description">SEO Description</label>
-                                                                            <textarea class="form-control" id="seo_description" rows="3" name="seo_description" value="{{ $settings->seo_description ?? old('seo_description') }}" placeholder="SEO Description" required>{{ $settings->seo_description ?? old('seo_description') }}</textarea>
-                                                                        </fieldset>
-                                                                        <fieldset class="form-group">
-                                                                            <label for="google_ad_code">Google Ad Code</label>
-                                                                            <textarea class="form-control" id="google_ad_code" rows="3" name="google_ad_code" value="{{ $settings->google_ad_code ?? old('google_ad_code') }}" placeholder="Google ad code">{{ $settings->google_ad_code ?? old('google_ad_code') }}</textarea>
-                                                                        </fieldset>
-                                                                        <fieldset class="form-group">
-                                                                            <label for="google_dashboard_ad_code">Google Dashboard Ad Code</label>
-                                                                            <textarea class="form-control" id="google_dashboard_ad_code" rows="5" name="google_dashboard_ad_code" value="{{ $settings->google_dashboard_ad_code ?? old('google_dashboard_ad_code') }}" placeholder="Google dashboard ad code">{{ $settings->google_dashboard_ad_code ?? old('google_dashboard_ad_code') }}</textarea>
-                                                                        </fieldset>
-                                                                    </div>
+<div class="app-content content">
+    <div class="content-overlay"></div>
+    <div class="content-wrapper">
+        <div class="content-body">
+            <!-- Basic Inputs start -->
+            <section id="basic-input">
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="card">
+                            <div class="content-body">
+                                <!-- Nav Filled Starts -->
+                                <section id="nav-filled">
+                                    <div class="row">
+                                        <div class="col-sm-12">
+                                            <div class="card">
+                                                <div class="card-header">
+                                                    <h4 class="card-title">App Settings</h4>
+                                                    @include('layouts.alerts')
+                                                </div>
+                                                <div class="card-content">
+                                                    <div class="card-body">
+                                                        <form action="{{route('settings.update')}}" method="POST" enctype="multipart/form-data">
+                                                            @csrf
+                                                            <div class="row">
+                                                                <div class="col-md-6">
+                                                                    <fieldset class="form-group">
+                                                                        <label for="official_email">Official Email</label>
+                                                                        <input type="text" class="form-control" id="official_email" name="official_email" value="{{ $settings->official_email ?? old('official_email') }}" placeholder="Official email">
+                                                                    </fieldset>
+                                                                    <fieldset class="form-group">
+                                                                        <label for="whatsapp_number">Whatsapp Number</label>
+                                                                        <input type="text" class="form-control" id="whatsapp_number" name="whatsapp_number" value="{{ $settings->whatsapp_number ?? old('whatsapp_number') }}" placeholder="Whatsapp number">
+                                                                    </fieldset>
+                                                                    <fieldset class="form-group">
+                                                                        <label for="login_email_notification">Customer Login Email Notification</label>
+                                                                        <select name="login_email_notification" class="form-control" id="login_email_notification" required>
+                                                                            <option value="">Select</option>
+                                                                            <option value="yes" {{ $settings->login_email_notification == 'yes' ? 'selected' : ''}}>Yes</option>
+                                                                            <option value="no" {{ $settings->login_email_notification == 'no' ? 'selected' : ''}}>No</option>
+                                                                            
+                                                                        </select>
+                                                                    </fieldset>
+                                                                    <fieldset class="form-group">
+                                                                        <label for="transaction_email_notification">Transaction Email Notification</label>
+                                                                        <select name="transaction_email_notification" class="form-control" id="transaction_email_notification" required>
+                                                                            <option value="">Select</option>
+                                                                            <option value="yes" {{ $settings->transaction_email_notification == 'yes' ? 'selected' : ''}}>Yes</option>
+                                                                            <option value="no" {{ $settings->transaction_email_notification == 'no' ? 'selected' : ''}}>No</option>
+                                                                            
+                                                                        </select>
+                                                                    </fieldset>
+                                                                    <fieldset class="form-group">
+                                                                        <label for="currency">Currency</label>
+                                                                        <select name="currency" class="form-control" id="currency" required>
+                                                                            <option value="">Select</option>
+                                                                            @foreach($currencies as $currency)
+                                                                                <option value="{{ $currency }}" {{ $currency == $settings->currency ? 'selected' : ''}}>{!! $currency !!}</option>
+                                                                            @endforeach
+                                                                        </select>
+                                                                    </fieldset>
+                                                                    <fieldset class="form-group">
+                                                                        <label for="allow_fund_with_card" style="color:blue">Allow Wallet Funding with card</label>
+                                                                        <select name="allow_fund_with_card" class="form-control" id="allow_fund_with_card">
+                                                                            <option value="">Select</option>
+                                                                            <option value="yes"{{ $settings->allow_fund_with_card == 'yes' ? 'selected' : ''}}>Yes</option>
+                                                                            <option value="no" {{ $settings->allow_fund_with_card == 'no' ? 'selected' : ''}}>No</option>
+                                                                        </select>
+                                                                    </fieldset>
+                                                                    <fieldset class="form-group">
+                                                                        <label for="card_funding_extra_charge" style="color:blue">Card Funding Extra Charge({!! getSettings()->currency !!})</label>
+                                                                        <input type="number" name="card_funding_extra_charge" value="{{ $settings->card_funding_extra_charge ?? old('card_funding_extra_charge') }}" class="form-control">
+                                                                    </fieldset>
+                                                                    <fieldset class="form-group">
+                                                                        <label for="allow_fund_with_reserved_account">Allow Wallet Funding with reserved account</label>
+                                                                        <select name="allow_fund_with_reserved_account" class="form-control" id="allow_fund_with_reserved_account">
+                                                                            <option value="">Select</option>
+                                                                            <option value="yes"{{ $settings->allow_fund_with_reserved_account == 'yes' ? 'selected' : ''}}>Yes</option>
+                                                                            <option value="no" {{ $settings->allow_fund_with_reserved_account == 'no' ? 'selected' : ''}}>No</option>
+                                                                        </select>
+                                                                    </fieldset>
+                                                                    <fieldset class="form-group">
+                                                                        <label for="sage_secret_key">Sage Secret Key</label>
+                                                                        <input type="text" class="form-control" name="sage_secret_key" value="{{ $settings->sage_secret_key }}">
+                                                                    </fieldset>
+                                                                    <fieldset class="form-group">
+                                                                        <label for="sage_public_key">Sage Public Key</label>
+                                                                        <input type="text" class="form-control" name="sage_public_key" value="{{ $settings->sage_public_key }}">
+                                                                    </fieldset>
+                                                                    <fieldset class="form-group">
+                                                                        <label for="captcha_settings_status">Allow Security Captcha on forms</label>
+                                                                        <select name="captcha_settings_status" class="form-control" id="captcha_settings_status">
+                                                                            <option value="">Select</option>
+                                                                            <option value="yes"{{ isset($settings->captcha_settings['captcha_settings_status']) && $settings->captcha_settings['captcha_settings_status'] == 'yes' ? 'selected' : ''}}>Yes</option>
+                                                                            <option value="no" {{  isset($settings->captcha_settings['captcha_settings_status']) && $settings->captcha_settings['captcha_settings_status'] == 'no' ? 'selected' : ''}}>No</option>
+                                                                        </select>
+                                                                    </fieldset>
+                                                                    <fieldset class="form-group">
+                                                                        <label for="captcha_settings_provider">Security Captcha Provider</label>
+                                                                        <select name="captcha_settings_provider" class="form-control" id="captcha_settings_provider">
+                                                                            <option value="">Select</option>
+                                                                            <option value="simple" {{  isset($settings->captcha_settings['captcha_settings_provider']) && $settings->captcha_settings['captcha_settings_provider'] == 'simple' ? 'selected' : ''}}>Simple Captcha</option>
+                                                                            <option value="google"{{ isset($settings->captcha_settings['captcha_settings_provider']) && $settings->captcha_settings['captcha_settings_provider'] == 'google' ? 'selected' : ''}}>Google Captcha</option>
+                                                                            <option value="all"{{ isset($settings->captcha_settings['captcha_settings_provider']) && $settings->captcha_settings['captcha_settings_provider'] == 'all' ? 'selected' : ''}}>All</option>
+                                                                        </select>
+                                                                    </fieldset>
+                                                                    <fieldset class="form-group">
+                                                                        <label for="RECAPTCHA_SITE_KEY">Google Captcha Site Key</label>
+                                                                        <input type="text" class="form-control" name="RECAPTCHA_SITE_KEY" value="{{ $settings->captcha_settings['google']['RECAPTCHA_SITE_KEY'] ?? old('RECAPTCHA_SITE_KEY') }}">
+                                                                    </fieldset>
+                                                                    <fieldset class="form-group">
+                                                                        <label for="RECAPTCHA_SECRET_KEY">Google Captcha Secret Key</label>
+                                                                        <input type="text" class="form-control" name="RECAPTCHA_SECRET_KEY" value="{{ $settings->captcha_settings['google']['RECAPTCHA_SECRET_KEY'] ?? old('RECAPTCHA_SECRET_KEY') }}">
+                                                                    </fieldset>
                                                                 </div>
-                                                                <div class="row">
-                                                                    <div class="col-md-12">
-                                                                        <h4 class="card-title">Theme Settings</h4>
+                                                                <div class="col-md-6">
+                                                                    <fieldset class="form-group">
+                                                                        <label for="">Payment Gateway</label>
+                                                                        <select name="payment_gateway" class="form-control" id="payment_gateway" required>
+                                                                            <option value="">Select</option>
+                                                                            @foreach($payment_gateways as $gateway)
+                                                                            <option value="{{ $gateway->id }}" {{ $gateway->id == getSettings()->payment_gateway ? 'selected' : ''}}>{{$gateway->name}}</option>
+                                                                            @endforeach
+                                                                        </select>
+                                                                    </fieldset>
+                                                                    <div class="row">
+                                                                        <div class="col-md-8">
+                                                                            <fieldset class="form-group">
+                                                                                <label for="logo">Logo</label>
+                                                                                <div class="custom-file">
+                                                                                    <input type="file" accept="image/*" class="custom-file-input" id="logo" name="logo">
+                                                                                    <label class="custom-file-label" for="image">Replace Logo</label>
+                                                                                </div>
+                                                                            </fieldset>
+                                                                        </div>
+                                                                        <div class="col-md-4">
+                                                                            @if(!empty(getSettings()->logo))
+                                                                                <img style="height:auto;width:120px" src="{{ asset(getSettings()->logo)}}" alt="">
+                                                                            @endif
+                                                                        </div>
                                                                     </div>
-                                                                </div>
-
-                                                                <div class="row">
+                                                                    <div class="row">
+                                                                        <div class="col-md-8">
+                                                                            <fieldset class="form-group">
+                                                                                <label for="favicon">Favicon</label>
+                                                                                <div class="custom-file">
+                                                                                    <input type="file" accept="image/*" class="custom-file-input" id="favicon" name="favicon">
+                                                                                    <label class="custom-file-label" for="image">Replace Favicon</label>
+                                                                                </div>
+                                                                            </fieldset>
+                                                                        </div>
+                                                                        <div class="col-md-4">
+                                                                            @if(!empty(getSettings()->favicon))
+                                                                                <img style="height:62px;width:auto" src="{{ asset(getSettings()->favicon)}}" alt="">
+                                                                            @endif
+                                                                        </div>
+                                                                    </div>
                                                                     
-                                                                    <div class="col-md-6">
-                                                                        <fieldset class="form-group">
-                                                                            <label for="">Menu Text color</label>
-                                                                            <input class="form-control" type="color" name="menu_text_color" value="{{ getSettings()->menu_text_color ??  old('menu_text_color') }}">
-                                                                        </fieldset>
-                                                                        
+                                                                    <div class="row">
+                                                                        <div class="col-md-8">
+                                                                            <fieldset class="form-group">
+                                                                                <label for="dashboard_logo">Dashboard Logo</label>
+                                                                                <div class="custom-file">
+                                                                                    <input type="file" style="height:auto;width:100%;max-width: 100%;" accept="image/*" class="custom-file-input" id="dashboard_logo" name="dashboard_logo">
+                                                                                    <label class="custom-file-label" for="dashboard_logo">Replace Dashboard Logo</label>
+                                                                                </div>
+                                                                            </fieldset>
+                                                                        </div>
+                                                                        <div class="col-md-4">
+                                                                            @if(!empty(getSettings()->dashboard_logo))
+                                                                                <img style="height:auto;width:100%;max-width: 100%" src="{{ asset(getSettings()->dashboard_logo)}}" alt="">
+                                                                            @endif
+                                                                        </div>
                                                                     </div>
-                                                                    <div class="col-md-6">
-                                                                        <fieldset class="form-group">
-                                                                            <label for="">Menu Background color</label>
-                                                                            <input class="form-control" type="color" name="menu_background_color" value="{{ getSettings()->menu_background_color ??  old('menu_background_color') }}">
-                                                                        </fieldset>
-                                                                    </div>
-                                                                    <div class="col-md-6">
-                                                                        <fieldset class="form-group">
-                                                                            <label for="">Menu Active Color</label>
-                                                                            <input class="form-control" type="color" name="active_color" value="{{ getSettings()->active_color ??  old('active_color') }}">
-                                                                        </fieldset>
-                                                                    </div>
-                                                                    <div class="col-md-6">
-                                                                        <fieldset class="form-group">
-                                                                            <label for="">Text Header Color</label>
-                                                                            <input class="form-control" type="color" name="block_header_color" value="{{ getSettings()->block_header_color ??  old('block_header_color') }}">
-                                                                        </fieldset>
-                                                                    </div>
-                                                                    <div class="col-md-6">
-                                                                        <fieldset class="form-group">
-                                                                            <label for="">Dashboard Customer Details Color</label>
-                                                                            <input class="form-control" type="color" name="dasboard_customer_details_color" value="{{ getSettings()->dasboard_customer_details_color ??  old('dasboard_customer_details_color') }}">
-                                                                        </fieldset>
-                                                                    </div>
-                                                                    {{-- <div class="col-md-6">
-                                                                        <fieldset class="form-group">
-                                                                            <label for="">Active Hover Color</label>
-                                                                            <input class="form-control" type="color" name="active_hover_color" value="{{ getSettings()->active_hover_color ??  old('active_hover_color') }}">
-                                                                        </fieldset>
-                                                                    </div>
-                                                                     --}}
+                                                                    <fieldset class="form-group">
+                                                                        <label for="seo_title">SEO Title</label>
+                                                                        <input type="text" class="form-control" id="seo_title" name="seo_title" value="{{ $settings->seo_title ?? old('seo_title') }}" placeholder="SEO Title">
+                                                                    </fieldset>
+                                                                    <fieldset class="form-group">
+                                                                        <label for="support_link">Support Link</label>
+                                                                        <input type="text" class="form-control" id="support_link" name="support_link" value="{{ $settings->support_link ?? old('support_link') }}" placeholder="Support Link">
+                                                                    </fieldset>
+                                                                    
+                                                                    <fieldset class="form-group">
+                                                                        <label for="seo_description">SEO Description</label>
+                                                                        <textarea class="form-control" id="seo_description" rows="3" name="seo_description" value="{{ $settings->seo_description ?? old('seo_description') }}" placeholder="SEO Description" required>{{ $settings->seo_description ?? old('seo_description') }}</textarea>
+                                                                    </fieldset>
+                                                                    <fieldset class="form-group">
+                                                                        <label for="google_ad_code">Google Ad Code</label>
+                                                                        <textarea class="form-control" id="google_ad_code" rows="3" name="google_ad_code" value="{{ $settings->google_ad_code ?? old('google_ad_code') }}" placeholder="Google ad code">{{ $settings->google_ad_code ?? old('google_ad_code') }}</textarea>
+                                                                    </fieldset>
+                                                                    <fieldset class="form-group">
+                                                                        <label for="google_dashboard_ad_code">Google Dashboard Ad Code</label>
+                                                                        <textarea class="form-control" id="google_dashboard_ad_code" rows="5" name="google_dashboard_ad_code" value="{{ $settings->google_dashboard_ad_code ?? old('google_dashboard_ad_code') }}" placeholder="Google dashboard ad code">{{ $settings->google_dashboard_ad_code ?? old('google_dashboard_ad_code') }}</textarea>
+                                                                    </fieldset>
                                                                 </div>
-                                                                <div class="row">
-                                                                    <div class="col-md-12">
-                                                                        <button class="btn btn-primary" type="submit">Update</button>
-                                                                    </div>
+                                                            </div>
+                                                            <div class="row">
+                                                                <div class="col-md-12">
+                                                                    <h4 class="card-title">Theme Settings</h4>
                                                                 </div>
-                                                            </form>
-                                                        </div>
+                                                            </div>
+
+                                                            <div class="row">
+                                                                
+                                                                <div class="col-md-6">
+                                                                    <fieldset class="form-group">
+                                                                        <label for="">Menu Text color</label>
+                                                                        <input class="form-control" type="color" name="menu_text_color" value="{{ getSettings()->menu_text_color ??  old('menu_text_color') }}">
+                                                                    </fieldset>
+                                                                    
+                                                                </div>
+                                                                <div class="col-md-6">
+                                                                    <fieldset class="form-group">
+                                                                        <label for="">Menu Background color</label>
+                                                                        <input class="form-control" type="color" name="menu_background_color" value="{{ getSettings()->menu_background_color ??  old('menu_background_color') }}">
+                                                                    </fieldset>
+                                                                </div>
+                                                                <div class="col-md-6">
+                                                                    <fieldset class="form-group">
+                                                                        <label for="">Menu Active Color</label>
+                                                                        <input class="form-control" type="color" name="active_color" value="{{ getSettings()->active_color ??  old('active_color') }}">
+                                                                    </fieldset>
+                                                                </div>
+                                                                <div class="col-md-6">
+                                                                    <fieldset class="form-group">
+                                                                        <label for="">Text Header Color</label>
+                                                                        <input class="form-control" type="color" name="block_header_color" value="{{ getSettings()->block_header_color ??  old('block_header_color') }}">
+                                                                    </fieldset>
+                                                                </div>
+                                                                <div class="col-md-6">
+                                                                    <fieldset class="form-group">
+                                                                        <label for="">Dashboard Customer Details Color</label>
+                                                                        <input class="form-control" type="color" name="dasboard_customer_details_color" value="{{ getSettings()->dasboard_customer_details_color ??  old('dasboard_customer_details_color') }}">
+                                                                    </fieldset>
+                                                                </div>
+                                                                {{-- <div class="col-md-6">
+                                                                    <fieldset class="form-group">
+                                                                        <label for="">Active Hover Color</label>
+                                                                        <input class="form-control" type="color" name="active_hover_color" value="{{ getSettings()->active_hover_color ??  old('active_hover_color') }}">
+                                                                    </fieldset>
+                                                                </div>
+                                                                    --}}
+                                                            </div>
+                                                            <div class="row">
+                                                                <div class="col-md-12">
+                                                                    <button class="btn btn-primary" type="submit">Update</button>
+                                                                </div>
+                                                            </div>
+                                                        </form>
                                                     </div>
                                                 </div>
                                             </div>
                                         </div>
-                                    </section>
-                                    <!-- Nav Filled Ends -->
-                                </div>
+                                    </div>
+                                </section>
+                                <!-- Nav Filled Ends -->
                             </div>
                         </div>
                     </div>
-                </section>
-            </div>
+                </div>
+            </section>
         </div>
     </div>
+</div>
 @endsection
 @section('page-script')
 <script src="{{ asset('app-assets/js/scripts/pages/dashboard-analytics.js') }}"></script>

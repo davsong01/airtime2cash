@@ -9,5 +9,5 @@ class Settings extends Model
 {
     use HasFactory;
     protected $guarded = [];
-
+    protected $casts = ['captcha_settings' => 'array'];
 }
