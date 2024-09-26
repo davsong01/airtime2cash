@@ -76,9 +76,18 @@ class SettingsController extends Controller
     public function update(Request $request, Settings $settings)
     {
         $settings = Settings::first();
+        // captcha settings
+        $captcha_settings = [
+            'captcha_settings_status' => $request->captcha_settings_status,
+            'captcha_settings_provider' => $request->captcha_settings_provider,
+            'google' => [
+                'RECAPTCHA_SITE_KEY' => $request->RECAPTCHA_SITE_KEY,
+                'RECAPTCHA_SECRET_KEY' => $request->RECAPTCHA_SECRET_KEY
+            ],
+        ];
 
-        $data = $request->except(['_token', 'logo', 'favicon', 'ip']);
-
+        $data = $request->except(['_token', 'logo', 'favicon', 'ip','captcha_settings_status', 'captcha_settings_provider', 'RECAPTCHA_SITE_KEY', 'RECAPTCHA_SECRET_KEY']);
+        $data['captcha_settings'] = $captcha_settings;
         if (!empty($request->logo)) {
             $data['logo'] = $this->uploadFile($request->logo, 'site');
         }
@@ -90,9 +99,9 @@ class SettingsController extends Controller
         if (!empty($request->favicon)) {
             $data['favicon'] = $this->uploadFile($request->favicon, 'site');
         }
-      
+        
         $settings->update($data);
-
+        
         return back()->with('message', 'Operation successful');
     }
 

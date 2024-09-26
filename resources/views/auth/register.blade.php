@@ -49,13 +49,14 @@
                                     placeholder="Password" required>
                             </div>
                         </div>
-                        <div class="form-group mb-50 mt-2 ">
+                        <div class="form-group mb-50 mt-2">
                             <div class="checkbox checkbox-success checkbox-glow">
                                 <input type="checkbox" id="checkboxGlow3" name="privacy" required>
                                 <label for="checkboxGlow3"><p>I agree to the <a target="_blank" href="https://airtime2cash.com/terms-of-service/">TERMS OF SERVICE</a> of {{ config('app.name')}}</p></label>
                             </div>
                         </div>
-
+                        
+                        <x-captcha group-class="mb-50 mt-2" />
                         <button type="submit" class="btn btn-primary glow w-100 position-relative">Register</button>
                     </form>
                     <hr>
