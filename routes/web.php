@@ -191,6 +191,8 @@ Route::middleware(['auth', 'verified', 'admin', 'ipcheck', 'adminRoute'])->prefi
     Route::resource('customerlevel', CustomerLevelController::class);
     Route::get('customers-unverified', [CustomerController::class, 'unverifiedCustomers'])->name('customers.unverified');
     Route::get('customers-verify/{customer}', [CustomerController::class, 'verifyCustomer'])->name('customer.verify');
+    Route::get('customer-delete/{customer}', [CustomerController::class, 'deleteCustomer'])->name('customer.delete');
+    
     
     Route::get('pull-variations/{product}', [VariationController::class, 'pullVariations'])->name('variations.pull');
     Route::post('update-variations/{product}', [VariationController::class, 'updateVariations'])->name('variations.update');
