@@ -56,7 +56,7 @@ class CustomerController extends Controller
         }
 
         if (!empty($request->mobile)) {
-            $customers = $customers->where('mobile', 'like', $request->mobile);
+            $customers = $customers->where('phone', 'like', $request->mobile);
         }
 
         if (!empty($request->from) && !empty($request->to)) {
