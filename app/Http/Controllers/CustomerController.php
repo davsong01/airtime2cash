@@ -94,6 +94,27 @@ class CustomerController extends Controller
         }
     }
 
+    function deleteCustomer($customer)
+    {        
+        $user = User::where('id', $customer)->first();
+        
+        if ($user && is_null($user->email_verified_at)) {
+            if($user->customer){
+                $user->customer->delete();
+            }
+
+            if ($user->reserved_accounts) {
+                $user->reserved_accounts->delete();
+            }
+            
+            $user->delete();
+            
+            return back()->with('message', 'Operation successful');
+        } else {
+            return back()->with('error', 'Customer not found or already verified');
+        }
+    }
+
 
     public function addReservedAccounts(Request $request, Customer $customer)
     {

@@ -16,6 +16,7 @@
                 <div class="card">
                     <div class="card-header">
                         <h5 class="card-title">Unverified Customers</h5>
+                        @include('layouts.alerts')
                     </div>
 
                     <div class="card-body">
@@ -49,7 +50,10 @@
                                             <td>{{ $customer->created_at }}</td>
                                             @if(hasAccess('customers.verify'))
                                             <td>
-                                                <a onclick="return confirm('Are you sure you want to verify this user?');" href="{{ route('customer.verify', $customer->id) }}"><button type="button" class="btn btn-primary btn-sm mr-1 mb-1"><i class="bx bx-check"></i><span class="align-middle ml-25">Verify Email</span></button>
+                                                <a style="display:block" onclick="return confirm('Are you sure you want to verify this user?');" href="{{ route('customer.verify', $customer->id) }}"><button type="button" class="btn btn-primary btn-sm mr-1 mb-1"><i class="bx bx-check"></i><span class="align-middle ml-25">Verify Email</span></button>
+                                                </a>
+
+                                                <a style="display:block" onclick="return confirm('Are you sure you want to delete this user, this action is irreversible?');" href="{{ route('customer.delete', $customer->id) }}"><button type="button" class="btn btn-danger btn-sm mr-1 mb-1"><i class="fa fa-recycle"></i><span class="align-middle ml-25">Delete</span></button>
                                                 </a>
                                             </td>
                                             @endif
