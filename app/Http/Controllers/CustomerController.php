@@ -123,6 +123,7 @@ class CustomerController extends Controller
     }
 
     public function verifyMultiActions(Request $request){
+        set_time_limit(3600);
         $customer_ids = $request->customer_ids;
         
         if(!empty($customer_ids)){
