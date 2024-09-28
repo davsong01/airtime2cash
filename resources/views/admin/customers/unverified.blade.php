@@ -109,8 +109,9 @@
             }
             
             $('#table-extended-success').DataTable({
-                columnDefs: [
-                    { orderable: false, targets: [0, 5] }
+                "pageLength": 50,
+                "columnDefs": [
+                    { orderable: false, targets: [0, 5] } // Disable sorting for the first and last columns
                 ]
             });
             // Select all checkboxes
