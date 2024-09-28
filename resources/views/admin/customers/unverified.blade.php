@@ -104,6 +104,15 @@
 
     <script>
         $(document).ready(function () {
+            if ($.fn.dataTable.isDataTable('#table-extended-success')) {
+                $('#table-extended-success').DataTable().destroy();
+            }
+            
+            $('#table-extended-success').DataTable({
+                columnDefs: [
+                    { orderable: false, targets: [0, 5] }
+                ]
+            });
             // Select all checkboxes
             $('#select-all').on('change', function () {
                 // Check if "Select All" is checked or not and set the state of customer checkboxes accordingly
