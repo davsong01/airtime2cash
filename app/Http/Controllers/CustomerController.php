@@ -65,7 +65,7 @@ class CustomerController extends Controller
 
             $customers = $customers->whereBetween('created_at', [$from, $to]);
         }
-
+        
         $customers = $customers->paginate(100);
 
         $customer_levels = CustomerLevel::all();
@@ -80,7 +80,7 @@ class CustomerController extends Controller
         return view('admin.customers.unverified', ['customers' => $customers]);
     }
 
-    function verifyCustomer($customer)
+    function verifyCustomer($customer, $internal=null)
     {
         $customer = User::where('id', $customer)->first();
         if ($customer) {
@@ -94,7 +94,7 @@ class CustomerController extends Controller
         }
     }
 
-    function deleteCustomer($customer)
+    function deleteCustomer($customer, $internal=null)
     {        
         $user = User::where('id', $customer)->first();
         
@@ -109,12 +109,37 @@ class CustomerController extends Controller
             
             $user->delete();
             
+            if($internal){
+                return true;
+            }
+            
             return back()->with('message', 'Operation successful');
         } else {
+            if ($internal) {
+                return true;
+            }
             return back()->with('error', 'Customer not found or already verified');
         }
     }
 
+    public function verifyMultiActions(Request $request){
+        $customer_ids = $request->customer_ids;
+        
+        if(!empty($customer_ids)){
+            $customer_ids = explode(',', $customer_ids);
+            foreach($customer_ids as $id){
+                if($request->action == 'verify'){
+                    $this->verifyCustomer($id, 'internal');
+                }
+                
+                if($request->action == 'delete'){
+                    $this->deleteCustomer($id, 'internal');
+                }
+            }
+        }
+
+        return back()->with('message', 'Operation Successful');
+    }
 
     public function addReservedAccounts(Request $request, Customer $customer)
     {
