@@ -87,7 +87,9 @@ class SettingsController extends Controller
         ];
 
         $data = $request->except(['_token', 'logo', 'favicon', 'ip','captcha_settings_status', 'captcha_settings_provider', 'RECAPTCHA_SITE_KEY', 'RECAPTCHA_SECRET_KEY']);
+       
         $data['captcha_settings'] = $captcha_settings;
+        
         if (!empty($request->logo)) {
             $data['logo'] = $this->uploadFile($request->logo, 'site');
         }
