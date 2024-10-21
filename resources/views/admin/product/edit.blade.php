@@ -304,7 +304,6 @@
                                                                                             <input type="number" class="form-control tiny" id="system_price" name="system_price[{{ $variation->id }}]"  value="{{ $variation->system_price }}">
                                                                                         </fieldset>
                                                                                     </div>
-                                                                                   
                                                                                     @foreach($customerlevel as $level)
                                                                                     <div class="col-md-3">
                                                                                         <fieldset class="form-group">
