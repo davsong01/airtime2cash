@@ -120,6 +120,8 @@
                 $('.customer-checkbox').prop('checked', this.checked);
             });
 
+
+            
             // Submit the form when the action is selected
             $('#submit-action').on('click', function (e) {
                 // Prevent form submission if no action is selected
