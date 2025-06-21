@@ -9,7 +9,7 @@
 <body class="vertical-layout vertical-menu-modern semi-dark-layout 2-columns  navbar-sticky footer-static  " data-open="click" data-menu="vertical-menu-modern" data-col="2-columns" data-layout="semi-dark-layout">
     <div class="layout-wrapper layout-content-navbar  ">
         <div class="layout-container">
-     <!-- BEGIN: Header-->
+    <!-- BEGIN: Header-->
     @include('layouts.navigation')
     <!-- END: Header-->
 

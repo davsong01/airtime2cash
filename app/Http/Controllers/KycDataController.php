@@ -11,7 +11,11 @@ class KycDataController extends Controller
 
     public function adminKycIndex()
     {
-        $customers = Customer::with('user')->get();
+        // $customers = Customer::with('user')->orderby('awaiting-approval','pending')->get();
+        $customers = Customer::with('user')
+            ->orderByRaw("FIELD(kyc_status, 'awaiting-approval', 'pending','unverified') ASC")
+            ->get();
+        // dd($customers);
         return view('admin.customers.kyc_data', compact('customers'));
     }
 

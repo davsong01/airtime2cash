@@ -35,6 +35,7 @@
         </div>
     </div>
 </body>
+@include('layouts.chat')
 @include('layouts.footer')
 
 </body>

@@ -69,4 +69,16 @@
     <script src="{{ asset('app-assets/vendors/js/tables/datatable/pdfmake.min.js') }}"></script>
     <script src="{{ asset('app-assets/vendors/js/tables/datatable/vfs_fonts.js') }}"></script>
     <script src="{{ asset('app-assets/js/scripts/datatables/datatable.js') }}"></script>
+
+    <script>
+        jQuery(document).ready(function($) {
+            if ($.fn.DataTable.isDataTable('#table-extended-success')) {
+                $('#table-extended-success').DataTable().destroy();
+            }
+
+            $('#table-extended-success').DataTable({
+                order: [] // disable initial sorting
+            });
+        });
+    </script>
 @endsection
