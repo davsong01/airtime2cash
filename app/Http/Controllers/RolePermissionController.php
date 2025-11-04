@@ -10,6 +10,7 @@ class RolePermissionController extends Controller
     public function index(Request $request)
     {
         $permissions = RolePermission::orderBy('created_at', 'DESC')->get();
+        dd($permissions);
         return view('admin.permission.index', ['permissions' => $permissions]);
     }
 

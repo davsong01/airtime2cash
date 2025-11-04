@@ -24,6 +24,8 @@ class CustomerController extends Controller
                 $customers->where('status', 'active');
             } elseif ($status == 'api') {
                 $customers->where('type', 'api');
+            } elseif ($status == 'delete') {
+                $customers->where('status', 'delete');
             } elseif ($status == 'suspended') {
                 $customers->where('status', 'suspended');
             } elseif ($status == 'email-blacklist') {

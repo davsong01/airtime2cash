@@ -57,6 +57,8 @@ class SettingsController extends Controller
                 'seo_title' => '',
                 'seo_description' => '',
                 'support_link' => '',
+                'telegram_number' => '',
+                'a2cash_chat_engine' => '',
             ]);
         }
 
@@ -87,7 +89,7 @@ class SettingsController extends Controller
         ];
 
         $data = $request->except(['_token', 'logo', 'favicon', 'ip','captcha_settings_status', 'captcha_settings_provider', 'RECAPTCHA_SITE_KEY', 'RECAPTCHA_SECRET_KEY']);
-       
+        
         $data['captcha_settings'] = $captcha_settings;
         
         if (!empty($request->logo)) {

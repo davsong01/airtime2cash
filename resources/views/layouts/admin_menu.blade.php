@@ -126,6 +126,13 @@
                                         data-i18n="Input Groups">Suspended Customers</span></a>
                             </li>
                         @endif
+                        @if (in_array('customers.suspended', $allowedRoutes) || in_array(1, auth()->user()->admin->roleIds()))
+                            <li class="svg {{ Request::is('customers') ? 'active' : '' }}"><a
+                                    href="{{ route('customers', 'delete') }}"><i
+                                        class="bx bx-right-arrow-alt"></i><span class="menu-item"
+                                        data-i18n="Input Groups">Deleted Customers</span></a>
+                            </li>
+                        @endif
 
                         @if (in_array('customer-blacklist.index', $allowedRoutes) || in_array(1, auth()->user()->admin->roleIds()))
                             <li class="svg"><a href="{{ request()->route()->getPrefix() }}/customer-blacklist"><i

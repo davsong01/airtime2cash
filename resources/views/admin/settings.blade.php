@@ -36,8 +36,21 @@ use App\Models\PaymentGateway;
                                                                         <input type="text" class="form-control" id="official_email" name="official_email" value="{{ $settings->official_email ?? old('official_email') }}" placeholder="Official email">
                                                                     </fieldset>
                                                                     <fieldset class="form-group">
+                                                                        <label for="a2cash_chat_engine">Airtime2cash Chat Engine</label>
+                                                                        <select name="a2cash_chat_engine" class="form-control" id="a2cash_chat_engine" required>
+                                                                            <option value="">Select</option>
+                                                                            <option value="whatsapp" {{ $settings->a2cash_chat_engine == 'whatsapp' ? 'selected' : ''}}>Whatsapp</option>
+                                                                            <option value="telegram" {{ $settings->a2cash_chat_engine == 'telegram' ? 'selected' : ''}}>Telegram</option>
+                                                                            
+                                                                        </select>
+                                                                    </fieldset>
+                                                                    <fieldset class="form-group">
                                                                         <label for="whatsapp_number">Whatsapp Number</label>
                                                                         <input type="text" class="form-control" id="whatsapp_number" name="whatsapp_number" value="{{ $settings->whatsapp_number ?? old('whatsapp_number') }}" placeholder="Whatsapp number">
+                                                                    </fieldset>
+                                                                    <fieldset class="form-group">
+                                                                        <label for="telegram_username">Telegram Username</label>
+                                                                        <input type="text" class="form-control" id="telegram_username" name="telegram_username" value="{{ $settings->telegram_username ?? old('telegram_username') }}" placeholder="Telegram Username">
                                                                     </fieldset>
                                                                     <fieldset class="form-group">
                                                                         <label for="login_email_notification">Customer Login Email Notification</label>
@@ -142,7 +155,7 @@ use App\Models\PaymentGateway;
                                                                         </div>
                                                                         <div class="col-md-4">
                                                                             @if(!empty(getSettings()->logo))
-                                                                                <img style="height:auto;width:120px" src="{{ asset(getSettings()->logo)}}" alt="">
+                                                                                <img style="height:60px;width:auto" src="{{ asset(getSettings()->logo)}}" alt="">
                                                                             @endif
                                                                         </div>
                                                                     </div>

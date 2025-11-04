@@ -296,48 +296,62 @@ class TransactionController extends Controller
 
         // Log Transaction Email
         $subject = "Airtime2Cash Transaction Alert";
-        $body = '<p>Hello! ' . auth()->user()->name . ',</p>';
-        $body .= '<p style="line-height: 2.0;">You have just indicated a request to convert your airtime to cash on ' . config('app.name') . ' <br> Please find below the details of the transaction: <br>
-            <strong>Amount Charged:</strong> ' . getSettings()->currency . number_format($log->amount_charged, 2) . '<br>
-            <strong>Amount to Receive:</strong> ' . getSettings()->currency . number_format($log->amount_paid, 2) . '<br>
-            <strong>Charge Rate:</strong> ' . number_format($log->charge_rate) . '%<br>
-            <strong>Total Credit to transfer:</strong> ' . getSettings()->currency . number_format($log->total_amount, 2) . '<br>
-            <strong>Phone Numbers:</strong> ' . $log->phone_numbers . '<br>
-            <strong>Transaction ID:</strong> ' . $log->transaction_id . '<br>
-            <strong>Network:</strong> ' . $product->name . '<br>
-            <strong>Payment Method:</strong> ' . $log->payment_method . '<br>
-            <strong>Transaction Date:</strong> ' . date("M jS, Y g:iA", strtotime($log->created_at)) . '<br><br>
-            Warm Regards. (' . config('app.name') . ')<br/>
-            </p>';
+
+        $body = '<p>Hello ' . e(auth()->user()->name) . ',</p>';
+        $body .= '<p style="line-height: 2;">You have just indicated a request to convert your airtime to cash on ' . e(config('app.name')) . '.<br>
+Please find below the details of the transaction:</p>';
+
+        $body .= '
+<p style="line-height: 1.8;">
+<strong>Amount Charged:</strong> ' . e(getSettings()->currency) . number_format($log->amount_charged, 2) . '<br>
+<strong>Amount to Receive:</strong> ' . e(getSettings()->currency) . number_format($log->amount_paid, 2) . '<br>
+<strong>Charge Rate:</strong> ' . number_format($log->charge_rate) . '%<br>
+<strong>Total Credit to transfer:</strong> ' . e(getSettings()->currency) . number_format($log->total_amount, 2) . '<br>
+<strong>Phone Numbers:</strong> ' . e($log->phone_numbers) . '<br>
+<strong>Transaction ID:</strong> ' . e($log->transaction_id) . '<br>
+<strong>Network:</strong> ' . e($product->name) . '<br>
+<strong>Payment Method:</strong> ' . e($log->payment_method) . '<br>
+<strong>Transaction Date:</strong> ' . date("M jS, Y g:iA", strtotime($log->created_at)) . '<br>';
+
+        if ($log->payment_method == 'Transfer to Bank Account') {
+            $body .= '
+<strong>Bank Name:</strong> ' . e($log->bank_name) . '<br>
+<strong>Account Name:</strong> ' . e($log->account_name) . '<br>
+<strong>Account Number:</strong> ' . e($log->account_number) . '<br>';
+        }
+
+        $body .= '<br>Warm Regards,<br>' . e(config('app.name')) . '.</p>';
+
         $email = $request->email;
         logEmails($email, $subject, $body);
 
-        // <strong>Bank Name:</strong> ' . $log->bank_name . '<br>
-        // <strong>Account Name:</strong> ' . $log->account_name . '<br>
-        // <strong>Account Number:</strong> ' . $log->account_number. '<br>
-        $string = 'Hello Admin, I want to convert Airtime to cash on ' . config("app.name") . '. Please find below details of the transaction below: 
-        
-        *Name:* ' . auth()->user()->name . '
-        *Amount Charged:* ' . getSettings()->currency . number_format($log->amount_charged, 2) . '
-        *Amount to Receive:* ' . getSettings()->currency . number_format($log->amount_paid, 2) . '
-        *Charge Rate:* ' . number_format($log->charge_rate) . '
-        *Total Credit to transfer:* ' . getSettings()->currency . number_format($log->total_amount, 2) . '
-        *Phone Numbers:* ' . $log->phone_numbers . '
-        *Transaction ID:* ' . $log->transaction_id . '
-        *Network:* ' . $product->name . '
-        *Payment Method:* ' . $log->payment_method . '
-        *Transaction Date:* ' . date("M jS, Y g:iA", strtotime($log->created_at)) . '';
+        // build formatted plain-text message for WhatsApp/Telegram
+        $message = "Hello Admin, I want to convert Airtime to cash on " . config("app.name") . ". Please find below details of the transaction:\n\n" .
+            "*Name:* " . auth()->user()->name . "\n" .
+            "*Amount Charged:* " . getSettings()->currency . number_format($log->amount_charged, 2) . "\n" .
+            "*Amount to Receive:* " . getSettings()->currency . number_format($log->amount_paid, 2) . "\n" .
+            "*Charge Rate:* " . number_format($log->charge_rate) . "%\n" .
+            "*Total Credit to transfer:* " . getSettings()->currency . number_format($log->total_amount, 2) . "\n" .
+            "*Phone Numbers:* " . $log->phone_numbers . "\n" .
+            "*Transaction ID:* " . $log->transaction_id . "\n" .
+            "*Network:* " . $product->name . "\n" .
+            "*Payment Method:* " . $log->payment_method . "\n" .
+            "*Transaction Date:* " . date("M jS, Y g:iA", strtotime($log->created_at)) . "\n";
 
         if ($log->payment_method == 'Transfer to Bank Account') {
-            $string .= '
-            *Bank Name:* ' . $log->bank_name . '
-            *Account Name:* ' . $log->account_name . '
-            *Account Number:* ' . $log->account_number . '';
+            $message .= "\n*Bank Name:* " . $log->bank_name .
+                "\n*Account Name:* " . $log->account_name .
+                "\n*Account Number:* " . $log->account_number;
         }
 
-        $string = "https://api.whatsapp.com/send?phone=" . getSettings()->whatsapp_number . "&text=" . urlencode($string);
-        // dd($string);
-        return redirect()->away($string);
+        // generate correct link
+        if (getSettings()->a2cash_chat_engine == 'telegram') {
+            $chatLink = "https://t.me/" . ltrim(getSettings()->telegram_username, '@') . "?text=" . urlencode($message);
+        } else {
+            $chatLink = "https://api.whatsapp.com/send?phone=" . getSettings()->whatsapp_number . "&text=" . urlencode($message);
+        }
+
+        return redirect()->away($chatLink);
     }
 
     public function initializeWalletToBankTransaction(Request $request, Product $product)
