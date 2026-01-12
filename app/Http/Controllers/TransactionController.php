@@ -407,7 +407,7 @@ Please find below the details of the transaction:</p>';
         $request['customer_name'] = auth()->user()->firstname;
         $request['product_id'] = $product->id;
         $request['product_name'] = $product->name;
-        $request['category_id'] = $product->category->id;
+        $request['category_id'] = $product?->category?->id;
         $request['reason'] = 'Wallet to Bank Transfer';
         $request['unique_element'] = 'Wallet2Bank';
         $request['discount'] = 0;
@@ -1719,7 +1719,7 @@ Please find below the details of the transaction:</p>';
         } else {
             $error = 'Could not complete bank transfer at the moment, please try again later';
             $status = 'failed';
-            $api_response = $token ?? 'NO RESPONSE';
+            $api_response = $login ?? 'PROVIDER TOKEN COULD NOT BE GENERATED';
 
             if (!empty($transaction)) {
                 $transaction->update([
