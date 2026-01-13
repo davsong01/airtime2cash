@@ -360,17 +360,25 @@ Please find below the details of the transaction:</p>';
             return back()->with('error', 'The selected product/service does not seem to exist, kindly try again');
         }
 
-        $max =  walletBalance(auth()->user()) - env('BANK_TRANSFER_CHARGES');
-        $min = 60; // Provider minimum is 50
-        $rate = $product->discounted_rate;
+        $bankCharge  = (float) env('BANK_TRANSFER_CHARGES');
+        $providerMin = 60;
+
+        $walletBal = walletBalance(auth()->user());
+        $max       = $walletBal;
+        $min       = $bankCharge + $providerMin;
+
         $amount = $this->removeCharsInAmount($request->amount);
 
-        if ($amount <= $min) {
-            return back()->with('error', 'Invalid amount entered');
+        // amount must be enough to cover bank charge + provider minimum
+        if ($amount < $min) {
+            return back()->with(
+                'error',
+                'Amount too low. You must withdraw at least ₦' . number_format($min)
+            );
         }
 
         if ($amount > $max) {
-            return back()->with('error', 'Invalid amount entered');
+            return back()->with('error', 'Insufficient wallet balance for this transaction.');
         }
 
         $bank = Bank::where('cbn_code', $request->bank)->first();
@@ -421,7 +429,7 @@ Please find below the details of the transaction:</p>';
             // Log basic transaction
             $wallet = new WalletController();
             $transaction = $this->logTransaction($request->all());
-
+            
             // Log wallet
             $wallet->logWallet($request->all());
 

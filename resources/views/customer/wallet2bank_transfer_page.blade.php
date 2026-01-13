@@ -85,14 +85,15 @@
                                                                 </div>     --}}
                                                                 <div class="col-md-12">
                                                                     @php
-                                                                        $bankCharge     = (float) env('BANK_TRANSFER_CHARGES');
-                                                                        $providerMin    = 50;
-                                                                        $walletBal      = walletBalance(auth()->user());
+                                                                        $bankCharge   = (float) env('BANK_TRANSFER_CHARGES');
+                                                                        $providerMin  = 60;
+                                                                        $walletBal    = walletBalance(auth()->user());
 
-                                                                        $minAmount      = $providerMin;
-                                                                        $maxAmount      = max(0, $walletBal - $bankCharge);
+                                                                        $minAmount = $bankCharge + $providerMin;
 
-                                                                        $canWithdraw = $walletBal > ($bankCharge + $providerMin);
+                                                                        $maxAmount = max(0, $walletBal);
+
+                                                                        $canWithdraw = $walletBal >= $minAmount;
                                                                     @endphp
 
                                                                     <fieldset class="form-group">
@@ -100,15 +101,20 @@
 
                                                                         @if(!$canWithdraw)
                                                                             <div class="alert alert-warning">
-                                                                                You do not have sufficient wallet balance to use this service.
+                                                                                You do not have sufficient balance to use this service.
                                                                                 <br>
                                                                                 <small>
-                                                                                    Minimum required balance is
+                                                                                    Minimum required wallet balance is
                                                                                     <strong>
                                                                                         {!! getSettings()['currency'] !!}
-                                                                                        {{ number_format($bankCharge + $providerMin) }}
+                                                                                        {{ number_format($minAmount) }}
                                                                                     </strong>
-                                                                                    (includes bank charges).
+                                                                                    so that the provider can receive at least
+                                                                                    <strong>
+                                                                                        {!! getSettings()['currency'] !!}
+                                                                                        {{ number_format($providerMin) }}
+                                                                                    </strong>
+                                                                                    after bank charges.
                                                                                 </small>
                                                                             </div>
                                                                         @else
@@ -137,6 +143,7 @@
                                                                         @endif
                                                                     </fieldset>
                                                                 </div>
+
 
                                                                 <div class="col-md-12">
                                                                     <fieldset class="form-group">
