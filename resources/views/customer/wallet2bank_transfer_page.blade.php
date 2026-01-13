@@ -61,7 +61,7 @@
                                                                         $bankCharge = (float) env('BANK_TRANSFER_CHARGES');
                                                                         $walletBal  = walletBalance(auth()->user());
 
-                                                                        $minAmount  = $bankCharge + 10;
+                                                                        $minAmount  = 60;
                                                                         $maxAmount  = max(0, $walletBal - $bankCharge);
                                                                     @endphp
                                                                     <fieldset class="form-group">

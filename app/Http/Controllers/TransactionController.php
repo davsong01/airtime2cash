@@ -361,7 +361,7 @@ Please find below the details of the transaction:</p>';
         }
 
         $max =  walletBalance(auth()->user()) - env('BANK_TRANSFER_CHARGES');
-        $min = env('BANK_TRANSFER_CHARGES') + 10;
+        $min = 60; // Provider minimum is 50
         $rate = $product->discounted_rate;
         $amount = $this->removeCharsInAmount($request->amount);
 
