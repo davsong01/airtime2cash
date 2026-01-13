@@ -22,7 +22,6 @@ class SageController extends Controller
 
     public function login(){
         $url = $this->base_url. "merchant/authorization";
-
         $headers = [
             "Authorization: Basic " . base64_encode($this->public_key . ':' . $this->secret_key)
         ];
@@ -52,10 +51,10 @@ class SageController extends Controller
             "account_number" => $account_number,
             "reference" => $reference ?? $this->generateRequestId(),
             "account_name" => $account_name,
-            "amount" => $amount - env('BANK_TRANSFER_CHARGES'),
+            "amount" => $amount,
             "narration" => 'Transfer from ' . config('app.name'),
         ];
-
+        
         $headers = [
             "Content-Type: application/json",
             "Authorization: Bearer " . $token . "",

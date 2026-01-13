@@ -56,33 +56,6 @@
                                                                 <div class="col-md-12">
                                                                     <p></p>
                                                                 </div>
-                                                                {{-- <div class="col-md-12">
-                                                                    @php
-                                                                        $bankCharge = (float) env('BANK_TRANSFER_CHARGES');
-                                                                        $walletBal  = walletBalance(auth()->user());
-
-                                                                        $minAmount  = 60; // Provider minimum is 50
-                                                                        $maxAmount  = max(0, $walletBal - $bankCharge);
-                                                                    @endphp
-                                                                    <fieldset class="form-group">
-                                                                        <label for="amount" class="">Amount to withdraw from wallet</label>
-                                                                        <input class="form-control" id="amount" name="amount" placeholder="Enter Amount to transfer" required="" type="number" required min="{{ $minAmount }}" max="{{ $maxAmount }}">
-                                                                        
-
-                                                                        <div class="footnote">
-                                                                            <small>
-                                                                                <strong>
-                                                                                    (Minimum amount: {!! getSettings()['currency'] !!}{{ number_format($minAmount) }} |
-                                                                                    Maximum amount: {!! getSettings()['currency'] !!}{{ number_format($maxAmount) }})
-                                                                                </strong>
-                                                                                | <span style="color:red">
-                                                                                    Bank charge of {!! getSettings()['currency'] !!}{{ number_format($bankCharge) }} applies
-                                                                                </span>
-                                                                            </small>
-                                                                        </div>
-
-                                                                    </fieldset>
-                                                                </div>     --}}
                                                                 <div class="col-md-12">
                                                                     @php
                                                                         $bankCharge   = (float) env('BANK_TRANSFER_CHARGES');
@@ -90,9 +63,7 @@
                                                                         $walletBal    = walletBalance(auth()->user());
 
                                                                         $minAmount = $bankCharge + $providerMin;
-
                                                                         $maxAmount = max(0, $walletBal);
-
                                                                         $canWithdraw = $walletBal >= $minAmount;
                                                                     @endphp
 
@@ -106,13 +77,11 @@
                                                                                 <small>
                                                                                     Minimum required wallet balance is
                                                                                     <strong>
-                                                                                        {!! getSettings()['currency'] !!}
-                                                                                        {{ number_format($minAmount) }}
+                                                                                        {!! getSettings()['currency'] !!}{{ number_format($minAmount) }}
                                                                                     </strong>
                                                                                     so that the provider can receive at least
                                                                                     <strong>
-                                                                                        {!! getSettings()['currency'] !!}
-                                                                                        {{ number_format($providerMin) }}
+                                                                                        {!! getSettings()['currency'] !!}{{ number_format($providerMin) }}
                                                                                     </strong>
                                                                                     after bank charges.
                                                                                 </small>
@@ -127,6 +96,7 @@
                                                                                 required
                                                                                 min="{{ $minAmount }}"
                                                                                 max="{{ $maxAmount }}"
+                                                                                data-bank-charge="{{ $bankCharge }}"
                                                                             >
 
                                                                             <div class="footnote">
@@ -135,15 +105,32 @@
                                                                                         (Minimum amount: {!! getSettings()['currency'] !!}{{ number_format($minAmount) }} |
                                                                                         Maximum amount: {!! getSettings()['currency'] !!}{{ number_format($maxAmount) }})
                                                                                     </strong>
-                                                                                    | <span style="color:red">
-                                                                                        Bank charge of {!! getSettings()['currency'] !!}{{ number_format($bankCharge) }} applies
+                                                                                    | <span id="recipient-amount" style="color:green">
+                                                                                        Recipient will receive {!! getSettings()['currency'] !!}0
                                                                                     </span>
                                                                                 </small>
                                                                             </div>
                                                                         @endif
                                                                     </fieldset>
                                                                 </div>
+                                                                <script>
+                                                                    document.addEventListener('DOMContentLoaded', function () {
+                                                                        const amountInput = document.getElementById('amount');
+                                                                        const recipientEl = document.getElementById('recipient-amount');
 
+                                                                        if (!amountInput || !recipientEl) return;
+
+                                                                        const bankCharge = parseFloat(amountInput.dataset.bankCharge) || 0;
+                                                                        const currency   = `{!! getSettings()['currency'] !!}`;
+
+                                                                        amountInput.addEventListener('input', function () {
+                                                                            const amount = parseFloat(this.value) || 0;
+                                                                            const receivable = Math.max(0, amount - bankCharge);
+
+                                                                            recipientEl.textContent = `Recipient will receive ${currency}${receivable.toLocaleString()}`;
+                                                                        });
+                                                                    });
+                                                                </script>
 
                                                                 <div class="col-md-12">
                                                                     <fieldset class="form-group">

@@ -390,8 +390,8 @@ Please find below the details of the transaction:</p>';
         }
 
         $request['quantity'] = 1;
-        $request['total_amount'] = $amount + env('BANK_TRANSFER_CHARGES');
-        $request['amount'] = $amount;
+        $request['total_amount'] = $amount;
+        $request['amount'] = $amount - env('BANK_TRANSFER_CHARGES');
         
         // Get Wallet Balance
         $balance = walletBalance(auth()->user());
@@ -421,7 +421,6 @@ Please find below the details of the transaction:</p>';
         $request['discount'] = 0;
         $request['provider_charge'] = env('BANK_TRANSFER_CHARGES') ?? null;
 
-
         // Process Transaction
         try {
             DB::beginTransaction();
@@ -435,15 +434,8 @@ Please find below the details of the transaction:</p>';
 
             // Update Customer Wallet
             $wallet->updateCustomerWallet(auth()->user(), $request['total_amount'], $request['type']);
-            
-            if (env('ENT') == 'elocal') {
-                $transfer = [
-                    'status' => 'success',
-                    'api_response' => 'local Successful response from API',
-                ];
-            } else {
-                $transfer = $this->transferToBankAccount($bank->cbn_code, $request->account_number, $request->account_name, $amount, $transaction);
-            }
+
+            $transfer = $this->transferToBankAccount($bank->cbn_code, $request->account_number, $request->account_name, $request['amount'], $transaction);
             
             if (isset($transfer['status']) && $transfer['status'] == 'success') {
                 $user_status = 'success';
@@ -483,7 +475,7 @@ Please find below the details of the transaction:</p>';
         } catch (\Throwable $th) {
             \Log::error(['Transaction Error' => 'Message: ' . $th->getMessage() . ' File: ' . $th->getFile() . ' Line: ' . $th->getLine()]);
             DB::rollBack();
-           
+            
             return back()->with('error', 'An error occured, please try again later');
         }
     }
