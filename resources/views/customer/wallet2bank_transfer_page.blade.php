@@ -56,12 +56,12 @@
                                                                 <div class="col-md-12">
                                                                     <p></p>
                                                                 </div>
-                                                                <div class="col-md-12">
+                                                                {{-- <div class="col-md-12">
                                                                     @php
                                                                         $bankCharge = (float) env('BANK_TRANSFER_CHARGES');
                                                                         $walletBal  = walletBalance(auth()->user());
 
-                                                                        $minAmount  = 60;
+                                                                        $minAmount  = 60; // Provider minimum is 50
                                                                         $maxAmount  = max(0, $walletBal - $bankCharge);
                                                                     @endphp
                                                                     <fieldset class="form-group">
@@ -82,7 +82,62 @@
                                                                         </div>
 
                                                                     </fieldset>
-                                                                </div>    
+                                                                </div>     --}}
+                                                                <div class="col-md-12">
+                                                                    @php
+                                                                        $bankCharge     = (float) env('BANK_TRANSFER_CHARGES');
+                                                                        $providerMin    = 50;
+                                                                        $walletBal      = walletBalance(auth()->user());
+
+                                                                        $minAmount      = $providerMin;
+                                                                        $maxAmount      = max(0, $walletBal - $bankCharge);
+
+                                                                        $canWithdraw = $walletBal > ($bankCharge + $providerMin);
+                                                                    @endphp
+
+                                                                    <fieldset class="form-group">
+                                                                        <label for="amount">Amount to withdraw from wallet</label>
+
+                                                                        @if(!$canWithdraw)
+                                                                            <div class="alert alert-warning">
+                                                                                You do not have sufficient wallet balance to use this service.
+                                                                                <br>
+                                                                                <small>
+                                                                                    Minimum required balance is
+                                                                                    <strong>
+                                                                                        {!! getSettings()['currency'] !!}
+                                                                                        {{ number_format($bankCharge + $providerMin) }}
+                                                                                    </strong>
+                                                                                    (includes bank charges).
+                                                                                </small>
+                                                                            </div>
+                                                                        @else
+                                                                            <input
+                                                                                class="form-control"
+                                                                                id="amount"
+                                                                                name="amount"
+                                                                                type="number"
+                                                                                placeholder="Enter Amount to transfer"
+                                                                                required
+                                                                                min="{{ $minAmount }}"
+                                                                                max="{{ $maxAmount }}"
+                                                                            >
+
+                                                                            <div class="footnote">
+                                                                                <small>
+                                                                                    <strong>
+                                                                                        (Minimum amount: {!! getSettings()['currency'] !!}{{ number_format($minAmount) }} |
+                                                                                        Maximum amount: {!! getSettings()['currency'] !!}{{ number_format($maxAmount) }})
+                                                                                    </strong>
+                                                                                    | <span style="color:red">
+                                                                                        Bank charge of {!! getSettings()['currency'] !!}{{ number_format($bankCharge) }} applies
+                                                                                    </span>
+                                                                                </small>
+                                                                            </div>
+                                                                        @endif
+                                                                    </fieldset>
+                                                                </div>
+
                                                                 <div class="col-md-12">
                                                                     <fieldset class="form-group">
                                                                         <label for="payment_method">Select Bank </label>
