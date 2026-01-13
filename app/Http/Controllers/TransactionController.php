@@ -361,7 +361,7 @@ Please find below the details of the transaction:</p>';
         }
 
         $max =  walletBalance(auth()->user()) - env('BANK_TRANSFER_CHARGES');
-        $min = 1;
+        $min = env('BANK_TRANSFER_CHARGES') + 10;
         $rate = $product->discounted_rate;
         $amount = $this->removeCharsInAmount($request->amount);
 

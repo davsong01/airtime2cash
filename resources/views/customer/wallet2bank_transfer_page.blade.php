@@ -57,12 +57,30 @@
                                                                     <p></p>
                                                                 </div>
                                                                 <div class="col-md-12">
+                                                                    @php
+                                                                        $bankCharge = (float) env('BANK_TRANSFER_CHARGES');
+                                                                        $walletBal  = walletBalance(auth()->user());
+
+                                                                        $minAmount  = $bankCharge + 10;
+                                                                        $maxAmount  = max(0, $walletBal - $bankCharge);
+                                                                    @endphp
                                                                     <fieldset class="form-group">
                                                                         <label for="amount" class="">Amount to withdraw from wallet</label>
-                                                                        <input class="form-control" id="amount" name="amount" placeholder="Enter Amount to transfer" required="" type="number" required min="1" max="{{ walletBalance(auth()->user()) - env('BANK_TRANSFER_CHARGES')}}">
+                                                                        <input class="form-control" id="amount" name="amount" placeholder="Enter Amount to transfer" required="" type="number" required min="{{ $minAmount }}" max="{{ $maxAmount }}">
+                                                                        
+
                                                                         <div class="footnote">
-                                                                            <small><strong>(Maximum amount is: {!! getSettings()['currency'] !!}{{ number_format(walletBalance(auth()->user()) - env('BANK_TRANSFER_CHARGES'))}}) </strong>| <span style="color:red">Bank Charge of {!! getSettings()['currency'] !!}{{ number_format(env('BANK_TRANSFER_CHARGES'))}} applies</span></small>
+                                                                            <small>
+                                                                                <strong>
+                                                                                    (Minimum amount: {!! getSettings()['currency'] !!}{{ number_format($minAmount) }} |
+                                                                                    Maximum amount: {!! getSettings()['currency'] !!}{{ number_format($maxAmount) }})
+                                                                                </strong>
+                                                                                | <span style="color:red">
+                                                                                    Bank charge of {!! getSettings()['currency'] !!}{{ number_format($bankCharge) }} applies
+                                                                                </span>
+                                                                            </small>
                                                                         </div>
+
                                                                     </fieldset>
                                                                 </div>    
                                                                 <div class="col-md-12">
