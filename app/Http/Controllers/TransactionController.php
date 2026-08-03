@@ -1,0 +1,1799 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Bank;
+use App\Models\User;
+use App\Models\Wallet;
+use App\Models\Product;
+use App\Models\Category;
+use App\Models\Discount;
+use App\Models\BillerLog;
+use App\Models\BlackList;
+use App\Models\Variation;
+use Illuminate\Http\Request;
+use App\Models\PaymentGateway;
+use App\Models\TransactionLog;
+use App\Services\ExcelService;
+use App\Models\ReferralEarning;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\DB;
+use App\Models\ReservedAccountCallback;
+use Illuminate\Support\Facades\Session;
+use App\Models\Airtime2CashTransactions;
+use Illuminate\Support\Facades\Validator;
+use App\Http\Controllers\WalletController;
+use Illuminate\Contracts\Database\Query\Builder;
+use App\Http\Controllers\PaymentProcessors\SquadController;
+use App\Http\Controllers\PaymentProcessors\MonnifyController;
+
+class TransactionController extends Controller
+{
+    public function showProductsPage($slug)
+    {
+        $category = Category::with([
+            'products' => function ($query) {
+                return $query->where('status', 'active')->get();
+            }
+        ])->where('status', 'active')->where('slug', $slug)->first();
+
+        if (!empty($category) && $category->status == 'active') {
+            return view('customer.single_category_page', compact('category'));
+        } else {
+            return back();
+        }
+    }
+
+    public function airtimeToCash()
+    {
+        $route = '<a style="color: yellow;" href="' . route("update.kyc.details") . '">HERE</a>';
+
+        if (auth()->user()->customer->kyc_status == 'unverified') {
+            return back()->with('error', 'Airtime2Cash conversions is only available for fully verified clients, please click ' . $route . ' to get verified');
+        }
+        $category = Category::with([
+            'products' => function ($query) {
+                return $query->where('status', 'active')
+                    ->where('type', 'airtime2cash')
+                    ->get();
+            }
+        ])->where('status', 'active')->where('type', 'airtime2cash')->first();
+    
+        foreach ($category->products as $product) {
+            $discount = Discount::where('product_id', $product->id)->where('customer_level', auth()->user()->customer->level->id)->first();
+            $product->discounted_rate = (!empty($discount) && $discount->price < $product->rate) ? $discount->price : $product->rate;
+        }
+
+        $banks = Bank::all();
+
+        if (!empty($category) && $category->status == 'active') {
+            return view('customer.airtime2cash_page', compact('category', 'banks'));
+        } else {
+            return back();
+        }
+    }
+
+    public function walletToBank($slug)
+    {
+        $route = '<a style="color: yellow;" href="' . route("update.kyc.details") . '">HERE</a>';
+
+        if (auth()->user()->customer->kyc_status == 'unverified') {
+            return back()->with('error', 'Wallet to bank conversion is only available for fully verified clients, please click ' . $route . ' to get verified');
+        }
+
+        $product = Product::where('slug', $slug)->first();
+        $banks = Bank::all();
+
+        if (walletBalance(auth()->user()) <= env('BANK_TRANSFER_CHARGES')) {
+            return redirect(route('dashboard'))->with('error', 'You need above ' . getSettings()['currency'] . number_format(env('BANK_TRANSFER_CHARGES')) . ' wallet balance to use this feature!');
+        }
+        if (!empty($product) && $product->status == 'active') {
+            return view('customer.wallet2bank_transfer_page', compact('product', 'banks'));
+        } else {
+            return back();
+        }
+    }
+
+    public function initializeTransaction(Request $request)
+    {
+        $blacklist = $this->bounceBlacklist($request->phone ?? $request->unique_element, auth()->user()->email, $request->email);
+
+        if ($blacklist) {
+            return back()->with('error', 'Account blacklisted!, kindly reach out to support!');
+        }
+
+        // Check Transaction pin
+        $pinCheck = $this->checkTransactionPin($request);
+
+        if (!$pinCheck) {
+            return back()->with('error', 'Invalid Transaction PIN!');
+        }
+
+        // Get product
+        $product = Product::where('id', $request->product)->first();
+        $category = $product->category_id;
+
+        if (empty($product)) {
+            return back()->with('error', 'The selected product/service does not seem to exist, kindly check your selection');
+        }
+
+        $element = $product->category->unique_element;
+        $request['unique_element'] = $request->unique_element ?? $request->$element;
+
+        if ($product->has_variations == 'yes') {
+            $variation = Variation::where('id', $request->variation)->where('product_id', $product->id)->first();
+
+            if ($variation->fixed_price == 'Yes') {
+                $request['amount'] = $variation->system_price;
+            } elseif ($product->allow_subscription_type == 'yes' && $variation->category->unique_element == 'iuc_number') {
+                if (!empty($request->bouquet) && $request->bouquet == 'renew') {
+                    $req = new Request([
+                        'unique_element' => $request['unique_element'],
+                        'variation' => $variation->id,
+                    ]);
+                    $res = $this->verify($req);
+                    if (isset($res['renewal_amount'])) {
+                        $request['amount'] = $res['renewal_amount'];
+                    } else {
+                        $request['amount'] = $variation->system_price;
+                    }
+                } else {
+                    $request['amount'] = $variation->system_price;
+                }
+            } else {
+                $request['amount'] = $this->removeCharsInAmount($request->amount);
+            }
+        } else {
+            if ($product->fixed_price == 'yes') {
+                $request['amount'] = $product->system_price;
+            } else {
+                $request['amount'] = $this->removeCharsInAmount($request->amount);
+            }
+        }
+
+        // Verify Meter
+        if ($product->allow_meter_validation) {
+            $meterValidation = $this->validateMeter($product);
+            if (isset($meterValidation) && $meterValidation['code'] == 0) {
+                return back()->with('error', $meterValidation['error']);
+            }
+        }
+
+        $request['discount'] = 0;
+
+        if ($product->has_variations == 'yes') {
+            $discount = $this->getDiscount($variation, 'variation', $request['amount'], 'yes');
+        } else {
+            $discount = $this->getDiscount($product, 'product', $request['amount'], 'yes');
+        }
+
+        $discountedAmount = $discount['discounted_price'];
+        $disCountApplied = $discount['discount_applied'];
+
+        $request['quantity'] = $request->quantity ?? 1;
+        $request['total_amount'] = $discountedAmount * $request['quantity'];
+        $request['discount'] = $disCountApplied * $request['quantity'];
+
+
+        // Get Wallet Balance
+        $wallet = new WalletController();
+        $balance = $wallet->getWalletBalance(auth()->user());
+
+        if ($balance < $request['total_amount']) {
+            return back()->with('error', 'Insufficient Wallet Balance, Please try again');
+        }
+
+        // Log Wallet
+        $request_id = $this->generateRequestId();
+        $request['type'] = 'debit';
+        $request['customer_id'] = auth()->user()->customer->id;
+        $request['transaction_id'] = 'A2C-' . $request_id;
+        $request['request_id'] = $request_id;
+        $request['payment_method'] = 'wallet';
+        $request['balance_before'] = $balance;
+        $request['ip_address'] = $this->getIpAddress();
+        $request['domain_name'] = $this->getDomainName();
+        $request['customer_email'] = auth()->user()->email;
+        $request['customer_phone'] = auth()->user()->phone;
+        $request['customer_name'] = auth()->user()->firstname;
+        $request['variation_id'] = $variation->id ?? null;
+        $request['product_id'] = $product->id;
+        $request['product_name'] = $product->name;
+        $request['variation_name'] = $variation->slug ?? null;
+        $request['category_id'] = $product->category->id;
+        $request['api_id'] = $variation->api->id ?? $product->api_id;
+        $request['product_slug'] = $variation->product->slug ?? $product->slug;
+        $request['variation_slug'] = $variation->slug ?? null;
+        $request['network'] = $variation->network ?? null;
+        $request['reason'] = 'Product Purchase';
+        $request['subscription_type'] = $variation->bouquet ?? 'change';
+
+        // Log basic transaction
+        $transaction = $this->logTransaction($request->all());
+
+        // Log wallet
+        $wal = $wallet->logWallet($request->all());
+
+        // Update Customer Wallet
+        $wallet->updateCustomerWallet(auth()->user(), $request['total_amount'], $request['type']);
+
+        // Process Transaction
+        try {
+            //code...
+            $transaction = $this->processTransaction($request->all(), $transaction, $product, $variation ?? null);
+        } catch (\Throwable $th) {
+            \Log::error(['Transaction Error' => 'Message: ' . $th->getMessage() . ' File: ' . $th->getFile() . ' Line: ' . $th->getLine()]);
+            return back()->with('error', 'An error occured, please try again later');
+        }
+
+        // Log Transaction Email
+        $this->sendTransactionEmail($transaction, auth()->user());
+        return redirect(route('transaction.status', $transaction->transaction_id));
+    }
+
+    public function initializeAirtime2CashTransaction(Request $request)
+    {
+        $product = Product::where('id', $request->product)->first();
+
+        if (empty($product)) {
+            return back()->with('error', 'The selected product/service does not seem to exist, kindly check your selection');
+        }
+
+        $discount = Discount::where('product_id', $product->id)->where('customer_level', auth()->user()->customer->level->id)->first();
+        $product->discounted_rate = (!empty($discount) && $discount->price < $product->rate) ? $discount->price : $product->rate;
+
+        $max = $product->max;
+        $min = $product->min;
+        $rate = $product->discounted_rate;
+        $amount = $this->removeCharsInAmount($request->amount);
+
+        $amount_charged = ($rate / 100) * $amount;
+        $amount_paid = $amount - $amount_charged;
+
+        if ($amount > 0 && $amount >= $min && $amount <= $max) {
+            $amount = $amount - (($rate / 100) * $amount);
+        } else {
+            return back()->with('error', 'Invalid amount entered');
+        }
+
+        $transaction_id = 'A2C-' . $this->generateRequestId();
+        $bank = Bank::where('cbn_code', $request->bank)->first();
+        if (!empty($bank)) {
+            $bank_name = $bank->bank_name;
+        } else {
+            $bank_name = '';
+        }
+
+        $transaction = [
+            'amount_charged' => $amount_charged,
+            'amount_paid' => $amount_paid,
+            'charge_rate' => $rate,
+            'product_id' => $product->id,
+            'customer_id' => auth()->user()->customer->id,
+            'type' => 'credit',
+            'transaction_id' => $transaction_id,
+            'total_amount' => $amount_charged + $amount_paid,
+            'phone_numbers' => $request->phone,
+            'payment_method' => $request->payment_method,
+            'bank_code' => $request->bank,
+            'bank_name' => $bank_name,
+            'account_number' => $request->account_number,
+            'account_name' => $request->account_name,
+            // 'ip_address' => $request->ip,
+        ];
+
+
+        // Process Transaction
+        try {
+            $log = Airtime2CashTransactions::updateOrCreate(
+                ['transaction_id' => $transaction_id],
+                $transaction
+            );
+        } catch (\Throwable $th) {
+            \Log::error(['Transaction Error' => 'Message: ' . $th->getMessage() . ' File: ' . $th->getFile() . ' Line: ' . $th->getLine()]);
+            return back()->with('error', 'An error occured, please try again later');
+        }
+
+        // Log Transaction Email
+        $subject = "Airtime2Cash Transaction Alert";
+
+        $body = '<p>Hello ' . e(auth()->user()->name) . ',</p>';
+        $body .= '<p style="line-height: 2;">You have just indicated a request to convert your airtime to cash on ' . e(config('app.name')) . '.<br>
+Please find below the details of the transaction:</p>';
+
+        $body .= '
+<p style="line-height: 1.8;">
+<strong>Amount Charged:</strong> ' . e(getSettings()->currency) . number_format($log->amount_charged, 2) . '<br>
+<strong>Amount to Receive:</strong> ' . e(getSettings()->currency) . number_format($log->amount_paid, 2) . '<br>
+<strong>Charge Rate:</strong> ' . number_format($log->charge_rate) . '%<br>
+<strong>Total Credit to transfer:</strong> ' . e(getSettings()->currency) . number_format($log->total_amount, 2) . '<br>
+<strong>Phone Numbers:</strong> ' . e($log->phone_numbers) . '<br>
+<strong>Transaction ID:</strong> ' . e($log->transaction_id) . '<br>
+<strong>Network:</strong> ' . e($product->name) . '<br>
+<strong>Payment Method:</strong> ' . e($log->payment_method) . '<br>
+<strong>Transaction Date:</strong> ' . date("M jS, Y g:iA", strtotime($log->created_at)) . '<br>';
+
+        if ($log->payment_method == 'Transfer to Bank Account') {
+            $body .= '
+<strong>Bank Name:</strong> ' . e($log->bank_name) . '<br>
+<strong>Account Name:</strong> ' . e($log->account_name) . '<br>
+<strong>Account Number:</strong> ' . e($log->account_number) . '<br>';
+        }
+
+        $body .= '<br>Warm Regards,<br>' . e(config('app.name')) . '.</p>';
+
+        $email = $request->email;
+        logEmails($email, $subject, $body);
+
+        // build formatted plain-text message for WhatsApp/Telegram
+        $message = "Hello Admin, I want to convert Airtime to cash on " . config("app.name") . ". Please find below details of the transaction:\n\n" .
+            "*Name:* " . auth()->user()->name . "\n" .
+            "*Amount Charged:* " . getSettings()->currency . number_format($log->amount_charged, 2) . "\n" .
+            "*Amount to Receive:* " . getSettings()->currency . number_format($log->amount_paid, 2) . "\n" .
+            "*Charge Rate:* " . number_format($log->charge_rate) . "%\n" .
+            "*Total Credit to transfer:* " . getSettings()->currency . number_format($log->total_amount, 2) . "\n" .
+            "*Phone Numbers:* " . $log->phone_numbers . "\n" .
+            "*Transaction ID:* " . $log->transaction_id . "\n" .
+            "*Network:* " . $product->name . "\n" .
+            "*Payment Method:* " . $log->payment_method . "\n" .
+            "*Transaction Date:* " . date("M jS, Y g:iA", strtotime($log->created_at)) . "\n";
+
+        if ($log->payment_method == 'Transfer to Bank Account') {
+            $message .= "\n*Bank Name:* " . $log->bank_name .
+                "\n*Account Name:* " . $log->account_name .
+                "\n*Account Number:* " . $log->account_number;
+        }
+
+        // generate correct link
+        if (getSettings()->a2cash_chat_engine == 'telegram') {
+            $chatLink = "https://t.me/" . ltrim(getSettings()->telegram_username, '@') . "?text=" . urlencode($message);
+        } else {
+            $chatLink = "https://api.whatsapp.com/send?phone=" . getSettings()->whatsapp_number . "&text=" . urlencode($message);
+        }
+
+        return redirect()->away($chatLink);
+    }
+
+    public function initializeWalletToBankTransaction(Request $request, Product $product)
+    {
+        if (empty($product)) {
+            return back()->with('error', 'The selected product/service does not seem to exist, kindly try again');
+        }
+
+        $bankCharge  = (float) env('BANK_TRANSFER_CHARGES');
+        $providerMin = 60;
+
+        $walletBal = walletBalance(auth()->user());
+        $max       = $walletBal;
+        $min       = $bankCharge + $providerMin;
+
+        $amount = $this->removeCharsInAmount($request->amount);
+
+        // amount must be enough to cover bank charge + provider minimum
+        if ($amount < $min) {
+            return back()->with(
+                'error',
+                'Amount too low. You must withdraw at least ₦' . number_format($min)
+            );
+        }
+
+        if ($amount > $max) {
+            return back()->with('error', 'Insufficient wallet balance for this transaction.');
+        }
+
+        $bank = Bank::where('cbn_code', $request->bank)->first();
+
+        if (!empty($bank)) {
+            $bank_name = $bank->bank_name;
+        } else {
+            return back()->with('error', 'Invalid bank selected');
+        }
+
+        $request['quantity'] = 1;
+        $request['total_amount'] = $amount;
+        $request['amount'] = $amount - env('BANK_TRANSFER_CHARGES');
+        
+        // Get Wallet Balance
+        $balance = walletBalance(auth()->user());
+
+        if ($balance < $request['total_amount']) {
+            return redirect(route('dashboard'))->with('error', 'Insufficient Wallet Balance, Please try again');
+        }
+
+        $request_id = $this->generateRequestId();
+        $request['type'] = 'debit';
+        $request['customer_id'] = auth()->user()->customer->id;
+        $request['transaction_id'] = 'W2B-' . $request_id;
+        $request['request_id'] = $request_id;
+        $request['payment_method'] = 'wallet';
+        $request['balance_before'] = $balance;
+        $request['balance_after'] = $balance;
+        $request['ip_address'] = $this->getIpAddress();
+        $request['domain_name'] = $this->getDomainName();
+        $request['customer_email'] = auth()->user()->email;
+        $request['customer_phone'] = auth()->user()->phone;
+        $request['customer_name'] = auth()->user()->firstname;
+        $request['product_id'] = $product->id;
+        $request['product_name'] = $product->name;
+        $request['category_id'] = $product?->category?->id;
+        $request['reason'] = 'Wallet to Bank Transfer';
+        $request['unique_element'] = 'Wallet2Bank';
+        $request['discount'] = 0;
+        $request['provider_charge'] = env('BANK_TRANSFER_CHARGES') ?? null;
+
+        // Process Transaction
+        try {
+            DB::beginTransaction();
+
+            // Log basic transaction
+            $wallet = new WalletController();
+            $transaction = $this->logTransaction($request->all());
+            
+            // Log wallet
+            $wallet->logWallet($request->all());
+
+            // Update Customer Wallet
+            $wallet->updateCustomerWallet(auth()->user(), $request['total_amount'], $request['type']);
+
+            $transfer = $this->transferToBankAccount($bank->cbn_code, $request->account_number, $request->account_name, $request['amount'], $transaction);
+            
+            if (isset($transfer['status']) && $transfer['status'] == 'success') {
+                $user_status = 'success';
+                $status = 'success';
+                $description = 'Wallet to Bank Transfer transaction was completed';
+                $api_response = $transfer['api_response'] ?? null;
+                $balance_after = $request['balance_before'] - $request['total_amount'];
+            } else {
+                $wallet = new WalletController();
+                $request['type'] = 'credit';
+                $wallet->logWallet($request);
+
+                $status = 'failed';
+                $failure_reason = 'Wallet to Bank Transfer transaction could not be completed';
+
+                // Update Customer Wallet
+                $wallet->updateCustomerWallet(auth()->user(), $request['total_amount'], 'credit');
+                $balance_after = $request['balance_before'];
+                $user_status = 'failed';
+                $description = 'Wallet to Bank Transfer transaction could not be completed';
+                $api_response = $transfer['api_response'] ?? null;
+            }
+
+            $transaction->update([
+                'balance_after' => $balance_after,
+                'api_response' => $api_response ?? null,
+                'failure_reason' => $failure_reason ?? null,
+                'status' => $status ?? '',
+                'descr' => $description ?? null,
+                'user_status' => $user_status ?? null
+            ]);
+
+            DB::commit();
+            $this->sendTransactionEmail($transaction, auth()->user());
+            
+            return redirect(route('transaction.status', $transaction->transaction_id));
+        } catch (\Throwable $th) {
+            \Log::error(['Transaction Error' => 'Message: ' . $th->getMessage() . ' File: ' . $th->getFile() . ' Line: ' . $th->getLine()]);
+            DB::rollBack();
+            
+            return back()->with('error', 'An error occured, please try again later');
+        }
+    }
+
+    public function transactionStatus($transaction_id)
+    {
+        $transaction = TransactionLog::where('transaction_id', $transaction_id)->first();
+        return view('customer.transaction_status', compact('transaction'));
+    }
+
+    public function Airtime2CashTransactionStatus($transaction_id)
+    {
+        $transaction = Airtime2CashTransactions::where('transaction_id', $transaction_id)->first();
+        return view('customer.airtime_2_cash_transaction_status', compact('transaction'));
+    }
+
+    public function transactionReceipt($transaction_id)
+    {
+        $transaction = TransactionLog::with(['product', 'category', 'variation'])->where('id', $transaction_id)->first()->toArray();
+
+        $pdf = Pdf::loadView('customer.receipts.transaction_receipt', ['transaction' => $transaction])->setPaper('a4', 'portrait');
+        return $pdf->download($transaction['transaction_id'] . '.pdf');
+        // return view('customer.receipts.transaction_receipt', compact('transaction'));
+    }
+
+    public function airtime2CashTransactionReceipt($transaction_id)
+    {
+        $transaction = Airtime2CashTransactions::with(['product:id,name,image', 'customer'])->where('id', $transaction_id)->first()->toArray();
+
+        $pdf = Pdf::loadView('customer.receipts.airtime2cash_transaction_receipt', ['transaction' => $transaction])->setPaper('a4', 'portrait');
+        return $pdf->download($transaction['transaction_id'] . '.pdf');
+        // return view('customer.receipts.airtime2cash_transaction_receipt', compact('transaction'));
+    }
+
+
+
+    public function processTransaction($request, $transaction, $product, $variation)
+    {
+        $failure_reason = '';
+        $api = $variation->api ?? $product->api;
+        // Get Api
+        $query = app("App\Http\Controllers\Providers\KingsVtuController")->query($request, $variation->api ?? $product->api, $variation, $product);
+
+        try {
+            //code...
+            DB::beginTransaction();
+            if (isset($query) && $query['status_code'] == 1) {
+                $user = auth()->user();
+                $this->referralReward($user->referral, $request['total_amount'], $user->customer->id, $request['transaction_id'], $product->referral_percentage);
+                $res = [
+                    'status' => $query['status'],
+                    'message' => 'Transaction Successful!',
+                ];
+
+                $user_status = 'success';
+                $balance_after = $request['balance_before'] - $request['total_amount'];
+            } else  if (isset($query) && $query['status_code'] == 2) {
+                $user = auth()->user();
+                // $this->referralReward($user->referral, $request['total_amount'], $user->customer->id, $request['transaction_id'], $product->referral_percentage);
+                $res = [
+                    'status' => $query['status'],
+                    'message' => 'Transaction Pending!',
+                ];
+
+                $user_status = 'pending';
+                $balance_after = $request['balance_before'] - $request['total_amount'];
+            } else if (isset($query) && $query['status_code'] == 0) {
+                // Log wallet
+                $wallet = new WalletController();
+                $request['type'] = 'credit';
+                $wallet->logWallet($request);
+                $failure_reason = $query['error'] ?? $query['message'];
+
+                // Update Customer Wallet
+                $wallet->updateCustomerWallet(auth()->user(), $request['total_amount'], 'credit');
+                $balance_after = $request['balance_before'];
+                $user_status = 'failed';
+            } else {
+                $user_status = 'failed';
+                $res = [
+                    'status' => $query['status'],
+                    'message' => 'Transaction Successful!',
+                ];
+
+                $balance_after = $request['balance_before'] - $request['total_amount'];
+            }
+
+            $extra_info = [];
+            $customer_details = BillerLog::where('service_id', $transaction->product->slug)->where('billers_code', $transaction->unique_element)->first();
+            if (!empty($customer_details)) {
+                $customer_details = json_decode($customer_details->refined_data, true);
+            } else {
+                $customer_details = [];
+            }
+
+            $info = $query['extra_info'] ?? [];
+            $extra_info = array_merge($info, $customer_details);
+            // Update Transaction
+            $transaction->update([
+                'balance_after' => $balance_after,
+                'request_data' => $query['payload'],
+                'api_response' => $query['api_response'] ?? null,
+                'failure_reason' => $failure_reason,
+                'extras' => $query['extras'] ?? null,
+                'status' => $query['status'] ?? 'attention-required',
+                'descr' => $query['description'],
+                'extra_info' => !empty($extra_info) ? json_encode($extra_info) : null,
+                'user_status' => $user_status ?? null
+            ]);
+
+            DB::commit();
+        } catch (\Throwable $th) {
+            DB::rollBack();
+            $wallet = new WalletController();
+            $request['type'] = 'credit';
+            $wallet->logWallet($request);
+            $failure_reason = $query['error'] ?? $query['message'];
+
+            // Update Customer Wallet
+            $wallet->updateCustomerWallet(auth()->user(), $request['total_amount'], 'credit');
+            $balance_after = $request['balance_before'];
+
+            $transaction->update([
+                'balance_after' => $balance_after
+            ]);
+            // \Log::error(['Transaction Error' => 'Message: ' . $th->getMessage() . ' File: ' . $th->getFile() . ' Line: ' . $th->getLine()]);
+        }
+
+        return $transaction;
+    }
+
+    public function verify(Request $request, $admin = null)
+    {
+        $variation = Variation::where('id', $request->variation)->first();
+
+        if (in_array($variation->slug, array_keys(specialVerifiableVariations()))) {
+            $element = specialVerifiableVariations()[$variation->slug];
+        } else {
+            $element = $variation->category->unique_element;
+        }
+
+        $unique_elementX = ucfirst(str_replace("_", " ", $element));
+
+        if (empty($admin)) {
+            $validator = Validator::make($request->all(), [
+                'unique_element' => 'required'
+            ]);
+
+            if ($validator->fails()) {
+                $res = [
+                    'status' => '0',
+                    'message' => $unique_elementX . ' is required',
+                    'title' => 'Please fill all fields',
+                ];
+
+                return response()->json($res);
+            }
+        }
+
+
+        $product = $variation->product;
+        $api = $variation->api;
+
+        $request['product_name'] = $product->name ?? null;
+        $request['variation_name'] = $variation->slug ?? null;
+        $request['category_id'] = $product->category->id ?? null;
+        $request['product_slug'] = $variation->product->slug ?? null;
+        $request['network'] = $variation->network ?? null;
+
+        $request['unique_element'] = $request->unique_element;
+
+        $data = [
+            'variation' => $variation,
+            'product' => $product,
+            'api' => $api,
+            'request' => $request
+        ];
+
+        // Get Api
+        $verify = app("App\Http\Controllers\Providers\KingsVtuController")->verify($data);
+
+        if (isset($verify) && $verify['status_code'] == 1) {
+            $res = [
+                'status' => $verify['status_code'],
+                'message' => $verify['message'],
+                'title' => $verify['title'],
+                'renewal_amount' => $verify['renewal_amount']
+            ];
+
+            if (isset($verify['raw_response'])) {
+                $this->refineAndLogBiller($verify, $variation->category, $request['unique_element'], $request['product_slug']);
+            }
+        } else if (isset($query) && $query['status_code'] == 0) {
+            $res = [
+                'status' => $verify['status_code'],
+                'message' => $verify['message'],
+                'title' => $verify['title'],
+            ];
+        } else {
+            $res = [
+                'status' => $verify['status_code'] ?? 0,
+                'message' => $verify['message'] ?? 'Biller not reachable at the moment, please try again later',
+                'title' => $verify['title'] ?? 'Not Reachable',
+            ];
+        }
+
+        if ($request->ajax()) {
+            return response()->json($res);
+        } else {
+            return $res;
+        }
+    }
+
+    public function checkTransactionPin($request)
+    {
+        $pin = base64_decode(base64_decode(base64_decode(auth()->user()->transaction_pin)));
+        if ($pin == $request->transaction_pin) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    public function getCustomerDiscount(Request $request)
+    {
+        if (!empty($request->product_id)) {
+            $resource = Product::where('id', $request->product_id)->first();
+            $type = 'product';
+        }
+
+        if (!empty($request->variation_id)) {
+            $resource = Variation::where('id', $request->variation_id)->first();
+            $type = 'variation';
+        }
+
+        $discount = $this->getDiscount($resource, $type, $request->amount, 'yes');
+        // $suffix = (isset($discount['type']) && $discount['type'] == 'percentage') ? number_format($discount['rate']) . '% off' : 'Discounted to ' . getSettings()->currency . number_format($discount['rate'], 2);
+        $suffix = '';
+
+        if (!empty($request->raw) && $request->raw == 'yes') {
+            return [
+                'discount' => $discount['rate'],
+                'message' => '<span class="pay">You will pay </span><strong><span class="rate">' . getSettings()->currency . number_format($discount['discounted_price']) . '</span></strong><span class="suffix"></span>',
+            ];
+        } else {
+            return response()->json([
+                'discount' => $discount['rate'],
+                'message' => '<span class="pay">You will pay </span><strong><span class="rate">' . getSettings()->currency . number_format($discount['discounted_price']) . '</span></strong><span class="suffix"></span>',
+            ]);
+        }
+    }
+
+    public function getDiscount($resource, $type, $amount = null, $getRate = null)
+    {
+        $discount = 0;
+        $level = auth()->user()->customer->customer_level;
+        $amount = $amount;
+
+        if ($type == 'variation') {
+            $findDiscount = Discount::where(['customer_level' => $level, 'variation_id' => $resource->id])->where('price', '>', 0)->first();
+            if ($resource->fixed_price == 'Yes') {
+                $amount = $resource->system_price;
+            }
+        }
+
+        if ($type == 'product') {
+            $findDiscount = Discount::where(['customer_level' => $level, 'product_id' => $resource->id])->where('price', '>', 0)->first();
+        }
+
+        if (!empty($findDiscount) && $findDiscount->price > 0) {
+            $price = $findDiscount->price;
+            if ($resource->category->discount_type == 'flat') {
+                $discount = $price;
+                $discounted_price = $discount;
+            }
+
+            if ($resource->category->discount_type == 'percentage' && !empty($amount)) {
+                $discount = ($price / 100) * $amount;
+                $discounted_price = $amount - $discount;
+            }
+        }
+
+        $discounted_price = floor($discounted_price ?? $amount); // to floor down percentage based discounts
+        // $discounted_price = intval(floor($discounted_price ?? $amount)); // to floor down percentage based discounts
+
+        if ($resource->fixed_price == 'Yes') {
+            $discounted_price = $discounted_price <= $resource->system_price ? $discounted_price : $resource->system_price;
+        }
+        // dd($resource->category->discount_type, $amount, $discount, $discounted_price);
+        $discounted_price = $discounted_price <= 0 ? $resource->system_price : $discounted_price;
+
+        if (!empty($getRate)) {
+
+            $response = [
+                'amount' => $amount ?? 0,
+                'discount' => $discount ?? 0,
+                'discounted_price' => $discounted_price ?? 0,
+                'rate' => $price ?? 0,
+                'type' => $resource->category->discount_type ?? '',
+                'discount_applied' => !empty($discounted_price) ? $amount - $discounted_price : 0,
+
+            ];
+
+            return $response;
+        } else {
+            return $discount;
+        }
+    }
+
+    public function validateMeter()
+    {
+    }
+
+    public function logTransaction($data)
+    {
+        $pre = [
+            'status' => $data['status'] ?? 'initiated',
+            'reference_id' => $data['request_id'],
+            'transaction_id' => $data['transaction_id'],
+            'payment_method' => $data['payment_method'],
+            'customer_id' => $data['customer_id'],
+            'customer_email' => $data['customer_email'],
+            'customer_phone' => $data['customer_phone'],
+            'customer_name' => $data['customer_name'],
+            'discount' => $data['discount'] ?? null,
+            'unit_price' => $data['amount'],
+            'quantity' => $data['quantity'] ?? 1,
+            'total_amount' => $data['total_amount'],
+            'amount' => $data['amount'],
+            'balance_before' => $data['balance_before'],
+            'balance_after' => $data['balance_after'] ?? ($data['balance_before'] - $data['total_amount']),
+            'descr' => $data['descr'] ?? null,
+            'product_id' => $data['product_id'] ?? null,
+            'product_name' => $data['product_name'] ?? null,
+            'variation_id' => $data['variation_id'] ?? null,
+            'variation_name' => $data['variation_name'] ?? null,
+            'category_id' => $data['category_id'] ?? null,
+            'unique_element' => $data['unique_element'],
+            'ip_address' => $data['ip_address'] ?? null,
+            'domain_name' => $data['domain_name'] ?? null,
+            'app_version' => Session::get('app_version') ?? null,
+            'api_id' => $data['api_id'] ?? null,
+            'reason' => $data['reason'] ?? null,
+            'wallet_funding_provider' => $data['wallet_funding_provider'] ?? null,
+            'provider_charge' => $data['provider_charge'] ?? null,
+            'account_number' => $data['account_number'] ?? null,
+            'ip_address' => Session::get('ip_address') ?? null,
+            'domain_name' => Session::get('domain_name') ?? null,
+        ];
+
+        $trans = TransactionLog::create($pre);
+        return $trans;
+    }
+
+    public function removeCharsInAmount($code)
+    {
+        $chars = str_split($code);
+        $str2 = "";
+        foreach ($chars as $char) {
+            if ($char != '#') {
+                $str2 .= $char;
+            }
+        }
+        $code = trim(preg_replace('/[^0-9\.]+/i', '', $str2));
+        return $code;
+    }
+
+    public function customerTransactionHistory(Request $request)
+    {
+        $transactions = TransactionLog::with(['product', 'variation', 'wallet'])->where('customer_id', auth()->user()->customer->id)->where('status', '!=', 'initiated');
+
+        if (!empty($request->service)) {
+            $transactions = $transactions->where('product_id', $request->service);
+        }
+
+        if (!empty($request->reason)) {
+            $transactions = $transactions->where('reason', $request->reason);
+        }
+
+        if (!empty($request->transaction_id)) {
+            $transactions = $transactions->where('transaction_id', $request->transaction_id);
+        }
+
+        if (!empty($request->status)) {
+            $transactions = $transactions->where('status', $request->status);
+        }
+
+        if (!empty($request->unique_element)) {
+            $transactions = $transactions->where('unique_element', 'LIKE', "%" . $request->unique_element . "%");
+        }
+
+        if (!empty($request->from) && !empty($request->to)) {
+            $from = $request->from . " 00:00:00";
+            $to = $request->to . " 23:59:59";
+            $transactions = $transactions->whereBetween('created_at', [$from, $to]);
+        }
+
+        $transactions = $transactions->orderBy('created_at', 'DESC')->paginate(20);
+
+        $products = Product::where('status', 'active')->where('type', 'general')->get();
+        return view('customer.mytransactions', compact('transactions', 'products'));
+    }
+
+    public function customerAirtime2CashTransactionHistory(Request $request)
+    {
+        $transactions = Airtime2CashTransactions::with(['product', 'customer'])->where('customer_id', auth()->user()->customer->id);
+
+        if (!empty($request->product_id)) {
+            $transactions = $transactions->where('product_id', $request->product_id);
+        }
+
+        if (!empty($request->transaction_id)) {
+            $transactions = $transactions->where('transaction_id', $request->transaction_id);
+        }
+
+        if (!empty($request->status)) {
+            $transactions = $transactions->where('status', $request->status);
+        }
+
+        if (!empty($request->from) && !empty($request->to)) {
+            $from = $request->from . " 00:00:00";
+            $to = $request->to . " 23:59:59";
+            $transactions = $transactions->whereBetween('created_at', [$from, $to]);
+        }
+
+        $transactions = $transactions->orderBy('created_at', 'DESC')->paginate(20);
+
+        $products = Product::where('type', 'airtime2cash')->where('status', 'active')->orderBy('created_at', 'DESC')->get();
+
+        return view('customer.airtime_to_cash_transactions', compact('transactions', 'products'));
+    }
+
+
+
+    public function showTransactionReportPage(Request $request, ExcelService $export)
+    {
+        if (!empty($request->type)) {
+            if ($request->type == 'transaction') {
+                $data = TransactionLog::with(['product', 'variation', 'wallet'])->where('customer_id', auth()->user()->customer->id)->where('status', '!=', 'initiated');
+
+                if (!empty($request->category)) {
+                    $data = $data->where('category_id', $request->category);
+                }
+
+                if (!empty($request->unique_element)) {
+                    $transactions = $data->where('unique_element', 'LIKE', "%" . $request->unique_element . "%");
+                }
+
+                if (!empty($request->status)) {
+                    if ($request->status == 'delivered') {
+                        $data = $data->whereIn('status', ['success', 'delivered']);
+                    } else {
+                        $data = $data->where('status', 'failed');
+                    }
+                }
+            }
+
+            if ($request->type == 'wallet') {
+                $data = Wallet::where('customer_id', auth()->user()->customer->id);
+            }
+
+            if ($request->type == 'earning') {
+                $data = ReferralEarning::where('customer_id', auth()->user()->customer->id);
+            }
+
+            if (!empty($request->from) && !empty($request->to)) {
+                $from = $request->from . " 00:00:00";
+                $to = $request->to . " 23:59:59";
+                $data = $data->whereBetween('created_at', [$from, $to]);
+            }
+
+            $data = $data->orderBy('created_at', 'DESC')->get()->toArray();
+            $format = [];
+            foreach ($data as $data) {
+                if ($request->type == 'earnings') {
+                    $details = Customer::with('user')->where('id', $data['customer_id'])->first();
+                    $data['customer_username'] = $details->username;
+                }
+
+                if (isset($data['reason'])) {
+                    $row['Reason'] = $data['reason'];
+                }
+
+                if (isset($data['extras'])) {
+                    $row['Extras'] = $data['extras'];
+                }
+
+                if (isset($data['product_name'])) {
+                    $row['Product Name'] = $data['product_name'];
+                }
+                if (isset($data['variation_name'])) {
+                    $row['Variation Name'] = $data['variation_name'];
+                }
+
+                if (isset($data['unique_element'])) {
+                    $row['Unique Element'] = $data['unique_element'];
+                }
+
+                if (isset($data['descr'])) {
+                    $row['Description'] = $data['descr'];
+                }
+
+                if (isset($data['payment_method'])) {
+                    $row['Payment Method'] = $data['payment_method'];
+                }
+
+                if (isset($data['customer_email'])) {
+                    $row['Customer Email'] = $data['customer_email'];
+                }
+
+                if (isset($data['customer_username'])) {
+                    $row['Customer Username'] = $data['customer_username'];
+                }
+
+                if (isset($data['customer_phone'])) {
+                    $row['Customer Phone'] = $data['customer_phone'];
+                }
+
+                $row['Type'] = $data['type'];
+                $row['Transaction ID'] = $data['transaction_id'];
+                $row['Amount'] = $data['amount'];
+
+                if (isset($data['unit_price'])) {
+                    $row['Unit Price'] = $data['unit_price'];
+                }
+
+                if (isset($data['provider_charge'])) {
+                    $row['Convenience Fee'] = $data['provider_charge'];
+                }
+
+                if (isset($data['discount'])) {
+                    $row['Discount'] = $data['discount'];
+                }
+
+                if (isset($data['total_amount'])) {
+                    $row['Total Amount'] = $data['total_amount'];
+                }
+
+                if (isset($data['balance_before'])) {
+                    $row['Initial Balance'] = $data['balance_before'];
+                }
+
+                if (isset($data['balance_after'])) {
+                    $row['Final Balance'] = $data['balance_after'];
+                }
+
+                $row['Date'] = $data['created_at'];
+
+                $format[] = $row;
+            }
+
+            $fileName = $request->type . '_report-' . rand(919, 9999) . '-' . date('Y-m-d H:i:s', time());
+            return $export->fastExcelExport($format, $fileName);
+        }
+
+
+        $products = Product::where('status', 'active')->where('type', 'geneeral')->get();
+        $categories = Category::where('status', 'active')->get();
+        return view('customer.reports', compact('products', 'categories'));
+    }
+
+    function referralReward($ref, $amount, $customer_id, $transaction_id, $referral_percentage)
+    {
+        if ($ref) {
+            if (!empty($referral_percentage)) {
+                $sett = getSettings();
+                $percentage = $referral_percentage;
+                $user = User::where('username', $ref)->first();
+                $curUser = auth()->user();
+
+                if ($user) {
+                    if ($sett->referral_system_status == 'active') {
+                        $cut = $percentage;
+                        $cal = ($cut / 100) * $amount;
+
+                        $customer = $user->customer;
+                        $current = $customer->referal_wallet;
+
+                        $sum = $current + $cal;
+                        $this->logEarnings('credit', $customer->id, $customer_id, $cal, $current, $sum, $transaction_id);
+                        $customer->referal_wallet = $sum;
+                        $customer->save();
+                        $host = env('APP_URL');
+                        $rewardMail = <<<__here
+                            Dear $user->firstname $user->lastname,
+    
+                            Congratulations! We are excited to inform you that you have earned a commission from a transaction made by your referred friend. Your support and engagement in our referral program are truly appreciated.
+    
+                            Here are the details of the transaction:
+    
+                            Referred Friend's Name: $curUser->firstname
+    
+                            Commission Earned: $cal
+    
+                            Total Commission Earned: $cal
+    
+                            Transaction Details: <a href="$host/downlines/$curUser->id">click here</a>
+    
+                            Your dedication to spreading the word about our services is making a real impact, and we are grateful for your continued support. As a token of our appreciation, we have credited your wallet with the earned commission.
+    
+                            Thank you once again for being a valued member of our community. We look forward to your continued success in our referral program!
+                            __here;
+
+                        logEmails($user->email, 'Referral Commission', $rewardMail);
+                    }
+                }
+            }
+        }
+    }
+
+    public function logEarnings($type, $customer, $referred, $amount, $before, $after, $transaction_id)
+    {
+        $ref = ReferralEarning::create([
+            'type' => $type,
+            'customer_id' => $customer,
+            'referred_customer_id' => $referred,
+            'amount' => $amount,
+            'balance_before' => $before,
+            'balance_after' => $after,
+            'transaction_id' => $transaction_id,
+        ]);
+
+        return $ref;
+    }
+
+    public function bounceBlacklist($phone, $user, $mail = null)
+    {
+        $blacklist = BlackList::where('status', 'active')->whereRaw(" (value = ? or value = ? or value = ?)", [$mail, $phone, $user])->first();
+
+        if ($blacklist)
+            return true;
+        return false;
+    }
+
+    public function transView(Request $request)
+    {
+        $transactions = TransactionLog::whereNotNull('product_id')->latest();
+        $transactionsS = clone $transactions;
+        $transactionsA = clone $transactions;
+        $transactionsF = clone $transactions;
+        $totalTransSuccess = $transactionsS->whereIn('status', ['delivered', 'success'])->sum('amount');
+        $totalTransFailed = $transactionsF->where('status', 'failed')->sum('amount');
+        $totalTransAttention = $transactionsA->where('status', 'attention-required')->sum('amount');
+        $products = Product::all();
+
+        if ($request->email) {
+            $transactions = $transactions->where('customer_email', $request->email);
+        }
+
+        if ($request->phone) {
+            $transactions = $transactions->where('customer_phone', $request->phone);
+        }
+
+        if ($request->service) {
+            $transactions = $transactions->where('product_id', $request->service);
+        }
+        if ($request->transaction_id) {
+            $transactions = $transactions->where('transaction_id', $request->transaction_id);
+        }
+        if ($request->unique_element) {
+            $transactions = $transactions->where('unique_element', $request->unique_element);
+        }
+        if ($request->status) {
+            $transactions = $transactions->where('status', $request->status);
+        }
+        if ($request->from) {
+            $time = $request->from . ' 00:00:00';
+            $transactions = $transactions->where('created_at', '>', $time);
+        }
+        if ($request->to) {
+            $time = $request->to . ' 00:00:00';
+            $transactions = $transactions->where('created_at', $time);
+        }
+
+        $transactions = $transactions->paginate(20);
+
+        return view('admin.transaction.index', [
+            'transactions' => $transactions,
+            'products' => $products,
+            'success' => $totalTransSuccess,
+            'failed' => $totalTransFailed,
+            'attention_required' => $totalTransAttention,
+            'query' => $request->query(),
+        ]);
+    }
+
+    public function walletTransView(Request $request)
+    {
+        $transactions = Wallet::latest();
+        $transactionsD = clone $transactions;
+        $transactionsC = clone $transactions;
+
+        $debit = $transactionsD->where('type', 'debit')->sum('amount');
+        $credit = $transactionsC->where('type', 'credit')->sum('amount');
+
+        if ($request->email) {
+            $user = User::where('email', $request->email)->first();
+            if (!empty($user)) {
+                $customer = $user->customer;
+                $id = $customer->id;
+                $transactions = $transactions->where('customer_id', $id);
+            }
+        }
+
+        if ($request->transaction_id) {
+            $transactions = $transactions->where('transaction_id', $request->transaction_id);
+        }
+
+        if ($request->type) {
+            $transactions = $transactions->where('type', $request->type);
+        }
+
+        if ($request->from) {
+            $time = $request->from . ' 00:00:00';
+            $transactions = $transactions->where('created_at', '>', $time);
+        }
+        if ($request->to) {
+            $time = $request->to . ' 00:00:00';
+            $transactions = $transactions->where('created_at', $time);
+        }
+        $transactions = $transactions->paginate(20);
+
+        return view('admin.transaction.wallet_log', [
+            'transactions' => $transactions,
+            'debit' => $debit,
+            'credit' => $credit,
+            'query' => $request->query(),
+        ]);
+    }
+
+    public function walletFundingLogView(Request $request)
+    {
+        $transactions = TransactionLog::whereNotNull('wallet_funding_provider')->where('unique_element', 'WALLET-FUNDING')->latest();
+        $transactionsS = clone $transactions;
+        $transactionsA = clone $transactions;
+        $transactionsF = clone $transactions;
+        $totalTransSuccess = $transactionsS->whereIn('status', ['delivered', 'success'])->sum('amount');
+        $totalTransFailed = $transactionsF->where('status', 'failed')->sum('amount');
+        $totalTransAttention = $transactionsA->where('status', 'attention-required')->sum('amount');
+        $providers = PaymentGateway::latest();
+
+        if ($request->email) {
+            $user = User::where('email', $request->email)->first();
+            if (!empty($user)) {
+                $customer = $user->customer;
+                $id = $customer->id;
+                $transactions = $transactions->where('customer_id', $id);
+            }
+        }
+
+        if ($request->transaction_id) {
+            $transactions = $transactions->where('transaction_id', $request->transaction_id);
+        }
+
+        if (!empty($transactions) && $request->type) {
+            $transactions = $transactions->where('type', $request->type);
+        }
+
+        if ($request->from) {
+            $time = $request->from . ' 00:00:00';
+            $transactions = $transactions->where('created_at', '>', $time);
+        }
+        if ($request->to) {
+            $time = $request->to . ' 00:00:00';
+            $transactions = $transactions->where('created_at', $time);
+        }
+
+        $transactions = $transactions->paginate(20);
+
+        return view('admin.transaction.wallet_funding', [
+            'providers' => $providers,
+            'transactions' => $transactions,
+            'success' => $totalTransSuccess,
+            'failed' => $totalTransFailed,
+            'attention_required' => $totalTransAttention,
+            'query' => $request->query(),
+        ]);
+    }
+
+    public function airtimeToCashTransactions(Request $request)
+    {
+        $transactions = Airtime2CashTransactions::with(['product', 'customer'])->where('type','credit')->latest();
+        $transactionsS = clone $transactions;
+        $transactionsProfit = clone $transactions;
+        $transactionsFailed = clone $transactions;
+        $transactionsPending = clone $transactions;
+        $totalTransSuccess = $transactionsS->whereIn('status', ['approved'])->sum('amount_paid');
+        $totalTransFailed = $transactionsFailed->where('status', 'declined')->count();
+        $totalProfit = $transactionsProfit->where('status', 'approved')->sum('amount_charged');
+        $totalPending = $transactionsPending->where('status', 'pending')->count();
+
+        if ($request->email) {
+            $user = User::where('email', $request->email)->first();
+            if (!empty($user)) {
+                $customer = $user->customer;
+                $id = $customer->id;
+                $transactions = $transactions->where('customer_id', $id);
+            }
+        }
+
+        if ($request->transaction_id) {
+            $transactions = $transactions->where('transaction_id', $request->transaction_id);
+        }
+
+        if ($request->status) {
+            $transactions = $transactions->where('status', $request->status);
+        }
+
+        if ($request->type) {
+            $transactions = $transactions->where('type', $request->type);
+        }
+
+        if ($request->from) {
+            $time = $request->from . ' 00:00:00';
+            $transactions = $transactions->where('created_at', '>', $time);
+        }
+        if ($request->to) {
+            $time = $request->to . ' 00:00:00';
+            $transactions = $transactions->where('created_at', $time);
+        }
+
+        $transactions = $transactions->paginate(20);
+
+        return view('admin.transaction.airtime2cash_transactions', [
+            'transactions' => $transactions,
+            'success' => $totalTransSuccess,
+            'failed' => $totalTransFailed,
+            'total_profit' => $totalProfit,
+            'totalPending' => $totalPending,
+            'query' => $request->query(),
+        ]);
+    }
+
+    public function walletEarningView(Request $request)
+    {
+        $transactions = ReferralEarning::latest();
+
+        $transactionsS = clone $transactions;
+        $transactionsF = clone $transactions;
+        $totalTransSuccess = $transactionsS->where('type', 'credit')->sum('amount');
+        $totalTransFailed = $transactionsF->where('type', 'debit')->sum('amount');
+
+
+        if ($request->upline_email) {
+            $user = User::where('email', $request->upline_email)->first();
+            if (!empty($user)) {
+                $customer = $user->customer;
+                $id = $customer->id;
+                $transactions = $transactions->where('customer_id', $id);
+            }
+        }
+
+        if ($request->downline_email) {
+            $user = User::where('email', $request->downline_email)->first();
+            if (!empty($user)) {
+                $customer = $user->customer;
+                $id = $customer->id;
+                $transactions = $transactions->where('referred_customer_id', $id);
+            }
+        }
+
+        if ($request->transaction_id) {
+            $transactions = $transactions->where('transaction_id', $request->transaction_id);
+        }
+
+        if ($request->type) {
+            $transactions = $transactions->where('type', $request->type);
+        }
+
+        if ($request->from) {
+            $time = $request->from . ' 00:00:00';
+            $transactions = $transactions->where('created_at', '>', $time);
+        }
+        if ($request->to) {
+            $time = $request->to . ' 00:00:00';
+            $transactions = $transactions->where('created_at', $time);
+        }
+
+        $transactions = $transactions->paginate(20);
+
+        return view('admin.transaction.earning_log', [
+            'transactions' => $transactions,
+            'success' => $totalTransSuccess,
+            'failed' => $totalTransFailed,
+            'query' => $request->query(),
+        ]);
+    }
+
+    public function singleTransactionView(TransactionLog $transaction)
+    {
+        return view('admin.transaction.single_transaction', compact('transaction'));
+    }
+
+    public function singleAirtimeTransactionView(Airtime2CashTransactions $transaction)
+    {
+        $banks = Bank::all();
+        return view('admin.transaction.single_airtime2cash_transaction', compact('transaction', 'banks'));
+    }
+
+    function debitCustomerPage()
+    {
+        return view('admin.transaction.debit_customer');
+    }
+
+    function creditCustomerPage()
+    {
+        return view('admin.transaction.credit_customer');
+    }
+
+    function processCreditDebit(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email',
+            'amount' => 'required|numeric',
+            'reason' => 'required'
+        ]);
+
+        $user = User::where('email', $request->email)->first();
+
+        if (!$user)
+            return back()->with('error', 'Account not found!');
+        if (str_contains(url()->previous(), 'debit'))
+            $type = 'debit';
+        else if (str_contains(url()->previous(), 'credit'))
+            $type = 'credit';
+
+        if (!$type)
+            return back()->with('error', 'Hmph, something went wrong!');
+
+        $controller = new TransactionController();
+        $amount = $controller->removeCharsInAmount($request->amount);
+        $currAmount = walletBalance($user);
+
+        if ($type == 'credit') {
+            $data['balance_after'] = $currAmount + $amount;
+        } else {
+            $data['balance_after'] = $currAmount - $amount;
+        }
+
+        $requestId = $controller->generateRequestId();
+        $tid = 'A2C-' . $requestId;
+        $reason = $type == 'debit' ? 'ADMIN-DEBIT' : 'ADMIN-CREDIT';
+        try {
+            //code...
+            $data['type'] = $type;
+            $data['customer_id'] = $user->customer->id;
+            $data['transaction_id'] = $tid;
+            $data['request_id'] = $requestId;
+            $data['payment_method'] = 'wallet';
+            $data['balance_before'] = $currAmount;
+            $data['amount'] = $amount;
+            $data['total_amount'] = $amount;
+            $data['customer_email'] = $user->email;
+            $data['customer_phone'] = $user->phone;
+            $data['customer_name'] = $user->firstname;
+            $data['unique_element'] = 'wallet';
+            $data['discount'] = 0;
+            $data['unit_price'] = $amount;
+            $data['descr'] = $request->reason;
+            $data['reason'] = $reason;
+            $data['status'] = 'delivered';
+            $data['admin_id'] = auth()->user()->admin->id;
+
+            $controller->logTransaction($data);
+
+            DB::transaction(function () use ($type, $amount, $tid, $user, $reason) {
+                $wallet = new WalletController();
+                $wallet->logWallet([
+                    'customer_id' => $user->customer->id,
+                    'type' => $type,
+                    'total_amount' => $amount,
+                    'reason' => $reason,
+                    'transaction_id' => $tid,
+                    'payment_method' => 'ADMIN-FUNDING',
+                ]);
+                $wallet->updateCustomerWallet($user, $amount, $type);
+            });
+            $sign = getSettings()->currency;
+            return back()->with('message', "Customer wallet has been {$type}ed with {$sign}" . number_format($amount));
+        } catch (\Exception $e) {
+
+            return back()->with('error', 'An error occured' . $e->getMessage() . $e->getLine() . $e->getFile());
+        }
+    }
+
+    public function queryWallet(Request $request, TransactionLog $transactionlog)
+    {
+        $type = $request->type;
+        $check = Wallet::where('transaction_id', $transactionlog->transaction_id)
+            ->where('type', $type)
+            ->get();
+
+        $type = strtoupper($request->type);
+        $message = '';
+
+        if ($check->count() > 0) {
+            $status = 'success';
+            $message .= '<h4 align="center" style="color:green"><b>QUERY SUCCESSFUL</b><br><span class="fa fa-check-circle text-success mr-1" style="font-size:19px">' . $check->count() . '</span></h4><hr style="margin:6px 0px 6px 0px"><table><tbody>';
+
+            foreach ($check as $wallet) {
+                $message .= '<tr><th>TransID:</th>
+                <td>&nbsp;' . $wallet->transaction_id . '</td>
+                </tr>
+                <tr><th>Amt:</th>
+                <td>&nbsp;' . getSettings()->currency . number_format($wallet->amount, 2) . '</td>
+                </tr>
+                <tr><th>Date:</th>
+                <td>&nbsp;' . $wallet->created_at . '</td>
+                <tr><th>Reason:</th>
+                <td>&nbsp;' . $wallet->reason . '</td>
+                </tr>';
+            }
+
+            $message .= '</tbody></table><br><center><button class="btn btn-success btn-sm">' . $type . ' DONE</button></center></div>';
+        } else {
+            $status = 'failed';
+            $message .= '<h4 align="center" style="color:red"><b>QUERY FAILED</b></h4><hr style="margin:6px 0px 6px 0px"><center><button class="btn btn-danger btn-sm">' . $type . ' NOT DONE</button></center>';
+        }
+
+        $ret = [
+            'status' => $status,
+            'message' => $message
+        ];
+
+        return response()->json($ret);
+    }
+
+    public function requery($transactionlog = null)
+    {
+        if (!$transactionlog) return ['status' => 'failed'];
+
+        $trans = TransactionLog::find($transactionlog);
+        if (!$trans) return ['status' => 'failed', 'message' => 'Transaction not found!'];
+
+        if ($trans->product->type == 'wallet2bank') {
+            $query = app("App\Http\Controllers\Providers\SageController")->requery($trans);
+        } else {
+            if ($trans->reason == 'WALLET-FUNDING') {
+                if ($trans->wallet_funding_provider == 1) {
+                    $monnify = new MonnifyController($trans->provider);
+                    return $monnify->verifyTransaction($trans->transaction_reference);
+                }
+
+                if ($trans->wallet_funding_provider == 2) {
+                    $squad = new SquadController($trans->provider);
+                    return $squad->verifyTransaction($trans->transaction_reference);
+                }
+            }else{
+                $query = app("App\Http\Controllers\Providers\KingsVtuController")->requery($trans);
+            }
+        }
+
+        return $query;
+    }
+
+    
+    public function requeryCallback($reference)
+    {
+        $transaction = ReservedAccountCallback::where('transaction_reference', $reference)->first();
+        
+        if ($transaction->provider_id == 1) {
+            $monnify = new MonnifyController($transaction->gateway);
+            return $monnify->verifyTransaction($reference);
+        }
+
+        if ($transaction->wallet_funding_provider == 2) {
+            $squad = new SquadController($transaction->gateway);
+            return $squad->verifyTransaction($reference);
+        }
+
+    }
+
+    public function changeTransactionMethod(Request $request, Airtime2CashTransactions $transaction)
+    {
+
+        $transaction->update([
+            'payment_method' => $request->payment_method,
+            'bank_code' => $request->bank ?? $transaction->bank_code,
+            'account_number' => $request->account_number ?? $transaction->account_number,
+            'account_name' => $request->account_name ?? $transaction->account_name,
+        ]);
+
+        return back()->with('Operation successful');
+    }
+
+    public function approveAirtime2CashTransactions(Request $request, Airtime2CashTransactions $transaction)
+    {
+        //Update wallet balance if payment method is Transfer to Wallet
+        if ($transaction->payment_method == 'Transfer to Wallet') {
+            // Get Wallet Balance
+            $wallet = new WalletController();
+            $balance = $wallet->getWalletBalance(auth()->user());
+
+            // Log Wallet
+            $request['type'] = 'credit';
+            $request['customer_id'] = $transaction->customer_id;
+            $request['transaction_id'] = $transaction->transaction_id;
+            $request['request_id'] = $transaction->transaction_id;
+            $request['payment_method'] = 'wallet';
+            $request['ip_address'] = $this->getIpAddress();
+            $request['domain_name'] = $this->getDomainName();
+            $request['customer_email'] = $transaction->customer->user->email;
+            $request['customer_phone'] = $transaction->customer->user->phone;
+            $request['customer_name'] = $transaction->customer->user->firstname;
+            $request['product_id'] = $transaction->product_id;
+            $request['product_name'] = $transaction->product->name;
+            $request['unique_element'] = 'Airtime2Cash Payment';
+            $request['category_id'] = $transaction->product->category->id;
+            $request['discount'] = 0;
+            $request['reason'] = 'Airtime2Cash Payment';
+            $request['status'] = 'delivered';
+            $request['unit_price'] = $transaction->amount_paid;
+            $request['quantity'] = 1;
+            $request['total_amount'] = $transaction->amount_paid;
+            $request['amount'] = $transaction->amount_paid;
+            $request['balance_before'] = $balance;
+            $request['balance_after'] = $balance + $transaction->amount_paid;
+            $request['descr'] = $transaction->description;
+
+            // Log basic transaction
+            $transactionlog = $this->logTransaction($request->all());
+            // Log wallet
+            $wal = $wallet->logWallet($request->all());
+
+            // Update Customer Wallet
+            $wallet->updateCustomerWallet($transaction->customer->user, $request['total_amount'], $request['type']);
+
+            $status = 'success';
+            $error = '';
+        } else {
+            // Perform Transfer to bank actions
+            $status = 'success';
+        }
+
+        try {
+            if ($status == 'success') {
+                $transaction->update([
+                    'status' => 'approved',
+                    'description' => 'Airtime2Cash Request was approved and completed by ADMIN',
+                    'approved_by' => auth()->user()->admin->id,
+                ]);
+
+                $subject = "Airtime2Cash Transaction Update";
+                $body = '<p>Hello! ' . $transaction->customer->user->name . ',</p>';
+                $body .= '<p style="line-height: 2.0;">Your Transaction with transaction ID : <strong>' . $transaction->transaction_id . '</strong> has been updated to: ' . ucfirst($transaction->status) . '<br><strong>Date Updated:</strong> ' . date("M jS, Y g:iA", strtotime($transaction->updated_at)) . '<br><br>
+                Warm Regards. (' . config('app.name') . ')<br/>
+                </p>';
+                $email = $transaction->customer->user->email;
+
+                logEmails($email, $subject, $body);
+                return back()->with('message', 'Operation successful');
+            } else {
+                return back()->with('error', 'An error occured when performing action: ' . $error);
+            }
+        } catch (\Throwable $th) {
+            return back()->with('error', 'An error occured when performing action: ' . $th->getMessage());
+        }
+    }
+
+    public function transferToBankAccount($bank_code, $account_number, $account_name, $amount, $transaction = null)
+    {
+        $status = 'failed';
+        $error = 'failed';
+        
+        $request_data = [
+            $token ?? '',
+            $bank_code,
+            $account_number,
+            $account_name,
+            $amount,
+            $transaction->transaction_id
+        ];
+
+        $login = app('App\Http\Controllers\Providers\SageController')->login();
+        
+        if (!empty($login) && $login['success'] == true) {
+            $token = $login['data']['token']['access_token'] ?? null;
+            $api_response = $login;
+        } else {
+            $error = 'Could not complete bank transfer at the moment, please try again later';
+            $api_response = $login ?? 'NO RESPONSE WHEN LOGGING IN';
+            $status = 'failed';
+        }
+
+        if (!empty($token)) {
+            // Get balance
+            $balance = app('App\Http\Controllers\Providers\SageController')->walletBalance($token);
+            $real_balance = 0;
+           
+            if (!empty($balance) && $balance['success'] == true && $balance['status'] == 'success') {
+                $status = $balance['status'];
+                $error = '';
+                $real_balance = $balance['general_wallet']['balance'] ?? null;
+                $api_response = $balance ?? 'NO RESPONSE';
+            } else {
+                $error = 'Could not fetch balance response from transfer provider';
+                $api_response = $balance ?? 'NO RESPONSE WHEN CHECKING BALANCE';
+                $status = 'failed';
+            }
+
+            // End get balance
+            if ($real_balance < $amount) {
+                $error = 'Not Enough balance to carry out transaction. ';
+                $status = 'failed';
+            } else {
+                $request_data = [
+                    "token" => $token,
+                    "bank_code" => $bank_code,
+                    "account_number" => $account_number,
+                    "reference" => $transaction->transaction_id,
+                    "account_name" => $account_name,
+                    "amount" => $amount - env('BANK_TRANSFER_CHARGES'),
+                    "narration" => 'Transfer from ' . config('app.name'),
+                ];
+                
+                $verify = app('App\Http\Controllers\Providers\SageController')->transfer($token,$bank_code, $account_number, $account_name, $amount, $transaction->transaction_id);
+                
+                $transaction->update([
+                    'bank_transfer_api_response' => array_merge(['Action: ' => 'TRANSFER'], $verify ?? ['Response:' => 'NO RESPONSE']),
+                    'request_data' => json_encode($request_data),
+                    'api_response' =>array_merge(['Action: ' => 'TRANSFER'], $verify ?? ['Response:' => 'NO RESPONSE']),
+                ]);
+                
+                if (!empty($verify) && $verify['success'] == true && $verify['status'] == 'success') {
+                    $status = $verify['status'];
+                    $error = '';
+                    $api_response = $verify ?? 'NO RESPONSE';
+                } else {
+                    $status = 'failed';
+                    $error = 'Transfer Error ';
+                    $api_response = $verify ?? 'NO RESPONSE';
+                }
+                
+                return [
+                    'error' => $error,
+                    'status' => $status,
+                    'request_data' => $request_data ?? '',
+                    'api_response' => $api_response ?? ''
+                ];
+            }
+        } else {
+            $error = 'Could not complete bank transfer at the moment, please try again later';
+            $status = 'failed';
+            $api_response = $login ?? 'PROVIDER TOKEN COULD NOT BE GENERATED';
+
+            if (!empty($transaction)) {
+                $transaction->update([
+                    'bank_transfer_api_response' => $error . ' | API_RESPONSE: ' . json_encode($api_response),
+                    'api_response' => $error . ' | API_RESPONSE: ' . json_encode($api_response),
+                    'descr' => $status == 'success' ? 'Wallet to bank transfer of ' . $amount . ' was successful' : 'We could not complete this transaction',
+                    'request_data' => json_encode($request_data)
+                ]);
+            }
+
+            return [
+                'error' => $error,
+                'status' => $status,
+                'api_response' => $api_response ?? '',
+                'request_data' => $request_data ?? '',
+            ];
+        }
+
+        
+    }
+    public function declineAirtime2CashTransactions(Request $request, Airtime2CashTransactions $transaction)
+    {
+        $transaction->update([
+            'status' => 'declined',
+            'description' => 'Airtime2Cash Request was declined by ADMIN',
+            'approved_by' => auth()->user()->admin->id,
+            'decline_reason' => $request->decline_reason,
+        ]);
+
+        $subject = "Airtime2Cash Transaction Update";
+        $body = '<p>Hello! ' . $transaction->customer->user->name . ',</p>';
+        $body .= '<p style="line-height: 2.0;">Your Transaction with transaction ID : <strong>' . $transaction->transaction_id . '</strong> has been updated to: ' . ucfirst($transaction->status) . '<br><strong>Date Updated:</strong> ' . date("M jS, Y g:iA", strtotime($transaction->updated_at)) . '<br>
+        Decline Reason: ' . $transaction->decline_reason . '<br><br>
+            Warm Regards. (' . config('app.name') . ')<br/>
+            </p>';
+        $email = $transaction->customer->user->email;
+
+        logEmails($email, $subject, $body);
+
+        return back()->with('message', 'Operation successful');
+    }
+
+    public function verifyBankDetails(Request $request)
+    {
+        $login = app('App\Http\Controllers\Providers\SageController')->login();
+        
+        if (!empty($login) && $login['success'] == true) {
+            $token = $login['data']['token']['access_token'] ?? null;
+        } else {
+            return response()->json([
+                'message' => 'Could not verify account details at the moment, please try again later',
+            ]);
+        }
+        
+        if (!empty($token)) {
+            $url2 =  env('SAGE_BASE_URL') . "transfer/verify-bank-account";
+            $payload = [
+                "bank_code" => $request->bank_code,
+                "account_number" => $request->account_number
+            ];
+            $headers = [
+                "Content-Type: application/json",
+                "Authorization: Bearer " . $token . "",
+            ];
+
+            $verify = $this->basicApiCall($url2, json_encode($payload), $headers);
+
+            return response()->json([
+                'message' => $verify,
+            ]);
+        } else {
+            return response()->json([
+                'message' => 'Could not verify account details at the moment, please try again later',
+            ]);
+        }
+    }
+}
