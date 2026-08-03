@@ -406,7 +406,6 @@ use App\Models\BlackList;
                                                                     <option value="International Passport" {{(kycStatus('IDCARDTYPE', $user->customer->id)['value'] ==  "International Passport" ? 'selected' : '') }}>International Passport</option>
                                                                     <option value="Driver's Licence" {{(kycStatus('IDCARDTYPE', $user->customer->id)['value'] ==  "Driver's Licence" ? 'selected' : '') }}>Driver's Licence</option>
                                                                     <option value="Voter's Card" {{(kycStatus('IDCARDTYPE', $user->customer->id)['value'] ==  "Voter's Card" ? 'selected' : '') }}>Voter's Card</option>
-                                                                    <option value="Work/School ID" {{(kycStatus('IDCARDTYPE', $user->customer->id)['value'] ==  "Work/School ID" ? 'selected' : '') }}>Work/School ID</option>
                                                                 </select>
                                                         </div>
                                                         @else 
@@ -424,7 +423,6 @@ use App\Models\BlackList;
                                                                     <option value="International Passport" {{(kycStatus('IDCARDTYPE', $user->customer->id)['value'] ==  "International Passport" ? 'selected' : '') }}>International Passport</option>
                                                                     <option value="Driver's Licence" {{(kycStatus('IDCARDTYPE', $user->customer->id)['value'] ==  "Driver's Licence" ? 'selected' : '') }}>Driver's Licence</option>
                                                                     <option value="Voter's Card" {{(kycStatus('IDCARDTYPE', $user->customer->id)['value'] ==  "Voter's Card" ? 'selected' : '') }}>Voter's Card</option>
-                                                                    <option value="Work/School ID" {{(kycStatus('IDCARDTYPE', $user->customer->id)['value'] ==  "Work/School ID" ? 'selected' : '') }}>Work/School ID</option>
                                                                 </select>
                                                             </fieldset>
                                                         </div>
