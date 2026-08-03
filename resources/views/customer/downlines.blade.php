@@ -74,7 +74,7 @@
                                                 <tbody>
                                                     @foreach ($refs as $ref)
                                                         <tr>
-                                                            <td>{{ $ref->referredCustomer->user->username }}</td>
+                                                            <td>{{ $ref->referredCustomer?->user?->username }}</td>
                                                             @if (!$check)
                                                                 <td>{!! getSettings()->currency . number_format($ref->total_earnings()) !!}</td>
                                                                 @else

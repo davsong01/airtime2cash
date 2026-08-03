@@ -22,7 +22,14 @@
                         <input type="email" class="form-control" id="email" name="email" value="{{ old('email')}}" placeholder="Enter your email address"></div>
                     <div class="form-group">
                         <label class="text-bold-600" for="password">Password</label>
-                        <input type="password" class="form-control" id="password" name="password" placeholder="Enter Password">
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="password" name="password" placeholder="Enter Password">
+                            <div class="input-group-append">
+                                <button class="btn btn-outline-secondary" type="button" id="togglePassword" aria-label="Show password">
+                                    <i class="fa fa-eye" id="togglePasswordIcon"></i>
+                                </button>
+                            </div>
+                        </div>
                     </div>
                     <div class="form-group d-flex flex-md-row flex-column justify-content-between align-items-center">
                         <div class="text-left">
@@ -42,4 +49,25 @@
         </div>
     </div>
 </div>
+@endsection
+
+@section('page-script')
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const passwordInput = document.getElementById('password');
+        const toggleButton = document.getElementById('togglePassword');
+        const toggleIcon = document.getElementById('togglePasswordIcon');
+
+        if (!passwordInput || !toggleButton || !toggleIcon) {
+            return;
+        }
+
+        toggleButton.addEventListener('click', function () {
+            const isHidden = passwordInput.type === 'password';
+            passwordInput.type = isHidden ? 'text' : 'password';
+            toggleIcon.className = isHidden ? 'fa fa-eye-slash' : 'fa fa-eye';
+            toggleButton.setAttribute('aria-label', isHidden ? 'Hide password' : 'Show password');
+        });
+    });
+</script>
 @endsection
