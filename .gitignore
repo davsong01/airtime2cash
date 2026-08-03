@@ -24,6 +24,7 @@
 /public/build
 /public/fonts-manifest.dev.json
 /public/hot
+/node_modules
 /public/storage
 /storage/*.key
 /storage/pail
