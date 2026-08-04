@@ -6,7 +6,6 @@
 <script src="{{ asset('modern-assets/vendor/libs/pickr/pickr.js') }}"></script>
 <script src="{{ asset('modern-assets/vendor/libs/perfect-scrollbar/perfect-scrollbar.js') }}"></script>
 <script src="{{ asset('modern-assets/vendor/libs/hammer/hammer.js') }}"></script>
-<script src="{{ asset('modern-assets/vendor/libs/i18n/i18n.js') }}"></script>
 <script src="{{ asset('modern-assets/vendor/js/menu.js') }}"></script>
 
 <!-- Vendors JS -->
@@ -15,7 +14,7 @@
 <script>
   window.config = window.config || {};
   window.config.enableMenuLocalStorage = false;
-  window.assetsPath = document.documentElement.getAttribute('data-assets-path') || "{{ asset('modern-assets/') }}";
+  window.assetsPath = document.documentElement.getAttribute('data-assets-path') || "{{ rtrim(asset('modern-assets'), '/') }}/";
   window.templateName = document.documentElement.getAttribute('data-template') || "vertical-menu-template-bordered";
 
   document.addEventListener("DOMContentLoaded", function () {

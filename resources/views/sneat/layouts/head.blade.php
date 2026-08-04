@@ -13,7 +13,7 @@
   class="layout-navbar-fixed layout-menu-fixed layout-compact"
   dir="ltr"
   data-skin="bordered"
-  data-assets-path="{{ asset('modern-assets/') }}"
+  data-assets-path="{{ rtrim(asset('modern-assets'), '/') }}/"
   data-template="vertical-menu-template-bordered"
   data-bs-theme="light">
 <head>
@@ -45,5 +45,6 @@
   @yield('page-css')
 
   <script src="{{ asset('modern-assets/vendor/js/helpers.js') }}"></script>
+  <script src="{{ asset('modern-assets/js/config.js') }}"></script>
 </head>
 <body>

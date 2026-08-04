@@ -24,12 +24,12 @@
 
                 <section class="ops-hero mb-2">
                     <div class="row align-items-center">
-                        <div class="col-lg-7">
+                        <div class="col-lg-12">
                             <span class="ops-kicker"><i class="bx bx-pulse"></i> Live operations</span>
                             <h2>Operations control centre</h2>
                             <p>Monitor customer activity, wallet exposure, transaction flow, and provider health from one place.</p>
                         </div>
-                        <div class="col-lg-5 mt-2 mt-lg-0">
+                        {{-- <div class="col-lg-5 mt-2 mt-lg-0">
                             <div class="ops-earnings-card">
                                 <span><i class="bx bx-trending-up"></i> Recorded platform earnings</span>
                                 <strong>{{ $currency }}{{ number_format($recordedEarnings, 2) }}</strong>
@@ -39,7 +39,7 @@
                                 <span><i class="bx bxs-circle"></i> {{ number_format((int) $transactionSummary->today) }} transactions today</span>
                                 <strong>{{ number_format((int) $airtimeToCashSummary->pending_count) }} A2Cash pending</strong>
                             </div>
-                        </div>
+                        </div> --}}
                     </div>
                 </section>
 
