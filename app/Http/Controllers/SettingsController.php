@@ -81,6 +81,18 @@ class SettingsController extends Controller
     public function update(Request $request, Settings $settings)
     {
         $settings = Settings::first();
+        $colorFields = [
+            'menu_text_color',
+            'menu_background_color',
+            'active_color',
+            'block_header_color',
+            'dasboard_customer_details_color',
+        ];
+
+        $request->validate(collect($colorFields)
+            ->mapWithKeys(fn (string $field) => [$field => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/']])
+            ->all());
+
         // captcha settings
         $captcha_settings = [
             'captcha_settings_status' => $request->captcha_settings_status,
@@ -99,6 +111,10 @@ class SettingsController extends Controller
         $data['admin_layout'] = in_array($adminLayout, ['legacy'], true) ? $adminLayout : 'legacy';
         $data['customer_layout'] = in_array($customerLayout, ['legacy', 'modern'], true) ? $customerLayout : 'legacy';
         $data['google_dashboard_ad_enabled'] = $request->boolean('google_dashboard_ad_enabled');
+
+        foreach ($colorFields as $field) {
+            $data[$field] = strtoupper($request->string($field)->toString());
+        }
         
         $data['captcha_settings'] = $captcha_settings;
         
