@@ -41,6 +41,9 @@
 
     <!-- BEGIN: Custom CSS-->
     <link rel="stylesheet" type="text/css" href="{{asset('assets/css/style.css') }}">
+    @if(Auth::check() && auth()->user()->type === 'customer')
+        <link rel="stylesheet" type="text/css" href="{{ asset('css/customer-mobile-nav.css') }}">
+    @endif
     <!-- END: Custom CSS-->
     <style>
         .btn-group{

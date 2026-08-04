@@ -378,13 +378,6 @@ if (!function_exists("customerMenuData")) {
 
         $selfService = [
             [
-                'label' => 'Dashboard',
-                'href' => route('dashboard'),
-                'icon_key' => 'home-smile',
-                'modern_icon_key' => 'grid-alt',
-                'active_paths' => ['dashboard'],
-            ],
-            [
                 'label' => 'Announcements',
                 'href' => route('customer.announcements.index'),
                 'icon_key' => 'news',
@@ -462,6 +455,14 @@ if (!function_exists("customerMenuData")) {
         }
 
         $selfService[] = [
+            'label' => 'User Dashboard',
+            'href' => route('dashboard'),
+            'icon_key' => 'home-smile',
+            'modern_icon_key' => 'grid-alt',
+            'active_paths' => ['dashboard'],
+        ];
+
+        $selfService[] = [
             'label' => 'Logout',
             'href' => route('logout'),
             'icon_key' => 'log-out',
@@ -488,6 +489,42 @@ if (!function_exists("layoutIsModern")) {
     function layoutIsModern(string $scope = 'customer'): bool
     {
         return layoutMode($scope) === 'modern';
+    }
+}
+
+if (!function_exists('customerMobileNavItems')) {
+    function customerMobileNavItems(): array
+    {
+        return [
+            [
+                'label' => 'Home',
+                'href' => route('dashboard'),
+                'icon_key' => 'home-smile',
+                'active_paths' => ['dashboard'],
+            ],
+            [
+                'label' => 'Convert',
+                'href' => route('airtime-to-cash'),
+                'icon_key' => 'transfer-alt',
+                'active_paths' => ['airtime-to-cash', 'airtime2cash.transaction.status'],
+            ],
+            [
+                'label' => 'Fund Wallet',
+                'href' => route('customer.load.wallet'),
+                'icon_key' => 'wallet-alt',
+                'active_paths' => ['customer.load.wallet', 'process-customer-load-wallet'],
+            ],
+            [
+                'label' => 'History',
+                'href' => route('customer.transaction.history'),
+                'icon_key' => 'history',
+                'active_paths' => [
+                    'customer.transaction.history',
+                    'customer.airtime2cash.transaction.history',
+                    'transaction.status',
+                ],
+            ],
+        ];
     }
 }
 

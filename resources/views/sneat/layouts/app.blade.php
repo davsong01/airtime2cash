@@ -8,6 +8,8 @@
 
 @include('sneat.layouts.content')
 
+@include('shared.customer-mobile-footer')
+
 @include('sneat.layouts.footer')
 
 @include('sneat.layouts.shell-end')

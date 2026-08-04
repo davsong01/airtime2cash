@@ -331,6 +331,7 @@
     </div>
 
     @include('sneat.layouts.alerts')
+    @include('shared.kyc-rejection-alert')
 
     @if($settings->google_dashboard_ad_enabled ?? true)
         {!! $settings->google_dashboard_ad_code !!}

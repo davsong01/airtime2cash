@@ -430,6 +430,7 @@ class CustomerController extends Controller
     public function approveCustomerKyc(Customer $customer){
         $customer->update([
             "kyc_status" => 'verified',
+            'kyc_rejection_reason' => null,
         ]);
         
         KycData::where('customer_id', $customer->id)->update([
@@ -461,10 +462,17 @@ class CustomerController extends Controller
         
     }
 
-    public function declineCustomerKyc(Customer $customer)
+    public function declineCustomerKyc(Request $request, Customer $customer)
     {
+        $validated = $request->validateWithBag('kycRejection', [
+            'kyc_rejection_reason' => ['required', 'string', 'min:10', 'max:2000'],
+        ]);
+
+        $reason = trim($validated['kyc_rejection_reason']);
+
         $customer->update([
             "kyc_status" => 'unverified',
+            'kyc_rejection_reason' => $reason,
         ]);
 
         KycData::where('customer_id', $customer->id)->update([
@@ -473,11 +481,12 @@ class CustomerController extends Controller
 
         $subject = "KYC Info Update";
         $body = '<p>Hello! ' . $customer->user->firstname . '</p>';
-        $body .= '<p style="line-height: 2.0;">Your KYC Information was declined on ' . config('app.name') . '<br><br> Please revisit the page and enter your details again.<br/></p>';
+        $body .= '<p style="line-height: 2.0;">Your KYC Information was declined on ' . config('app.name') . '.<br><br>';
+        $body .= '<strong>Reason:</strong><br>' . nl2br(e($reason)) . '<br><br>Please revisit the KYC page, correct the information, and submit it again.<br/></p>';
 
         logEmails($customer->user->email, $subject, $body);
 
-        return back()->with('message', 'Operation successful');
+        return back()->with('message', 'KYC rejected and the customer has been notified of the reason.');
 
     }
 }

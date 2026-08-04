@@ -55,6 +55,7 @@
                                                     <div class="card-header" style="padding:1.4rem 0.7rem">
                                                         <h4 class="card-title">Update KYC data</h4>
                                                         @include('layouts.alerts')
+                                                        @include('shared.kyc-rejection-alert')
                                                     </div>
                                                 </div>
                                                 <div class="card-content">

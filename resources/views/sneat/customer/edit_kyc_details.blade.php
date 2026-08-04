@@ -30,6 +30,7 @@
     ])
 
     @include('sneat.layouts.alerts')
+    @include('shared.kyc-rejection-alert')
 
     <div class="row g-4">
         <div class="col-lg-4">

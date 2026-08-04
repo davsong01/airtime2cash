@@ -22,6 +22,7 @@
     <!-- END: Main Menu-->
 
     @yield('content')
+    @include('shared.customer-mobile-footer')
     <!-- demo chat-->
     @include('layouts.chat')
     @include('layouts.copyright')

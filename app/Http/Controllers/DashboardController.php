@@ -452,6 +452,7 @@ class DashboardController extends Controller
 
         $customer->update([
             "kyc_status" => 'awaiting-approval',
+            'kyc_rejection_reason' => null,
         ]);
         
         // Create reserved account

@@ -235,7 +235,7 @@ Route::middleware(['auth', 'verified', 'admin', 'ipcheck', 'adminRoute'])->prefi
     Route::post('password-reset/{user}', [CustomerController::class, 'resetPassword'])->name('admin.password.reset');
     Route::post('customer-update-kyc/{customer}', [CustomerController::class, 'processCustomerUpdateKycInfo'])->name('admin.customer.update.kyc');
     Route::get('customer-approve-kyc/{customer}', [CustomerController::class, 'approveCustomerKyc'])->name('admin.customer.approve.kyc');
-    Route::get('customer-decline-kyc/{customer}', [CustomerController::class, 'declineCustomerKyc'])->name('admin.customer.decline.kyc');
+    Route::post('customer-decline-kyc/{customer}', [CustomerController::class, 'declineCustomerKyc'])->name('admin.customer.decline.kyc');
     Route::get('/dashboard-widgets/{type}', [DashboardController::class, 'dashboardWidgets']);
 });
 

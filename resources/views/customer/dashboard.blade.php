@@ -93,6 +93,7 @@
                             @endif
                         <div class="col-md-12">
                             @include('layouts.alerts')
+                            @include('shared.kyc-rejection-alert')
                         </div>
                         @if(!empty($customer))
                         <div class="col-md-6 dashboard-greetings">
