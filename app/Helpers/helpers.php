@@ -11,6 +11,7 @@ use App\Models\Announcement;
 use App\Models\PaymentGateway;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\View;
 use App\Http\Controllers\WalletController;
 use App\Http\Controllers\PaymentProcessors\SquadController;
 use App\Http\Controllers\PaymentProcessors\MonnifyController;
@@ -183,6 +184,59 @@ if (!function_exists("getSettings")) {
     function getSettings()
     {
         return Settings::first();
+    }
+}
+
+if (!function_exists("layoutMode")) {
+    function layoutMode(string $scope = 'customer'): string
+    {
+        $settings = getSettings();
+
+        if (!$settings) {
+            return 'legacy';
+        }
+
+        if ($scope === 'admin') {
+            return $settings->admin_layout ?? 'legacy';
+        }
+
+        return $settings->customer_layout
+            ?? $settings->ui_layout_version
+            ?? 'legacy';
+    }
+}
+
+if (!function_exists("layoutIsModern")) {
+    function layoutIsModern(string $scope = 'customer'): bool
+    {
+        return layoutMode($scope) === 'modern';
+    }
+}
+
+if (!function_exists("useNewUiLayout")) {
+    function useNewUiLayout(): bool
+    {
+        return layoutIsModern('customer');
+    }
+}
+
+if (!function_exists("useBootstrap5Layout")) {
+    function useBootstrap5Layout(): bool
+    {
+        return useNewUiLayout();
+    }
+}
+
+if (!function_exists("themeView")) {
+    function themeView(string $scope, string $view): string
+    {
+        $modernView = "sneat.{$scope}.{$view}";
+
+        if (layoutIsModern($scope) && View::exists($modernView)) {
+            return $modernView;
+        }
+
+        return "{$scope}.{$view}";
     }
 }
 

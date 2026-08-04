@@ -43,7 +43,7 @@ class DashboardController extends Controller
             
             return view('admin.dashboard', compact('customer', 'kyc_verified', 'active_customers', 'customers', 'total_wallet_balance','apis'));
         } else {
-            return view('customer.dashboard', compact('customer'));
+            return view(themeView('customer', 'dashboard'), compact('customer'));
         }
     }
 
@@ -114,23 +114,23 @@ class DashboardController extends Controller
 
     public function resetTransactionPin()
     {
-        return view('customer.reset_pin');
+        return view(themeView('customer', 'reset_pin'));
     }
 
     public function createTransactionPin(){
-        return view('customer.create_pin');
+        return view(themeView('customer', 'create_pin'));
     }
 
     public function showUpgradeForm()
     {
         $levels = CustomerLevel::orderBy('order', 'ASC')->where('id', '>', auth()->user()->customer->level->id)->get();
-        return view('customer.upgrade_level', compact('levels'));
+        return view(themeView('customer', 'upgrade_level'), compact('levels'));
     }
 
     public function showLoadWalletPge()
     {
         $gateway = PaymentGateway::where('id', getSettings()->payment_gateway)->first();
-        return view('customer.load_wallet', compact('gateway'));
+        return view(themeView('customer', 'load_wallet'), compact('gateway'));
     }
 
     public function upgradeAccount(Request $request)
@@ -353,11 +353,11 @@ class DashboardController extends Controller
     public function updateKycInfo()
     {
         $kyc = $this->getKycStatus(auth()->user());
-        return view('customer.edit_kyc_details', compact('kyc'));
+        return view(themeView('customer', 'edit_kyc_details'), compact('kyc'));
     }
 
     public function apiSettings(){
-        return view('customer.api_settings');
+        return view(themeView('customer', 'api_settings'));
     }
 
     public function processUpdateKycInfo(Request $request)
@@ -492,19 +492,19 @@ class DashboardController extends Controller
             $refs = $refs->groupBy('referred_customer_id')->get();
         }
        
-        return view('customer.downlines', ['refs' => $refs, 'check' => $id]);
+        return view(themeView('customer', 'downlines'), ['refs' => $refs, 'check' => $id]);
     }
 
     public function allDownlines(){
         $refs = User::where('referral', auth()->user()->username)->orderBy('created_at','DESC')->get();
         
-        return view('customer.referals', ['refs' => $refs]);
+        return view(themeView('customer', 'referals'), ['refs' => $refs]);
 
     }
 
     function downlinesWithdrawal()
     {
-        return view('customer.withdraw_earning');
+        return view(themeView('customer', 'withdraw_earning'));
     }
 
     function processWithdrawal(Request $request)

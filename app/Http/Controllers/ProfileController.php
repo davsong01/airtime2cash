@@ -21,7 +21,7 @@ class ProfileController extends Controller
         if (auth()->user()->type == 'admin') {
             return view('admin.edit_profile');
         } else {
-            return view('customer.edit_profile');
+            return view(themeView('customer', 'edit_profile'));
         }
     }
 

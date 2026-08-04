@@ -45,6 +45,21 @@ use App\Models\PaymentGateway;
                                                                         </select>
                                                                     </fieldset>
                                                                     <fieldset class="form-group">
+                                                                        <label for="admin_layout">Admin Layout</label>
+                                                                        <select name="admin_layout" class="form-control" id="admin_layout">
+                                                                            <option value="legacy" {{ ($settings->admin_layout ?? 'legacy') === 'legacy' ? 'selected' : '' }}>Legacy Layout</option>
+                                                                        </select>
+                                                                        <small class="text-muted d-block mt-50">Admin stays on the legacy shell for now.</small>
+                                                                    </fieldset>
+                                                                    <fieldset class="form-group">
+                                                                        <label for="customer_layout">Customer Layout</label>
+                                                                        <select name="customer_layout" class="form-control" id="customer_layout">
+                                                                            <option value="legacy" {{ ($settings->customer_layout ?? 'legacy') === 'legacy' ? 'selected' : '' }}>Legacy Layout</option>
+                                                                            <option value="modern" {{ ($settings->customer_layout ?? 'legacy') === 'modern' ? 'selected' : '' }}>Modern Layout</option>
+                                                                        </select>
+                                                                        <small class="text-muted d-block mt-50">Customer pages will resolve through the template engine.</small>
+                                                                    </fieldset>
+                                                                    <fieldset class="form-group">
                                                                         <label for="whatsapp_number">Whatsapp Number</label>
                                                                         <input type="text" class="form-control" id="whatsapp_number" name="whatsapp_number" value="{{ $settings->whatsapp_number ?? old('whatsapp_number') }}" placeholder="Whatsapp number">
                                                                     </fieldset>

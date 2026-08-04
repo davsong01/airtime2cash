@@ -38,7 +38,7 @@ class TransactionController extends Controller
         ])->where('status', 'active')->where('slug', $slug)->first();
 
         if (!empty($category) && $category->status == 'active') {
-            return view('customer.single_category_page', compact('category'));
+            return view(themeView('customer', 'single_category_page'), compact('category'));
         } else {
             return back();
         }
@@ -67,7 +67,7 @@ class TransactionController extends Controller
         $banks = Bank::all();
 
         if (!empty($category) && $category->status == 'active') {
-            return view('customer.airtime2cash_page', compact('category', 'banks'));
+            return view(themeView('customer', 'airtime2cash_page'), compact('category', 'banks'));
         } else {
             return back();
         }
@@ -88,7 +88,7 @@ class TransactionController extends Controller
             return redirect(route('dashboard'))->with('error', 'You need above ' . getSettings()['currency'] . number_format(env('BANK_TRANSFER_CHARGES')) . ' wallet balance to use this feature!');
         }
         if (!empty($product) && $product->status == 'active') {
-            return view('customer.wallet2bank_transfer_page', compact('product', 'banks'));
+            return view(themeView('customer', 'wallet2bank_transfer_page'), compact('product', 'banks'));
         } else {
             return back();
         }
@@ -483,13 +483,13 @@ Please find below the details of the transaction:</p>';
     public function transactionStatus($transaction_id)
     {
         $transaction = TransactionLog::where('transaction_id', $transaction_id)->first();
-        return view('customer.transaction_status', compact('transaction'));
+        return view(themeView('customer', 'transaction_status'), compact('transaction'));
     }
 
     public function Airtime2CashTransactionStatus($transaction_id)
     {
         $transaction = Airtime2CashTransactions::where('transaction_id', $transaction_id)->first();
-        return view('customer.airtime_2_cash_transaction_status', compact('transaction'));
+        return view(themeView('customer', 'airtime_2_cash_transaction_status'), compact('transaction'));
     }
 
     public function transactionReceipt($transaction_id)
@@ -876,7 +876,7 @@ Please find below the details of the transaction:</p>';
         $transactions = $transactions->orderBy('created_at', 'DESC')->paginate(20);
 
         $products = Product::where('status', 'active')->where('type', 'general')->get();
-        return view('customer.mytransactions', compact('transactions', 'products'));
+        return view(themeView('customer', 'mytransactions'), compact('transactions', 'products'));
     }
 
     public function customerAirtime2CashTransactionHistory(Request $request)
@@ -905,7 +905,7 @@ Please find below the details of the transaction:</p>';
 
         $products = Product::where('type', 'airtime2cash')->where('status', 'active')->orderBy('created_at', 'DESC')->get();
 
-        return view('customer.airtime_to_cash_transactions', compact('transactions', 'products'));
+        return view(themeView('customer', 'airtime_to_cash_transactions'), compact('transactions', 'products'));
     }
 
 
@@ -1034,7 +1034,7 @@ Please find below the details of the transaction:</p>';
 
         $products = Product::where('status', 'active')->where('type', 'geneeral')->get();
         $categories = Category::where('status', 'active')->get();
-        return view('customer.reports', compact('products', 'categories'));
+        return view(themeView('customer', 'reports'), compact('products', 'categories'));
     }
 
     function referralReward($ref, $amount, $customer_id, $transaction_id, $referral_percentage)
