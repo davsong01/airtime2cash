@@ -39,7 +39,6 @@
   <link rel="stylesheet" href="{{ asset('modern-assets/vendor/css/core.css') }}" />
   <link rel="stylesheet" href="{{ asset('modern-assets/css/demo.css') }}" />
   <link rel="stylesheet" href="{{ asset('modern-assets/vendor/libs/perfect-scrollbar/perfect-scrollbar.css') }}" />
-  <link rel="stylesheet" href="{{ asset('modern-assets/vendor/fonts/flag-icons.css') }}" />
   <link rel="stylesheet" href="{{ asset('modern-assets/vendor/libs/apex-charts/apex-charts.css') }}" />
   <link rel="stylesheet" href="{{ asset('modern-assets/css/customer-purchase.css') }}" />
 

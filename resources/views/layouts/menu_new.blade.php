@@ -22,7 +22,7 @@
             <div class="small opacity-75">Level: {{ auth()->user()->customer?->level?->name ?? 'N/A' }}</div>
         </div>
 
-        <div class="text-uppercase small text-muted fw-semibold mb-2">Make payment</div>
+        <div class="text-uppercase small text-muted fw-semibold mb-2">Services</div>
         <div class="d-grid gap-2 mb-4">
             @foreach($categories as $category)
                 <a href="{{ route('open.transaction.page', $category->slug) }}" class="btn btn-light border text-start rounded-4 py-3">

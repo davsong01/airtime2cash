@@ -372,7 +372,7 @@ if (!function_exists("customerMenuData")) {
         }
 
         $sections[] = [
-            'label' => 'Make Payment',
+            'label' => 'Services',
             'items' => $paymentItems,
         ];
 
