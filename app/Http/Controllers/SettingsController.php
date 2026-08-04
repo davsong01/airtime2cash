@@ -56,6 +56,7 @@ class SettingsController extends Controller
                 'official_email' => '',
                 'whatsapp_number' => '',
                 'google_ad_code' => '',
+                'google_dashboard_ad_enabled' => true,
                 'seo_title' => '',
                 'seo_description' => '',
                 'support_link' => '',
@@ -97,6 +98,7 @@ class SettingsController extends Controller
 
         $data['admin_layout'] = in_array($adminLayout, ['legacy'], true) ? $adminLayout : 'legacy';
         $data['customer_layout'] = in_array($customerLayout, ['legacy', 'modern'], true) ? $customerLayout : 'legacy';
+        $data['google_dashboard_ad_enabled'] = $request->boolean('google_dashboard_ad_enabled');
         
         $data['captcha_settings'] = $captcha_settings;
         

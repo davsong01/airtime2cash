@@ -3,10 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Models\Announcement;
+use App\Services\AnnouncementNotificationService;
 use Illuminate\Http\Request;
 
 class AnnouncementController extends Controller
 {
+    public function __construct(private readonly AnnouncementNotificationService $notificationService)
+    {
+    }
+
     /**
      * Display a listing of the resource.
      */
@@ -43,13 +48,17 @@ class AnnouncementController extends Controller
     {
         // dd($request->all());
         foreach($request->status as $key => $val) {
-            Announcement::updateOrCreate([
+            $announcement = Announcement::updateOrCreate([
                 'type' => $request->type[$key]
             ], [
                 'message' => $request->message[$key],
                 'status' => $val,
                 'title' => $request->title[$key]
             ]);
+
+            if ($announcement->wasRecentlyCreated || $announcement->wasChanged(['title', 'message', 'status'])) {
+                $this->notificationService->publish($announcement);
+            }
         }
         return back()->with('message', 'Announcement updated successfully!');
     }
@@ -87,6 +96,10 @@ class AnnouncementController extends Controller
         $announcement->type = $request->type;
         $announcement->message = $request->message;
         $announcement->save();
+
+        if ($announcement->wasChanged(['title', 'message', 'status'])) {
+            $this->notificationService->publish($announcement);
+        }
 
         return redirect()->route('announcement.index')->with('message', "{$announcement->title} was updated successfully");
     }

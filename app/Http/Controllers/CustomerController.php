@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Carbon\Carbon;
 use App\Models\User;
 use App\Models\Customer;
+use App\Models\BlackList;
 use Illuminate\Http\Request;
 use App\Models\CustomerLevel;
 use App\Models\KycData;
@@ -166,28 +167,65 @@ class CustomerController extends Controller
         }
     }
 
-    function singleCustomer($id)
+    function singleCustomer(Request $request, $id)
     {
         if (!is_numeric($id)) {
             return redirect(404);
         }
 
-        $user = User::findOrFail($id);
+        $allowedTabs = ['account', 'transactions', 'downlines', 'kyc', 'reserved-account', 'actions'];
+        $activeTab = in_array($request->query('tab'), $allowedTabs, true)
+            ? $request->query('tab')
+            : 'account';
+
+        $user = User::with(['customer.level'])->findOrFail($id);
         $customer = $user->customer->id;
-        $downlines = ReferralEarning::where('customer_id', $customer)
-            ->latest()
-            ->groupBy('referred_customer_id')
-            ->get(['*', DB::raw('sum(amount) as total')]);
 
         $curr = getSettings()->currency;
         $balance = $curr . number_format(walletBalance($user), 2) ?? 0;
         $ref = $curr . number_format(referralBalance($user), 2) ?? 0;
-        $transTotal = $curr . number_format($user->customer->transactions()->first([DB::raw('sum(amount) as total')], 2)->total) ?? 0;
-        $fundTotal = $curr . number_format($user->customer->transactions()->whereNotNull('wallet_funding_provider')->first([DB::raw('sum(amount) as total')], 2)->total) ?? 0;
+        $transactionSummary = $user->customer->transactions()
+            ->selectRaw('COALESCE(SUM(amount), 0) as total')
+            ->selectRaw('COALESCE(SUM(CASE WHEN wallet_funding_provider IS NOT NULL THEN amount ELSE 0 END), 0) as funded_total')
+            ->first();
+        $transTotal = $curr . number_format((float) $transactionSummary->total, 2);
+        $fundTotal = $curr . number_format((float) $transactionSummary->funded_total, 2);
         $balances = ['Wallet Balance' => $balance, 'Referral Earning' => $ref, 'Transaction Total' => $transTotal, 'Funds Total' => $fundTotal];
-        $reservedAccount = ReservedAccountNumber::where('customer_id', $customer)->orderBy('created_at', 'desc')->get();
+        $downlines = collect();
+        $reservedAccount = collect();
+        $transactions = null;
+        $kycData = collect();
+        $blacklists = collect();
+        $customerLevels = collect();
 
-        $customerLevels = CustomerLevel::orderBy('order','ASC')->get();
+        if ($activeTab === 'account') {
+            $customerLevels = CustomerLevel::orderBy('order', 'ASC')->get();
+        } elseif ($activeTab === 'transactions') {
+            $transactions = $user->customer->transactions()->latest()->paginate(10);
+        } elseif ($activeTab === 'downlines') {
+            $downlines = ReferralEarning::where('customer_id', $customer)
+                ->with('referredCustomer.user')
+                ->latest()
+                ->groupBy('referred_customer_id')
+                ->get(['*', DB::raw('sum(amount) as total')]);
+        } elseif ($activeTab === 'kyc') {
+            $kycData = KycData::where('customer_id', $customer)->get()->keyBy('key');
+        } elseif ($activeTab === 'reserved-account') {
+            $reservedAccount = ReservedAccountNumber::with(['gateway', 'admin.user'])
+                ->withCount('transactions')
+                ->withSum('transactions as transaction_total', 'total_amount')
+                ->where('customer_id', $customer)
+                ->orderBy('created_at', 'desc')
+                ->get();
+            $kycData = KycData::where('customer_id', $customer)
+                ->where('key', 'BVN')
+                ->get()
+                ->keyBy('key');
+        } elseif ($activeTab === 'actions') {
+            $blacklists = BlackList::whereIn('value', array_filter([$user->email, $user->phone]))
+                ->get()
+                ->keyBy('value');
+        }
 
         return view(
             'admin.customers.single-customer',
@@ -196,7 +234,11 @@ class CustomerController extends Controller
                 'downlines' => $downlines,
                 'accounts' => $reservedAccount,
                 'balances' => $balances,
-                'customerLevels' => $customerLevels
+                'customerLevels' => $customerLevels,
+                'transactions' => $transactions,
+                'kycData' => $kycData,
+                'blacklists' => $blacklists,
+                'activeTab' => $activeTab,
             ]
         );
     }

@@ -1,44 +1,49 @@
 @extends('layouts.auth')
-@section('body')
-<!-- left section-login -->
 
-<div class="col-md-12 col-12 px-0">
-    <div class="card disable-rounded-right d-flex justify-content-center">
-        <div class="card-header pb-1">
-            <div class="card-title">
-                <h4 class="text-center mb-2">Reset Password</h4>
-            </div>
-        </div>
-        <div class="card-content">
-            <div class="card-body">
-               @include('layouts.alerts')
-                <form action="{{ route('password.store') }}" method="POST">
-                    @csrf
-                    <div class="row">
-
-                    </div>
-                    <div class="form-group mb-50">
-                        <label class="text-bold-600" for="email">Email address</label>
-                        <input type="email" class="form-control" id="email" name="email" value="{{ old('email') ?? $request->email }}" required autofocus autocomplete="username">
-                    </div>
-                    <div class="form-group">
-                        <label class="text-bold-600" for="password">New Password</label>
-                        <input type="password" class="form-control" id="password" name="password" placeholder="Enter Password" required>
-                    </div>
-                    <div class="form-group">
-                        <label class="text-bold-600" for="password">Confirm Password</label>
-                        <input type="password" class="form-control" id="password_confirmation" name="password_confirmation" required>
-                    </div>
-                    
-                    <button type="submit" class="btn btn-primary glow w-100 position-relative">Reset Password<i id="icon-arrow" class="bx bx-right-arrow-alt"></i></button>
-                <input type="hidden" name="token" value="{{ $request->route('token') }}">
-
-                </form>
-                <hr>
-                <div class="text-center"><small class="mr-25">I remember my passsword</small><a href="{{ route('register') }}"><small>Sign up</small></a></div>
-            </div>
-        </div>
-    </div>
-</div>
+@section('page-css')
+    <link rel="stylesheet" href="{{ asset('app-assets/css/auth-refresh.css') }}">
 @endsection
 
+@section('body')
+    <div class="auth-refresh auth-refresh--compact col-12 px-0">
+        <div class="auth-heading">
+            <span class="auth-heading-icon"><i class="bx bx-lock-open-alt"></i></span>
+            <h1>Choose a new password</h1>
+            <p>Use a strong password that you have not used previously on this account.</p>
+        </div>
+
+        @include('layouts.alerts')
+
+        <div class="auth-panel">
+            <form action="{{ route('password.store') }}" method="POST">
+                @csrf
+                <input type="hidden" name="token" value="{{ $request->route('token') }}">
+                <div class="form-group">
+                    <label for="email">Email address</label>
+                    <input type="email" class="form-control" id="email" name="email" value="{{ old('email', $request->email) }}" autocomplete="email" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">New password</label>
+                    <div class="auth-password-wrap">
+                        <input type="password" class="form-control" id="password" name="password" placeholder="Enter new password" autocomplete="new-password" required>
+                        <button class="auth-password-toggle" type="button" data-password-toggle="password" aria-label="Show password"><i class="bx bx-show"></i></button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="password_confirmation">Confirm new password</label>
+                    <div class="auth-password-wrap">
+                        <input type="password" class="form-control" id="password_confirmation" name="password_confirmation" placeholder="Repeat new password" autocomplete="new-password" required>
+                        <button class="auth-password-toggle" type="button" data-password-toggle="password_confirmation" aria-label="Show password"><i class="bx bx-show"></i></button>
+                    </div>
+                </div>
+                <button type="submit" class="auth-submit btn">Update password <i class="bx bx-check"></i></button>
+            </form>
+        </div>
+
+        <div class="auth-footer"><a href="{{ route('login') }}">Return to sign in</a></div>
+    </div>
+@endsection
+
+@section('page-script')
+    @include('auth.partials.password-toggle-script')
+@endsection

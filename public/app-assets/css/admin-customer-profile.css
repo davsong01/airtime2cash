@@ -1,0 +1,131 @@
+.customer-admin-hero {
+  position: relative;
+  overflow: hidden;
+  padding: 1.65rem 1.8rem;
+  border-radius: .8rem;
+  background: linear-gradient(125deg, #123f43, #1f6667 70%, #278078);
+  color: #fff;
+  box-shadow: 0 1rem 2.5rem rgba(18, 63, 67, .2);
+}
+
+.customer-admin-hero::after {
+  position: absolute;
+  width: 260px;
+  height: 260px;
+  border: 46px solid rgba(244, 232, 90, .11);
+  border-radius: 50%;
+  content: '';
+  right: -90px;
+  top: -120px;
+}
+
+.customer-admin-hero h2 { color: #fff; }
+
+.customer-admin-avatar {
+  display: inline-flex;
+  width: 74px;
+  height: 74px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 3px solid rgba(255,255,255,.32);
+  border-radius: 1rem;
+  background: #f4e85a;
+  color: #123f43;
+  font-size: 1.35rem;
+  font-weight: 800;
+  box-shadow: 0 .6rem 1.5rem rgba(0,0,0,.16);
+}
+
+.customer-admin-kicker {
+  margin-bottom: .25rem;
+  color: rgba(255,255,255,.7);
+  font-size: .7rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.customer-admin-meta { gap: .45rem 1rem; color: rgba(255,255,255,.78); font-size: .8rem; }
+
+.customer-admin-statuses {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: .65rem;
+}
+
+.customer-admin-statuses > div {
+  padding: .75rem;
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: .6rem;
+  background: rgba(255,255,255,.1);
+  backdrop-filter: blur(8px);
+}
+
+.customer-admin-statuses small { display: block; margin-bottom: .35rem; color: rgba(255,255,255,.68); }
+.customer-admin-statuses strong { color: #fff; font-size: .83rem; }
+
+.customer-balance-card { border: 0; box-shadow: 0 .45rem 1.3rem rgba(34,48,62,.075); }
+.customer-balance-card .card-body { padding: 1rem 1.1rem; }
+.customer-balance-card small { display: block; margin-bottom: .2rem; color: #828d99; }
+.customer-balance-card strong { display: block; color: #22303e; font-size: 1.05rem; }
+.customer-balance-icon {
+  display: inline-flex;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: .6rem;
+  background: #eef8f4;
+  color: #0b7d4f;
+  font-size: 1.2rem;
+}
+
+.customer-workspace { overflow: visible; border: 0; box-shadow: 0 .6rem 1.8rem rgba(34,48,62,.09); }
+.customer-workspace-tabs { padding: 0 .8rem; flex-wrap: nowrap; overflow-x: auto; }
+.customer-workspace-tabs .nav-link {
+  display: inline-flex;
+  padding: 1rem .9rem;
+  align-items: center;
+  gap: .4rem;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  color: #6b7882;
+  white-space: nowrap;
+}
+.customer-workspace-tabs .nav-link.active { border-bottom-color: #0b7d4f; background: transparent; color: #0b7d4f; }
+.customer-workspace-tabs .nav-link i { font-size: 1.05rem; }
+.customer-workspace-content { padding: 1.5rem; }
+
+.customer-section-heading { display: flex; margin-bottom: 1.25rem; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.customer-section-heading h4 { margin-bottom: .2rem; }
+.customer-section-heading p { margin: 0; color: #828d99; font-size: .82rem; }
+.customer-form-panel { padding: 1.2rem; border: 1px solid #e5e9ec; border-radius: .7rem; background: #fbfcfc; }
+.customer-form-panel .form-control { min-height: 42px; border-color: #d9e0e3; border-radius: .45rem; }
+.customer-form-panel label { color: #4f5f69; font-size: .78rem; font-weight: 600; }
+.customer-data-table thead th { border-top: 0; color: #677680; font-size: .72rem; letter-spacing: .035em; text-transform: uppercase; }
+.customer-data-table td { vertical-align: middle; }
+.customer-empty-state { padding: 2.5rem 1rem; color: #828d99; text-align: center; }
+.customer-empty-state i { display: block; margin-bottom: .6rem; color: #b2bcc2; font-size: 2rem; }
+.kyc-field-status { margin-left: .4rem; font-size: .68rem; font-weight: 600; }
+.kyc-document-thumb { width: 76px; height: 58px; border-radius: .4rem; object-fit: cover; cursor: zoom-in; }
+.customer-risk-card { height: 100%; padding: 1.15rem; border: 1px solid #e4e9ec; border-radius: .7rem; background: #fff; }
+.customer-risk-icon { display: inline-flex; width: 40px; height: 40px; align-items: center; justify-content: center; border-radius: .55rem; background: #f2f4f5; font-size: 1.1rem; }
+.select2-container--default .select2-selection--multiple { min-height: 42px; border-color: #d9e0e3; }
+
+@media (max-width: 991.98px) {
+  .customer-admin-statuses { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 767.98px) {
+  .customer-admin-hero { padding: 1.25rem; }
+  .customer-admin-avatar { width: 58px; height: 58px; }
+  .customer-admin-meta { display: block !important; }
+  .customer-admin-meta span { display: block; margin-top: .25rem; overflow-wrap: anywhere; }
+  .customer-workspace-content { padding: 1rem; }
+  .customer-section-heading { display: block; }
+  .customer-section-heading .btn { margin-top: .75rem; }
+}

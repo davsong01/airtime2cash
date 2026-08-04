@@ -12,8 +12,23 @@
         float: right;
     }
     #verify-link{
+        padding: 0.2rem 0.55rem;
+        border: 1px solid {{ getSettings()->active_color }};
+        border-radius: 0.35rem;
+        background: transparent;
+        color: {{ getSettings()->active_color }} !important;
+        font-size: 0.75rem;
+        font-weight: 600;
         text-transform: capitalize;
-        text-decoration: underline;
+        text-decoration: none;
+        white-space: nowrap;
+    }
+    #verify-link:hover,
+    #verify-link:focus {
+        background: {{ getSettings()->active_color }};
+        color: #ffffff !important;
+        text-decoration: none;
+        outline: none;
     }
 </style>
 @endsection

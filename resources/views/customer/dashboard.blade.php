@@ -88,7 +88,9 @@
                 <section id="dashboard-ecommerce">
                     <div class="row">
                         <div class="col-md-12">
-                            {!! getSettings()->google_dashboard_ad_code !!}
+                            @if(getSettings()->google_dashboard_ad_enabled ?? true)
+                                {!! getSettings()->google_dashboard_ad_code !!}
+                            @endif
                         <div class="col-md-12">
                             @include('layouts.alerts')
                         </div>

@@ -46,10 +46,13 @@ class TransactionController extends Controller
 
     public function airtimeToCash()
     {
-        $route = '<a style="color: yellow;" href="' . route("update.kyc.details") . '">HERE</a>';
-
         if (auth()->user()->customer->kyc_status == 'unverified') {
-            return back()->with('error', 'Airtime2Cash conversions is only available for fully verified clients, please click ' . $route . ' to get verified');
+            $kycLink = '<a href="' . route('update.kyc.details') . '"><strong>complete your KYC now</strong></a>';
+
+            return back()->with(
+                'error',
+                'Identity verification is required before you can convert airtime to cash. Please ' . $kycLink . ' to continue.'
+            );
         }
         $category = Category::with([
             'products' => function ($query) {
@@ -482,7 +485,10 @@ Please find below the details of the transaction:</p>';
 
     public function transactionStatus($transaction_id)
     {
-        $transaction = TransactionLog::where('transaction_id', $transaction_id)->first();
+        $transaction = TransactionLog::with(['product', 'variation'])
+            ->where('transaction_id', $transaction_id)
+            ->firstOrFail();
+
         return view(themeView('customer', 'transaction_status'), compact('transaction'));
     }
 
@@ -494,11 +500,15 @@ Please find below the details of the transaction:</p>';
 
     public function transactionReceipt($transaction_id)
     {
-        $transaction = TransactionLog::with(['product', 'category', 'variation'])->where('id', $transaction_id)->first()->toArray();
+        $transaction = TransactionLog::with(['product', 'category', 'variation'])
+            ->where('id', $transaction_id)
+            ->firstOrFail()
+            ->toArray();
 
-        $pdf = Pdf::loadView('customer.receipts.transaction_receipt', ['transaction' => $transaction])->setPaper('a4', 'portrait');
+        $receiptView = themeView('customer', 'receipts.transaction_receipt');
+        $pdf = Pdf::loadView($receiptView, ['transaction' => $transaction])->setPaper('a4', 'portrait');
+
         return $pdf->download($transaction['transaction_id'] . '.pdf');
-        // return view('customer.receipts.transaction_receipt', compact('transaction'));
     }
 
     public function airtime2CashTransactionReceipt($transaction_id)

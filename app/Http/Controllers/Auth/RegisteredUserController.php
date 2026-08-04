@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Str;
 use App\Providers\RouteServiceProvider;
 
 class RegisteredUserController extends Controller
@@ -34,8 +35,18 @@ class RegisteredUserController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
-
         // return back()->with('error', 'Registration is currently not available, please try again');
+        $modernOnboarding = layoutIsModern('customer');
+
+        if (!$request->filled('username')) {
+            $request->merge([
+                'username' => $this->generateUniqueUsername(
+                    (string) $request->input('first_name'),
+                    (string) $request->input('last_name')
+                ),
+            ]);
+        }
+
         $captchaSettings = getSettings()->captcha_settings;
         if(isset($captchaSettings['captcha_settings_status']) && $captchaSettings['captcha_settings_status'] == 'yes' ){
             if(in_array($captchaSettings['captcha_settings_provider'], ['all','simple'])){
@@ -77,31 +88,32 @@ class RegisteredUserController extends Controller
             'api_key' =>  strrev(md5($user->username)),
         ]);
 
-        $provider = EmailApiSetting::first();
+        $provider = null;
 
-        try {
-            //code...
+        if (!$modernOnboarding) {
+            $provider = EmailApiSetting::first();
 
-            if (!empty($provider)) {
-                config([
-                    'mail.driver' => $provider->MAIL_DRIVER,
-                    'mail.host' => $provider->MAIL_HOST,
-                    'mail.port' => $provider->MAIL_PORT,
-                    'mail.encryption' => $provider->MAIL_ENCRYPTION,
-                    'mail.username' => $provider->MAIL_USERNAME,
-                    'mail.password' => $provider->MAIL_PASSWORD,
-                    'mail.replyToName' => $provider->MAIL_REPLY_TO_NAME,
-                    'mail.replyToAddress' => $provider->MAIL_REPLY_TO_ADDRESS,
-                    'mail.from' => [
-                        'address' => $provider->MAIL_FROM_ADDRESS,
-                        'name' => $provider->MAIL_FROM_NAME,
-                    ],
-                ]);
-                $current['provider'] = $provider->toArray();
+            try {
+                if (!empty($provider)) {
+                    config([
+                        'mail.driver' => $provider->MAIL_DRIVER,
+                        'mail.host' => $provider->MAIL_HOST,
+                        'mail.port' => $provider->MAIL_PORT,
+                        'mail.encryption' => $provider->MAIL_ENCRYPTION,
+                        'mail.username' => $provider->MAIL_USERNAME,
+                        'mail.password' => $provider->MAIL_PASSWORD,
+                        'mail.replyToName' => $provider->MAIL_REPLY_TO_NAME,
+                        'mail.replyToAddress' => $provider->MAIL_REPLY_TO_ADDRESS,
+                        'mail.from' => [
+                            'address' => $provider->MAIL_FROM_ADDRESS,
+                            'name' => $provider->MAIL_FROM_NAME,
+                        ],
+                    ]);
+                }
+                event(new Registered($user));
+            } catch (\Throwable $th) {
+                \Log::error($th->getMessage(). ' Line: ' .$th->getLine(). ' Filename: ' .$th->getFile());
             }
-            event(new Registered($user));
-        } catch (\Throwable $th) {
-            \Log::error($th->getMessage(). ' Line: ' .$th->getLine(). ' Filename: ' .$th->getFile());
         }
 
         $customer = Customer::create([
@@ -113,10 +125,16 @@ class RegisteredUserController extends Controller
         
         KycData::create([
             'key' => 'PHONE_NUMBER',
-            'value' => $user->firstname,
+            'value' => $user->phone,
             'status' => 'unverified',
             'customer_id' => $customer->id
         ]);
+
+        if ($modernOnboarding) {
+            return redirect()
+                ->route('login')
+                ->with('message', 'Registration successful. Please log in to complete your profile and KYC verification.');
+        }
 
         Auth::login($user);
 
@@ -146,5 +164,18 @@ class RegisteredUserController extends Controller
         }
 
         return redirect(RouteServiceProvider::HOME);
+    }
+
+    private function generateUniqueUsername(string $firstName, string $lastName): string
+    {
+        $base = Str::lower(Str::ascii($firstName . $lastName));
+        $base = preg_replace('/[^a-z0-9]/', '', $base) ?: 'user';
+        $base = Str::limit($base, 24, '');
+
+        do {
+            $username = $base . random_int(100, 9999);
+        } while (User::where('username', $username)->exists());
+
+        return $username;
     }
 }

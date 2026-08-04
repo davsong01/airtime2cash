@@ -1,16 +1,18 @@
 <?php
     use Illuminate\Support\Facades\Auth;
+    $settings = getSettings();
+    $favicon = $settings?->favicon ?: 'favicon.ico';
 ?>
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=0">
-    <meta name="description" content="{{ getSettings()->seo_description }}">
+    <meta name="description" content="{{ getSettings()?->seo_description }}">
     <meta name="keywords" content="@yield('keywords')">
     <meta name="author" content="{{ config('app.name')}}">
-    <title>{{config('app.name')}} - {{ getSettings()->seo_title }}</title>
-    <link rel="apple-touch-icon" href="{{ asset(getSettings()->favicon) }}">
-    <link rel="shortcut icon" type="image/x-icon" href="{{ asset(getSettings()->favicon) }}">
+    <title>{{ config('app.name') }} - {{ $settings?->seo_title ?: 'Login' }}</title>
+    <link rel="apple-touch-icon" href="{{ asset($favicon) }}">
+    <link rel="shortcut icon" type="image/x-icon" href="{{ asset($favicon) }}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.2/css/fontawesome.min.css" integrity="" crossorigin="anonymous">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     <!-- BEGIN: Vendor CSS-->
@@ -25,7 +27,9 @@
     <link rel="stylesheet" type="text/css" href="{{ asset('app-assets/css/colors.css') }}">
     <link rel="stylesheet" type="text/css" href="{{ asset('app-assets/css/components.css') }}">
     <script src="https://www.google.com/recaptcha/api.js?render=@yield('CAPTCHA_SITEKEY')"></script>
-    @include('layouts/css/main_menu_css')
+    @if($settings)
+        @include('layouts/css/main_menu_css')
+    @endif
     <link rel="stylesheet" type="text/css" href="{{ asset('app-assets/css/themes/dark-layout.css') }}">
     <link rel="stylesheet" type="text/css" href="{{ asset('app-assets/css/themes/semi-dark-layout.css') }}">
     <!-- END: Theme CSS-->
@@ -75,7 +79,7 @@
         }
 
         .svg svg{
-            fill: {{ getSettings()->menu_text_color }};
+            fill: {{ $settings?->menu_text_color ?: '#ffffff' }};
         }
 
         .captcha {
@@ -128,8 +132,8 @@
 
     </style>
     @yield('page-css')
-    @if(Auth::check() && auth()->user()->type == 'customer')
+    @if($settings && Auth::check() && auth()->user()->type == 'customer')
     {{-- Google ads --}}
-    {!! getSettings()->google_ad_code !!}
+    {!! $settings->google_ad_code !!}
     @endif
 </head>

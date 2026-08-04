@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        if (!Schema::hasColumn('reserved_account_callbacks', 'payment_method')) {
+        if (Schema::hasTable('reserved_account_callbacks') && !Schema::hasColumn('reserved_account_callbacks', 'payment_method')) {
             Schema::table('reserved_account_callbacks', function (Blueprint $table) {
                 $table->string('payment_method')->nullable()->after('account_number');
             });
@@ -24,5 +24,10 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (Schema::hasTable('reserved_account_callbacks') && Schema::hasColumn('reserved_account_callbacks', 'payment_method')) {
+            Schema::table('reserved_account_callbacks', function (Blueprint $table) {
+                $table->dropColumn('payment_method');
+            });
+        }
     }
 };

@@ -1,73 +1,51 @@
 @extends('layouts.auth')
+
+@section('page-css')
+    <link rel="stylesheet" href="{{ asset('app-assets/css/auth-refresh.css') }}">
+@endsection
+
 @section('body')
-<!-- left section-login -->
-
-<div class="col-md-12 col-12 px-0">
-    <div class="card disable-rounded-right d-flex justify-content-center">
-        <div class="card-header pb-1">
-            <div class="card-title">
-                <h4 class="text-center mb-2">Welcome Back</h4>
-            </div>
+    <div class="auth-refresh auth-refresh--compact col-12 px-0">
+        <div class="auth-heading">
+            <span class="auth-heading-icon"><i class="bx bx-log-in-circle"></i></span>
+            <h1>Welcome back</h1>
+            <p>Sign in securely to manage your wallet, transactions, and account verification.</p>
         </div>
-        <div class="card-content">
-            <div class="card-body">
-               @include('layouts.alerts')
-                <form action="{{ route('login') }}" method="POST">
-                    @csrf
-                    <div class="row">
 
+        @include('layouts.alerts')
+
+        <div class="auth-panel">
+            <form action="{{ route('login') }}" method="POST">
+                @csrf
+                <div class="form-group">
+                    <label for="email">Email address</label>
+                    <input type="email" class="form-control" id="email" name="email" value="{{ old('email') }}" placeholder="name@example.com" autocomplete="email" autofocus required>
+                </div>
+                <div class="form-group">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <label for="password">Password</label>
+                        <a href="{{ route('password.request') }}" class="auth-link small">Forgot password?</a>
                     </div>
-                    <div class="form-group mb-50">
-                        <label class="text-bold-600" for="email">Email address</label>
-                        <input type="email" class="form-control" id="email" name="email" value="{{ old('email')}}" placeholder="Enter your email address"></div>
-                    <div class="form-group">
-                        <label class="text-bold-600" for="password">Password</label>
-                        <div class="input-group">
-                            <input type="password" class="form-control" id="password" name="password" placeholder="Enter Password">
-                            <div class="input-group-append">
-                                <button class="btn btn-outline-secondary" type="button" id="togglePassword" aria-label="Show password">
-                                    <i class="fa fa-eye" id="togglePasswordIcon"></i>
-                                </button>
-                            </div>
-                        </div>
+                    <div class="auth-password-wrap">
+                        <input type="password" class="form-control" id="password" name="password" placeholder="Enter your password" autocomplete="current-password" required>
+                        <button class="auth-password-toggle" type="button" data-password-toggle="password" aria-label="Show password"><i class="bx bx-show"></i></button>
                     </div>
-                    <div class="form-group d-flex flex-md-row flex-column justify-content-between align-items-center">
-                        <div class="text-left">
-                            <div class="checkbox checkbox-sm">
-                                <input type="checkbox" class="form-check-input" id="exampleCheck1">
-                                <label class="checkboxsmall" for="exampleCheck1"><small>Keep me logged in</small></label>
-                            </div>
-                        </div>
-                        <div class="text-right"><a href="{{ route('password.request') }}" class="card-link"><small>Forgot Password?</small></a></div>
+                </div>
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <div class="auth-remember">
+                        <input type="checkbox" id="remember" name="remember" value="1">
+                        <label for="remember">Keep me signed in</label>
                     </div>
-                    <button type="submit" class="btn btn-primary glow w-100 position-relative">Login<i id="icon-arrow" class="bx bx-right-arrow-alt"></i></button>
-                </form>
-                <hr>
-                <div class="text-center"><small class="mr-25">Don't have an account?</small><a href="{{ route('register') }}"><small>Sign up</small></a></div>
-                @include('layouts.support')
-            </div>
+                </div>
+                <button type="submit" class="auth-submit btn">Sign in <i class="bx bx-right-arrow-alt"></i></button>
+            </form>
         </div>
+
+        <div class="auth-footer">New to {{ config('app.name') }}? <a href="{{ route('register') }}">Create an account</a></div>
+        <div class="auth-support">@include('layouts.support')</div>
     </div>
-</div>
 @endsection
 
 @section('page-script')
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const passwordInput = document.getElementById('password');
-        const toggleButton = document.getElementById('togglePassword');
-        const toggleIcon = document.getElementById('togglePasswordIcon');
-
-        if (!passwordInput || !toggleButton || !toggleIcon) {
-            return;
-        }
-
-        toggleButton.addEventListener('click', function () {
-            const isHidden = passwordInput.type === 'password';
-            passwordInput.type = isHidden ? 'text' : 'password';
-            toggleIcon.className = isHidden ? 'fa fa-eye-slash' : 'fa fa-eye';
-            toggleButton.setAttribute('aria-label', isHidden ? 'Hide password' : 'Show password');
-        });
-    });
-</script>
+    @include('auth.partials.password-toggle-script')
 @endsection

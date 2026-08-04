@@ -362,12 +362,25 @@ class DashboardController extends Controller
 
     public function processUpdateKycInfo(Request $request)
     {
+        $customer = auth()->user()->customer;
+
+        if ($customer->kyc_status !== 'unverified') {
+            $message = $customer->kyc_status === 'awaiting-approval'
+                ? 'Your KYC submission is currently awaiting review and cannot be changed. You can update it if the administrator declines the submission.'
+                : 'Your verified KYC details cannot be changed from the customer portal. Please contact support if your information needs to be corrected.';
+
+            return back()->with(
+                'error',
+                $message
+            );
+        }
+
         $input = $this->validate($request, [
             "FIRST_NAME" => "required",
             "MIDDLE_NAME" => "required",
             "LAST_NAME" => "required",
             "PHONE_NUMBER" => "required",
-            "BVN" => "required|string|min:11|max:11",
+            "BVN" => "required|digits:11",
             "IDCARD" => "required|image|max:1024",
             "IDCARDTYPE" => "required"
         ]);
@@ -396,13 +409,13 @@ class DashboardController extends Controller
         //     "lastname" => $lastname,
         // ]);
         foreach ($input as $key => $value) {
-            $this->updateKycData($key, $value, auth()->user()->customer->id, 'unverified');
+            $this->updateKycData($key, $value, $customer->id, 'unverified');
         }
 
         // verify BVN automatically
         // $this->updateKycData('BVN', $request->BVN, auth()->user()->customer->id, 'verified');
 
-        auth()->user()->customer->update([
+        $customer->update([
             "kyc_status" => 'awaiting-approval',
         ]);
         

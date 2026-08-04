@@ -11,12 +11,17 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (Schema::hasTable('reserved_account_callbacks')) {
+            return;
+        }
+
         Schema::create('reserved_account_callbacks', function (Blueprint $table) {
             $table->id();
             $table->longText('raw')->nullable();
             $table->string('status')->default('pending');
             $table->integer('provider_id')->nullable();
             $table->string('account_number')->nullable();
+            $table->string('payment_method')->nullable();
             $table->timestamp('paid_on')->nullable();
             $table->string('session_id');
             $table->string('transaction_reference');

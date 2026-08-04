@@ -1,6 +1,10 @@
 @extends('layouts.app')
 @section('title', 'Edit KYC data')
 
+@php
+    $kycIsLocked = getFinalKycStatus(auth()->user()->customer->id) === 'awaiting-approval';
+@endphp
+
 @section('page-css')
 <style>
     .reset-pin {
@@ -57,6 +61,12 @@
                                                     <div class="card-body">
                                                         <form action="{{route('update.kyc.details.process')}}" method="POST" autocomplete="off" enctype="multipart/form-data">
                                                             @csrf
+                                                            @if($kycIsLocked)
+                                                                <div class="alert alert-warning">
+                                                                    <strong>KYC awaiting review.</strong> Your submitted details are locked while the administrator reviews them. You can make changes if the submission is declined.
+                                                                </div>
+                                                            @endif
+                                                            <fieldset @if($kycIsLocked) disabled @endif>
                                                             <div class="row">
                                                                 <div class="col-md-6">   
                                                                     <fieldset class="form-group">
@@ -205,15 +215,14 @@
                                                                     <fieldset class="form-group">
                                                                         @if(kycStatus('BVN', auth()->user()->customer->id)['status'] == 'verified')
                                                                         <label for="BVN">BVN</label><span class="verified"><i class="fa fa-check"></i> Verified</span>
-                                                                        <input autocomplete="false" type="text" class="form-control" value="{{ starMiddle(kycStatus('BVN', auth()->user()->customer->id)['value'] ) }}" disabled>
+                                                                        <input autocomplete="off" type="text" class="form-control" value="{{ starMiddle(kycStatus('BVN', auth()->user()->customer->id)['value'] ) }}" disabled>
                                                                         @else 
                                                                         @if(kycStatus('BVN', auth()->user()->customer->id)['status'] == 'declined')
                                                                         <label for="BVN">BVN</label><span class="declined"><i class="fa fa-times"></i> Declined</span>
                                                                         @else
                                                                         <label for="BVN">BVN</label><span class="unverified"><i class="fa fa-times"></i> Not Verified</span>
                                                                         @endif
-                                                                        <label for="bvn">BVN</label>
-                                                                        <input type="text" name="BVN"  class="form-control" value="{{kycStatus('BVN', auth()->user()->customer->id)['value'] }}" required maxlength="11" minlength="11">
+                                                                        <input type="text" id="BVN" name="BVN" class="form-control" value="{{ $kycIsLocked ? starMiddle(kycStatus('BVN', auth()->user()->customer->id)['value']) : '' }}" autocomplete="off" inputmode="numeric" pattern="[0-9]{11}" placeholder="Enter your 11-digit BVN" required maxlength="11" minlength="11">
                                                                         @endif
                                                                     </fieldset>
                                                                 </div>
@@ -255,13 +264,14 @@
                                                                 
                                                             </div>
                                                             
-                                                            @if(getFinalKycStatus(auth()->user()->customer->id) == 'unverified' || getFinalKycStatus(auth()->user()->customer->id) == 'awaiting-approval')
+                                                            </fieldset>
+                                                            @if(getFinalKycStatus(auth()->user()->customer->id) == 'unverified')
                                                             <div class="row">
                                                                 <div class="col-md-12"> 
                                                                     <button class="btn btn-primary" type="submit">Submit</button>
                                                                 </div>
                                                             </div>
-                                                            @else
+                                                            @elseif(getFinalKycStatus(auth()->user()->customer->id) == 'verified')
                                                             <a href="{{ route('customer.load.wallet') }}" class="btn btn-success">Fund wallet</a>
                                                             @endif
                                                         </form>

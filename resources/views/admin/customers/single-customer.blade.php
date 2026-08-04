@@ -1,822 +1,159 @@
-<?php
-use App\Models\BlackList;
-?>
 @extends('layouts.app')
+
 @section('page-css')
-    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-    <style>
-         .verified{
-            color: green !important;
-            font-size: 13px;
-            margin-top: -6px;
-            display: inline-block;
-            margin-left: 5px;
-        }
-        .unverified{
-            color: orange !important;
-            font-size: 13px;
-            margin-top: -6px;
-            display: inline-block;
-            margin-left: 5px;
-        }
-
-        .declined{
-            color: red !important;
-            font-size: 13px;
-            margin-top: -6px;
-            display: inline-block;
-            margin-left: 5px;
-        }
-
-
-        .select2-container {
-            width: 100% !important;
-        }
-    </style>
+    <link rel="stylesheet" href="{{ asset('app-assets/vendors/css/forms/select/select2.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('app-assets/css/admin-customer-profile.css') }}">
 @endsection
+
+@php
+    $customer = $user->customer;
+    $fullName = trim(collect([$user->firstname, $user->middlename, $user->lastname])->filter()->implode(' ')) ?: $user->username;
+    $initials = strtoupper(substr((string) $user->firstname, 0, 1) . substr((string) $user->lastname, 0, 1));
+    $initials = $initials ?: strtoupper(substr((string) $user->username, 0, 2));
+    $finalKycStatus = $customer->kyc_status ?: 'unverified';
+    $tabs = [
+        'account' => ['label' => 'Account', 'icon' => 'bx bx-user-circle', 'view' => 'profile-account'],
+        'transactions' => ['label' => 'Transactions', 'icon' => 'bx bx-receipt', 'view' => 'profile-transactions'],
+        'downlines' => ['label' => 'Referrals', 'icon' => 'bx bx-git-branch', 'view' => 'profile-referrals'],
+        'kyc' => ['label' => 'KYC', 'icon' => 'bx bx-id-card', 'view' => 'profile-kyc'],
+        'reserved-account' => ['label' => 'Reserved accounts', 'icon' => 'bx bx-building-house', 'view' => 'profile-reserved-accounts'],
+        'actions' => ['label' => 'Security & risk', 'icon' => 'bx bx-shield-quarter', 'view' => 'profile-actions'],
+    ];
+@endphp
+
 @section('content')
-    <!-- Content wrapper -->
     <div class="app-content content">
         <div class="content-overlay"></div>
         <div class="content-wrapper">
-            <div class="content-header row">
-                <div class="content-header-left col-12 mb-2 mt-1">
-                    <div class="row breadcrumbs-top">
-                        <div class="col-12">
-                            <div class="breadcrumb-wrapper col-12">
-                                <ol class="breadcrumb p-0 mb-0">
-                                    <li class="breadcrumb-item"><a href="/"><i class="bx bx-home-alt"></i></a>
-                                    </li>
-                                    <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Dashboard</a>
-                                    </li>
-                                    <li class="breadcrumb-item active">Customer Profile</li>
-                                </ol>
-                            </div>
-                        </div>
+            <div class="content-header row mb-1">
+                <div class="col-12">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <ol class="breadcrumb p-0 mb-0 bg-transparent">
+                            <li class="breadcrumb-item"><a href="{{ route('dashboard') }}"><i class="bx bx-home-alt"></i></a></li>
+                            <li class="breadcrumb-item"><a href="{{ route('customers') }}">Customers</a></li>
+                            <li class="breadcrumb-item active">Customer profile</li>
+                        </ol>
                     </div>
                 </div>
             </div>
-            <section id="table-success">
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="card-title">Customer Profile</h5>
-                        <div class="mt-3">
-                            @include('layouts.alerts')
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-sm-2">
-                                <div class="d-flex justify-content-center flex-column align-items-center">
-                                    @if ($user->avatar)
-                                        <img src="{{ $user->avatar }}" width="180px" height="180px"
-                                            alt="{{ $user->firstname }}" class="users-avatar-shadow rounded-circle" />
-                                    @else
-                                        <div class="users-avatar-shadow rounded-circle">
-                                            <svg xmlns="http://www.w3.org/2000/svg" height="180" viewBox="0 -960 960 960"
-                                                width="180">
-                                                <path fill="red"
-                                                    d="M234-276q51-39 114-61.5T480-360q69 0 132 22.5T726-276q35-41 54.5-93T800-480q0-133-93.5-226.5T480-800q-133 0-226.5 93.5T160-480q0 59 19.5 111t54.5 93Zm246-164q-59 0-99.5-40.5T340-580q0-59 40.5-99.5T480-720q59 0 99.5 40.5T620-580q0 59-40.5 99.5T480-440Zm0 360q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q53 0 100-15.5t86-44.5q-39-29-86-44.5T480-280q-53 0-100 15.5T294-220q39 29 86 44.5T480-160Zm0-360q26 0 43-17t17-43q0-26-17-43t-43-17q-26 0-43 17t-17 43q0 26 17 43t43 17Zm0-60Zm0 360Z" />
-                                            </svg>
-                                        </div>
-                                    @endif
-                                    <h5 class="card-title" style="text-align:center !important">
-                                        {{ ucfirst($user->firstname) . ' ' . ucfirst($user->middlename) . ' ' . ucfirst($user->lastname) }}</h5> 
-                                        <small class="info"><strong>({{ $user->customer->level->name ?? 'Level 1' }})</strong></small>
-                                        
-                                        <p style="text-align:center !important">
-                                            Email: <br><small><a href="mailto:{{ $user->email }}">{{ $user->email }}</a></small> <br>
-                                            Phone: <br><small>{{ $user->phone }}</small>
 
-                                        </p>
+            @include('layouts.alerts')
+
+            <section class="customer-admin-hero mb-2">
+                <div class="row align-items-center position-relative" style="z-index:1;">
+                    <div class="col-lg-7">
+                        <div class="d-flex align-items-center">
+                            <div class="customer-admin-avatar mr-1">{{ $initials }}</div>
+                            <div>
+                                <div class="customer-admin-kicker">Customer #{{ $user->id }}</div>
+                                <h2 class="mb-25">{{ $fullName }}</h2>
+                                <div class="d-flex flex-wrap align-items-center customer-admin-meta">
+                                    <span><i class="bx bx-at mr-25"></i>{{ $user->username }}</span>
+                                    <span><i class="bx bx-envelope mr-25"></i>{{ $user->email }}</span>
+                                    <span><i class="bx bx-phone mr-25"></i>{{ $user->phone ?: 'No phone number' }}</span>
                                 </div>
                             </div>
-                            <div class="col-sm-10">
-                                <div class="card-body">
-                                    <ul class="nav nav-tabs" role="tablist">
-                                        <li class="nav-item">
-                                            <a class="nav-link active" id="account-tab" data-toggle="tab" href="#account"
-                                                aria-controls="home" role="tab" aria-selected="true">
-                                                <i class="bx bxs-bar-chart-alt-2 align-middle"></i>
-                                                <span class="align-middle">Account</span>
-                                            </a>
-                                        </li>
-                                        <li class="nav-item">
-                                            <a class="nav-link" id="transactions-tab" data-toggle="tab" href="#transactions"
-                                                aria-controls="home" role="tab" aria-selected="true">
-                                                <i class="bx bxs-bar-chart-alt-2 align-middle"></i>
-                                                <span class="align-middle">Transactions</span>
-                                            </a>
-                                        </li>
-                                        <li class="nav-item">
-                                            <a class="nav-link" id="downlines-tab" data-toggle="tab" href="#downlines"
-                                                aria-controls="profile" role="tab" aria-selected="false">
-                                                <i class="bx bx-user-plus align-middle"></i>
-                                                <span class="align-middle">Downlines</span>
-                                            </a>
-                                        </li>
-                                        <li class="nav-item">
-                                            <a class="nav-link" id="ky-tabc" data-toggle="tab" href="#kyc"
-                                                aria-controls="about" role="tab" aria-selected="false">
-                                                <i class="bx bx-user align-middle"></i>
-                                                <span class="align-middle">KYC Data</span>
-                                            </a>
-                                        </li>
-                                        <li class="nav-item">
-                                            <a class="nav-link" id="reserved-account-tab" data-toggle="tab"
-                                                href="#reserved-account" aria-controls="about" role="tab"
-                                                aria-selected="false">
-                                                <i class="bx bx-wallet align-middle"></i>
-                                                <span class="align-middle">Reserved Accounts</span>
-                                            </a>
-                                        </li>
-                                        <li class="nav-item">
-                                            <a class="nav-link" id="actions-tab" data-toggle="tab" href="#actions"
-                                                aria-controls="about" role="tab" aria-selected="false">
-                                                <i class="bx bx-repost align-middle"></i>
-                                                <span class="align-middle">Actions</span>
-                                            </a>
-                                        </li>
-                                    </ul>
-                                    <div class="tab-content">
-                                        <div class="tab-pane active" id="account" aria-labelledby="account-tab"
-                                            role="tabpanel">
-                                            <div class="row">
-                                                @foreach ($balances as $key => $bal)
-                                                    <div class="col-sm-3 col-md-3">
-                                                        <div
-                                                            class="card bg-warning bg-lighten-2 p-0">
-                                                            <div class="card-content">
-                                                                <div class="card-body text-center" style="padding: 10px;padding-bottom: 0px;">
-                                                                    <p class="card-text white">
-                                                                        {{ $key }}</p>
-                                                                    <h5 class="card-title white">
-                                                                        {!! $bal !!}
-                                                                    </h5>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                @endforeach
-                                            </div>
-                                            <h5 class="card-title mt-3">
-                                                Profile Info
-                                            </h5>
-                                            <form
-                                                action="{{ request()->route()->getPrefix() }}/customer/update/{{ $user->id }}"
-                                                method="POST">
-                                                <fieldset class="form-group">
-                                                    <label for="firstname">First Name</label>
-                                                    <input type="text" class="form-control" id="firstname"
-                                                        placeholder="First name" value="{{ $user->firstname }}"
-                                                        name="firstname">
-                                                </fieldset>
-                                                <fieldset class="form-group">
-                                                    <label for="lastname">Last Name</label>
-                                                    <input type="text" class="form-control" id="lastname"
-                                                        placeholder="Last name" value="{{ $user->lastname }}"
-                                                        name="lastname">
-                                                </fieldset>
-                                                <fieldset class="form-group">
-                                                    <label for="status">Status</label>
-                                                    <select name="status" class="form-control" id="status">
-                                                        <option value="">Select Status</option>
-                                                        <option value="active" @selected($user->status == 'active')>Active</option>
-                                                        <option value="suspended" @selected($user->status == 'suspended')>Suspended
-                                                        </option>
-                                                        <option value="delete" @selected($user->status == 'delete')>Delete</option>
-                                                    </select>
-                                                </fieldset>
-                                                
-                                                <fieldset class="form-group">
-                                                    <label for="customerlevel">Customer Level</label>
-                                                    <select name="customerlevel" class="form-control" id="customerlevel">
-                                                        <option value="">Select Customerlevel</option>
-                                                        @foreach ($customerLevels as $level)
-                                                        <option value="{{ $level->id }}" {{$user->customer->customer_level == $level->id ? 'selected':''}}>{{ $level->name}}</option>
-                                                        @endforeach
-                                                    </select>
-                                                </fieldset>
-                                                <fieldset class="form-group">
-                                                    <label for="email">Email</label>
-                                                    <input type="email" disabled class="form-control" id="email" placeholder="Email" value="{{ $user->email }}">
-                                                </fieldset>
-                                                <fieldset class="form-group">
-                                                    <label for="username">Username</label>
-                                                    <input type="text" class="form-control" disabled placeholder="Username" value="{{ $user->username }}">
-                                                </fieldset>
-                                                <fieldset class="form-group">
-                                                    <label for="phone">Phone</label>
-                                                    <input type="phone" class="form-control" id="email"
-                                                        placeholder="Phone number" value="{{ $user->phone }}"
-                                                        name="phone">
-                                                </fieldset>
-                                                <fieldset class="form-group">
-                                                    <button type="submit" class="btn btn-success">
-                                                        Update
-                                                    </button>
-                                                </fieldset>
-                                                @csrf
-                                            </form>
-                                        </div>
-                                        <div class="tab-pane" id="transactions" aria-labelledby="transactions-tab"
-                                            role="tabpanel">
-                                            <div class="table-responsive">
-                                                <table id="table-extended-success" class="table mb-0">
-                                                    <thead>
-                                                        <tr>
-                                                            <th>Product</th>
-                                                            <th>Amount</th>
-                                                            <th>Amount Paid</th>
-                                                            <th>Biller</th>
-                                                            <th>Status</th>
-                                                            <th>Transaction ID</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        @php
-                                                            $trans = $user->customer
-                                                                ->transactions()
-                                                                ->latest()
-                                                                ->paginate(10);
-                                                        @endphp
-                                                        @foreach ($trans as $transaction)
-                                                            <tr>
-                                                                <td>
-                                                                    {{ $transaction->product_name }} <br><br>
-                                                                   <span><small>{{ $transaction->created_at->toDateString('en-GB') }}</small></span>
-                                                                </td>
-                                                                <td>{!! getSettings()->currency . number_format($transaction->amount) !!}</td>
-                                                                <td>{!! getSettings()->currency . number_format($transaction->total_amount) !!}</td>
-                                                                <td>{{ $transaction->unique_element }}</td>
-                                                                <td>{{ $transaction->status }}</td>
-                                                                <td><a class="mr-1 mb-1"  href="{{ route('admin.single.transaction.view', $transaction->id) }}">{{ $transaction->transaction_id }}</a>
-                                                                </td>
-                                                            </tr>
-                                                        @endforeach
-                                                    </tbody>
-                                                </table>
-                                                {{ $trans->render() }}
-                                            </div>
-                                        </div>
-                                        <div class="tab-pane" id="downlines" aria-labelledby="profile-tab"
-                                            role="tabpanel">
-                                            <table able class="table table-striped dataex-html5-selectors">
-                                                <thead>
-                                                    <tr>
-                                                        <th>Name</th>
-                                                        <th>Email</th>
-                                                        <th>Phone</th>
-                                                        <th>Total Earned</th>
-                                                        <th>Date</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                 
-                                                    @if($downlines->count() > 0)
-                                                    @foreach ($downlines as $ref)
-                                                        <tr>
-                                                            <td>
-                                                                @if(isset($ref->referredCustomer->user->firstname))
-                                                                {{ ucfirst($ref->referredCustomer->user->firstname) . ' ' . ucfirst($ref->referredCustomer->user->lastname) }}
-                                                                @else   
-                                                                N/A
-                                                                @endif
-                                                            </td>
-                                                            <td>{{ $ref->referredCustomer->user->email ?? ''}}</td>
-                                                            <td>{{ $ref->referredCustomer->user->phone ?? ''}}</td>
-                                                            <td>{!! getSettings()->currency . number_format($ref->total) !!}</td>
-                                                            <td>{{ $ref->created_at->toDateTimeString() }}</td>
-                                                        </tr>
-                                                    @endforeach
-                                                    @endif
-                                                </tbody>
-
-                                            </table>
-                                        </div>
-                                        <div class="tab-pane" id="kyc" aria-labelledby="about-tab" role="tabpanel">
-                                            {{-- <div class="card-header"> --}}
-                                               
-                                            {{-- </div> --}}
-                                           
-                                            <form action="{{ route('admin.customer.update.kyc', $user->customer->id) }}" method="POST" onsubmit="return confirm('Are you sure you want to update these details?');" enctype="multipart/form-data">
-                                                @csrf
-                                                <div class="card-content">
-                                                    <div class="row">
-                                                        <div class="col-md-6">
-                                                            <h1>KYC Data</h1>
-                                                            <h5 class="primary">General KYC Status: <button class="btn btn-primary btn-sm">{{ getFinalKycStatus($user->customer->id) }}</button> </h5>
-                                                        </div>
-                                                        <div class="col-md-6">
-                                                            {{-- @if(getFinalKycStatus($user->customer->id) == 'unverified' || getFinalKycStatus($user->customer->id) == 'declined') --}}
-                                                            <a onclick="return confirm('You are about to approve KYC details');" href="{{ route('admin.customer.approve.kyc', $user->customer->id) }}" class="btn btn-dark btn-sm"><i class="fa fa-check"></i> Approve and create reserved accounts</a>
-                                                            <a onclick="return confirm('You are about to decline KYC details');" href="{{ route('admin.customer.decline.kyc', $user->customer->id) }}" class="btn btn-danger btn-sm"><i class="fa fa-times"></i> Decline</a>
-                                                            {{-- @endif --}}
-                                                        </div>
-                                                        <hr>
-                                                        <div class="col-md-6">   
-                                                            <fieldset class="form-group">
-                                                                @if(kycStatus('FIRST_NAME', $user->customer->id)['status'] == 'verified')
-                                                                <label for="FIRST_NAME">First Name</label><span class="verified"><i class="fa fa-check"></i> Verified</span>
-                                                                
-                                                                @else
-                                                                    @if(kycStatus('FIRST_NAME', $user->customer->id)['status'] == 'declined')
-                                                                    <label for="FIRST_NAME">First Name</label><span class="declined"><i class="fa fa-times"></i> Declined</span>
-                                                                    @else
-                                                                    <label for="FIRST_NAME">First Name</label><span class="unverified"><i class="fa fa-times"></i> Not Verified</span>
-                                                                    @endif
-                                                                   
-                                                                @endif
-                                                                <input type="text" class="form-control" name="FIRST_NAME" value="{{ kycStatus('FIRST_NAME', $user->customer->id)['value'] }}">
-                                                            </fieldset>
-                                                        </div>
-                                                        
-                                                        <div class="col-md-6">   
-                                                            <fieldset class="form-group">
-                                                                @if(kycStatus('MIDDLE_NAME', $user->customer->id)['status'] == 'verified')
-                                                                <label for="MIDDLE_NAME">Middle Name</label><span class="verified"><i class="fa fa-check"></i> Verified</span>
-                                                                
-                                                                @else 
-                                                                @if(kycStatus('MIDDLE_NAME', $user->customer->id)['status'] == 'declined')
-                                                                <label for="MIDDLE_NAME">Middle Name</label><span class="declined"><i class="fa fa-times"></i> Declined</span>
-                                                                @else
-                                                                <label for="MIDDLE_NAME">Middle Name</label><span class="unverified"><i class="fa fa-times"></i> Not Verified</span>
-                                                                @endif
-                                                                @endif
-                                                                <input type="text" class="form-control" name="MIDDLE_NAME" value="{{ kycStatus('MIDDLE_NAME', $user->customer->id)['value'] }}">
-                                                            </fieldset>
-                                                        </div>
-                                                        <div class="col-md-6">   
-                                                            <fieldset class="form-group">
-                                                                @if(kycStatus('LAST_NAME', $user->customer->id)['status'] == 'verified')
-                                                                <label for="LAST_NAME">Last Name</label><span class="verified"><i class="fa fa-check"></i> Verified</span>
-                                                                
-                                                                @else 
-                                                                @if(kycStatus('LAST_NAME', $user->customer->id)['status'] == 'declined')
-                                                                <label for="LAST_NAME">Last Name</label><span class="declined"><i class="fa fa-times"></i> Declined</span>
-                                                                @else
-                                                                <label for="LAST_NAME">Last Name</label><span class="unverified"><i class="fa fa-times"></i> Not Verified</span>
-                                                                @endif
-                                                                @endif
-                                                                <input type="text" class="form-control" name="LAST_NAME" value="{{ kycStatus('LAST_NAME', $user->customer->id)['value'] }}">
-                                                            </fieldset>
-                                                        </div>
-                                                        <div class="col-md-6">   
-                                                            <fieldset class="form-group">
-                                                                <label for="email">Email Address</label><span class="verified"><i class="fa fa-check"></i> Verified</span>
-                                                                <input autocomplete="false" class="form-control" disabled value="{{ $user->email }}">
-                                                            </fieldset>
-                                                        </div>
-                                                        <div class="col-md-6">   
-                                                            <fieldset class="form-group">
-                                                                @if(kycStatus('PHONE_NUMBER', $user->customer->id)['status'] == 'verified')
-                                                                <label for="PHONE_NUMBER">Phone Number</label><span class="verified"><i class="fa fa-check"></i> Verified</span>
-                                                                
-                                                                @else 
-                                                                @if(kycStatus('PHONE_NUMBER', $user->customer->id)['status'] == 'declined')
-                                                                <label for="PHONE_NUMBER">Phone Number</label><span class="declined"><i class="fa fa-times"></i> Declined</span>
-                                                                @else
-                                                                <label for="PHONE_NUMBER">Phone Number</label><span class="unverified"><i class="fa fa-times"></i> Not Verified</span>
-                                                                @endif
-                                                                @endif
-                                                                <input type="text" class="form-control" name="PHONE_NUMBER" value="{{ kycStatus('PHONE_NUMBER', $user->customer->id)['value'] }}">
-                                                            </fieldset>
-                                                        </div>
-                                                        <div class="col-md-6">   
-                                                            <fieldset class="form-group">
-                                                                @if(kycStatus('BVN', $user->customer->id)['status'] == 'verified')
-                                                                <label for="BVN">BVN</label><span class="verified"><i class="fa fa-check"></i> Verified</span>
-                                                                
-                                                                @else 
-                                                                @if(kycStatus('BVN', $user->customer->id)['status'] == 'declined')
-                                                                <label for="BVN">BVN</label><span class="declined"><i class="fa fa-times"></i> Declined</span>
-                                                                @else
-                                                                <label for="BVN">BVN</label><span class="unverified"><i class="fa fa-times"></i> Not Verified</span>
-                                                                @endif
-                                                                @endif
-                                                                <input type="text" name="BVN"  class="form-control" value="{{kycStatus('BVN', $user->customer->id)['value'] }}" maxlength="11" minlength="11">
-                                                            </fieldset>
-                                                        </div>
-                                                        @if(kycStatus('IDCARDTYPE', $user->customer->id)['status'] == 'verified')
-                                                        <div class="col-md-6 mb-2"> 
-                                                            <label for="idcard">ID CARD TYPE</label><span class="verified"><i class="fa fa-check"></i> Verified</span>
-                                                                <select id="IDCARDTYPE" name="IDCARDTYPE" class="form-control">
-                                                                    <option value="">Select</option>
-                                                                    <option value="Nin Slip" {{(kycStatus('IDCARDTYPE', $user->customer->id)['value'] ==  "Nin Slip" ? 'selected' : '') }}>Nin Slip</option>
-                                                                    <option value="International Passport" {{(kycStatus('IDCARDTYPE', $user->customer->id)['value'] ==  "International Passport" ? 'selected' : '') }}>International Passport</option>
-                                                                    <option value="Driver's Licence" {{(kycStatus('IDCARDTYPE', $user->customer->id)['value'] ==  "Driver's Licence" ? 'selected' : '') }}>Driver's Licence</option>
-                                                                    <option value="Voter's Card" {{(kycStatus('IDCARDTYPE', $user->customer->id)['value'] ==  "Voter's Card" ? 'selected' : '') }}>Voter's Card</option>
-                                                                </select>
-                                                        </div>
-                                                        @else 
-                                                        <div class="col-md-6">   
-                                                            <fieldset class="form-group">
-                                                                @if(kycStatus('IDCARD', $user->customer->id)['status'] == 'declined')
-                                                                <label for="IDCARD">ID Card Type</label><span class="declined"><i class="fa fa-times"></i> Declined</span>
-                                                                @else
-                                                                <label for="IDCARD">ID Card Type</label><span class="unverified"><i class="fa fa-times"></i> Not Verified</span>
-                                                                @endif
-                                                                
-                                                                <select id="IDCARDTYPE" name="IDCARDTYPE" class="form-control">
-                                                                    <option value="">Select</option>
-                                                                    <option value="Nin Slip" {{(kycStatus('IDCARDTYPE', $user->customer->id)['value'] ==  "Nin Slip" ? 'selected' : '') }}>Nin Slip</option>
-                                                                    <option value="International Passport" {{(kycStatus('IDCARDTYPE', $user->customer->id)['value'] ==  "International Passport" ? 'selected' : '') }}>International Passport</option>
-                                                                    <option value="Driver's Licence" {{(kycStatus('IDCARDTYPE', $user->customer->id)['value'] ==  "Driver's Licence" ? 'selected' : '') }}>Driver's Licence</option>
-                                                                    <option value="Voter's Card" {{(kycStatus('IDCARDTYPE', $user->customer->id)['value'] ==  "Voter's Card" ? 'selected' : '') }}>Voter's Card</option>
-                                                                </select>
-                                                            </fieldset>
-                                                        </div>
-                                                        @endif
-                                                        <div class="col-md-6">  
-                                                            
-                                                            <fieldset class="form-group">
-                                                                    @if(kycStatus('IDCARD', $user->customer->id)['status'] == 'verified')
-                                                                    <label for="IDCARD">ID Card </label> <small class="primary" style="font-weight: bold;">(Not more that 500 kilobytes)</small> <span class="verified"><i class="fa fa-check"></i> Verified</span> <br>
-                                                                    <img style="width: 60px;cursor:zoom-in;" src="{{asset(kycStatus('IDCARD', $user->customer->id)['value'])}}" onclick="zoomImg(this)">
-
-                                                                    @else
-                                                                    @if(kycStatus('IDCARD', $user->customer->id)['status'] == 'declined')
-                                                                    <label for="IDCARD">ID Card </label> <small class="primary" style="font-weight: bold;">(Not more that 500 kilobytes)</small> <span class="declined"><i class="fa fa-times"></i> Declined</span>
-                                                                    @else
-                                                                    <label for="IDCARD">ID Card </label> <small class="primary" style="font-weight: bold;">(Not more that 500 kilobytes)</small> <span class="unverified"><i class="fa fa-times"></i> Not Verified</span>
-                                                                    @endif
-
-                                                                    <br>
-                                                                    <img style="width: 60px;cursor:zoom-in;" src="{{ asset(kycStatus('IDCARD', $user->customer->id)['value'])}}" onclick="zoomImg(this)">
-
-                                                                    @endif
-                                                                    </label>
-                                                                    <input type="file" name="IDCARD" accept="image/jpg, image/jpeg" class="form-control" value="{{ kycStatus('IDCARD', $user->customer->id)['value'] }}">
-                                                            </fieldset>
-                                                        </div>
-                                                    
-                                                        <div class="col-md-12"> 
-                                                            <button class="btn btn-primary" width="100%" type="submit">Update Customer details</button>
-                                                        </div>
-                                                        
-                                                    </div>
-                                                </div>
-                                            </form>
-                                        </div>
-                                        <div class="tab-pane" id="reserved-account" aria-labelledby="about-tab"
-                                            role="tabpanel">
-                                            @empty($accounts)
-                                                <p>No reserved account has been created by this customer</p>
-                                            @else
-                                            <button type="button" class="btn btn-success" data-toggle="modal" data-target="#reserved">Create Reserved Account
-                                            </button>
-
-                                                <table able class="table table-striped dataex-html5-selectors">
-                                                    <thead>
-                                                        <tr>
-                                                            <th>Name</th>
-                                                            <th>Bank</th>
-                                                            <th>Account</th>
-                                                            <th>Transactions</th>
-                                                            <th>ACtion</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        @foreach ($accounts as $key => $account)
-                                                            {{-- @if ($account->paymentgateway_id == 1) --}}
-                                                                <tr>
-                                                                    <td>{{ ucfirst($account->account_name) }}</td>
-                                                                    <td>{{ ucfirst($account->bank_name) }} <br>
-                                                                        <button class="btn btn-{{$account->gateway->slug == 'monnify' ? 'info' : 'primary'}} btn-sm">{{ $account->gateway->name }}</button>
-                                                                    </td>
-                                                                    <td>{{ ucfirst($account->account_number) }} <br>
-                                                                    <small style="color:black"><strong>Created on: {{$account->created_at}} </strong>
-                                                                        @if(!empty($account->admin_id)) <br>
-                                                                        By: <strong>{{ $account->admin->user->firstname . ' '. $account->admin->user->lastname}}</strong>
-                                                                        @else <br>
-                                                                        By: <strong>SYSTEM</strong>
-                                                                        @endif
-                                                                    </small></td>
-                                                                    <td>
-                                                                        <a title ="View Transactions" href="{{route('account.transactions', $account->id)}}">
-                                                                        {!! getSettings()->currency !!}{{ number_format($account->transactions->sum('total_amount'), 2) }} <small><strong>({{number_format($account->transactions->count())}})</strong></small></a>
-                                                                    </td>
-                                                                    <td>
-                                                                        <div>
-                                                                            <a onclick="return confirm('You are about to delete a reserved account!')"class="btn btn-danger btn-sm mr-1 mb-1" href="{{ route('reserved_account.delete', $account->id) }}"><i class="bx bxs-trash"></i><span class="align-middle ml-25">Delete</span></button></a>
-                                                                        </div>
-                                                                    </td>
-                                                                </tr>
-                                                            {{-- @endif --}}
-                                                        @endforeach
-                                                    </tbody>
-                                                </table>
-                                            @endempty
-                                        </div>
-                                        <div class="tab-pane" id="actions" aria-labelledby="about-tab"
-                                            role="tabpanel">
-                                            <div class="row">
-                                                
-                                                @php
-                                                    // check blacklist status
-                                                    $mail = BlackList::where('value', $user->email)->first();
-                                                  
-                                                @endphp
-                                                <div class="col-md-6 col-sm-6">
-                                                    <div class="card bg-lighten-2 p-0 bg-dark">
-                                                        <div class="card-body">
-                                                            <div class="card-content">
-                                                                <h5 class="card-title white">
-                                                                    Blacklist Email
-                                                                </h5>
-                                                                @if ($mail)
-                                                                    <div
-                                                                        class="custom-control custom-switch custom-switch-success custom-switch-glow custom-control-inline mb-1">
-                                                                        <input type="checkbox"
-                                                                            class="custom-control-input"
-                                                                            id="customSwitchGlow2"
-                                                                            @checked($mail->status == 'active')
-                                                                            onchange="toggleStatus()"
-                                                                            data-id="{{ $mail->id }}"
-                                                                            data-value="{{ $mail->status }}">
-                                                                        <label class="custom-control-label"
-                                                                            for="customSwitchGlow2">
-                                                                        </label>
-                                                                    </div>
-                                                                @else
-                                                                    <form action="{{ route('customer-blacklist.store') }}"
-                                                                        method="POST">
-                                                                        @csrf
-                                                                        <input type="hidden" name="type"
-                                                                            value="email">
-                                                                        <input type="hidden" name="value"
-                                                                            value="{{ $user->email }}">
-                                                                        <input type="hidden" name="status"
-                                                                            value="active">
-                                                                        <button class="btn btn-danger" type="submit">Add
-                                                                            to blacklist</button>
-                                                                    </form>
-                                                                @endif
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                @php
-                                                    // check blacklist statu
-                                                    $phone = BlackList::where('value', $user->phone)->first();
-                                                @endphp
-                                                <div class="col-md-6 col-sm-6">
-                                                    <div class="card bg-lighten-2 p-0 bg-danger">
-                                                        <div class="card-body">
-                                                            <div class="card-content">
-                                                                <h5 class="card-title white">
-                                                                    Blacklist Phone
-                                                                </h5>
-                                                                @if ($phone)
-                                                                    <div
-                                                                        class="custom-control custom-switch custom-switch-success custom-switch-glow custom-control-inline mb-1">
-                                                                        <input type="checkbox"
-                                                                            class="custom-control-input"
-                                                                            id="customSwitchGlow2"
-                                                                            @checked($phone->status == 'active')
-                                                                            onchange="toggleStatus()"
-                                                                            data-id="{{ $phone->id }}"
-                                                                            data-value="{{ $phone->status }}">
-                                                                        <label class="custom-control-label"
-                                                                            for="customSwitchGlow2">
-                                                                        </label>
-                                                                    </div>
-                                                                @else
-                                                                    <form action="{{ route('customer-blacklist.store') }}"
-                                                                        method="POST">
-                                                                        
-                                                                        @csrf
-                                                                        <input type="hidden" name="type"
-                                                                            value="biller">
-                                                                        <input type="hidden" name="value"
-                                                                            value="{{ $user->phone }}">
-                                                                        <input type="hidden" name="status" value="active">
-                                                                        <button class="btn btn-danger" type="submit">Add
-                                                                            to blacklist</button>
-                                                                    </form>
-                                                                @endif
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                @if(hasAccess('admin.password.reset'))
-                                                <div class="col-md-6 col-sm-6">
-                                                    <div class="card bg-lighten-2 p-0 bg-dark">
-                                                        <div class="card-body">
-                                                            <div class="card-content">
-                                                                <h5 class="card-title white">
-                                                                    Password Reset
-                                                                </h5>
-                                                                <button type="button" class="btn btn-success" data-toggle="modal" data-target="#reset-password">Click to reset password</button>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                @endif
-                                                @if(hasAccess('admin.transaction.pin.reset'))
-                                                <div class="col-md-6 col-sm-6">
-                                                    <div class="card bg-lighten-2 p-0 bg-light">
-                                                        <div class="card-body">
-                                                            <div class="card-content">
-                                                                <h5 class="card-title white">
-                                                                    Reset Transaction PIN
-                                                                </h5>
-                                                                <button type="button" class="btn btn-success" data-toggle="modal" data-target="#reset-transaction-pin">Click to reset transaction PIN</button>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                @endif
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-5 mt-1 mt-lg-0">
+                        <div class="customer-admin-statuses">
+                            <div>
+                                <small>Account status</small>
+                                <span class="badge {{ $user->status === 'active' ? 'badge-light-success' : 'badge-light-danger' }}">{{ ucfirst($user->status ?: 'unknown') }}</span>
+                            </div>
+                            <div>
+                                <small>KYC status</small>
+                                <span class="badge {{ $finalKycStatus === 'verified' ? 'badge-light-success' : ($finalKycStatus === 'awaiting-approval' ? 'badge-light-warning' : 'badge-light-secondary') }}">{{ ucfirst(str_replace('-', ' ', $finalKycStatus)) }}</span>
+                            </div>
+                            <div>
+                                <small>Customer level</small>
+                                <strong>{{ $customer->level->name ?? 'Level 1' }}</strong>
                             </div>
                         </div>
                     </div>
                 </div>
             </section>
-        </div>
-    </div>
-    <div class="modal fade text-left" id="reserved" tabindex="-1" role="dialog" aria-labelledby="myModalLabel160" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-md" role="document">
-            <div class="modal-content">
-                <div class="modal-header bg-primary">
-                    <h5 class="modal-title white" id="myModalLabel160">Add Reserved account for {{ $user->name }}</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <i class="bx bx-x"></i>
-                    </button>
-                </div>
-                <form action="{{route('create.reserved.account', $user->customer->id)}}" method="POST">
-                    @csrf
-                    <div class="modal-body">
-                        <div class="row">
-                            <div class="col-md-12">
-                                <fieldset class="form-group">
-                                    <label for="bank" style="display: block">Bank(s)</label>
-                                    
-                                    <select class="form-control js-example-basic-single" name="bank[]" id="bank" required multiple>
-                                        <option value="">Select</option>
-                                        <option value="50515" {{ old('bank') == '50515' ? 'selected' : ''}}>Moniepoint</option>
-                                        <option value="035" {{ old('bank') == '035' ? 'selected' : ''}}>Wema Bank</option>
-                                        <option value="058" {{ old('bank') == '058' ? 'selected' : ''}}>Guaranty Trust Bank</option> 
-                                    </select>
-                                </fieldset>
-                            </div>
-                        </div>
-                        <input type="hidden" name="bvn" value="{{ kycStatus('BVN', $user->customer->id)['value']  }}">
-                        <input type="hidden" name="customer_id" value="{{ $user->customer->id }}">
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-light-secondary" data-dismiss="modal">
-                            <i class="bx bx-x d-block d-sm-none"></i>
-                            <span class="d-none d-sm-block">Close</span>
-                        </button>
-                        <button type="submit" class="btn btn-primary ml-1"><span class="d-none d-sm-block">Submit</span>
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-    @if(hasAccess('admin.transaction.pin.reset'))
-    <div class="modal fade text-left" id="reset-transaction-pin" tabindex="-1" role="dialog" aria-labelledby="myModalLabel160" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-md" role="document">
-            <div class="modal-content">
-                <div class="modal-header bg-primary">
-                    <h5 class="modal-title white" id="myModalLabel160">Reset Transaction PIN for: {{ $user->name }}</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <i class="bx bx-x"></i>
-                    </button>
-                </div>
-                <form action="{{route('admin.transaction.pin.reset', $user->id)}}" method="POST">
-                    @csrf
-                    <div class="modal-body">
-                        <div class="row">
-                            <div class="col-md-12">
-                                <fieldset class="form-group">
-                                    <label for="new_transaction_pin">New Trasaction PIN</label>
-                                    <input type="text" class="form-control" name="new_transaction_pin" value="{{ old('new_transaction_pin') }}">
-                                </fieldset>
+
+            <div class="row match-height customer-balance-grid">
+                @foreach ($balances as $key => $balance)
+                    @php
+                        $balanceIcons = [
+                            'Wallet Balance' => 'bx bx-wallet',
+                            'Referral Earning' => 'bx bx-gift',
+                            'Transaction Total' => 'bx bx-transfer-alt',
+                            'Funds Total' => 'bx bx-credit-card',
+                        ];
+                    @endphp
+                    <div class="col-xl-3 col-sm-6">
+                        <div class="card customer-balance-card">
+                            <div class="card-body d-flex align-items-center">
+                                <span class="customer-balance-icon mr-1"><i class="{{ $balanceIcons[$key] ?? 'bx bx-bar-chart' }}"></i></span>
+                                <div><small>{{ $key }}</small><strong>{!! $balance !!}</strong></div>
                             </div>
                         </div>
                     </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-light-secondary" data-dismiss="modal">
-                            <i class="bx bx-x d-block d-sm-none"></i>
-                            <span class="d-none d-sm-block">Close</span>
-                        </button>
-                        <button type="submit" class="btn btn-primary ml-1"><span class="d-none d-sm-block">Submit</span>
-                        </button>
-                    </div>
-                </form>
+                @endforeach
             </div>
-        </div>
-    </div>
-    @endif
-    @if(hasAccess('admin.password.reset'))
-    <div class="modal fade text-left" id="reset-password" tabindex="-1" role="dialog" aria-labelledby="myModalLabel160" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-md" role="document">
-            <div class="modal-content">
-                <div class="modal-header bg-primary">
-                    <h5 class="modal-title white" id="myModalLabel160">Reset Password for: {{ $user->name }}</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <i class="bx bx-x"></i>
-                    </button>
+
+            <div class="card customer-workspace">
+                <div class="card-header border-bottom p-0">
+                    <ul class="nav nav-tabs customer-workspace-tabs border-0" role="tablist">
+                        @foreach($tabs as $tabId => $tab)
+                            <li class="nav-item">
+                                <a class="nav-link {{ $activeTab === $tabId ? 'active' : '' }}" href="{{ route('customers.edit', ['id' => $user->id, 'tab' => $tabId]) }}" aria-current="{{ $activeTab === $tabId ? 'page' : 'false' }}">
+                                    <i class="{{ $tab['icon'] }}"></i><span>{{ $tab['label'] }}</span>
+                                </a>
+                            </li>
+                        @endforeach
+                    </ul>
                 </div>
-                <form action="{{route('admin.password.reset', $user->id)}}" method="POST">
-                    @csrf
-                    <div class="modal-body">
-                        <div class="row">
-                            <div class="col-md-12">
-                                <fieldset class="form-group">
-                                    <label for="new_password">New Password</label>
-                                    <input type="text" class="form-control" name="new_password" value="{{ old('new_password') }}">
-                                </fieldset>
-                            </div>
-                        </div>
+                <div class="card-body p-0">
+                    <div class="customer-workspace-content">
+                        @include('admin.customers.partials.' . $tabs[$activeTab]['view'])
                     </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-light-secondary" data-dismiss="modal">
-                            <i class="bx bx-x d-block d-sm-none"></i>
-                            <span class="d-none d-sm-block">Close</span>
-                        </button>
-                        <button type="submit" class="btn btn-primary ml-1"><span class="d-none d-sm-block">Submit</span>
-                        </button>
-                    </div>
-                </form>
+                </div>
             </div>
         </div>
     </div>
-    @endif
-    <div id="myModal" class="modal modalPix">
-        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-xl" role="document">
-            <img class="modal-content" id="img01">
-        </div>
-    </div>
+
+    @include('admin.customers.partials.profile-modals')
 @endsection
 
 @section('page-script')
-    {{-- <script src="{{asset('asset/js/app-logistics-dashboard.js')}}"></script> --}}
-    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script src="{{ asset('app-assets/vendors/js/forms/select/select2.full.min.js') }}"></script>
     <script>
-        $(document).ready(function() {
-            $('.js-example-basic-single').select2();
-
-            $('#state').on('change',function () {
-                var state = $('#state').val();
-                $('#lga option:not(:first)').remove();
-                $.ajax({
-                    type: "GET",
-                    url: "{{url('/')}}/get-lga-by-statename/"+state,
-                    beforeSend: function () {
-
-                    },
-                    success: function(data) {
-                        $("#lga").append(data);
-                    }
-                });
-            });
+        $(function () {
+            $('.js-example-basic-single').select2({ width: '100%' });
 
         });
-        
-    </script>
-    <script>
-        var modal = document.getElementById("myModal");
-        var span = document.getElementsByClassName("close")[0];
-        var modalImg = document.getElementById("img01");
 
-        modalImg.onclick = function() {
-            modal.style.display = "none";
+        function zoomImg(image) {
+            const modal = document.getElementById('kyc-document-modal');
+            const modalImage = document.getElementById('kyc-document-preview');
+            modalImage.src = image.src;
+            $(modal).modal('show');
         }
 
-        function zoomImg(e){
-            modal.style.display = "block";
-            modalImg.src = e.src;
-        }
-
-        function toggleStatus() {
-            let check = confirm('Are you sure you want to perform this action?');
-            if (check) {
-                let status = $('#customSwitchGlow2').attr('data-value');
-                let id = $('#customSwitchGlow2').attr('data-id');
-
-                $.ajax({
-                    url: '/admin/black-list-status',
-                    data: {
-                        status,
-                        id
-                    },
-                    success: e => {
-                        alert(e.message)
-                        if (e.code == 1) {
-                            let status = $('#customSwitchGlow2').attr('data-value', e.status);
-                        }
-                    },
-                    error: () => alert('Request could not be completed!'),
-                });
+        function toggleBlacklist(input) {
+            if (!window.confirm('Are you sure you want to change this blacklist status?')) {
+                input.checked = !input.checked;
+                return;
             }
+
+            $.get('{{ route('black.list.status') }}', {
+                id: input.dataset.id,
+                status: input.dataset.status
+            }).done(function (response) {
+                if (response.code === 1) {
+                    input.dataset.status = response.status;
+                } else {
+                    input.checked = !input.checked;
+                    window.alert(response.message || 'The status could not be changed.');
+                }
+            }).fail(function () {
+                input.checked = !input.checked;
+                window.alert('The status could not be changed.');
+            });
         }
     </script>
-
 @endsection

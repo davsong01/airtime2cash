@@ -13,6 +13,7 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\CustomerAnnouncementController;
 use App\Http\Controllers\EmailApiController;
 use App\Http\Controllers\EmailLogController;
 use App\Http\Controllers\SettingsController;
@@ -71,13 +72,13 @@ Route::middleware(['auth', 'verified', 'tpin', 'ipcheck'])->group(function () {
     Route::get('confirm_reset_pin', [DashboardController::class, 'resetPin2']);
     Route::post('reset_pin_final', [DashboardController::class, 'finalProcessPin'])->name('final.pin.reset');
     // Route::post('change-pin', [HomeController::class, 'processResetPin'])->name('pin.process.reset');
-    Route::get('customer/{slug}', [TransactionController::class, 'showProductsPage'])->name('open.transaction.page');
     Route::get('airtime-to-cash', [TransactionController::class, 'airtimeToCash'])->name('airtime-to-cash');
     Route::get('wallet-to-bank/{sluhg}', [TransactionController::class, 'walletToBank'])->name('wallet-to-bank');
     
     Route::get('customer-get-variations/{product}', [VariationController::class, 'getCustomerVariations'])->name('get.customer.variations');
 
     Route::middleware(['kyc'])->group(function () {
+        Route::get('customer/{slug}', [TransactionController::class, 'showProductsPage'])->name('open.transaction.page');
         Route::post('customer-initialize-transaction', [TransactionController::class, 'initializeTransaction'])->name('initialize.transaction');
         Route::post('customer-initialize-airtime2cash-transaction', [TransactionController::class, 'initializeAirtime2CashTransaction'])->name('initialize.airtime2cashtransaction');
         Route::post('customer-initialize-wallet2banktransaction/{product}', [TransactionController::class, 'initializeWalletToBankTransaction'])->name('initialize.wallet2banktransaction');
@@ -115,6 +116,10 @@ Route::middleware(['auth', 'verified', 'tpin', 'ipcheck'])->group(function () {
 });
 
 Route::middleware('auth')->group(function () {
+    Route::get('/announcements', [CustomerAnnouncementController::class, 'index'])->name('customer.announcements.index');
+    Route::get('/notifications', [CustomerAnnouncementController::class, 'notifications'])->name('customer.notifications.index');
+    Route::post('/notifications/read-all', [CustomerAnnouncementController::class, 'markAllAsRead'])->name('customer.notifications.read-all');
+    Route::post('/notifications/{notification}/read', [CustomerAnnouncementController::class, 'markAsRead'])->name('customer.notifications.read');
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
@@ -163,6 +168,9 @@ Route::middleware(['auth', 'verified', 'admin', 'ipcheck', 'adminRoute'])->prefi
     Route::get('debit-customer', [TransactionController::class, 'debitCustomerPage'])->name('admin.debit.customer');
     Route::post('process-credit-debit', [TransactionController::class, 'processCreditDebit'])->name('admin.process.credit.debit');
     Route::get('admin-kyc', [KycDataController::class, 'adminKycIndex'])->name('admin.kyc');
+    Route::get('admin-kyc/customer-suggestions', [KycDataController::class, 'customerSuggestions'])
+        ->middleware('throttle:120,1')
+        ->name('admin.kyc.customer-suggestions');
     Route::get('admin-reserved-account', [ReservedAccountNumberController::class, 'index'])->name('admin.reserved.accounts');
     Route::get('account-transactions/{account}', [ReservedAccountNumberController::class, 'show'])->name('account.transactions');
     Route::get('admin-callback-analysis', [PaymentController::class, 'callBackAnalysis'])->name('callback.analysis');

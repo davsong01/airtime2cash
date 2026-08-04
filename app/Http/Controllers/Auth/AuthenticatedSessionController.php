@@ -31,15 +31,18 @@ class AuthenticatedSessionController extends Controller
 
         // Check if account is inactive
         if ($user->status !== 'active') {
-            auth()->logout();
+            Auth::guard('web')->logout();
+
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
 
             $message = match ($user->status) {
-                'delete' => 'This account has been deleted! Please contact support.',
-                'suspended' => 'This account has been suspended! Please contact support.',
-                default => 'This account is not active! Please contact support.',
+                'delete' => 'This account has been deleted. Please contact support.',
+                'suspended' => 'This account has been suspended. Please contact support.',
+                default => 'This account is not active. Please contact support.',
             };
 
-            return back()->with('error', $message);
+            return redirect()->route('login')->with('error', $message);
         }
 
         // Regenerate session to prevent fixation attacks

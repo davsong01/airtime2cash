@@ -13,11 +13,11 @@ return new class extends Migration
     {
         if (!Schema::hasColumns('settings', ['menu_text_color', 'menu_background_color', 'active_color','text_header_color','dasboard_customer_details_color', 'active_hover_color'])) {
             Schema::table('settings', function (Blueprint $table) {
-                $table->string('menu_text_color')->default('#fffff'); // Text color
-                $table->string('menu_background_color')->default('#1a233a'); // Background color
-                $table->string('active_color')->default('#FFB43C');
-                $table->string('text_header_color')->default('#bac0c7');
-                $table->string('dasboard_customer_details_color')->default('#fffff');
+                $table->string('menu_text_color')->default('#F4FAF9');
+                $table->string('menu_background_color')->default('#123F43');
+                $table->string('active_color')->default('#0B7D4F');
+                $table->string('text_header_color')->default('#286F70');
+                $table->string('dasboard_customer_details_color')->default('#F4E85A');
                 $table->string('active_hover_color')->default('#5a8dee');
             });
         }

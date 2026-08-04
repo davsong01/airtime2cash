@@ -43,6 +43,37 @@ class AuthenticationTest extends TestCase
         $this->assertGuest();
     }
 
+    public function test_suspended_customers_can_not_authenticate(): void
+    {
+        $user = User::factory()->create([
+            'type' => 'customer',
+            'status' => 'suspended',
+        ]);
+
+        $response = $this->post('/login', [
+            'email' => $user->email,
+            'password' => 'password',
+        ]);
+
+        $this->assertGuest();
+        $response->assertRedirect(route('login'));
+        $response->assertSessionHas('error', 'This account has been suspended. Please contact support.');
+    }
+
+    public function test_inactive_customer_sessions_are_revoked_on_the_next_request(): void
+    {
+        $user = User::factory()->create([
+            'type' => 'customer',
+            'status' => 'delete',
+        ]);
+
+        $response = $this->actingAs($user)->get('/profile');
+
+        $this->assertGuest();
+        $response->assertRedirect(route('login'));
+        $response->assertSessionHas('error', 'This account has been deleted. Please contact support.');
+    }
+
     public function test_users_can_logout(): void
     {
         $user = User::factory()->create();

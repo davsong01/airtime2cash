@@ -16,6 +16,19 @@ trait CreatesApplication
 
         $app->make(Kernel::class)->bootstrap();
 
+        $connection = config('database.default');
+        $database = config("database.connections.{$connection}.database");
+
+        if (!$app->environment('testing')) {
+            throw new \RuntimeException('Tests must run with APP_ENV=testing.');
+        }
+
+        if ($connection !== 'sqlite' || $database !== ':memory:') {
+            throw new \RuntimeException(
+                "Unsafe test database [{$connection}:{$database}]. Tests require sqlite :memory:."
+            );
+        }
+
         return $app;
     }
 }
