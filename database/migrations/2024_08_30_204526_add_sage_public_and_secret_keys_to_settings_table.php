@@ -11,13 +11,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        if (!Schema::hasColumn('settings', 'sage_public_key')) {
+        if (Schema::hasTable('settings') && !Schema::hasColumn('settings', 'sage_public_key')) {
             Schema::table('settings', function (Blueprint $table) {
                 $table->string('sage_public_key')->nullable();
             });
         }
 
-        if (!Schema::hasColumn('settings', 'sage_secret_key')) {
+        if (Schema::hasTable('settings') && !Schema::hasColumn('settings', 'sage_secret_key')) {
             Schema::table('settings', function (Blueprint $table) {
                 $table->string('sage_secret_key')->nullable();
             });
@@ -29,13 +29,13 @@ return new class extends Migration
      */
     public function down(): void
     {
-        if (Schema::hasColumn('settings', 'sage_public_key')) {
+        if (Schema::hasTable('settings') && Schema::hasColumn('settings', 'sage_public_key')) {
             Schema::table('settings', function (Blueprint $table) {
                 $table->dropColumn('sage_public_key');
             });
         }
 
-        if (Schema::hasColumn('settings', 'sage_secret_key')) {
+        if (Schema::hasTable('settings') && Schema::hasColumn('settings', 'sage_secret_key')) {
             Schema::table('settings', function (Blueprint $table) {
                 $table->dropColumn('sage_secret_key');
             });

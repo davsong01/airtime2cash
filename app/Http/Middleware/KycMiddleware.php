@@ -20,7 +20,10 @@ class KycMiddleware
         if(Auth::check()){
             $kyc_status = getFinalKycStatus(auth()->user()->customer->id);
             if($kyc_status != 'verified'){
-                return redirect(route('dashboard'))->with('unverified', 'You need to complete your KYC to be able to use this resource, Click <a href="'. route("update.kyc.details"). '"><b>HERE</b></a>');
+                return redirect(route('dashboard'))->with(
+                    'unverified',
+                    'Identity verification is required to use this service. Please <a href="' . route('update.kyc.details') . '"><strong>complete your KYC now</strong></a> to continue.'
+                );
             }else{
                 return $next($request);
             }

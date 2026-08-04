@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Carbon\Carbon;
 use App\Models\User;
 use App\Models\Customer;
+use App\Models\BlackList;
 use Illuminate\Http\Request;
 use App\Models\CustomerLevel;
 use App\Models\KycData;
@@ -17,69 +18,128 @@ class CustomerController extends Controller
 {
     function customers(Request $request, $status = null)
     {
-        $customers = User::where('type', '!=', 'admin')->orderby('id', 'DESC');
+        $request->validate([
+            'status' => ['nullable', 'in:active,api,delete,suspended,email-blacklist,phone-blacklist'],
+            'level' => ['nullable', 'integer'],
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date', 'after_or_equal:from'],
+        ]);
 
-        if ($status) {
-            if ($status == 'active') {
+        $selectedStatus = $status ?: $request->status;
+        $customers = User::with(['customer.level'])->where('type', '!=', 'admin');
+
+        if ($selectedStatus) {
+            if ($selectedStatus == 'active') {
                 $customers->where('status', 'active');
-            } elseif ($status == 'api') {
+            } elseif ($selectedStatus == 'api') {
                 $customers->where('type', 'api');
-            } elseif ($status == 'delete') {
+            } elseif ($selectedStatus == 'delete') {
                 $customers->where('status', 'delete');
-            } elseif ($status == 'suspended') {
+            } elseif ($selectedStatus == 'suspended') {
                 $customers->where('status', 'suspended');
-            } elseif ($status == 'email-blacklist') {
+            } elseif ($selectedStatus == 'email-blacklist') {
                 $customers->where('status', 'email-blacklist');
-            } elseif ($status == 'phone-blacklist') {
+            } elseif ($selectedStatus == 'phone-blacklist') {
                 $customers->where('status', 'phone-blacklist');
             } else {
-                return redirect(404);
+                abort(404);
             }
         }
 
-        if (isset($request->search)) {
+        if ($request->filled('search')) {
             $key = "%{$request->search}%";
-            $customers = $customers->where('firstname', 'like', $key)
-                ->orWhere('lastname', 'like', $key)
-                ->orWhere('middlename', 'like', $key)
-                ->orWhere('username', 'like', $key)
-                ->orWhere('phone', 'like', $key);
+            $customers->where(function ($query) use ($key) {
+                $query->where('firstname', 'like', $key)
+                    ->orWhere('lastname', 'like', $key)
+                    ->orWhere('middlename', 'like', $key)
+                    ->orWhere('username', 'like', $key)
+                    ->orWhere('email', 'like', $key)
+                    ->orWhere('phone', 'like', $key);
+            });
         }
 
-        // $customers = $customers->latest()->get();
-        // $customers = User::orderby('id', 'DESC');
-
-        if (!empty($request->email)) {
-            $customers = $customers->where('email', 'like', $request->email);
+        if ($request->filled('email')) {
+            $customers->where('email', 'like', '%' . trim($request->email) . '%');
         }
 
-        if (!empty($request->username)) {
-            $customers = $customers->where('username', 'like', $request->username);
+        if ($request->filled('username')) {
+            $customers->where('username', 'like', '%' . trim($request->username) . '%');
         }
 
-        if (!empty($request->mobile)) {
-            $customers = $customers->where('phone', 'like', $request->mobile);
+        if ($request->filled('mobile')) {
+            $customers->where('phone', 'like', '%' . trim($request->mobile) . '%');
         }
 
-        if (!empty($request->from) && !empty($request->to)) {
-            $from = $request->from . ' 00:00:00';
-            $to = $request->to . ' 23:59:59';
-
-            $customers = $customers->whereBetween('created_at', [$from, $to]);
+        if ($request->filled('level')) {
+            $customers->whereHas('customer', function ($query) use ($request) {
+                $query->where('customer_level', $request->level);
+            });
         }
-        
-        $customers = $customers->paginate(100);
 
-        $customer_levels = CustomerLevel::all();
+        if ($request->from && $request->to) {
+            $customers->whereBetween('created_at', [$request->from . ' 00:00:00', $request->to . ' 23:59:59']);
+        } elseif ($request->from) {
+            $customers->where('created_at', '>=', $request->from . ' 00:00:00');
+        } elseif ($request->to) {
+            $customers->where('created_at', '<=', $request->to . ' 23:59:59');
+        }
 
-        return view('admin.customers.index', ['customers' => $customers, 'customer_levels' => $customer_levels]);
+        $customers = $customers->latest('id')->paginate(25)->withQueryString();
+
+        $summary = User::where('users.type', '!=', 'admin')
+            ->leftJoin('customers', 'customers.user_id', '=', 'users.id')
+            ->selectRaw('COUNT(*) AS total')
+            ->selectRaw("SUM(CASE WHEN users.status = 'active' THEN 1 ELSE 0 END) AS active")
+            ->selectRaw("SUM(CASE WHEN users.status = 'suspended' THEN 1 ELSE 0 END) AS suspended")
+            ->selectRaw("SUM(CASE WHEN customers.kyc_status = 'verified' THEN 1 ELSE 0 END) AS verified")
+            ->selectRaw("SUM(CASE WHEN users.created_at >= ? THEN 1 ELSE 0 END) AS new_this_month", [now()->startOfMonth()])
+            ->first();
+
+        $customer_levels = CustomerLevel::orderBy('name')->get();
+
+        return view('admin.customers.index', compact('customers', 'customer_levels', 'summary', 'selectedStatus'));
     }
 
     function unverifiedCustomers(Request $request, $status = null)
     {
-        set_time_limit(360);
-        $customers = User::select('id', 'firstname','lastname','email','phone', 'created_at', 'email_verified_at', 'username')->whereNull('email_verified_at')->orderBy('created_at', 'DESC')->get();
-        return view('admin.customers.unverified', ['customers' => $customers]);
+        $request->validate([
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date', 'after_or_equal:from'],
+        ]);
+
+        $customers = User::where('type', '!=', 'admin')->whereNull('email_verified_at');
+
+        if ($request->filled('search')) {
+            $search = '%' . trim($request->search) . '%';
+            $customers->where(function ($query) use ($search) {
+                $query->where('firstname', 'like', $search)
+                    ->orWhere('lastname', 'like', $search)
+                    ->orWhere('username', 'like', $search)
+                    ->orWhere('email', 'like', $search)
+                    ->orWhere('phone', 'like', $search);
+            });
+        }
+
+        if ($request->from && $request->to) {
+            $customers->whereBetween('created_at', [$request->from . ' 00:00:00', $request->to . ' 23:59:59']);
+        } elseif ($request->from) {
+            $customers->where('created_at', '>=', $request->from . ' 00:00:00');
+        } elseif ($request->to) {
+            $customers->where('created_at', '<=', $request->to . ' 23:59:59');
+        }
+
+        $summary = User::where('type', '!=', 'admin')
+            ->selectRaw('SUM(CASE WHEN email_verified_at IS NULL THEN 1 ELSE 0 END) AS unverified')
+            ->selectRaw('SUM(CASE WHEN email_verified_at IS NULL AND created_at >= ? THEN 1 ELSE 0 END) AS new_this_month', [now()->startOfMonth()])
+            ->selectRaw('SUM(CASE WHEN email_verified_at IS NOT NULL THEN 1 ELSE 0 END) AS verified')
+            ->first();
+
+        $customers = $customers->select('id', 'firstname', 'lastname', 'email', 'phone', 'status', 'created_at', 'email_verified_at', 'username')
+            ->latest('id')
+            ->paginate(25)
+            ->withQueryString();
+
+        return view('admin.customers.unverified', compact('customers', 'summary'));
     }
     
     function verifyCustomer($customer, $internal=null)
@@ -166,28 +226,65 @@ class CustomerController extends Controller
         }
     }
 
-    function singleCustomer($id)
+    function singleCustomer(Request $request, $id)
     {
         if (!is_numeric($id)) {
             return redirect(404);
         }
 
-        $user = User::findOrFail($id);
+        $allowedTabs = ['account', 'transactions', 'downlines', 'kyc', 'reserved-account', 'actions'];
+        $activeTab = in_array($request->query('tab'), $allowedTabs, true)
+            ? $request->query('tab')
+            : 'account';
+
+        $user = User::with(['customer.level'])->findOrFail($id);
         $customer = $user->customer->id;
-        $downlines = ReferralEarning::where('customer_id', $customer)
-            ->latest()
-            ->groupBy('referred_customer_id')
-            ->get(['*', DB::raw('sum(amount) as total')]);
 
         $curr = getSettings()->currency;
         $balance = $curr . number_format(walletBalance($user), 2) ?? 0;
         $ref = $curr . number_format(referralBalance($user), 2) ?? 0;
-        $transTotal = $curr . number_format($user->customer->transactions()->first([DB::raw('sum(amount) as total')], 2)->total) ?? 0;
-        $fundTotal = $curr . number_format($user->customer->transactions()->whereNotNull('wallet_funding_provider')->first([DB::raw('sum(amount) as total')], 2)->total) ?? 0;
+        $transactionSummary = $user->customer->transactions()
+            ->selectRaw('COALESCE(SUM(amount), 0) as total')
+            ->selectRaw('COALESCE(SUM(CASE WHEN wallet_funding_provider IS NOT NULL THEN amount ELSE 0 END), 0) as funded_total')
+            ->first();
+        $transTotal = $curr . number_format((float) $transactionSummary->total, 2);
+        $fundTotal = $curr . number_format((float) $transactionSummary->funded_total, 2);
         $balances = ['Wallet Balance' => $balance, 'Referral Earning' => $ref, 'Transaction Total' => $transTotal, 'Funds Total' => $fundTotal];
-        $reservedAccount = ReservedAccountNumber::where('customer_id', $customer)->orderBy('created_at', 'desc')->get();
+        $downlines = collect();
+        $reservedAccount = collect();
+        $transactions = null;
+        $kycData = collect();
+        $blacklists = collect();
+        $customerLevels = collect();
 
-        $customerLevels = CustomerLevel::orderBy('order','ASC')->get();
+        if ($activeTab === 'account') {
+            $customerLevels = CustomerLevel::orderBy('order', 'ASC')->get();
+        } elseif ($activeTab === 'transactions') {
+            $transactions = $user->customer->transactions()->latest()->paginate(10);
+        } elseif ($activeTab === 'downlines') {
+            $downlines = ReferralEarning::where('customer_id', $customer)
+                ->with('referredCustomer.user')
+                ->latest()
+                ->groupBy('referred_customer_id')
+                ->get(['*', DB::raw('sum(amount) as total')]);
+        } elseif ($activeTab === 'kyc') {
+            $kycData = KycData::where('customer_id', $customer)->get()->keyBy('key');
+        } elseif ($activeTab === 'reserved-account') {
+            $reservedAccount = ReservedAccountNumber::with(['gateway', 'admin.user'])
+                ->withCount('transactions')
+                ->withSum('transactions as transaction_total', 'total_amount')
+                ->where('customer_id', $customer)
+                ->orderBy('created_at', 'desc')
+                ->get();
+            $kycData = KycData::where('customer_id', $customer)
+                ->where('key', 'BVN')
+                ->get()
+                ->keyBy('key');
+        } elseif ($activeTab === 'actions') {
+            $blacklists = BlackList::whereIn('value', array_filter([$user->email, $user->phone]))
+                ->get()
+                ->keyBy('value');
+        }
 
         return view(
             'admin.customers.single-customer',
@@ -196,7 +293,11 @@ class CustomerController extends Controller
                 'downlines' => $downlines,
                 'accounts' => $reservedAccount,
                 'balances' => $balances,
-                'customerLevels' => $customerLevels
+                'customerLevels' => $customerLevels,
+                'transactions' => $transactions,
+                'kycData' => $kycData,
+                'blacklists' => $blacklists,
+                'activeTab' => $activeTab,
             ]
         );
     }

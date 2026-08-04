@@ -74,6 +74,23 @@ class ApiAuthMiddleware
             return app('App\Http\Controllers\ExternalApiController')->toJson($json);
         }
 
+        if ($user->type === 'customer' && $user->status !== 'active') {
+            $message = match ($user->status) {
+                'delete' => 'This account has been deleted. Please contact support.',
+                'suspended' => 'This account has been suspended. Please contact support.',
+                default => 'This account is not active. Please contact support.',
+            };
+
+            $json = [
+                'status' => 'error',
+                'message' => $message,
+                'errors' => 'ACCOUNT_INACTIVE',
+                'data' => null,
+            ];
+
+            return app('App\Http\Controllers\ExternalApiController')->toJson($json);
+        }
+
         if ($request->method() == "GET") {
             if (!Hash::check($request->header("public-key"), $user->public_key)) {
                 $json = [

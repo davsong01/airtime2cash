@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        if (!Schema::hasColumn('reserved_account_callbacks', 'transaction_id')) {
+        if (Schema::hasTable('reserved_account_callbacks') && !Schema::hasColumn('reserved_account_callbacks', 'transaction_id')) {
             Schema::table('reserved_account_callbacks', function (Blueprint $table) {
                 $table->string('transaction_id')->nullable();
             });

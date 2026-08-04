@@ -17,6 +17,12 @@ class TransactionPinMiddleware
     public function handle(Request $request, Closure $next): Response
     {
         if(empty(auth()->user()->transaction_pin) && auth()->user()->type == 'customer'){
+            $customer = auth()->user()->customer;
+
+            if (layoutIsModern('customer') && $customer && getFinalKycStatus($customer->id) !== 'verified') {
+                return $next($request);
+            }
+
             return redirect(route('customer.create.pin'));
         }
         

@@ -3,6 +3,40 @@ use App\Models\PaymentGateway;
 ?>
 @extends('layouts.app')
 @section('page-css')
+    <style>
+        .settings-image-preview {
+            display: flex;
+            width: 100%;
+            min-width: 0;
+            height: 76px;
+            padding: .5rem;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            border: 1px solid #d9dfe7;
+            border-radius: .35rem;
+            background: #f8f9fa;
+        }
+
+        .settings-image-preview--dashboard {
+            height: 96px;
+        }
+
+        .settings-image-preview img {
+            display: block;
+            width: auto;
+            height: auto;
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        @media (max-width: 767.98px) {
+            .settings-image-preview {
+                margin-bottom: 1rem;
+            }
+        }
+    </style>
 @endsection
 @section('content')
 <!-- Content wrapper -->
@@ -43,6 +77,21 @@ use App\Models\PaymentGateway;
                                                                             <option value="telegram" {{ $settings->a2cash_chat_engine == 'telegram' ? 'selected' : ''}}>Telegram</option>
                                                                             
                                                                         </select>
+                                                                    </fieldset>
+                                                                    <fieldset class="form-group">
+                                                                        <label for="admin_layout">Admin Layout</label>
+                                                                        <select name="admin_layout" class="form-control" id="admin_layout">
+                                                                            <option value="legacy" {{ ($settings->admin_layout ?? 'legacy') === 'legacy' ? 'selected' : '' }}>Legacy Layout</option>
+                                                                        </select>
+                                                                        <small class="text-muted d-block mt-50">Admin stays on the legacy shell for now.</small>
+                                                                    </fieldset>
+                                                                    <fieldset class="form-group">
+                                                                        <label for="customer_layout">Customer Layout</label>
+                                                                        <select name="customer_layout" class="form-control" id="customer_layout">
+                                                                            <option value="legacy" {{ ($settings->customer_layout ?? 'legacy') === 'legacy' ? 'selected' : '' }}>Legacy Layout</option>
+                                                                            <option value="modern" {{ ($settings->customer_layout ?? 'legacy') === 'modern' ? 'selected' : '' }}>Modern Layout</option>
+                                                                        </select>
+                                                                        <small class="text-muted d-block mt-50">Customer pages will resolve through the template engine.</small>
                                                                     </fieldset>
                                                                     <fieldset class="form-group">
                                                                         <label for="whatsapp_number">Whatsapp Number</label>
@@ -155,7 +204,9 @@ use App\Models\PaymentGateway;
                                                                         </div>
                                                                         <div class="col-md-4">
                                                                             @if(!empty(getSettings()->logo))
-                                                                                <img style="height:60px;width:auto" src="{{ asset(getSettings()->logo)}}" alt="">
+                                                                                <div class="settings-image-preview">
+                                                                                    <img src="{{ asset(getSettings()->logo)}}" alt="Current logo">
+                                                                                </div>
                                                                             @endif
                                                                         </div>
                                                                     </div>
@@ -171,7 +222,9 @@ use App\Models\PaymentGateway;
                                                                         </div>
                                                                         <div class="col-md-4">
                                                                             @if(!empty(getSettings()->favicon))
-                                                                                <img style="height:62px;width:auto" src="{{ asset(getSettings()->favicon)}}" alt="">
+                                                                                <div class="settings-image-preview">
+                                                                                    <img src="{{ asset(getSettings()->favicon)}}" alt="Current favicon">
+                                                                                </div>
                                                                             @endif
                                                                         </div>
                                                                     </div>
@@ -188,7 +241,9 @@ use App\Models\PaymentGateway;
                                                                         </div>
                                                                         <div class="col-md-4">
                                                                             @if(!empty(getSettings()->dashboard_logo))
-                                                                                <img style="height:auto;width:100%;max-width: 100%" src="{{ asset(getSettings()->dashboard_logo)}}" alt="">
+                                                                                <div class="settings-image-preview settings-image-preview--dashboard">
+                                                                                    <img src="{{ asset(getSettings()->dashboard_logo)}}" alt="Current dashboard logo">
+                                                                                </div>
                                                                             @endif
                                                                         </div>
                                                                     </div>
@@ -212,6 +267,14 @@ use App\Models\PaymentGateway;
                                                                     <fieldset class="form-group">
                                                                         <label for="google_dashboard_ad_code">Google Dashboard Ad Code</label>
                                                                         <textarea class="form-control" id="google_dashboard_ad_code" rows="5" name="google_dashboard_ad_code" value="{{ $settings->google_dashboard_ad_code ?? old('google_dashboard_ad_code') }}" placeholder="Google dashboard ad code">{{ $settings->google_dashboard_ad_code ?? old('google_dashboard_ad_code') }}</textarea>
+                                                                    </fieldset>
+                                                                    <fieldset class="form-group">
+                                                                        <label for="google_dashboard_ad_enabled">Google Dashboard Ad</label>
+                                                                        <select class="form-control" id="google_dashboard_ad_enabled" name="google_dashboard_ad_enabled">
+                                                                            <option value="1" {{ old('google_dashboard_ad_enabled', $settings->google_dashboard_ad_enabled ?? true) ? 'selected' : '' }}>Enabled</option>
+                                                                            <option value="0" {{ !old('google_dashboard_ad_enabled', $settings->google_dashboard_ad_enabled ?? true) ? 'selected' : '' }}>Disabled</option>
+                                                                        </select>
+                                                                        <small class="text-muted d-block mt-50">Controls the dashboard ad in both customer layouts.</small>
                                                                     </fieldset>
                                                                 </div>
                                                             </div>

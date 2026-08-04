@@ -18,10 +18,14 @@ class RouteProtectionMiddleware
     public function handle(Request $request, Closure $next): Response
     {
         $curRouteName = Route::currentRouteName();
+        $permissionRoute = match ($curRouteName) {
+            'admin.kyc.customer-suggestions' => 'admin.kyc',
+            default => $curRouteName,
+        };
         
         $routes = auth()->user()->admin->rolepermissions();
         // dd($routes, $curRouteName);
-        if (in_array($curRouteName, $routes) || in_array(1, auth()->user()->admin->roleIds())) {
+        if (in_array($permissionRoute, $routes) || in_array(1, auth()->user()->admin->roleIds())) {
             return $next($request);
         } else {
             return back()->with('error', 'You cannot access this resource');

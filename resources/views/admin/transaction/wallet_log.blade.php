@@ -32,8 +32,8 @@
                                 <!-- data-2 -->
                                 <div class="statistics-data my-auto">
                                     <div class="statistics">
-                                        <s!!an
-                                            class="font-medium-2 mr-50 text-bold-600">{!! getSettings()->currency. number_format($debit) !!}</s!!an><br><span
+                                        <span
+                                            class="font-medium-2 mr-50 text-bold-600">{!! getSettings()->currency. number_format($debit) !!}</span><br><span
                                             class="text-danger">Debit</span>
                                     </div>
                                     
@@ -112,7 +112,7 @@
                                                         {{ $transaction->transaction_id }}
                                                     </a>
                                                     @else
-                                                    <a target="_blank" href="{{ route('admin.single.transaction.view', $transaction->transaction_id) }}">
+                                                    <a target="_blank" href="{{ $transaction->transaction_log ? route('admin.single.transaction.view', $transaction->transaction_log->id) : '#' }}">
                                                         {{ $transaction->transaction_id }}
                                                     </a>
                                                     @endif

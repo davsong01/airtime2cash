@@ -11,31 +11,40 @@ class Admin extends Model
 
     protected $guarded = [];
 
+    private ?array $cachedRolePermissions = null;
+    private ?array $cachedRoleIds = null;
+
     function rolepermissions () {
-        $permission = $this->permissions;
-        $allPermissions = [];
-        $routes = [];
-        if(empty($permission)){
-            return $allPermissions;
-        }else{
-            $allroles = explode(",",$permission);
-            $rolePermission = Role::where('status','active')->whereIn('id',$allroles)->pluck('permissions')->toArray();
-            
-            foreach($rolePermission as $permissions){
-                $explode = explode(",", $permissions);
-                foreach ($explode as $key=>$permissions) {
-                    $allPermissions[] = $permissions;
-                }
-            }
+        if ($this->cachedRolePermissions !== null) {
+            return $this->cachedRolePermissions;
         }
 
-        $allPermissions = array_unique($allPermissions);
-        // Getting the slugs
-        foreach($allPermissions as $key=>$value){
-            $routes[] = RolePermission::where('id', $value)->value('route');
+        if (empty($this->permissions)) {
+            return $this->cachedRolePermissions = [];
         }
 
-        return $routes;
+        $roles = Role::where('status', 'active')
+            ->whereIn('id', array_filter(explode(',', $this->permissions)))
+            ->get(['id', 'permissions']);
+
+        $this->cachedRoleIds = $roles->pluck('id')->all();
+        $permissionIds = $roles->pluck('permissions')
+            ->filter()
+            ->flatMap(fn ($permissions) => explode(',', $permissions))
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($permissionIds->isEmpty()) {
+            return $this->cachedRolePermissions = [];
+        }
+
+        return $this->cachedRolePermissions = RolePermission::whereIn('id', $permissionIds)
+            ->pluck('route')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
     }
 
     function user () {
@@ -43,15 +52,18 @@ class Admin extends Model
     }
 
     public function roleIds(){
-        $permission = $this->permissions;
-        $allPermissions = [];
-        if (empty($permission)) {
-            return $allPermissions;
-        } else {
-            $allroles = explode(",", $permission);
-            $allPermissions= Role::where('status', 'active')->whereIn('id', $allroles)->pluck('id')->toArray();
-            return $allPermissions;
+        if ($this->cachedRoleIds !== null) {
+            return $this->cachedRoleIds;
         }
+
+        if (empty($this->permissions)) {
+            return $this->cachedRoleIds = [];
+        }
+
+        return $this->cachedRoleIds = Role::where('status', 'active')
+            ->whereIn('id', array_filter(explode(',', $this->permissions)))
+            ->pluck('id')
+            ->all();
     }
     
 }

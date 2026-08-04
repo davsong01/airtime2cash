@@ -1,114 +1,22 @@
+@php $currency = getSettings()?->currency ?? 'NGN'; @endphp
+
 @extends('layouts.app')
-@section('title', 'All Reserved Account Details')
-@section('page-css')
-    <link rel="stylesheet" type="text/css" href="{{ asset('app-assets/vendors/css/vendors.min.css') }}">
-    <link rel="stylesheet" type="text/css" href="{{ asset('app-assets/vendors/css/tables/datatable/datatables.min.css') }}"> 
-    
-    <!-- BEGIN: Vendor CSS-->
-    <link rel="stylesheet" type="text/css" href="{{ asset('app-assets/vendors/css/vendors.min.css')}}">
-    <link rel="stylesheet" type="text/css" href="{{ asset('app-assets/vendors/css/tables/datatable/datatables.min.css')}}">
-    <!-- END: Vendor CSS-->
-    
-@endsection
+@section('title', 'Reserved Accounts')
+@section('page-css')<link rel="stylesheet" href="{{ asset('app-assets/css/admin-operations.css') }}">@endsection
+
 @section('content')
-<!-- Content wrapper -->
- <div class="app-content content">
-        <div class="content-overlay"></div>
-        <div class="content-wrapper">
-            <div class="content-header row">
-                <div class="content-header-left col-12 mb-2 mt-1">
-                    <div class="row breadcrumbs-top">
-                        <div class="col-12">
-                            <div class="breadcrumb-wrapper col-12">
-                                <ol class="breadcrumb p-0 mb-0">
-                                    <li class="breadcrumb-item"><a href="/"><i class="bx bx-home-alt"></i></a>
-                                    </li>
-                                   
-                                    <li class="breadcrumb-item active">All Reserved Accounts
-                                    </li>
-                                </ol>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="content-body">
-                <!-- Column selectors with Export Options and print table -->
-                <section id="column-selectors">
-                    <div class="row">
-                        <div class="col-12">
-                            <div class="card">
-                                @include('layouts.alerts')
-                                <div class="card-content">
-                                    <div class="card-body card-dashboard">
-                                        <div class="table-responsive">
-                                            <table class="table table-striped dataex-html5-selectors">
-                                                <thead>
-                                                    <tr>
-                                                        <th>Customer Details</th>
-                                                        <th>Account Details</th>
-                                                        <th>Transactions</th>
-                                                        <th>Actions</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    @foreach ( $numbers as $number )
-                                                    <tr>
-                                                        <td><p>
-                                                            {{$number->customer->user->name}} <br>
-                                                            <a title="View Customer" target="_blank" href="{{route('customers.edit', $number->customer->user->id)}}">{{$number->customer->user->email}}</a> <br>
-                                                            
-                                                                <small style="color:black"><strong>Created on: {{$number->created_at}} </strong>
-                                                                    @if(!empty($number->admin_id)) <br>
-                                                                    By: <strong>{{ $number->admin->user->firstname . ' '. $number->admin->user->lastname}}</strong>
-                                                                    @else   <br>
-                                                                    By: <strong>SYSTEM</strong>
-                                                                    @endif
-                                                                </small>
-                                                            </p>
-                                                        </td>
-                                                        <td><p>
-                                                            {{$number->account_name}}<br>
-                                                            {{$number->account_number}}<br>
-                                                            {{$number->bank_name}}<br>
-                                                            <small><strong>Attached BVN: </strong>{{mask($number->bvn)}}</small> <br>
-                                                            <span style="color:black">Provider:</span> {{$number->payment_gateway->name}}
-                                                            </p>
-                                                        </td>
-                                                        <td>
-                                                            <a title ="View Transactions" href="{{route('account.transactions', $number->id)}}">
-                                                            {!! getSettings()->currency !!}{{ number_format($number->transactions->sum('total_amount'), 2) }} <small><strong>({{number_format($number->transactions->count())}})</strong></small></a>
-                                                        </td>
-                                                        <td>
-                                                            @if($number->transactions->count() < 1)
-                                                            <a onclick="return confirm('You are about to delete a reserved account!')"class="btn btn-danger btn-sm mr-1 mb-1" href="{{ route('reserved_account.delete', $number->id) }}"><i class="bx bxs-trash"></i><span class="align-middle ml-25">Delete</span></button></a>
-                                                            @endif
-                                                        </td>
-                                                    </tr>
-                                                    @endforeach
-                                                </tbody>
-                                                
-                                            </table>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-                <!-- Column selectors with Export Options and print table -->
-            </div>
-        </div>
+<div class="app-content content"><div class="content-overlay"></div><div class="content-wrapper">
+    <div class="content-header row"><div class="content-header-left col-12 mb-2 mt-1"><div class="breadcrumb-wrapper col-12"><ol class="breadcrumb p-0 mb-0"><li class="breadcrumb-item"><a href="{{ route('dashboard') }}"><i class="bx bx-home-alt"></i></a></li><li class="breadcrumb-item active">Reserved accounts</li></ol></div></div></div>
+    <div class="content-body">@include('layouts.alerts')
+        <section class="ops-hero mb-2"><div class="row align-items-center"><div class="col-lg-8"><span class="ops-kicker"><i class="bx bx-building-house"></i> Banking operations</span><h2>Reserved account directory</h2><p>Search virtual accounts and inspect transaction activity without loading every account and transaction into memory.</p></div><div class="col-lg-4 text-lg-right mt-2 mt-lg-0"><a href="{{ route('admin.walletfundinglog') }}" class="btn btn-light"><i class="bx bx-wallet mr-50"></i> Wallet funding</a></div></div></section>
+        <section class="row"><div class="col-md-4"><div class="card ops-metric-card"><div class="card-body"><span class="ops-metric-icon is-primary"><i class="bx bx-credit-card"></i></span><span class="ops-metric-label">Reserved accounts</span><strong>{{ number_format((int) $summary->total) }}</strong><small>Accounts provisioned</small></div></div></div><div class="col-md-4"><div class="card ops-metric-card"><div class="card-body"><span class="ops-metric-icon is-success"><i class="bx bx-check-circle"></i></span><span class="ops-metric-label">Active accounts</span><strong>{{ number_format((int) $summary->active) }}</strong><small>Currently marked active</small></div></div></div><div class="col-md-4"><div class="card ops-metric-card"><div class="card-body"><span class="ops-metric-icon is-info"><i class="bx bx-group"></i></span><span class="ops-metric-label">Customers covered</span><strong>{{ number_format((int) $summary->customers) }}</strong><small>Distinct customer accounts</small></div></div></div></section>
+        <section class="card ops-panel ops-filter-panel mb-2"><div class="card-header d-flex align-items-center justify-content-between"><div class="d-flex align-items-center"><span class="ops-filter-icon"><i class="bx bx-filter-alt"></i></span><div><h5 class="mb-25">Find reserved accounts</h5><small class="text-muted">Search customer or bank details and narrow by provider.</small></div></div>@if(request()->query())<a href="{{ route('admin.reserved.accounts') }}" class="btn btn-sm btn-light-secondary"><i class="bx bx-reset mr-25"></i> Clear</a>@endif</div><div class="card-body"><form method="GET" action="{{ route('admin.reserved.accounts') }}"><div class="row"><div class="col-md-6 form-group"><label for="search">Customer or account details</label><input class="form-control" id="search" name="search" value="{{ request('search') }}" placeholder="Name, email, phone, bank or account number"></div><div class="col-md-3 form-group"><label for="gateway">Payment gateway</label><select class="form-control" id="gateway" name="gateway"><option value="">All gateways</option>@foreach($gateways as $gateway)<option value="{{ $gateway->id }}" @selected((string) request('gateway') === (string) $gateway->id)>{{ $gateway->name }}</option>@endforeach</select></div><div class="col-md-3 d-flex align-items-end"><button class="btn btn-primary btn-block" type="submit"><i class="bx bx-search mr-25"></i> Apply filters</button></div></div></form></div></section>
+        <section class="card ops-panel"><div class="card-header"><span class="ops-section-kicker">Account directory</span><h5 class="mb-0">{{ number_format($numbers->total()) }} matching accounts</h5></div><div class="table-responsive"><table class="table table-hover mb-0 ops-table"><thead><tr><th>S/N</th><th>Customer</th><th>Account</th><th>Provider</th><th>Transactions</th><th class="text-right">Action</th></tr></thead><tbody>
+            @forelse($numbers as $number)
+                @php $user = $number->customer?->user; $name = $user?->name ?: $number->account_name ?: 'Unknown customer'; @endphp
+                <tr><td class="text-muted">{{ $numbers->firstItem() + $loop->index }}</td><td><div class="d-flex align-items-center"><span class="ops-customer-mark">{{ str($name)->substr(0, 1)->upper() }}</span><div><a class="d-block font-weight-bold" href="{{ $user ? route('customers.edit', $user->id) : '#' }}">{{ $name }}</a><small class="d-block text-muted">{{ $user?->email ?: 'Customer unavailable' }}</small><small class="text-muted">Created {{ $number->created_at->format('M j, Y') }}</small></div></div></td><td><strong class="d-block">{{ $number->account_number }}</strong><small class="d-block text-muted">{{ $number->account_name }}</small><small class="d-block text-muted">{{ $number->bank_name }} · BVN {{ mask($number->bvn) }}</small></td><td><strong class="d-block">{{ $number->payment_gateway?->name ?: 'Unknown provider' }}</strong><span class="badge badge-light-{{ $number->status === 'active' ? 'success' : 'warning' }} mt-50">{{ ucfirst($number->status ?: 'unknown') }}</span><small class="d-block text-muted mt-50">By {{ $number->admin?->user ? trim($number->admin->user->firstname . ' ' . $number->admin->user->lastname) : 'System' }}</small></td><td><a href="{{ route('account.transactions', $number->id) }}"><strong class="d-block">{{ $currency }}{{ number_format((float) ($number->transaction_total ?? 0), 2) }}</strong><small>{{ number_format($number->transactions_count) }} transactions</small></a></td><td class="text-right"><a class="btn btn-sm btn-primary" href="{{ route('account.transactions', $number->id) }}"><i class="bx bx-show mr-25"></i> View</a>@if($number->transactions_count < 1)<a onclick="return confirm('Delete this reserved account?')" class="btn btn-sm btn-outline-danger" href="{{ route('reserved_account.delete', $number->id) }}"><i class="bx bx-trash"></i></a>@endif</td></tr>
+            @empty<tr><td colspan="6" class="text-center py-3 text-muted">No reserved accounts match these filters.</td></tr>@endforelse
+        </tbody></table></div>@if($numbers->hasPages())<div class="card-footer d-flex justify-content-between align-items-center"><small class="text-muted">Showing {{ $numbers->firstItem() }}–{{ $numbers->lastItem() }} of {{ number_format($numbers->total()) }}</small>{{ $numbers->links() }}</div>@endif</section>
     </div>
-@endsection
-@section('page-script')
-    <script src="{{ asset('app-assets/vendors/js/tables/datatable/datatables.min.js') }}"></script>
-    <script src="{{ asset('app-assets/vendors/js/tables/datatable/dataTables.bootstrap4.min.js') }}"></script>
-    <script src="{{ asset('app-assets/vendors/js/tables/datatable/dataTables.buttons.min.js') }}"></script>
-    <script src="{{ asset('app-assets/vendors/js/tables/datatable/buttons.html5.min.js') }}"></script>
-    <script src="{{ asset('app-assets/vendors/js/tables/datatable/buttons.print.min.js') }}"></script>
-    <script src="{{ asset('app-assets/vendors/js/tables/datatable/buttons.bootstrap.min.js') }}"></script>
-    <script src="{{ asset('app-assets/vendors/js/tables/datatable/pdfmake.min.js') }}"></script>
-    <script src="{{ asset('app-assets/vendors/js/tables/datatable/vfs_fonts.js') }}"></script>
-     <script src="{{ asset('app-assets/js/scripts/datatables/datatable.js') }}"></script>
+</div></div>
 @endsection

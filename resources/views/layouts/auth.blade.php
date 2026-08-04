@@ -21,7 +21,7 @@
                             <div class="row m-1">
                                 <a href="/" class="app-brand-link gap-2" style="margin: auto !important;">
                                     <span class="app-brand-logo demo">
-                                        <img style="object-fit: contain;max-width: 300px;" src="{{ asset(getSettings()->logo) }}" height="100px">
+                                        <img style="object-fit: contain;max-width: 300px;" src="{{ asset(getSettings()?->logo ?: 'app-assets/images/logo/logo.png') }}" height="100px">
                                     </span>
                                 </a>
                                 @yield('body')

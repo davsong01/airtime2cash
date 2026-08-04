@@ -1,0 +1,28 @@
+.a2c-admin-hero { position: relative; overflow: hidden; padding: 1.7rem 1.8rem; border-radius: .8rem; background: linear-gradient(125deg, #123f43, #1f6866 72%, #2b887c); color: #fff; box-shadow: 0 1rem 2.5rem rgba(18,63,67,.2); }
+.a2c-admin-hero::after { position: absolute; width: 260px; height: 260px; border: 45px solid rgba(255,255,255,.05); border-radius: 50%; content: ""; right: -90px; top: -135px; }
+.a2c-admin-hero h2 { margin: .55rem 0 .3rem; color: #fff; }
+.a2c-admin-hero p { max-width: 680px; margin: 0; color: rgba(255,255,255,.72); }
+.a2c-admin-kicker { display: inline-flex; align-items: center; gap: .4rem; font-size: .72rem; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; }
+.a2c-admin-queue { position: relative; z-index: 1; padding: 1rem 1.15rem; border: 1px solid rgba(255,255,255,.22); border-radius: .7rem; background: rgba(255,255,255,.11); backdrop-filter: blur(8px); }
+.a2c-admin-queue span, .a2c-admin-queue small { display: block; color: rgba(255,255,255,.7); }
+.a2c-admin-queue strong { display: block; margin: .15rem 0; color: #fff; font-size: 1.65rem; }
+.a2c-metric-card { border: 1px solid #e4e9ec; border-radius: .7rem; box-shadow: 0 .55rem 1.5rem rgba(34,48,62,.06); }
+.a2c-metric-card .card-body { position: relative; }
+.a2c-metric-card strong { display: block; margin: .45rem 0 .2rem; color: #273b4a; font-size: 1.25rem; }
+.a2c-metric-card small { color: #87939b; }
+.a2c-metric-label { display: block; padding-right: 42px; color: #667781; font-size: .72rem; font-weight: 700; letter-spacing: .035em; text-transform: uppercase; }
+.a2c-metric-icon { position: absolute; display: inline-flex; width: 38px; height: 38px; align-items: center; justify-content: center; border-radius: .55rem; right: 1.2rem; top: 1.1rem; font-size: 1.1rem; }
+.a2c-metric-icon.is-success { background: #e8f7ef; color: #16845a; }
+.a2c-metric-icon.is-primary { background: #e9efff; color: #426fc5; }
+.a2c-metric-icon.is-warning { background: #fff3dc; color: #b67508; }
+.a2c-metric-icon.is-danger { background: #ffebeb; color: #cf4b4b; }
+.a2c-filter-card, .a2c-queue-card { border: 1px solid #e4e9ec; border-radius: .7rem; box-shadow: 0 .55rem 1.5rem rgba(34,48,62,.06); }
+.a2c-filter-icon { display: inline-flex; width: 40px; height: 40px; margin-right: .75rem; align-items: center; justify-content: center; border-radius: .55rem; background: #e9f6f2; color: #16845a; font-size: 1.15rem; }
+.a2c-filter-card label { color: #586973; font-size: .74rem; font-weight: 600 !important; }
+.a2c-filter-card .form-control { min-height: 40px; border-color: #dce2e6; }
+.a2c-admin-table thead th { border-top: 0; color: #687882; font-size: .68rem; letter-spacing: .045em; text-transform: uppercase; white-space: nowrap; }
+.a2c-admin-table td { vertical-align: middle; }
+.a2c-customer-mark { display: inline-flex; width: 38px; height: 38px; margin-right: .7rem; flex: 0 0 38px; align-items: center; justify-content: center; border-radius: .55rem; background: #eef7f4; color: #14795a; font-weight: 800; }
+.a2c-reference { max-width: 190px; overflow: hidden; color: #334854; font-size: .76rem; text-overflow: ellipsis; white-space: nowrap; }
+.min-width-0 { min-width: 0; }
+@media (max-width: 767.98px) { .a2c-admin-hero { padding: 1.25rem; } .a2c-admin-hero h2 { font-size: 1.45rem; } }

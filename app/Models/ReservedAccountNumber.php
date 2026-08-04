@@ -25,7 +25,7 @@ class ReservedAccountNumber extends Model
 
     public function transactions()
     {
-        return $this->hasMany(TransactionLog::class, 'account_number', 'id');
+        return $this->hasMany(TransactionLog::class, 'account_number', 'account_number');
     }
 
     public function payment_gateway()

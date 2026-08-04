@@ -1,13 +1,7 @@
 @extends('layouts.app')
 @section('title', 'All Reserved Account Details')
 @section('page-css')
-    <link rel="stylesheet" type="text/css" href="{{ asset('app-assets/vendors/css/vendors.min.css') }}">
-    <link rel="stylesheet" type="text/css" href="{{ asset('app-assets/vendors/css/tables/datatable/datatables.min.css') }}"> 
-    
-    <!-- BEGIN: Vendor CSS-->
-    <link rel="stylesheet" type="text/css" href="{{ asset('app-assets/vendors/css/vendors.min.css')}}">
-    <link rel="stylesheet" type="text/css" href="{{ asset('app-assets/vendors/css/tables/datatable/datatables.min.css')}}">
-    <!-- END: Vendor CSS-->
+    <link rel="stylesheet" href="{{ asset('app-assets/css/admin-operations.css') }}">
     
 @endsection
 @section('content')
@@ -42,7 +36,7 @@
                                 <div class="card-content">
                                     <div class="card-body card-dashboard">
                                         <div class="table-responsive">
-                                            <table class="table table-striped dataex-html5-selectors">
+                                            <table class="table table-hover mb-0 ops-table ops-compact-table">
                                                 <thead>
                                                     <tr>
                                                         <th>Customer Details</th>
@@ -57,7 +51,7 @@
                                                     <tr>
                                                         <td><p>
                                                             {{$transaction->customer_name}} <br>
-                                                            <a title="View Customer" target="_blank" href="{{route('customers.edit', $transaction->customer->id)}}">{{$transaction->customer_email}}</a> <br>
+                                                            <a title="View Customer" target="_blank" href="{{ $transaction->customer?->user ? route('customers.edit', $transaction->customer->user->id) : '#' }}">{{$transaction->customer_email}}</a> <br>
                                                             @if($transaction->status == 'success')
                                                             <button class="btn btn-success btn-sm">Success</button>
                                                             @else  
@@ -77,7 +71,7 @@
                                                         <td>{{$transaction->created_at}}</td>
                                                         <td>{!! getSettings()->currency !!}{{ number_format($transaction->amount, 2)}}</td>
                                                         <td>
-                                                            <a class="btn btn-info btn-sm" title="View Transaction" href="{{ route('transaction.status', $transaction->transaction_id) }}">View</a>
+                                                            <a class="btn btn-info btn-sm" title="View Transaction" href="{{ route('admin.single.transaction.view', $transaction->id) }}">View</a>
                                                         </td>
                                                     </tr>
                                                     @endforeach
@@ -85,6 +79,9 @@
                                                 
                                             </table>
                                         </div>
+                                        @if($transactions->hasPages())
+                                            <div class="d-flex justify-content-end mt-1">{{ $transactions->links() }}</div>
+                                        @endif
                                     </div>
                                 </div>
                             </div>
@@ -95,15 +92,4 @@
             </div>
         </div>
     </div>
-@endsection
-@section('page-script')
-    <script src="{{ asset('app-assets/vendors/js/tables/datatable/datatables.min.js') }}"></script>
-    <script src="{{ asset('app-assets/vendors/js/tables/datatable/dataTables.bootstrap4.min.js') }}"></script>
-    <script src="{{ asset('app-assets/vendors/js/tables/datatable/dataTables.buttons.min.js') }}"></script>
-    <script src="{{ asset('app-assets/vendors/js/tables/datatable/buttons.html5.min.js') }}"></script>
-    <script src="{{ asset('app-assets/vendors/js/tables/datatable/buttons.print.min.js') }}"></script>
-    <script src="{{ asset('app-assets/vendors/js/tables/datatable/buttons.bootstrap.min.js') }}"></script>
-    <script src="{{ asset('app-assets/vendors/js/tables/datatable/pdfmake.min.js') }}"></script>
-    <script src="{{ asset('app-assets/vendors/js/tables/datatable/vfs_fonts.js') }}"></script>
-     <script src="{{ asset('app-assets/js/scripts/datatables/datatable.js') }}"></script>
 @endsection

@@ -1,5 +1,8 @@
 <?php
     $verifiable = verifiableUniqueElements();
+    $manualProducts = $category->products->where('manual_status', 'active')->count();
+    $autoShareProducts = $category->products->where('auto_share_status', 'active')->count();
+    $defaultTransferMode = old('transfer_mode', $manualProducts ? 'manual' : 'auto_share');
 ?>
 @extends('layouts.app')
 @section('title', $category->seo_title)
@@ -23,6 +26,12 @@
         font-weight: 500 !important;
         color: black;
     }
+    .legacy-conversion-mode { display: flex; min-height: 82px; padding: 14px; align-items: center; gap: 10px; border: 1px solid #dfe5e8; border-radius: 8px; cursor: pointer; }
+    .legacy-conversion-mode strong, .legacy-conversion-mode small { display: block; }
+    .legacy-conversion-mode small { margin-top: 3px; color: #828d99; }
+    .legacy-conversion-mode i { color: #168a67; font-size: 22px !important; }
+    .legacy-mode-input:checked + .legacy-conversion-mode { border-color: #168a67; background: #f1faf7; box-shadow: 0 0 0 2px rgba(22,138,103,.1); }
+    .legacy-mode-input:disabled + .legacy-conversion-mode { opacity: .5; cursor: not-allowed; }
 </style>
 @endsection
 @section('content')
@@ -62,13 +71,26 @@
                                                                             </div>
                                                                         </div>
                                                                         <div class="row">
+                                                                            <div class="col-md-12 mb-1">
+                                                                                <label>Transfer Method</label>
+                                                                                <div class="row">
+                                                                                    <div class="col-md-6 mb-1">
+                                                                                        <input class="legacy-mode-input d-none" type="radio" name="transfer_mode" id="legacy-transfer-manual" value="manual" @checked($defaultTransferMode === 'manual') @disabled(!$manualProducts)>
+                                                                                        <label class="legacy-conversion-mode" for="legacy-transfer-manual"><i class="bx bx-hand"></i><span><strong>Manual Transfer</strong><small>Send airtime manually to our number</small></span></label>
+                                                                                    </div>
+                                                                                    <div class="col-md-6 mb-1">
+                                                                                        <input class="legacy-mode-input d-none" type="radio" name="transfer_mode" id="legacy-transfer-auto" value="auto_share" @checked($defaultTransferMode === 'auto_share') @disabled(!$autoShareProducts)>
+                                                                                        <label class="legacy-conversion-mode" for="legacy-transfer-auto"><i class="bx bx-bolt-circle"></i><span><strong>Auto Transfer</strong><small>Airtime moved through Auto Share</small></span></label>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
                                                                             <div class="col-md-12">
                                                                                 <fieldset class="form-group">
                                                                                     <label for="product">Select Network Provider</label>
                                                                                     <select class="form-control js-example-basic-single" name="product" id="product" required>
                                                                                         <option value="">Select</option>
                                                                                         @foreach ($category->products as $item)
-                                                                                            <option value="{{ $item->id }}" data-discounted_rate = {{ $item->discounted_rate }} data-allow_quantity="{{ $item->allow_quantity }}" data-min="{{ $item->min}}" data-max="{{$item->max}}" data-system_price="{{ $item->system_price }}" data-fixed_price="{{ $item->fixed_price}}" data-image="{{ asset($item->image) }}" data-name="{{ $item->name }}" data-instruction="{{ $item->instruction }}" data-rate="{{ $item->rate }}" data-description="{{ $item->description }}" {{ old('product') == $item->id ? 'selected' : ''}} {{ old('product') == $item->id ? 'selected' : ''}}>{{ $item->display_name }}</option>
+                                                                                            <option value="{{ $item->id }}" data-manual_status="{{ $item->manual_status }}" data-auto_share_status="{{ $item->auto_share_status }}" data-manual_rate="{{ $item->manual_discounted_rate }}" data-auto_share_rate="{{ $item->auto_share_discounted_rate }}" data-allow_quantity="{{ $item->allow_quantity }}" data-min="{{ $item->min}}" data-max="{{$item->max}}" data-system_price="{{ $item->system_price }}" data-fixed_price="{{ $item->fixed_price}}" data-image="{{ asset($item->image) }}" data-name="{{ $item->name }}" data-instruction="{{ $item->instruction }}" data-description="{{ $item->description }}">{{ $item->display_name }}</option>
                                                                                         @endforeach
                                                                                     </select>
                                                                                     <div class="footnote">
@@ -230,8 +252,27 @@
 
 
     $(document).ready(function () {
+        var productSelect = $('#product');
+        var allProductOptions = productSelect.find('option').clone();
+
+        function refreshNetworks() {
+            var transferMode = $('input[name="transfer_mode"]:checked').val();
+            var statusKey = transferMode === 'auto_share' ? 'auto_share_status' : 'manual_status';
+
+            productSelect.empty();
+            allProductOptions.each(function (index) {
+                var option = $(this);
+                if (index === 0 || option.data(statusKey) === 'active') {
+                    productSelect.append(option.clone());
+                }
+            });
+
+            productSelect.val('').trigger('change');
+        }
+
+        $('input[name="transfer_mode"]').on('change', refreshNetworks);
+        refreshNetworks();
         $("#amount").val('');
-        $('#product').val('');
         $('#amount-div').hide();
         $('#payment_method').val('');
 
@@ -239,7 +280,10 @@
             $('#agreement').prop('checked', false);
             var fixed_price = $('#product').find(':selected').data('fixed_price');
             var system_price = $('#product').find(':selected').data('system_price');
-            var discounted_rate = $('#product').find(':selected').data('discounted_rate');
+            var transferMode = $('input[name="transfer_mode"]:checked').val();
+            var discounted_rate = transferMode === 'auto_share'
+                ? $('#product').find(':selected').data('auto_share_rate')
+                : $('#product').find(':selected').data('manual_rate');
             var max = $('#product').find(':selected').data('max');
             var min = $('#product').find(':selected').data('min');
             var product = $('#product').val();

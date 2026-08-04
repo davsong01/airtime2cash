@@ -1,70 +1,107 @@
 @extends('layouts.auth')
+
+@section('page-css')
+    <link rel="stylesheet" href="{{ asset('app-assets/css/auth-refresh.css') }}">
+@endsection
+
 @section('body')
-    <!-- left section-login -->
-    <div class="col-md-12 col-12 px-0">
-        <div class="card disable-rounded-right d-flex justify-content-center">
-            <div class="card-header pb-1">
-                <div class="card-title">
-                    <h4 class="text-center mb-2">Create An Account</h4>
-                </div>
-            </div>
-            <div class="card-content">
-                <div class="card-body">
-                    @include('layouts.alerts')
-                    <form action="{{ route('register') }}" method="POST">
-                        @csrf
-                        <div class="row">
-                            <div class="form-group mb-50 col-sm-6 col-12">
-                                <label class="text-bold-600" for="firstName">First Name <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="firstName" name="first_name"
-                                    value="{{ old('first_name') }}" placeholder="First name" required>
-                            </div>
-                            <div class="form-group col-sm-6 col-12">
-                                <label class="text-bold-600" for="lastName">Last Name <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="lastName" name="last_name" value="{{ old('last_name') }}" placeholder="Last name" required>
-                            </div>
-                            <div class="form-group col-sm-6 col-12 mb-50">
-                                <label class="text-bold-600" for="email">Email Address <span class="text-danger">*</span></label>
-                                <input type="email" class="form-control" id="email" name="email"
-                                value="{{ old('email') }}" placeholder="Enter your email address" required>
-                            </div>
-                            <div class="form-group col-sm-6 col-12 mb-50">
-                                <label class="text-bold-600" for="phone">Phone Number <span class="text-danger">*</span></label>
-                                <input type="tel" class="form-control" id="phone" name="phone"
-                                value="{{ old('phone') }}" placeholder="Enter your phone number" required>
-                            </div>
-                            <div class="form-group col-sm-6 col-12 mb-50">
-                                <label class="text-bold-600" for="username">Username <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="username" name="username"
-                                    value="{{ old('username') }}" placeholder="Username" required>
-                            </div>
-                            <div class="form-group mb-50 col-sm-6 col-12 mb-50">
-                                <label class="text-bold-600" for="ref">Referral Username</label>
-                                <input type="text" class="form-control" id="referral" name="referral"
-                                    value="{{ request()->referral }}" placeholder="Enter referral id">
-                            </div>
-                            <div class="form-group mb-50 col-sm-6 col-12 mb-50">
-                                <label class="text-bold-600" for="password">Password <span class="text-danger">*</span></label>
-                                <input type="password" class="form-control" id="password" name="password"
-                                    placeholder="Password" required>
-                            </div>
-                        </div>
-                        <div class="form-group mb-50 mt-2">
-                            <div class="checkbox checkbox-success checkbox-glow">
-                                <input type="checkbox" id="checkboxGlow3" name="privacy" required>
-                                <label for="checkboxGlow3"><p>I agree to the <a target="_blank" href="https://airtime2cash.com/terms-of-service/">TERMS OF SERVICE</a> of {{ config('app.name')}}</p></label>
-                            </div>
-                        </div>
-                        
-                        <x-captcha group-class="mb-50 mt-2" />
-                        <button type="submit" class="btn btn-primary glow w-100 position-relative">Register</button>
-                    </form>
-                    <hr>
-                    <div class="text-center"><small class="mr-25">Already have an account?</small><a
-                            href="{{ route('login') }}"><small>Login</small></a></div>
-                    @include('layouts.support')
-                </div>
-            </div>
+    <div class="auth-refresh col-12 px-0">
+        <div class="auth-heading">
+            <span class="auth-eyebrow"><i class="bx bx-shield-quarter"></i> Secure registration</span>
+            <h1>Create your account</h1>
+            <p>Enter accurate details so your account and KYC review can be completed without delays.</p>
         </div>
+
+        @include('layouts.alerts')
+
+        <form action="{{ route('register') }}" method="POST" autocomplete="on">
+            @csrf
+
+            <section class="auth-section">
+                <div class="auth-section-header">
+                    <span class="auth-step">01</span>
+                    <div>
+                        <h2>Personal details</h2>
+                        <p>Use the same information shown on your identification documents.</p>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="form-group col-md-6">
+                        <label for="firstName">First name <span class="auth-required">*</span></label>
+                        <input type="text" class="form-control" id="firstName" name="first_name" value="{{ old('first_name') }}" placeholder="Enter first name" autocomplete="given-name" required>
+                    </div>
+                    <div class="form-group col-md-6">
+                        <label for="lastName">Last name <span class="auth-required">*</span></label>
+                        <input type="text" class="form-control" id="lastName" name="last_name" value="{{ old('last_name') }}" placeholder="Enter last name" autocomplete="family-name" required>
+                    </div>
+                    <div class="form-group col-md-6">
+                        <label for="email">Email address <span class="auth-required">*</span></label>
+                        <input type="email" class="form-control" id="email" name="email" value="{{ old('email') }}" placeholder="name@example.com" autocomplete="email" required>
+                    </div>
+                    <div class="form-group col-md-6">
+                        <label for="phone">Phone number <span class="auth-required">*</span></label>
+                        <input type="tel" class="form-control" id="phone" name="phone" value="{{ old('phone') }}" placeholder="Enter phone number" autocomplete="tel" inputmode="tel" required>
+                    </div>
+                </div>
+            </section>
+
+            <section class="auth-section">
+                <div class="auth-section-header">
+                    <span class="auth-step">02</span>
+                    <div>
+                        <h2>Account access</h2>
+                        <p>Choose your login details and add a referral username if you have one.</p>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="form-group col-md-4">
+                        <label for="username">Username <span class="auth-required">*</span></label>
+                        <div class="auth-username-wrap">
+                            <input type="text" class="form-control" id="username" name="username" value="{{ old('username') }}" placeholder="Choose or generate one" autocomplete="username" required>
+                            <button type="button" class="auth-username-suggest" id="suggestUsername" aria-label="Generate a username">
+                                <i class="bx bx-refresh"></i><span>Suggest</span>
+                            </button>
+                        </div>
+                        <small class="auth-field-help">We can suggest one from your name, or you can enter your own.</small>
+                    </div>
+                    <div class="form-group col-md-4">
+                        <label for="referral">Referral username</label>
+                        <input type="text" class="form-control" id="referral" name="referral" value="{{ old('referral', request()->referral) }}" placeholder="Optional">
+                    </div>
+                    <div class="form-group col-md-4">
+                        <label for="password">Password <span class="auth-required">*</span></label>
+                        <div class="auth-password-wrap">
+                            <input type="password" class="form-control" id="password" name="password" placeholder="Create a password" autocomplete="new-password" required>
+                            <button class="auth-password-toggle" type="button" data-password-toggle="password" aria-label="Show password">
+                                <i class="bx bx-show"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <x-captcha />
+
+            <div class="auth-consent">
+                <input type="checkbox" id="privacy" name="privacy" value="1" required>
+                <label for="privacy">
+                    I agree to the <a target="_blank" rel="noopener" href="https://airtime2cash.com/terms-of-service/">Terms of Service</a> and confirm that the information provided is accurate.
+                </label>
+            </div>
+
+            <button type="submit" class="auth-submit btn">
+                Create account <i class="bx bx-right-arrow-alt"></i>
+            </button>
+        </form>
+
+        <div class="auth-footer">Already have an account? <a href="{{ route('login') }}">Sign in</a></div>
+        <div class="auth-support">@include('layouts.support')</div>
     </div>
+@endsection
+
+@section('page-script')
+    @include('auth.partials.password-toggle-script')
+    @include('auth.partials.username-suggestion-script')
 @endsection

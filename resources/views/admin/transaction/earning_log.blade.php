@@ -37,7 +37,7 @@
                                 <div class="statistics-data my-auto">
                                     <div class="statistics">
                                         <span
-                                            class="font-medium-2 mr-50 text-bold-600">{!! getSettings()->currency. number_format($failed, 2) !!}</s!!an><br><span
+                                            class="font-medium-2 mr-50 text-bold-600">{!! getSettings()->currency. number_format($failed, 2) !!}</span><br><span
                                             class="text-danger">Total Debit</span>
                                     </div>
                                    
@@ -115,12 +115,12 @@
                                             <tr>
                                                
                                                 <td>{{ $transaction->customer->user->name }} <br>
-                                                    <a href="{{ route('customers.edit', $transaction->customer)}}">{{ $transaction->customer->user->email  }}</a> <br>
+                                                    <a href="{{ route('customers.edit', $transaction->customer->user->id)}}">{{ $transaction->customer->user->email  }}</a> <br>
                                                     {{ $transaction->customer_phone }} <br>
                                                     
                                                 </td>
                                                  <td>{{ $transaction->referredCustomer->user->name }} <br>
-                                                    <a href="{{ route('customers.edit', $transaction->referredCustomer)}}">{{ $transaction->referredCustomer->user->email  }}</a> <br>
+                                                    <a href="{{ route('customers.edit', $transaction->referredCustomer->user->id)}}">{{ $transaction->referredCustomer->user->email  }}</a> <br>
                                                     {{ $transaction->customer_phone }} <br>
                                                     
                                                 </td>
@@ -146,7 +146,7 @@
                                                     </strong>
                                                 </td>
                                                 <td>
-                                                    <a class="btn btn-primary btn-sm mr-1 mb-1" href="{{ route('admin.single.transaction.view', $transaction->id) }}">
+                                                    <a class="btn btn-primary btn-sm mr-1 mb-1 {{ $transaction->transaction ? '' : 'disabled' }}" href="{{ $transaction->transaction ? route('admin.single.transaction.view', $transaction->transaction->id) : '#' }}">
                                                         <i class="fa fa-eye"></i>
                                                         <span class="align-middle ml-25">View</span>
                                                     </a>

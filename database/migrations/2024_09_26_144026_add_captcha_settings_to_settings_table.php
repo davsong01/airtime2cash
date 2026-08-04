@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        if (!Schema::hasColumn('settings', 'captcha_settings')) {
+        if (Schema::hasTable('settings') && !Schema::hasColumn('settings', 'captcha_settings')) {
             Schema::table('settings', function (Blueprint $table) {
                 $table->json('captcha_settings')->nullable();
             });
@@ -23,7 +23,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        if (Schema::hasColumn('settings', 'captcha_settings')) {
+        if (Schema::hasTable('settings') && Schema::hasColumn('settings', 'captcha_settings')) {
             Schema::table('settings', function (Blueprint $table) {
                 $table->dropColumn('captcha_settings');
             });

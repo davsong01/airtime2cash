@@ -14,7 +14,7 @@ return new class extends Migration
         if (!Schema::hasColumns('users', ['referral', 'username']))
         Schema::table('users', function (Blueprint $table) {
             $table->string('username');
-            $table->string('referral')->nullable;
+            $table->string('referral')->nullable();
         });
     }
 

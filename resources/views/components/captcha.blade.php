@@ -1,5 +1,5 @@
 @php
-    $captchaSettings = getSettings()->captcha_settings;
+    $captchaSettings = getSettings()?->captcha_settings ?? [];
 @endphp
 
 @if(isset($captchaSettings['captcha_settings_status']) && $captchaSettings['captcha_settings_status'] == 'yes')
@@ -18,6 +18,12 @@
         </script>
     @endif
     @if(in_array($captchaSettings['captcha_settings_provider'], ['all','simple']))
-        {!! getCaptchaBox() !!}
+        <div class="auth-captcha {{ $groupClass ?? '' }}">
+            <div>
+                <span class="auth-captcha-label">Security check</span>
+                <span class="auth-captcha-question">{{ getCaptchaQuestion() }}</span>
+            </div>
+            <input class="form-control auth-captcha-input" name="_answer" type="number" inputmode="numeric" aria-label="Captcha answer" required>
+        </div>
     @endif
 @endif

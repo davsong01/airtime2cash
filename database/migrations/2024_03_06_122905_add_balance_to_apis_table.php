@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        if (!Schema::hasColumn('a_p_is', 'balance')) {
+        if (Schema::hasTable('a_p_is') && !Schema::hasColumn('a_p_is', 'balance')) {
             Schema::table('a_p_is', function (Blueprint $table) {
                 $table->double('balance')->nullable();
             });
@@ -23,7 +23,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        if (Schema::hasColumn('a_p_is', 'balance')) {
+        if (Schema::hasTable('a_p_is') && Schema::hasColumn('a_p_is', 'balance')) {
             Schema::table('a_p_is', function (Blueprint $table) {
                 $table->dropColumn("balance")->nullable();
             }); 

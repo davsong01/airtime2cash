@@ -11,6 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (Schema::hasTable('airtime2_cash_transactions')) {
+            return;
+        }
+
         Schema::create('airtime2_cash_transactions', function (Blueprint $table) {
             $table->id();
             $table->double('amount_charged', 11,2)->nullable();

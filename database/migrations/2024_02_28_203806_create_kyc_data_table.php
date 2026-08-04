@@ -11,6 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (Schema::hasTable('kyc_data')) {
+            return;
+        }
+
         Schema::create('kyc_data', function (Blueprint $table) {
             $table->id();
             $table->integer('customer_id')->nullable();

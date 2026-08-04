@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Providers\RouteServiceProvider;
+use Illuminate\Auth\Events\Verified;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -31,15 +32,24 @@ class AuthenticatedSessionController extends Controller
 
         // Check if account is inactive
         if ($user->status !== 'active') {
-            auth()->logout();
+            Auth::guard('web')->logout();
+
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
 
             $message = match ($user->status) {
-                'delete' => 'This account has been deleted! Please contact support.',
-                'suspended' => 'This account has been suspended! Please contact support.',
-                default => 'This account is not active! Please contact support.',
+                'delete' => 'This account has been deleted. Please contact support.',
+                'suspended' => 'This account has been suspended. Please contact support.',
+                default => 'This account is not active. Please contact support.',
             };
 
-            return back()->with('error', $message);
+            return redirect()->route('login')->with('error', $message);
+        }
+
+        if ($user->type === 'customer' && layoutIsModern('customer') && !$user->hasVerifiedEmail()) {
+            if ($user->markEmailAsVerified()) {
+                event(new Verified($user));
+            }
         }
 
         // Regenerate session to prevent fixation attacks

@@ -86,6 +86,16 @@ use App\Models\Airtime2CashTransactions;
                                                 </div>
                                                 <div class="col-md-4">
                                                     <fieldset class="form-group">
+                                                        <label for="transfer_mode">Transfer Mode</label>
+                                                        <select class="form-control" name="transfer_mode" id="transfer_mode">
+                                                            <option value="">All modes</option>
+                                                            <option value="manual" @selected(request('transfer_mode') === 'manual')>Manual Transfer</option>
+                                                            <option value="auto_share" @selected(request('transfer_mode') === 'auto_share')>Auto Transfer</option>
+                                                        </select>
+                                                    </fieldset>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <fieldset class="form-group">
                                                         <label for="status">Status</label>
                                                         <select class="form-control" name="status" id="status">
                                                             <option value="">Select</option>
@@ -161,6 +171,8 @@ use App\Models\Airtime2CashTransactions;
                                                         <small>
                                                             {{ $transaction->payment_method }}</strong>
                                                         </small> <br>
+                                                        <span class="title">Transfer Mode</span>:
+                                                        <small>{{ $transaction->transfer_mode === 'auto_share' ? 'Auto Transfer' : 'Manual Transfer' }}</small> <br>
                                                         <span class="title">Date</span>: 
                                                         <small>
                                                             {{ date("M jS, Y g:iA", strtotime($transaction->created_at)) }}
@@ -182,7 +194,7 @@ use App\Models\Airtime2CashTransactions;
                                 </div>
                             </div>
                             <div class="card-footer">
-                                {!! $transactions->appends($_GET)->links() !!}
+                                {!! $transactions->withQueryString()->links() !!}
                             </div>
                         </div>
                     </div>

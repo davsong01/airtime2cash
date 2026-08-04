@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        if (!Schema::hasColumn('customer_levels', 'make_api_level')) {
+        if (Schema::hasTable('customer_levels') && !Schema::hasColumn('customer_levels', 'make_api_level')) {
             Schema::table('customer_levels', function (Blueprint $table) {
                 $table->string('make_api_level')->default('no');
             });
@@ -23,7 +23,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        if (Schema::hasColumn('customer_levels', 'make_api_level')) {
+        if (Schema::hasTable('customer_levels') && Schema::hasColumn('customer_levels', 'make_api_level')) {
             Schema::table('customer_levels', function (Blueprint $table) {
                 $table->dropColumn("make_api_level")->nullable();
             }); 

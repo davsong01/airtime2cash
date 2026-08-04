@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        if (!Schema::hasColumn('settings', 'card_funding_extra_charge')) {
+        if (Schema::hasTable('settings') && !Schema::hasColumn('settings', 'card_funding_extra_charge')) {
             Schema::table('settings', function (Blueprint $table) {
                 $table->string('card_funding_extra_charge')->default(0);
             });

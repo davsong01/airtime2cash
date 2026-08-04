@@ -4,6 +4,7 @@ use App\Models\KycData;
 use App\Models\Category;
 use App\Models\Customer;
 use App\Models\EmailLog;
+use App\Models\Product;
 use App\Models\Settings;
 use App\Mail\EmailMessages;
 use Illuminate\Support\Arr;
@@ -11,6 +12,7 @@ use App\Models\Announcement;
 use App\Models\PaymentGateway;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\View;
 use App\Http\Controllers\WalletController;
 use App\Http\Controllers\PaymentProcessors\SquadController;
 use App\Http\Controllers\PaymentProcessors\MonnifyController;
@@ -182,7 +184,337 @@ if (!function_exists("airtime2cashBalance")) {
 if (!function_exists("getSettings")) {
     function getSettings()
     {
-        return Settings::first();
+        if (app()->bound('app.settings')) {
+            return app('app.settings');
+        }
+
+        $settings = Settings::first();
+        app()->instance('app.settings', $settings);
+
+        return $settings;
+    }
+}
+
+if (!function_exists("layoutMode")) {
+    function layoutMode(string $scope = 'customer'): string
+    {
+        $settings = getSettings();
+
+        if (!$settings) {
+            return 'legacy';
+        }
+
+        if ($scope === 'admin') {
+            return $settings->admin_layout ?? 'legacy';
+        }
+
+        return $settings->customer_layout
+            ?? $settings->ui_layout_version
+            ?? 'legacy';
+    }
+}
+
+if (!function_exists("menuItemIsActive")) {
+    function menuItemIsActive(array $patterns = []): bool
+    {
+        foreach ($patterns as $pattern) {
+            if (request()->is($pattern) || request()->routeIs($pattern)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+}
+
+if (!function_exists("menuIconClass")) {
+    function menuIconClass(string $iconKey, string $variant = 'legacy'): string
+    {
+        $icons = [
+            'grid-alt' => 'bx-grid-alt',
+            'mobile-alt' => 'bx-mobile-alt',
+            'wifi' => 'bx-wifi',
+            'tv' => 'bx-tv',
+            'bulb' => 'bx-bulb',
+            'book-open' => 'bx-book-open',
+            'trophy' => 'bx-trophy',
+            'shield-quarter' => 'bx-shield-quarter',
+            'bus' => 'bx-bus',
+            'building-house' => 'bx-building-house',
+            'transfer-alt' => 'bx-transfer-alt',
+            'transfer' => 'bx-transfer',
+            'home-smile' => 'bx-home-smile',
+            'user-circle' => 'bx-user-circle',
+            'user' => 'bx-user',
+            'network-chart' => 'bx-network-chart',
+            'group' => 'bx-group',
+            'dollar-circle' => 'bx-dollar-circle',
+            'wallet' => 'bx-wallet',
+            'wallet-alt' => 'bx-wallet-alt',
+            'receipt' => 'bx-receipt',
+            'history' => 'bx-history',
+            'bar-chart-square' => 'bx-bar-chart-square',
+            'badge-check' => 'bx-badge-check',
+            'news' => 'bx-news',
+            'time' => 'bx-time-five',
+            'file' => 'bx-file',
+            'id-card' => 'bx-id-card',
+            'headphone' => 'bx-headphone',
+            'support' => 'bx-support',
+            'log-out-circle' => 'bx-log-out-circle',
+            'log-out' => 'bx-log-out',
+            'circle' => 'bx-circle',
+        ];
+
+        $icon = $icons[$iconKey] ?? $icons['circle'];
+
+        if ($variant === 'sneat') {
+            return 'menu-icon icon-base bx ' . $icon;
+        }
+
+        return 'bx ' . $icon;
+    }
+}
+
+if (!function_exists("modernServiceIconKey")) {
+    function modernServiceIconKey($category): string
+    {
+        $service = strtolower(trim(($category->slug ?? '') . ' ' . ($category->display_name ?? '')));
+        $icons = [
+            'airtime' => 'mobile-alt',
+            'recharge' => 'mobile-alt',
+            'data' => 'wifi',
+            'internet' => 'wifi',
+            'tv' => 'tv',
+            'cable' => 'tv',
+            'dstv' => 'tv',
+            'gotv' => 'tv',
+            'electric' => 'bulb',
+            'power' => 'bulb',
+            'education' => 'book-open',
+            'exam' => 'book-open',
+            'e-pin' => 'book-open',
+            'epin' => 'book-open',
+            'waec' => 'book-open',
+            'neco' => 'book-open',
+            'jamb' => 'book-open',
+            'bet' => 'trophy',
+            'sport' => 'trophy',
+            'insurance' => 'shield-quarter',
+            'transport' => 'bus',
+            'flight' => 'bus',
+        ];
+
+        foreach ($icons as $keyword => $iconKey) {
+            if (str_contains($service, $keyword)) {
+                return $iconKey;
+            }
+        }
+
+        return 'grid-alt';
+    }
+}
+
+if (!function_exists("customerMenuData")) {
+    function customerMenuData(): array
+    {
+        $user = auth()->user();
+        $settings = getSettings();
+
+        if (!$user || !$settings) {
+            return [
+                'stats' => [],
+                'sections' => [],
+            ];
+        }
+
+        $balance = $user->type === 'customer'
+            ? $settings->currency . number_format(walletBalance($user), 2)
+            : '0';
+
+        $levelName = $user->customer?->level?->name ?? 'N/A';
+        $sections = [];
+
+        $paymentItems = [];
+        foreach (getCategories() as $category) {
+            $paymentItems[] = [
+                'label' => $category->display_name,
+                'href' => route('open.transaction.page', $category->slug),
+                'icon_html' => $category->icon ?: null,
+                'icon_key' => 'grid-alt',
+                'modern_icon_key' => modernServiceIconKey($category),
+                'active_paths' => ['customer/' . $category->slug],
+            ];
+        }
+
+        $airtimeToCash = Category::where('type', 'airtime2cash')->where('status', 'active')->first();
+        if ($airtimeToCash) {
+            $paymentItems[] = [
+                'label' => 'Airtime To Cash',
+                'href' => route('airtime-to-cash'),
+                'icon_key' => 'transfer-alt',
+                'modern_icon_key' => 'mobile-alt',
+                'active_paths' => ['airtime-to-cash'],
+                'target' => '_blank',
+            ];
+        }
+
+        $walletToBank = Product::where('id', env('TRANSFER_TO_BANK_PRODUCT_ID'))->where('status', 'active')->first();
+        if ($walletToBank) {
+            $paymentItems[] = [
+                'label' => $walletToBank->display_name,
+                'href' => route('wallet-to-bank', $walletToBank->slug),
+                'icon_key' => 'transfer',
+                'modern_icon_key' => 'building-house',
+                'active_paths' => ['wallet-to-bank*'],
+                'target' => '_blank',
+            ];
+        }
+
+        $sections[] = [
+            'label' => 'Services',
+            'items' => $paymentItems,
+        ];
+
+        $selfService = [
+            [
+                'label' => 'Dashboard',
+                'href' => route('dashboard'),
+                'icon_key' => 'home-smile',
+                'modern_icon_key' => 'grid-alt',
+                'active_paths' => ['dashboard'],
+            ],
+            [
+                'label' => 'Announcements',
+                'href' => route('customer.announcements.index'),
+                'icon_key' => 'news',
+                'modern_icon_key' => 'news',
+                'active_paths' => ['announcements*'],
+                'modern_only' => true,
+            ],
+            [
+                'label' => 'My Profile',
+                'href' => route('profile.edit'),
+                'icon_key' => 'user',
+                'modern_icon_key' => 'user-circle',
+                'active_paths' => ['profile*'],
+            ],
+            [
+                'label' => 'Downlines',
+                'href' => route('alldownlines'),
+                'icon_key' => 'group',
+                'modern_icon_key' => 'network-chart',
+                'active_paths' => ['alldownlines'],
+            ],
+            [
+                'label' => 'Referral Earnings',
+                'href' => route('downlines'),
+                'icon_key' => 'wallet',
+                'modern_icon_key' => 'dollar-circle',
+                'active_paths' => ['downlines'],
+            ],
+            [
+                'label' => 'Fund Wallet',
+                'href' => route('customer.load.wallet'),
+                'icon_key' => 'wallet-alt',
+                'modern_icon_key' => 'wallet',
+                'active_paths' => ['customer.load.wallet'],
+            ],
+            [
+                'label' => 'Transactions History',
+                'href' => route('customer.transaction.history'),
+                'icon_key' => 'receipt',
+                'modern_icon_key' => 'receipt',
+                'active_paths' => ['customer.transaction.history'],
+            ],
+            [
+                'label' => 'A2Cash History',
+                'href' => route('customer.airtime2cash.transaction.history'),
+                'icon_key' => 'time',
+                'modern_icon_key' => 'history',
+                'active_paths' => ['customer.airtime2cash.transaction.history'],
+            ],
+            [
+                'label' => 'Reports',
+                'href' => route('customer.transaction.report'),
+                'icon_key' => 'file',
+                'modern_icon_key' => 'bar-chart-square',
+                'active_paths' => ['customer.transaction.report'],
+            ],
+            [
+                'label' => 'KYC Info',
+                'href' => route('update.kyc.details'),
+                'icon_key' => 'id-card',
+                'modern_icon_key' => 'badge-check',
+                'active_paths' => ['update.kyc.details'],
+            ],
+        ];
+
+        if (!empty($settings->support_link)) {
+            $selfService[] = [
+                'label' => 'Contact Us',
+                'href' => $settings->support_link,
+                'icon_key' => 'support',
+                'modern_icon_key' => 'headphone',
+                'target' => '_blank',
+                'active_paths' => [],
+            ];
+        }
+
+        $selfService[] = [
+            'label' => 'Logout',
+            'href' => route('logout'),
+            'icon_key' => 'log-out',
+            'modern_icon_key' => 'log-out-circle',
+            'type' => 'logout',
+        ];
+
+        $sections[] = [
+            'label' => 'Self Service',
+            'items' => $selfService,
+        ];
+
+        return [
+            'stats' => [
+                ['label' => 'Wallet Balance', 'value' => $balance],
+                ['label' => 'Customer Level', 'value' => $levelName],
+            ],
+            'sections' => $sections,
+        ];
+    }
+}
+
+if (!function_exists("layoutIsModern")) {
+    function layoutIsModern(string $scope = 'customer'): bool
+    {
+        return layoutMode($scope) === 'modern';
+    }
+}
+
+if (!function_exists("useNewUiLayout")) {
+    function useNewUiLayout(): bool
+    {
+        return layoutIsModern('customer');
+    }
+}
+
+if (!function_exists("useBootstrap5Layout")) {
+    function useBootstrap5Layout(): bool
+    {
+        return useNewUiLayout();
+    }
+}
+
+if (!function_exists("themeView")) {
+    function themeView(string $scope, string $view): string
+    {
+        $modernView = "sneat.{$scope}.{$view}";
+
+        if (layoutIsModern($scope) && View::exists($modernView)) {
+            return $modernView;
+        }
+
+        return "{$scope}.{$view}";
     }
 }
 

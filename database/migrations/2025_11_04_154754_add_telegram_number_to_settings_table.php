@@ -11,10 +11,17 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (!Schema::hasTable('settings')) {
+            return;
+        }
+
         Schema::table('settings', function (Blueprint $table) {
-            $table->string('telegram_username')->nullable()->after('whatsapp_number');
-            $table->string('a2cash_chat_engine')->default('whatsapp')->after('telegram_username');
-            
+            if (!Schema::hasColumn('settings', 'telegram_username')) {
+                $table->string('telegram_username')->nullable();
+            }
+            if (!Schema::hasColumn('settings', 'a2cash_chat_engine')) {
+                $table->string('a2cash_chat_engine')->default('whatsapp');
+            }
         });
     }
 
@@ -23,9 +30,16 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('settings', function (Blueprint $table) {
-            $table->dropColumn('telegram_username');
-            $table->dropColumn('a2cash_chat_engine');
-        });
+        if (!Schema::hasTable('settings')) {
+            return;
+        }
+
+        $columns = collect(['telegram_username', 'a2cash_chat_engine'])
+            ->filter(fn (string $column) => Schema::hasColumn('settings', $column))
+            ->all();
+
+        if ($columns) {
+            Schema::table('settings', fn (Blueprint $table) => $table->dropColumn($columns));
+        }
     }
 };
