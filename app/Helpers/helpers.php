@@ -184,7 +184,14 @@ if (!function_exists("airtime2cashBalance")) {
 if (!function_exists("getSettings")) {
     function getSettings()
     {
-        return Settings::first();
+        if (app()->bound('app.settings')) {
+            return app('app.settings');
+        }
+
+        $settings = Settings::first();
+        app()->instance('app.settings', $settings);
+
+        return $settings;
     }
 }
 

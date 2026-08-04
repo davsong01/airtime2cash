@@ -67,6 +67,11 @@ a.ops-metric-card:hover { color: inherit; transform: translateY(-2px); box-shado
 .ops-verification { display: inline-flex; align-items: center; gap: .25rem; font-size: .75rem; font-weight: 600; }
 .ops-verification.is-verified { color: #16845a; }
 .ops-verification.is-pending { color: #b67508; }
+.ops-compact-table th, .ops-compact-table td { padding: .5rem .7rem; }
+.ops-compact-table td { line-height: 1.25; }
+.ops-compact-table .ops-customer-mark { width: 34px; height: 34px; flex-basis: 34px; }
+.ops-compact-table td:nth-child(3) { min-width: 270px; max-width: 340px; }
+.ops-compact-table td:nth-child(4) { min-width: 175px; }
 .min-width-0 { min-width: 0; }
 @media (max-width: 991.98px) { .ops-hero-signal { justify-content: flex-start; } }
 @media (max-width: 767.98px) { .ops-hero { padding: 1.25rem; } .ops-hero h2 { font-size: 1.45rem; } .ops-hero-signal { flex-direction: column; gap: .25rem; } .ops-provider-balance { display: none; } }

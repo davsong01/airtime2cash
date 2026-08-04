@@ -102,9 +102,44 @@ class CustomerController extends Controller
 
     function unverifiedCustomers(Request $request, $status = null)
     {
-        set_time_limit(360);
-        $customers = User::select('id', 'firstname','lastname','email','phone', 'created_at', 'email_verified_at', 'username')->whereNull('email_verified_at')->orderBy('created_at', 'DESC')->get();
-        return view('admin.customers.unverified', ['customers' => $customers]);
+        $request->validate([
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date', 'after_or_equal:from'],
+        ]);
+
+        $customers = User::where('type', '!=', 'admin')->whereNull('email_verified_at');
+
+        if ($request->filled('search')) {
+            $search = '%' . trim($request->search) . '%';
+            $customers->where(function ($query) use ($search) {
+                $query->where('firstname', 'like', $search)
+                    ->orWhere('lastname', 'like', $search)
+                    ->orWhere('username', 'like', $search)
+                    ->orWhere('email', 'like', $search)
+                    ->orWhere('phone', 'like', $search);
+            });
+        }
+
+        if ($request->from && $request->to) {
+            $customers->whereBetween('created_at', [$request->from . ' 00:00:00', $request->to . ' 23:59:59']);
+        } elseif ($request->from) {
+            $customers->where('created_at', '>=', $request->from . ' 00:00:00');
+        } elseif ($request->to) {
+            $customers->where('created_at', '<=', $request->to . ' 23:59:59');
+        }
+
+        $summary = User::where('type', '!=', 'admin')
+            ->selectRaw('SUM(CASE WHEN email_verified_at IS NULL THEN 1 ELSE 0 END) AS unverified')
+            ->selectRaw('SUM(CASE WHEN email_verified_at IS NULL AND created_at >= ? THEN 1 ELSE 0 END) AS new_this_month', [now()->startOfMonth()])
+            ->selectRaw('SUM(CASE WHEN email_verified_at IS NOT NULL THEN 1 ELSE 0 END) AS verified')
+            ->first();
+
+        $customers = $customers->select('id', 'firstname', 'lastname', 'email', 'phone', 'status', 'created_at', 'email_verified_at', 'username')
+            ->latest('id')
+            ->paginate(25)
+            ->withQueryString();
+
+        return view('admin.customers.unverified', compact('customers', 'summary'));
     }
     
     function verifyCustomer($customer, $internal=null)

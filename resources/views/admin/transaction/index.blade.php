@@ -51,8 +51,8 @@
                                 <!-- data-2 -->
                                 <div class="statistics-data my-auto">
                                     <div class="statistics">
-                                        <s!!an
-                                            class="font-medium-2 mr-50 text-bold-600">{!! getSettings()->currency. number_format($failed) !!}</s!!an><br><span
+                                        <span
+                                            class="font-medium-2 mr-50 text-bold-600">{!! getSettings()->currency. number_format($failed) !!}</span><br><span
                                             class="text-danger">Failed</span>
                                     </div>
                                     
@@ -164,11 +164,11 @@
                                                 </td>
                                                 <td>
                                                     <small>
-                                                    <strong>Amount: </strong>{!! getSettings()->currency. number_format($transaction->amount, 2) !!} <br>
-                                                    <strong>Charge: </strong>{!! getSettings()->currency. number_format($transaction->provider_charge, 2) !!} <br>
-                                                    <strong>Total Amount: </strong>{!! getSettings()->currency. number_format($transaction->total_amount,2) !!} <br>
-                                                    <strong>Initial Balance: </strong>{!! getSettings()->currency. number_format($transaction->balance_before, 2) !!} <br>
-                                                    <strong>Final Balance: </strong>{!! getSettings()->currency. number_format($transaction->balance_after, 2) !!} <br>
+                                                    <strong>Amount: </strong>{!! getSettings()->currency. number_format((float) $transaction->amount, 2) !!} <br>
+                                                    <strong>Charge: </strong>{!! getSettings()->currency. number_format((float) $transaction->provider_charge, 2) !!} <br>
+                                                    <strong>Total Amount: </strong>{!! getSettings()->currency. number_format((float) $transaction->total_amount,2) !!} <br>
+                                                    <strong>Initial Balance: </strong>{!! getSettings()->currency. number_format((float) $transaction->balance_before, 2) !!} <br>
+                                                    <strong>Final Balance: </strong>{!! getSettings()->currency. number_format((float) $transaction->balance_after, 2) !!} <br>
                                                     </small>
                                                 </td>
                                                 <td>
@@ -181,8 +181,8 @@
                                                     @if(!empty($transaction->api))
                                                     <strong>Provider: </strong>{{ $transaction->api->name }} <br>
                                                     @endif
-                                                    <strong>Convenience: </strong>{!! getSettings()->currency. number_format($transaction->provider_charge, 2) !!} <br>
-                                                    <strong>Discount: </strong>{!! getSettings()->currency. number_format($transaction->discount, 2) !!} <br>
+                                                    <strong>Convenience: </strong>{!! getSettings()->currency. number_format((float) $transaction->provider_charge, 2) !!} <br>
+                                                    <strong>Discount: </strong>{!! getSettings()->currency. number_format((float) $transaction->discount, 2) !!} <br>
                                                 
 
                                                     </small>
