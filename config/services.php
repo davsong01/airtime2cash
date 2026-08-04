@@ -2,6 +2,13 @@
 
 return [
 
+    'autosync' => [
+        'base_url' => env('AUTOSYNC_BASE_URL', 'https://autosyncng.com/api/v1'),
+        'token' => env('AUTOSYNC_ACCESS_TOKEN'),
+        'transaction_pin' => env('AUTOSYNC_TRANSACTION_PIN'),
+        'fake' => env('AUTOSYNC_FAKE', env('APP_ENV') === 'local'),
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Third Party Services

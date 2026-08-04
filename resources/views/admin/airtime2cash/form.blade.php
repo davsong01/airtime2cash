@@ -139,6 +139,12 @@
                                     @error('auto_share_rate')<div class="invalid-feedback">{{ $message }}</div>@enderror
                                 </div>
                             </div>
+                            <div class="form-group mt-2 mb-0">
+                                <label for="auto_share_product_code">AutoSync product code</label>
+                                <input type="text" class="form-control @error('auto_share_product_code') is-invalid @enderror" id="auto_share_product_code" name="auto_share_product_code" value="{{ old('auto_share_product_code', $product?->auto_share_product_code) }}" placeholder="e.g. mtn">
+                                @error('auto_share_product_code')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                <small class="form-text text-muted">Required when Auto Share is active. Use AutoSync's product ID/code for this network.</small>
+                            </div>
                         </div>
                     </div>
 
@@ -206,9 +212,10 @@
                         <label for="description">Short description</label>
                         <textarea class="form-control" id="description" name="description" rows="3" placeholder="Briefly explain this conversion product">{{ old('description', $product?->description) }}</textarea>
                     </div>
-                    <div class="form-group mb-0">
-                        <label for="instruction-editor">Transfer instructions</label>
-                        <div id="toolbar-container">
+                    <div class="form-group">
+                        <label for="instruction-editor">Manual Transfer instructions</label>
+                        <small class="form-text text-muted mb-1">Shown after the customer selects a network for a manual transfer.</small>
+                        <div id="manual-instruction-toolbar">
                             <span class="ql-formats"><select class="ql-header"><option selected></option><option value="2"></option><option value="3"></option></select></span>
                             <span class="ql-formats"><button type="button" class="ql-bold"></button><button type="button" class="ql-italic"></button><button type="button" class="ql-underline"></button></span>
                             <span class="ql-formats"><button type="button" class="ql-list" value="ordered"></button><button type="button" class="ql-list" value="bullet"></button></span>
@@ -216,6 +223,18 @@
                         </div>
                         <div class="editor" id="instruction-editor">{!! old('instruction', $product?->instruction) !!}</div>
                         <input name="instruction" type="hidden" id="instruction-content">
+                    </div>
+                    <div class="form-group mb-0">
+                        <label for="auto-share-instruction-editor">Auto Transfer instructions</label>
+                        <small class="form-text text-muted mb-1">Shown immediately when the customer chooses Auto Transfer.</small>
+                        <div id="auto-share-instruction-toolbar">
+                            <span class="ql-formats"><select class="ql-header"><option selected></option><option value="2"></option><option value="3"></option></select></span>
+                            <span class="ql-formats"><button type="button" class="ql-bold"></button><button type="button" class="ql-italic"></button><button type="button" class="ql-underline"></button></span>
+                            <span class="ql-formats"><button type="button" class="ql-list" value="ordered"></button><button type="button" class="ql-list" value="bullet"></button></span>
+                            <span class="ql-formats"><button type="button" class="ql-link"></button><button type="button" class="ql-clean"></button></span>
+                        </div>
+                        <div class="editor" id="auto-share-instruction-editor">{!! old('auto_share_instruction', $product?->auto_share_instruction) !!}</div>
+                        <input name="auto_share_instruction" type="hidden" id="auto-share-instruction-content">
                     </div>
                 </div>
             </section>

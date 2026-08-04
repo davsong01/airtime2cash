@@ -175,6 +175,11 @@
                                     <span><strong>KYC review queue</strong><small>Review submitted customer identity data</small></span>
                                     <i class="bx bx-chevron-right"></i>
                                 </a>
+                                <a href="{{ route('admin.autosync.webhooks.index', ['webhook_status' => ((int) $autoSyncWebhookSummary->failed > 0 ? 'failed' : 'pending')]) }}" class="ops-attention-item">
+                                    <span class="ops-attention-icon {{ (int) $autoSyncWebhookSummary->failed > 0 ? 'is-danger' : 'is-info' }}"><i class="bx bx-cloud-download"></i></span>
+                                    <span><strong>AutoSync webhooks</strong><small>{{ number_format((int) $autoSyncWebhookSummary->pending) }} pending · {{ number_format((int) $autoSyncWebhookSummary->failed) }} need resolution</small></span>
+                                    <i class="bx bx-chevron-right"></i>
+                                </a>
                                 <a href="{{ route('customers', ['status' => 'suspended']) }}" class="ops-attention-item">
                                     <span class="ops-attention-icon is-danger"><i class="bx bx-user-x"></i></span>
                                     <span><strong>Suspended customers</strong><small>{{ number_format((int) $customerSummary->suspended) }} restricted accounts</small></span>

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Settings;
 use Illuminate\Http\Request;
 use App\Models\PaymentGateway;
+use App\Models\API;
 
 class SettingsController extends Controller
 {
@@ -71,8 +72,9 @@ class SettingsController extends Controller
         ];
 
         $payment_gateways = PaymentGateway::all();
+        $autoShareProviders = API::orderBy('name')->get(['id', 'name', 'status', 'slug']);
 
-        return view('admin.settings', compact('settings', 'currencies', 'payment_gateways'));
+        return view('admin.settings', compact('settings', 'currencies', 'payment_gateways', 'autoShareProviders'));
     }
 
     /**
@@ -91,7 +93,9 @@ class SettingsController extends Controller
 
         $request->validate(collect($colorFields)
             ->mapWithKeys(fn (string $field) => [$field => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/']])
-            ->all());
+            ->all() + [
+                'auto_share_provider_id' => ['nullable', 'integer', 'exists:a_p_is,id'],
+            ]);
 
         // captcha settings
         $captcha_settings = [

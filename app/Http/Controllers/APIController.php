@@ -29,7 +29,9 @@ class APIController extends Controller
             "sandbox_base_url" => "nullable",
             "live_base_url" => "nullable",
             "secret_key" => "nullable",
-            "public_key" => "nullable"
+            "public_key" => "nullable",
+            "slug" => "required|string|max:100",
+            "file_name" => "nullable|string|max:255",
         ]);
 
         API::updateOrCreate([
@@ -42,6 +44,8 @@ class APIController extends Controller
             "public_key" => $request->public_key,
             "sandbox_base_url" => $request->sandbox_base_url,
             "live_base_url" => $request->live_base_url,
+            "slug" => $request->slug,
+            "file_name" => $request->file_name,
         ]);
 
         return redirect(route('api.index'))->with('message', 'Added successfully');
@@ -63,7 +67,9 @@ class APIController extends Controller
             "secret_key" => "nullable",
             "public_key" => "nullable",
             "sandbox_base_url" => "nullable",
-            "live_base_url" => "nullable"
+            "live_base_url" => "nullable",
+            "slug" => "required|string|max:100",
+            "file_name" => "nullable|string|max:255",
         ]);
 
         $api->update([
@@ -76,6 +82,8 @@ class APIController extends Controller
             "public_key" => $request->public_key,
             "sandbox_base_url" => $request->sandbox_base_url,
             "live_base_url" => $request->live_base_url,
+            "slug" => $request->slug,
+            "file_name" => $request->file_name,
         ]);
 
         return back()->with('message', 'Updated successfully');

@@ -5,23 +5,31 @@
         document.addEventListener('DOMContentLoaded', function () {
             var form = document.getElementById('airtime2cash-product-form');
             var editorElement = document.getElementById('instruction-editor');
+            var autoShareEditorElement = document.getElementById('auto-share-instruction-editor');
             var imageInput = document.getElementById('image');
             var imagePreview = document.getElementById('product-image-preview');
             var nameInput = document.getElementById('name');
             var namePreview = document.getElementById('product-name-preview');
 
-            if (!form || !editorElement) {
+            if (!form || !editorElement || !autoShareEditorElement) {
                 return;
             }
 
             var quill = new Quill(editorElement, {
                 theme: 'snow',
                 placeholder: 'Enter the steps customers should follow...',
-                modules: { toolbar: '#toolbar-container' }
+                modules: { toolbar: '#manual-instruction-toolbar' }
+            });
+
+            var autoShareQuill = new Quill(autoShareEditorElement, {
+                theme: 'snow',
+                placeholder: 'Enter the steps customers should follow for Auto Transfer...',
+                modules: { toolbar: '#auto-share-instruction-toolbar' }
             });
 
             form.addEventListener('submit', function () {
                 document.getElementById('instruction-content').value = quill.root.innerHTML;
+                document.getElementById('auto-share-instruction-content').value = autoShareQuill.root.innerHTML;
             });
 
             nameInput.addEventListener('input', function () {

@@ -112,6 +112,19 @@ use App\Models\PaymentGateway;
                                                                         </select>
                                                                     </fieldset>
                                                                     <fieldset class="form-group">
+                                                                        <label for="auto_share_provider_id">Auto Share Provider</label>
+                                                                        <select name="auto_share_provider_id" class="form-control @error('auto_share_provider_id') is-invalid @enderror" id="auto_share_provider_id">
+                                                                            <option value="">Disable Auto Share integration</option>
+                                                                            @foreach($autoShareProviders as $provider)
+                                                                                <option value="{{ $provider->id }}" @selected((string) old('auto_share_provider_id', $settings->auto_share_provider_id) === (string) $provider->id)>
+                                                                                    {{ $provider->name }}{{ $provider->status !== 'active' ? ' (Inactive)' : '' }}
+                                                                                </option>
+                                                                            @endforeach
+                                                                        </select>
+                                                                        @error('auto_share_provider_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                                                        <small class="text-muted d-block mt-50">Provider used for automatic airtime transfers. The selected provider must also be active and configured under APIs.</small>
+                                                                    </fieldset>
+                                                                    <fieldset class="form-group">
                                                                         <label for="admin_layout">Admin Layout</label>
                                                                         <select name="admin_layout" class="form-control" id="admin_layout">
                                                                             <option value="legacy" {{ ($settings->admin_layout ?? 'legacy') === 'legacy' ? 'selected' : '' }}>Legacy Layout</option>

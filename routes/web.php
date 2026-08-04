@@ -24,12 +24,15 @@ use App\Http\Controllers\VariationController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\Airtime2CashController;
+use App\Http\Controllers\AutoSyncAirtimeController;
+use App\Http\Controllers\AutoSyncWebhookController;
 use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\CustomerLevelController;
 use App\Http\Controllers\PaymentGatewayController;
 use App\Http\Controllers\RolePermissionController;
 use App\Http\Controllers\ReservedAccountController;
 use App\Http\Controllers\ReservedAccountNumberController;
+use App\Http\Controllers\Admin\AutoSyncOperationsController;
 
 /*
 |--------------------------------------------------------------------------
@@ -43,6 +46,7 @@ use App\Http\Controllers\ReservedAccountNumberController;
 */
 
 Route::post('log-p-callback/{provider}', [PaymentController::class, 'dumpCallback'])->name('log.payment.response');
+Route::post('webhooks/autosync', [AutoSyncWebhookController::class, 'store'])->middleware('throttle:120,1')->name('webhooks.autosync');
 Route::get('cron/analyze-callback', [PaymentController::class, 'analyzeCallbackResponse'])->name('callback.analyze');
 Route::get('cron/sendemails', [Controller::class, 'cronSendEmails']);
 Route::get('generate-api-keys', function(){
@@ -81,6 +85,9 @@ Route::middleware(['auth', 'verified', 'tpin', 'ipcheck'])->group(function () {
         Route::get('customer/{slug}', [TransactionController::class, 'showProductsPage'])->name('open.transaction.page');
         Route::post('customer-initialize-transaction', [TransactionController::class, 'initializeTransaction'])->name('initialize.transaction');
         Route::post('customer-initialize-airtime2cash-transaction', [TransactionController::class, 'initializeAirtime2CashTransaction'])->name('initialize.airtime2cashtransaction');
+        Route::post('airtime-to-cash/auto/initiate', [AutoSyncAirtimeController::class, 'initiate'])->middleware('throttle:5,1')->name('airtime2cash.auto.initiate');
+        Route::post('airtime-to-cash/auto/complete', [AutoSyncAirtimeController::class, 'complete'])->middleware('throttle:10,1')->name('airtime2cash.auto.complete');
+        Route::post('airtime-to-cash/auto/resend-otp', [AutoSyncAirtimeController::class, 'resendOtp'])->middleware('throttle:3,1')->name('airtime2cash.auto.resend-otp');
         Route::post('customer-initialize-wallet2banktransaction/{product}', [TransactionController::class, 'initializeWalletToBankTransaction'])->name('initialize.wallet2banktransaction');
         
 
@@ -162,6 +169,10 @@ Route::middleware(['auth', 'verified', 'admin', 'ipcheck', 'adminRoute'])->prefi
     Route::get('wallet-transactions', [TransactionController::class, 'walletTransView'])->name('admin.walletlog');
     Route::get('admin-wallet-funding-log', [TransactionController::class, 'walletFundingLogView'])->name('admin.walletfundinglog');
     Route::get('admin-airtime-2-cash-log', [TransactionController::class, 'airtimeToCashTransactions'])->name('admin.airtime.2.cash.log');
+    Route::get('autosync-operations', [AutoSyncOperationsController::class, 'index'])->name('admin.autosync.index');
+    Route::get('autosync-operations/webhooks', [AutoSyncOperationsController::class, 'webhooks'])->name('admin.autosync.webhooks.index');
+    Route::get('autosync-operations/api-request-logs', [AutoSyncOperationsController::class, 'apiLogs'])->name('admin.autosync.api-logs.index');
+    Route::post('autosync-webhooks/{webhook}/resolve', [AutoSyncOperationsController::class, 'resolve'])->name('admin.autosync.webhooks.resolve');
     
     Route::get('admin-earninglog', [TransactionController::class, 'walletEarningView'])->name('admin.earninglog');
     Route::get('credit-customer', [TransactionController::class, 'creditCustomerPage'])->name('admin.credit.customer');

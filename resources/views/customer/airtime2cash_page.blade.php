@@ -3,6 +3,7 @@
     $manualProducts = $category->products->where('manual_status', 'active')->count();
     $autoShareProducts = $category->products->where('auto_share_status', 'active')->count();
     $defaultTransferMode = old('transfer_mode', $manualProducts ? 'manual' : 'auto_share');
+    $autoTransferInstruction = $category->products->firstWhere('auto_share_status', 'active')?->auto_share_instruction;
 ?>
 @extends('layouts.app')
 @section('title', $category->seo_title)
@@ -32,6 +33,14 @@
     .legacy-conversion-mode i { color: #168a67; font-size: 22px !important; }
     .legacy-mode-input:checked + .legacy-conversion-mode { border-color: #168a67; background: #f1faf7; box-shadow: 0 0 0 2px rgba(22,138,103,.1); }
     .legacy-mode-input:disabled + .legacy-conversion-mode { opacity: .5; cursor: not-allowed; }
+    #initialize { padding: 1.25rem; border: 1px solid #e4e9ed; border-radius: 14px; background: rgba(255,255,255,.96); box-shadow: 0 18px 42px rgba(23,65,89,.09); }
+    .legacy-auto-flow { padding: 1.5rem; border: 1px solid #dce9e4; border-radius: 14px; background: linear-gradient(145deg, #fff, #f2faf7); box-shadow: 0 16px 34px rgba(23,65,89,.1); }
+    .legacy-auto-mark { display:flex; width:52px; height:52px; margin:0 auto 1rem; align-items:center; justify-content:center; border-radius:16px; color:#fff; background:linear-gradient(145deg,#168a67,#0f6c53); font-size:25px; }
+    .legacy-auto-summary { display:grid; grid-template-columns:repeat(3,1fr); gap:.65rem; margin:1rem 0; }
+    .legacy-auto-summary span { padding:.75rem; border:1px solid #e2e9e6; border-radius:9px; background:#fff; }
+    .legacy-auto-summary small, .legacy-auto-summary strong { display:block; }
+    .legacy-secret-input { height:50px; text-align:center; font-size:18px; font-weight:700; letter-spacing:.25em; }
+    @media(max-width:767px) { .legacy-auto-summary { grid-template-columns:1fr; } #initialize { padding:.8rem; } }
 </style>
 @endsection
 @section('content')
@@ -90,7 +99,7 @@
                                                                                     <select class="form-control js-example-basic-single" name="product" id="product" required>
                                                                                         <option value="">Select</option>
                                                                                         @foreach ($category->products as $item)
-                                                                                            <option value="{{ $item->id }}" data-manual_status="{{ $item->manual_status }}" data-auto_share_status="{{ $item->auto_share_status }}" data-manual_rate="{{ $item->manual_discounted_rate }}" data-auto_share_rate="{{ $item->auto_share_discounted_rate }}" data-allow_quantity="{{ $item->allow_quantity }}" data-min="{{ $item->min}}" data-max="{{$item->max}}" data-system_price="{{ $item->system_price }}" data-fixed_price="{{ $item->fixed_price}}" data-image="{{ asset($item->image) }}" data-name="{{ $item->name }}" data-instruction="{{ $item->instruction }}" data-description="{{ $item->description }}">{{ $item->display_name }}</option>
+                                                                                            <option value="{{ $item->id }}" data-manual_status="{{ $item->manual_status }}" data-auto_share_status="{{ $item->auto_share_status }}" data-manual_rate="{{ $item->manual_discounted_rate }}" data-auto_share_rate="{{ $item->auto_share_discounted_rate }}" data-allow_quantity="{{ $item->allow_quantity }}" data-min="{{ $item->min}}" data-max="{{$item->max}}" data-system_price="{{ $item->system_price }}" data-fixed_price="{{ $item->fixed_price}}" data-image="{{ asset($item->image) }}" data-name="{{ $item->name }}" data-manual_instruction="{{ $item->instruction }}" data-auto_share_instruction="{{ $item->auto_share_instruction }}" data-description="{{ $item->description }}">{{ $item->display_name }}</option>
                                                                                         @endforeach
                                                                                     </select>
                                                                                     <div class="footnote">
@@ -170,7 +179,7 @@
                                                                             </div>
                                                                         </div>
                                                                     
-                                                                    <button id="buy-buttonx"style="margin-top:4px" class="btn btn-primary" type="submit" onclick="submitForm()">PROCEED </button>
+                                                                    <button id="buy-buttonx" style="margin-top:4px" class="btn btn-primary" type="submit" onclick="return submitForm()">PROCEED</button>
                                                                 </div>
                                                                 <div class="col-md-6 order-1 order-sm-2">   
                                                                     <div id="instruction-div" style="display: none">
@@ -183,6 +192,27 @@
                                                                             </div>
                                                                         </div>
                                                                     </div> 
+                                                                    <div id="legacy-auto-flow" class="legacy-auto-flow" style="display:none">
+                                                                        <div class="alert alert-danger" id="legacy-auto-error" style="display:none"></div>
+                                                                        <div id="legacy-pin-stage">
+                                                                            <span class="legacy-auto-mark"><i class="bx bx-lock-alt"></i></span>
+                                                                            <h3 class="text-center">Enter SIM PIN</h3>
+                                                                            <p class="text-center text-muted"><strong id="legacy-pin-phone"></strong><br>Enter your airtime share PIN to authorize the transfer.</p>
+                                                                            <div class="legacy-auto-summary"><span><small>Network</small><strong id="legacy-summary-network">-</strong></span><span><small>Airtime</small><strong id="legacy-summary-amount">-</strong></span><span><small>To wallet</small><strong id="legacy-summary-payout">-</strong></span></div>
+                                                                            <label for="legacy-share-pin">Airtime Share PIN</label>
+                                                                            <input type="password" class="form-control legacy-secret-input" id="legacy-share-pin" inputmode="numeric" maxlength="8" autocomplete="off" placeholder="----">
+                                                                            <small class="d-block text-center mt-50 text-muted">The PIN you use to share or transfer airtime from your SIM.</small>
+                                                                            <button type="button" class="btn btn-link px-0 mt-1" id="legacy-edit-details"><i class="bx bx-left-arrow-alt"></i> Edit conversion details</button>
+                                                                        </div>
+                                                                        <div id="legacy-otp-stage" style="display:none">
+                                                                            <span class="legacy-auto-mark"><i class="bx bx-message-rounded-dots"></i></span>
+                                                                            <h3 class="text-center">Enter OTP</h3>
+                                                                            <p class="text-center text-muted">OTP sent to <strong id="legacy-otp-phone"></strong><br>Enter the OTP to authorize the airtime transfer.</p>
+                                                                            <label for="legacy-auto-otp">OTP Code</label>
+                                                                            <input type="text" class="form-control legacy-secret-input" id="legacy-auto-otp" inputmode="numeric" maxlength="10" autocomplete="one-time-code" placeholder="------">
+                                                                            <div class="text-center mt-1"><button type="button" class="btn btn-sm btn-outline-secondary" id="legacy-resend-otp"><i class="bx bx-refresh"></i> Resend OTP</button></div>
+                                                                        </div>
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         </form>
@@ -225,35 +255,127 @@
 
 <script>
     function submitForm(){
-        var inputs = document.getElementById("initialize").getElementsByTagName("input");
-        // Loop through each input and perform validation
-        for (var i = 0; i < inputs.length; i++) {
-            var input = inputs[i];
-            // Check if the input is required and empty
-            if (input.hasAttribute("required") && input.value.trim() === "") {
-                alert("The " + input.name + " field is required" );
-                return;
-            }
-        }
-    
-        if ($('#agreement').prop('checked') == false){
-            return alert('You must agree to the instructions');
-            $("#agreement").focus();
-        }
-        
-        if ($("#payment_method").val() === "") {
-            alert("Please fill all inputs");
-            return;
-        }
-
-        $.LoadingOverlay("show");
-        document.forms["initialize"].submit();
+        return window.handleLegacyAirtimeToCashSubmit ? window.handleLegacyAirtimeToCashSubmit() : false;
     }
 
 
     $(document).ready(function () {
         var productSelect = $('#product');
         var allProductOptions = productSelect.find('option').clone();
+        var defaultAutoInstruction = @json($autoTransferInstruction);
+        var currency = @json(html_entity_decode(strip_tags(getSettings()['currency'])));
+        var csrfToken = @json(csrf_token());
+        var autoUrls = {
+            initiate: @json(route('airtime2cash.auto.initiate')),
+            complete: @json(route('airtime2cash.auto.complete')),
+            resend: @json(route('airtime2cash.auto.resend-otp'))
+        };
+        var autoStage = 'details';
+        var autoTransactionId = null;
+
+        function isAutoTransfer() { return $('input[name="transfer_mode"]:checked').val() === 'auto_share'; }
+        function setLegacyButton(label, disabled) { $('#buy-buttonx').text(label).prop('disabled', disabled); }
+        function showLegacyError(message) { $('#legacy-auto-error').text(message).toggle(Boolean(message)); }
+        function firstLegacyError(data) {
+            if (data.errors) {
+                var errors = Object.values(data.errors).reduce(function (all, item) { return all.concat(item); }, []);
+                if (errors.length) return errors[0];
+            }
+            return data.message || 'The request could not be completed. Please try again.';
+        }
+        function postLegacyAuto(url, payload) {
+            return fetch(url, {
+                method: 'POST', credentials: 'same-origin',
+                headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
+                body: JSON.stringify(payload)
+            }).then(function (response) {
+                return response.json().catch(function () { return {}; }).then(function (data) {
+                    if (!response.ok) throw new Error(firstLegacyError(data));
+                    return data;
+                });
+            });
+        }
+        function legacyAutoPayload() {
+            return {
+                product: $('#product').val(), transfer_mode: 'auto_share', amount: $('#amount').val(),
+                phone: $('#phone').val().replace(/\s+/g, ''), email: $('#email').val(),
+                payment_method: 'Transfer to Wallet', agreement: $('#agreement').prop('checked') ? 1 : 0
+            };
+        }
+        function validateLegacyDetails() {
+            if (isAutoTransfer()) $('#payment_method').val('Transfer to Wallet').trigger('change');
+            if (!document.getElementById('initialize').reportValidity()) return false;
+            if (!$('#agreement').prop('checked')) { alert('You must agree to the transfer instructions'); return false; }
+            return true;
+        }
+        function openLegacyPin() {
+            var selected = productSelect.find(':selected');
+            $('#legacy-pin-phone, #legacy-otp-phone').text($('#phone').val());
+            $('#legacy-summary-network').text(selected.data('name'));
+            $('#legacy-summary-amount').text(currency + Number($('#amount').val()).toLocaleString());
+            $('#legacy-summary-payout').text(currency + Number($('#receive').val()).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}));
+            $('#instruction-div').hide();
+            $('#legacy-auto-flow, #legacy-pin-stage').show();
+            $('#legacy-otp-stage').hide();
+            $('#legacy-share-pin, #legacy-auto-otp').val('');
+            autoStage = 'pin';
+            showLegacyError('');
+            setLegacyButton('SUBMIT PIN AND ENTER OTP', true);
+            document.getElementById('legacy-auto-flow').scrollIntoView({behavior:'smooth', block:'center'});
+        }
+        function openLegacyOtp(data) {
+            autoTransactionId = data.transaction_id;
+            autoStage = 'otp';
+            $('#legacy-pin-stage').hide();
+            $('#legacy-otp-stage').show();
+            $('#legacy-otp-phone').text(data.phone || $('#phone').val());
+            setLegacyButton('SHARE AIRTIME', true);
+            $('#legacy-auto-otp').focus();
+        }
+        window.handleLegacyAirtimeToCashSubmit = function () {
+            if (!isAutoTransfer()) {
+                if (!validateLegacyDetails()) return false;
+                setLegacyButton('PROCESSING...', true);
+                $.LoadingOverlay('show');
+                document.getElementById('initialize').submit();
+                return false;
+            }
+            if (autoStage === 'details') { if (validateLegacyDetails()) openLegacyPin(); return false; }
+            if (autoStage === 'pin') {
+                var pin = $('#legacy-share-pin').val();
+                if (!/^\d{4,8}$/.test(pin)) return false;
+                setLegacyButton('SENDING OTP...', true); showLegacyError('');
+                postLegacyAuto(autoUrls.initiate, Object.assign(legacyAutoPayload(), {share_pin: pin}))
+                    .then(openLegacyOtp).catch(function (error) { showLegacyError(error.message); setLegacyButton('SUBMIT PIN AND ENTER OTP', false); });
+                return false;
+            }
+            var otp = $('#legacy-auto-otp').val();
+            if (!/^\d{4,10}$/.test(otp)) return false;
+            setLegacyButton('SHARING AIRTIME...', true); showLegacyError('');
+            postLegacyAuto(autoUrls.complete, {transaction_id:autoTransactionId, otp:otp})
+                .then(function (data) { window.location.href = data.redirect; })
+                .catch(function (error) { showLegacyError(error.message); setLegacyButton('SHARE AIRTIME', false); });
+            return false;
+        };
+        $('#legacy-share-pin').on('input', function () { this.value=this.value.replace(/\D/g,'').slice(0,8); if(autoStage==='pin') setLegacyButton('SUBMIT PIN AND ENTER OTP', !/^\d{4,8}$/.test(this.value)); });
+        $('#legacy-auto-otp').on('input', function () { this.value=this.value.replace(/\D/g,'').slice(0,10); if(autoStage==='otp') setLegacyButton('SHARE AIRTIME', !/^\d{4,10}$/.test(this.value)); });
+        $('#legacy-edit-details').on('click', function () { autoStage='details'; $('#legacy-auto-flow').hide(); showInstruction(defaultAutoInstruction); setLegacyButton('INITIATE AUTO TRANSFER', false); });
+        $('#legacy-resend-otp').on('click', function () {
+            var button=$(this).prop('disabled',true).text('Sending...'); showLegacyError('');
+            postLegacyAuto(autoUrls.resend,{transaction_id:autoTransactionId})
+                .then(function(){button.text('OTP sent');setTimeout(function(){button.prop('disabled',false).html('<i class="bx bx-refresh"></i> Resend OTP');},2500);})
+                .catch(function(error){showLegacyError(error.message);button.prop('disabled',false).html('<i class="bx bx-refresh"></i> Resend OTP');});
+        });
+
+        function showInstruction(instruction) {
+            if (!instruction) {
+                $('#instruction-div').hide();
+                return;
+            }
+
+            $('#instruction').html(instruction);
+            $('#instruction-div').show();
+        }
 
         function refreshNetworks() {
             var transferMode = $('input[name="transfer_mode"]:checked').val();
@@ -270,8 +392,14 @@
             productSelect.val('').trigger('change');
         }
 
-        $('input[name="transfer_mode"]').on('change', refreshNetworks);
-        refreshNetworks();
+        $('input[name="transfer_mode"]').on('change', function () {
+            var auto = this.value === 'auto_share';
+            autoStage = 'details'; autoTransactionId = null;
+            $('#legacy-auto-flow').hide();
+            $('#payment_method option[value="Transfer to Bank Account"]').prop('disabled', auto);
+            setLegacyButton(auto ? 'INITIATE AUTO TRANSFER' : 'PROCEED', false);
+            refreshNetworks();
+        });
         $("#amount").val('');
         $('#amount-div').hide();
         $('#payment_method').val('');
@@ -287,7 +415,9 @@
             var max = $('#product').find(':selected').data('max');
             var min = $('#product').find(':selected').data('min');
             var product = $('#product').val();
-            var instruction = $('#product').find(':selected').data('instruction');
+            var instruction = transferMode === 'auto_share'
+                ? $('#product').find(':selected').data('auto_share_instruction') || defaultAutoInstruction
+                : $('#product').find(':selected').data('manual_instruction');
             $("#amount").val('');
             $('#receive-div').hide()
             $('#payment-div').hide()
@@ -297,7 +427,7 @@
                 $("#amount").val('');
                 $('#rate').val('');
                 $('#rate-div').hide();
-                $("#instruction-div").hide();
+                showInstruction(transferMode === 'auto_share' ? defaultAutoInstruction : null);
                 $('#receive').val('');
                 $('#payment_method').val('');
                 $('#amount-div').hide()
@@ -313,10 +443,9 @@
                 $("#product-image").attr("src", image);
                 $("#product-title").html(title);
                 $("#product-description").html(description);
-                $("#instruction-div").show();
+                showInstruction(instruction);
                 $("#rate-div").show();
                 $("#rate").val(discounted_rate);
-                $("#instruction").html(instruction);
                 
                 if(min != '' && max != ''){
                     $("#airtime-range").html('The Minimum and Maximum amount for '+title + ' is '+min + ' and ' +max + ' respectively');
@@ -333,6 +462,8 @@
 
             }
         });
+
+        $('input[name="transfer_mode"]:checked').trigger('change');
 
         $('#payment_method').on('change', function () {
             if($('#payment_method').val() == 'Transfer to Bank Account'){
@@ -367,6 +498,7 @@
                 $('#receive-div').show();
                 $('#receive').val(receive);
                 $('#payment-div').show();
+                if (isAutoTransfer()) $('#payment_method').val('Transfer to Wallet').trigger('change');
             }else{
                 $('#receive-div').hide();
                 $('#payment-div').hide();

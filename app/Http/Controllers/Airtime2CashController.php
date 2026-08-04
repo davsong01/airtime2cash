@@ -40,6 +40,9 @@ class Airtime2CashController extends Controller
             "auto_share_rate" => "required|numeric|min:0",
             "manual_status" => "required|in:active,inactive",
             "auto_share_status" => "required|in:active,inactive",
+            "instruction" => "nullable|string",
+            "auto_share_instruction" => "nullable|string",
+            "auto_share_product_code" => "nullable|string|max:100|required_if:auto_share_status,active",
             "min" => "required|numeric|min:0",
             "max" => "required|numeric|gte:min",
             "image" => "required|mimes:jpeg,png|max:1024",
@@ -80,6 +83,8 @@ class Airtime2CashController extends Controller
                 "max" => $request->max,
                 "type" => 'airtime2cash',
                 "instruction" => $request->instruction,
+                "auto_share_instruction" => $request->auto_share_instruction,
+                "auto_share_product_code" => $request->auto_share_product_code,
             ]
         );
 
@@ -119,6 +124,9 @@ class Airtime2CashController extends Controller
             "auto_share_rate" => "required|numeric|min:0",
             "manual_status" => "required|in:active,inactive",
             "auto_share_status" => "required|in:active,inactive",
+            "instruction" => "nullable|string",
+            "auto_share_instruction" => "nullable|string",
+            "auto_share_product_code" => "nullable|string|max:100|required_if:auto_share_status,active",
             "min" => "required|numeric|min:0",
             "max" => "required|numeric|gte:min",
             "image" => "nullable|mimes:jpeg,png|max:1024",
@@ -159,6 +167,8 @@ class Airtime2CashController extends Controller
                 "max" => $request->max,
                 "type" => 'airtime2cash',
                 "instruction" => $request->instruction,
+                "auto_share_instruction" => $request->auto_share_instruction,
+                "auto_share_product_code" => $request->auto_share_product_code,
             ]
         );
 
