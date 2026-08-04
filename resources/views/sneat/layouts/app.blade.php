@@ -66,20 +66,9 @@
 
   <body>
     
-      <!-- ?PROD Only: Google Tag Manager (noscript) (Default ThemeSelection: GTM-5DDHKGP, PixInvent: GTM-5J3LMKC) -->
-      <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-5DDHKGP" height="0" width="0" style="display: none; visibility: hidden"></iframe></noscript>
-      <!-- End Google Tag Manager (noscript) -->
-    
     <!-- Layout wrapper -->
 <div class="layout-wrapper layout-content-navbar  ">
   <div class="layout-container">
-    
-    
-
-
-
-
-<!-- Menu -->
 
 <aside id="layout-menu" class="layout-menu menu-vertical menu" >
   
@@ -1386,7 +1375,19 @@
             </li>
           </ul>
         </li>
-        <!-- / Style Switcher-->
+      <!-- / Style Switcher-->
+
+      <!-- Semi Dark Toggle -->
+      <li class="nav-item me-2 me-xl-0">
+        <button
+          type="button"
+          class="nav-link btn btn-link p-0 border-0 shadow-none"
+          id="nav-semi-dark-toggle"
+          aria-label="Toggle semi dark menu">
+          <i class="icon-base bx bx-brightness-half icon-md" id="nav-semi-dark-icon"></i>
+        </button>
+      </li>
+      <!-- / Semi Dark Toggle -->
       
 
       <!-- Quick links  -->
@@ -2719,17 +2720,6 @@
   <div class="drag-target"></div>
   
 </div>
-<!-- / Layout wrapper -->
-
-    
-      <div class="buy-now">
-        <a href="https://themeselection.com/item/sneat-dashboard-pro-bootstrap/" target="_blank" class="btn btn-danger btn-buy-now">Buy Now</a>
-      </div>
-    
-
-    <!-- Core JS -->
-    <!-- build:js assets/vendor/js/theme.js  -->
-    
     
       <script src="{{ asset('modern-assets/vendor/libs/jquery/jquery.js') }}"></script>
     
@@ -2763,6 +2753,44 @@
       window.config.enableMenuLocalStorage = false;
       window.assetsPath = document.documentElement.getAttribute('data-assets-path') || "{{ asset('modern-assets/') }}";
       window.templateName = document.documentElement.getAttribute('data-template') || "vertical-menu-template-bordered";
+
+      document.addEventListener("DOMContentLoaded", function () {
+        var toggle = document.getElementById("nav-semi-dark-toggle");
+        var icon = document.getElementById("nav-semi-dark-icon");
+        var menu = document.getElementById("layout-menu");
+        var storageKey = "2cash-semi-dark-menu";
+
+        if (!toggle || !menu) {
+          return;
+        }
+
+        var applyState = function (enabled) {
+          if (enabled) {
+            menu.setAttribute("data-bs-theme", "dark");
+            document.documentElement.setAttribute("data-semidark-menu", "true");
+          } else {
+            menu.removeAttribute("data-bs-theme");
+            document.documentElement.removeAttribute("data-semidark-menu");
+          }
+        };
+
+        try {
+          applyState(localStorage.getItem(storageKey) === "true");
+        } catch (error) {
+          applyState(false);
+        }
+
+        toggle.addEventListener("click", function () {
+          var isEnabled = menu.getAttribute("data-bs-theme") === "dark";
+          var nextState = !isEnabled;
+
+          applyState(nextState);
+
+          try {
+            localStorage.setItem(storageKey, String(nextState));
+          } catch (error) {}
+        });
+      });
     </script>
 
     <!-- Main JS -->
