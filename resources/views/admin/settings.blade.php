@@ -31,6 +31,39 @@ use App\Models\PaymentGateway;
             object-fit: contain;
         }
 
+        .theme-color-control {
+            display: flex;
+            align-items: stretch;
+            gap: .625rem;
+        }
+
+        .theme-color-swatch {
+            flex: 0 0 48px;
+            width: 48px;
+            height: 38px;
+            padding: .2rem;
+            cursor: pointer;
+            border: 1px solid #d9dfe7;
+            border-radius: .35rem;
+            background: #fff;
+        }
+
+        .theme-color-control .input-group {
+            min-width: 0;
+        }
+
+        .theme-color-hex {
+            min-width: 0;
+            font-family: monospace;
+            font-weight: 600;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+        }
+
+        .theme-color-copy {
+            min-width: 68px;
+        }
+
         @media (max-width: 767.98px) {
             .settings-image-preview {
                 margin-bottom: 1rem;
@@ -284,46 +317,55 @@ use App\Models\PaymentGateway;
                                                                 </div>
                                                             </div>
 
+                                                            @php
+                                                                $themeColors = [
+                                                                    'menu_text_color' => ['Menu Text Color', '#F4FAF9'],
+                                                                    'menu_background_color' => ['Menu Background Color', '#123F43'],
+                                                                    'active_color' => ['Menu Active Color', '#0B7D4F'],
+                                                                    'block_header_color' => ['Text Header Color', '#286F70'],
+                                                                    'dasboard_customer_details_color' => ['Dashboard Customer Details Color', '#F4E85A'],
+                                                                ];
+                                                            @endphp
                                                             <div class="row">
-                                                                
-                                                                <div class="col-md-6">
-                                                                    <fieldset class="form-group">
-                                                                        <label for="">Menu Text color</label>
-                                                                        <input class="form-control" type="color" name="menu_text_color" value="{{ getSettings()->menu_text_color ??  old('menu_text_color') }}">
-                                                                    </fieldset>
-                                                                    
-                                                                </div>
-                                                                <div class="col-md-6">
-                                                                    <fieldset class="form-group">
-                                                                        <label for="">Menu Background color</label>
-                                                                        <input class="form-control" type="color" name="menu_background_color" value="{{ getSettings()->menu_background_color ??  old('menu_background_color') }}">
-                                                                    </fieldset>
-                                                                </div>
-                                                                <div class="col-md-6">
-                                                                    <fieldset class="form-group">
-                                                                        <label for="">Menu Active Color</label>
-                                                                        <input class="form-control" type="color" name="active_color" value="{{ getSettings()->active_color ??  old('active_color') }}">
-                                                                    </fieldset>
-                                                                </div>
-                                                                <div class="col-md-6">
-                                                                    <fieldset class="form-group">
-                                                                        <label for="">Text Header Color</label>
-                                                                        <input class="form-control" type="color" name="block_header_color" value="{{ getSettings()->block_header_color ??  old('block_header_color') }}">
-                                                                    </fieldset>
-                                                                </div>
-                                                                <div class="col-md-6">
-                                                                    <fieldset class="form-group">
-                                                                        <label for="">Dashboard Customer Details Color</label>
-                                                                        <input class="form-control" type="color" name="dasboard_customer_details_color" value="{{ getSettings()->dasboard_customer_details_color ??  old('dasboard_customer_details_color') }}">
-                                                                    </fieldset>
-                                                                </div>
-                                                                {{-- <div class="col-md-6">
-                                                                    <fieldset class="form-group">
-                                                                        <label for="">Active Hover Color</label>
-                                                                        <input class="form-control" type="color" name="active_hover_color" value="{{ getSettings()->active_hover_color ??  old('active_hover_color') }}">
-                                                                    </fieldset>
-                                                                </div>
-                                                                    --}}
+                                                                @foreach($themeColors as $field => [$label, $defaultColor])
+                                                                    @php
+                                                                        $colorValue = old($field, $settings->{$field} ?? $defaultColor);
+                                                                        $colorValue = preg_match('/^#[0-9a-fA-F]{6}$/', (string) $colorValue)
+                                                                            ? strtoupper($colorValue)
+                                                                            : $defaultColor;
+                                                                    @endphp
+                                                                    <div class="col-md-6">
+                                                                        <fieldset class="form-group" data-color-control>
+                                                                            <label for="{{ $field }}">{{ $label }}</label>
+                                                                            <div class="theme-color-control">
+                                                                                <input
+                                                                                    class="theme-color-swatch"
+                                                                                    type="color"
+                                                                                    value="{{ $colorValue }}"
+                                                                                    data-color-picker
+                                                                                    aria-label="Choose {{ strtolower($label) }}">
+                                                                                <div class="input-group">
+                                                                                    <input
+                                                                                        class="form-control theme-color-hex"
+                                                                                        type="text"
+                                                                                        id="{{ $field }}"
+                                                                                        name="{{ $field }}"
+                                                                                        value="{{ $colorValue }}"
+                                                                                        maxlength="7"
+                                                                                        pattern="#[0-9A-Fa-f]{6}"
+                                                                                        title="Enter a six-digit hex color, for example #123F43"
+                                                                                        spellcheck="false"
+                                                                                        autocomplete="off"
+                                                                                        required
+                                                                                        data-color-hex>
+                                                                                    <div class="input-group-append">
+                                                                                        <button class="btn btn-outline-secondary theme-color-copy" type="button" data-copy-color>Copy</button>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                        </fieldset>
+                                                                    </div>
+                                                                @endforeach
                                                             </div>
                                                             <div class="row">
                                                                 <div class="col-md-12">
@@ -353,6 +395,80 @@ use App\Models\PaymentGateway;
     <script>
         $('.colorpicker').colorpicker();
     </script>
+<script>
+    document.querySelectorAll('[data-color-control]').forEach(function (control) {
+        var picker = control.querySelector('[data-color-picker]');
+        var hexInput = control.querySelector('[data-color-hex]');
+        var copyButton = control.querySelector('[data-copy-color]');
+
+        function normalizeHex(value) {
+            var hex = value.trim().toUpperCase();
+
+            if (/^[0-9A-F]{6}$/.test(hex)) {
+                hex = '#' + hex;
+            } else if (/^#[0-9A-F]{3}$/.test(hex)) {
+                hex = '#' + hex.slice(1).split('').map(function (character) {
+                    return character + character;
+                }).join('');
+            }
+
+            return /^#[0-9A-F]{6}$/.test(hex) ? hex : null;
+        }
+
+        function applyTypedColor() {
+            var color = normalizeHex(hexInput.value);
+
+            if (color) {
+                hexInput.value = color;
+                picker.value = color;
+                hexInput.setCustomValidity('');
+            } else {
+                hexInput.setCustomValidity('Enter a valid six-digit hex color, for example #123F43.');
+            }
+
+            return color;
+        }
+
+        picker.addEventListener('input', function () {
+            hexInput.value = picker.value.toUpperCase();
+            hexInput.setCustomValidity('');
+        });
+
+        hexInput.addEventListener('input', function () {
+            var color = normalizeHex(hexInput.value);
+            if (color) {
+                picker.value = color;
+                hexInput.setCustomValidity('');
+            }
+        });
+
+        hexInput.addEventListener('blur', applyTypedColor);
+
+        copyButton.addEventListener('click', function () {
+            var color = applyTypedColor();
+            if (!color) {
+                hexInput.reportValidity();
+                return;
+            }
+
+            var showCopied = function () {
+                copyButton.textContent = 'Copied';
+                window.setTimeout(function () {
+                    copyButton.textContent = 'Copy';
+                }, 1400);
+            };
+
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(color).then(showCopied);
+                return;
+            }
+
+            hexInput.select();
+            document.execCommand('copy');
+            showCopied();
+        });
+    });
+</script>
 <script>
     $('#referral_system_status').on('change', function (e) {
         var referral_system_status = $('#referral_system_status').val();
