@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        if (!Schema::hasColumn('transaction_logs', 'user_status')) {
+        if (Schema::hasTable('transaction_logs') && !Schema::hasColumn('transaction_logs', 'user_status')) {
             Schema::table('transaction_logs', function (Blueprint $table) {
                 $table->string('user_status')->nullable();
             });
@@ -23,7 +23,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        if (Schema::hasColumn('transaction_logs', 'discount_type')) {
+        if (Schema::hasTable('transaction_logs') && Schema::hasColumn('transaction_logs', 'user_status')) {
             Schema::table('transaction_logs', function (Blueprint $table) {
                 $table->dropColumn("user_status");
             }); 

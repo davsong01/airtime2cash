@@ -11,9 +11,17 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (!Schema::hasTable('settings')) {
+            return;
+        }
+
         Schema::table('settings', function (Blueprint $table) {
-            $table->string('admin_layout')->default('legacy')->after('currency');
-            $table->string('customer_layout')->default('legacy')->after('admin_layout');
+            if (!Schema::hasColumn('settings', 'admin_layout')) {
+                $table->string('admin_layout')->default('legacy');
+            }
+            if (!Schema::hasColumn('settings', 'customer_layout')) {
+                $table->string('customer_layout')->default('legacy');
+            }
         });
     }
 
@@ -22,8 +30,16 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('settings', function (Blueprint $table) {
-            $table->dropColumn(['admin_layout', 'customer_layout']);
-        });
+        if (!Schema::hasTable('settings')) {
+            return;
+        }
+
+        $columns = collect(['admin_layout', 'customer_layout'])
+            ->filter(fn (string $column) => Schema::hasColumn('settings', $column))
+            ->all();
+
+        if ($columns) {
+            Schema::table('settings', fn (Blueprint $table) => $table->dropColumn($columns));
+        }
     }
 };

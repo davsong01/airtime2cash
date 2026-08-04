@@ -9,21 +9,27 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (!Schema::hasColumn('products', 'auto_share_rate')) {
+        if (!Schema::hasTable('products')) {
+            return;
+        }
+
+        if (!Schema::hasColumn('products', 'auto_share_rate') && Schema::hasColumn('products', 'rate')) {
             Schema::table('products', function (Blueprint $table) {
                 $table->double('auto_share_rate')->nullable()->after('rate');
             });
         }
 
-        DB::table('products')
-            ->where('type', 'airtime2cash')
-            ->whereNull('auto_share_rate')
-            ->update(['auto_share_rate' => DB::raw('rate')]);
+        if (Schema::hasColumns('products', ['type', 'rate', 'auto_share_rate'])) {
+            DB::table('products')
+                ->where('type', 'airtime2cash')
+                ->whereNull('auto_share_rate')
+                ->update(['auto_share_rate' => DB::raw('rate')]);
+        }
     }
 
     public function down(): void
     {
-        if (Schema::hasColumn('products', 'auto_share_rate')) {
+        if (Schema::hasTable('products') && Schema::hasColumn('products', 'auto_share_rate')) {
             Schema::table('products', function (Blueprint $table) {
                 $table->dropColumn('auto_share_rate');
             });

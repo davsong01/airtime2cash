@@ -11,13 +11,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        if (Schema::hasColumn('settings', 'referral_percentage')) {
+        if (Schema::hasTable('settings') && Schema::hasColumn('settings', 'referral_percentage')) {
             Schema::table('settings', function (Blueprint $table) {
                 $table->dropColumn('referral_percentage');
             });
         }
 
-        if (!Schema::hasColumn('products', 'referral_percentage')) {
+        if (Schema::hasTable('products') && !Schema::hasColumn('products', 'referral_percentage')) {
             Schema::table('products', function (Blueprint $table) {
                 $table->double('referral_percentage')->nullable();
             });

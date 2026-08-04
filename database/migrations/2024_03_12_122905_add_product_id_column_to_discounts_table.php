@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        if (!Schema::hasColumn('discounts', 'product_id')) {
+        if (Schema::hasTable('discounts') && !Schema::hasColumn('discounts', 'product_id')) {
             Schema::table('discounts', function (Blueprint $table) {
                 $table->string('product_id')->nullable();
             });
@@ -23,7 +23,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        if (Schema::hasColumn('discounts', 'product_id')) {
+        if (Schema::hasTable('discounts') && Schema::hasColumn('discounts', 'product_id')) {
             Schema::table('discounts', function (Blueprint $table) {
                 $table->dropColumn("product_id")->nullable();
             }); 

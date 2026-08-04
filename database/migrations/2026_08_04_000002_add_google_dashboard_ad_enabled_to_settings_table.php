@@ -8,18 +8,17 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (!Schema::hasColumn('settings', 'google_dashboard_ad_enabled')) {
+        if (Schema::hasTable('settings') && !Schema::hasColumn('settings', 'google_dashboard_ad_enabled')) {
             Schema::table('settings', function (Blueprint $table) {
                 $table->boolean('google_dashboard_ad_enabled')
-                    ->default(true)
-                    ->after('google_dashboard_ad_code');
+                    ->default(true);
             });
         }
     }
 
     public function down(): void
     {
-        if (Schema::hasColumn('settings', 'google_dashboard_ad_enabled')) {
+        if (Schema::hasTable('settings') && Schema::hasColumn('settings', 'google_dashboard_ad_enabled')) {
             Schema::table('settings', function (Blueprint $table) {
                 $table->dropColumn('google_dashboard_ad_enabled');
             });

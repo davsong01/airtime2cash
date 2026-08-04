@@ -11,16 +11,30 @@ return new class extends Migration
      */
     public function up(): void
     {
-        if (!Schema::hasColumns('settings', ['menu_text_color', 'menu_background_color', 'active_color','text_header_color','dasboard_customer_details_color', 'active_hover_color'])) {
-            Schema::table('settings', function (Blueprint $table) {
-                $table->string('menu_text_color')->default('#F4FAF9');
-                $table->string('menu_background_color')->default('#123F43');
-                $table->string('active_color')->default('#0B7D4F');
-                $table->string('text_header_color')->default('#286F70');
-                $table->string('dasboard_customer_details_color')->default('#F4E85A');
-                $table->string('active_hover_color')->default('#5a8dee');
-            });
+        if (!Schema::hasTable('settings')) {
+            return;
         }
+
+        Schema::table('settings', function (Blueprint $table) {
+            if (!Schema::hasColumn('settings', 'menu_text_color')) {
+                $table->string('menu_text_color')->default('#F4FAF9');
+            }
+            if (!Schema::hasColumn('settings', 'menu_background_color')) {
+                $table->string('menu_background_color')->default('#123F43');
+            }
+            if (!Schema::hasColumn('settings', 'active_color')) {
+                $table->string('active_color')->default('#0B7D4F');
+            }
+            if (!Schema::hasColumn('settings', 'text_header_color')) {
+                $table->string('text_header_color')->default('#286F70');
+            }
+            if (!Schema::hasColumn('settings', 'dasboard_customer_details_color')) {
+                $table->string('dasboard_customer_details_color')->default('#F4E85A');
+            }
+            if (!Schema::hasColumn('settings', 'active_hover_color')) {
+                $table->string('active_hover_color')->default('#5a8dee');
+            }
+        });
     }
 
     /**
@@ -28,15 +42,21 @@ return new class extends Migration
      */
     public function down(): void
     {
-        if (Schema::hasColumns('settings', ['primary_color', 'secondary_color', 'active_color', 'dasboard_customer_details_color'])) {
-            Schema::table('settings', function (Blueprint $table) {
-                $table->dropColumn("menu_text_color");
-                $table->dropColumn("menu_background_color");
-                $table->dropColumn("active_color");
-                $table->dropColumn("text_header_color");
-                $table->dropColumn("dasboard_customer_details_color");
-                $table->dropColumn("active_hover_color");
-            }); 
+        if (!Schema::hasTable('settings')) {
+            return;
+        }
+
+        $columns = collect([
+            'menu_text_color',
+            'menu_background_color',
+            'active_color',
+            'text_header_color',
+            'dasboard_customer_details_color',
+            'active_hover_color',
+        ])->filter(fn (string $column) => Schema::hasColumn('settings', $column))->all();
+
+        if ($columns) {
+            Schema::table('settings', fn (Blueprint $table) => $table->dropColumn($columns));
         }
     }
 };

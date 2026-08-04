@@ -9,39 +9,53 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('products', function (Blueprint $table) {
+        if (Schema::hasTable('products')) {
             if (!Schema::hasColumn('products', 'manual_status')) {
-                $table->string('manual_status')->nullable()->after('auto_share_rate');
+                Schema::table('products', function (Blueprint $table) {
+                    $table->string('manual_status')->nullable();
+                });
             }
 
             if (!Schema::hasColumn('products', 'auto_share_status')) {
-                $table->string('auto_share_status')->nullable()->after('manual_status');
+                Schema::table('products', function (Blueprint $table) {
+                    $table->string('auto_share_status')->nullable();
+                });
             }
-        });
+        }
 
-        DB::table('products')
-            ->where('type', 'airtime2cash')
-            ->whereNull('manual_status')
-            ->update(['manual_status' => 'active']);
+        if (Schema::hasTable('products') && Schema::hasColumns('products', ['type', 'manual_status'])) {
+            DB::table('products')
+                ->where('type', 'airtime2cash')
+                ->whereNull('manual_status')
+                ->update(['manual_status' => 'active']);
+        }
 
-        DB::table('products')
-            ->where('type', 'airtime2cash')
-            ->whereNull('auto_share_status')
-            ->update(['auto_share_status' => 'inactive']);
+        if (Schema::hasTable('products') && Schema::hasColumns('products', ['type', 'auto_share_status'])) {
+            DB::table('products')
+                ->where('type', 'airtime2cash')
+                ->whereNull('auto_share_status')
+                ->update(['auto_share_status' => 'inactive']);
+        }
 
-        if (!Schema::hasColumn('airtime2_cash_transactions', 'transfer_mode')) {
+        if (Schema::hasTable('airtime2_cash_transactions')
+            && !Schema::hasColumn('airtime2_cash_transactions', 'transfer_mode')) {
             Schema::table('airtime2_cash_transactions', function (Blueprint $table) {
-                $table->string('transfer_mode')->default('manual')->after('charge_rate');
+                $table->string('transfer_mode')->default('manual');
             });
         }
     }
 
     public function down(): void
     {
-        if (Schema::hasColumn('airtime2_cash_transactions', 'transfer_mode')) {
+        if (Schema::hasTable('airtime2_cash_transactions')
+            && Schema::hasColumn('airtime2_cash_transactions', 'transfer_mode')) {
             Schema::table('airtime2_cash_transactions', function (Blueprint $table) {
                 $table->dropColumn('transfer_mode');
             });
+        }
+
+        if (!Schema::hasTable('products')) {
+            return;
         }
 
         Schema::table('products', function (Blueprint $table) {

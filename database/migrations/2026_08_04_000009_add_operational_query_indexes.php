@@ -44,7 +44,7 @@ return new class extends Migration
             }
 
             foreach ($indexes as $name => $columns) {
-                if (!Schema::hasIndex($table, $name)) {
+                if (Schema::hasColumns($table, $columns) && !Schema::hasIndex($table, $name)) {
                     Schema::table($table, fn (Blueprint $blueprint) => $blueprint->index($columns, $name));
                 }
             }

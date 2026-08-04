@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        if (!Schema::hasColumn('settings', 'google_dashboard_ad_code')) {
+        if (Schema::hasTable('settings') && !Schema::hasColumn('settings', 'google_dashboard_ad_code')) {
             Schema::table('settings', function (Blueprint $table) {
                 $table->longText('google_dashboard_ad_code')->nullable();
             });
@@ -23,7 +23,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        if (Schema::hasColumn('settings', 'google_dashboard_ad_code')) {
+        if (Schema::hasTable('settings') && Schema::hasColumn('settings', 'google_dashboard_ad_code')) {
             Schema::table('settings', function (Blueprint $table) {
                 $table->dropColumn('google_dashboard_ad_code');
             });

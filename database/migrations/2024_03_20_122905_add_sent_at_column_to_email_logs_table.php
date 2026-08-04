@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        if (!Schema::hasColumn('email_logs', 'sent_at')) {
+        if (Schema::hasTable('email_logs') && !Schema::hasColumn('email_logs', 'sent_at')) {
             Schema::table('email_logs', function (Blueprint $table) {
                 $table->timestamp('sent_at')->nullable();
             });
@@ -23,7 +23,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        if (Schema::hasColumn('email_logs', 'sent_at')) {
+        if (Schema::hasTable('email_logs') && Schema::hasColumn('email_logs', 'sent_at')) {
             Schema::table('email_logs', function (Blueprint $table) {
                 $table->dropColumn("sent_at");
             }); 

@@ -11,6 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (Schema::hasTable('email_api_settings')) {
+            return;
+        }
+
         Schema::create('email_api_settings', function (Blueprint $table) {
             $table->id();
             $table->string('MAIL_DRIVER')->nullable();

@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        if (!Schema::hasColumn('categories', 'discount_type')) {
+        if (Schema::hasTable('categories') && !Schema::hasColumn('categories', 'discount_type')) {
             Schema::table('categories', function (Blueprint $table) {
                 $table->enum('discount_type', ['flat', 'percentage'])->default('flat');
             });
@@ -23,7 +23,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        if (Schema::hasColumn('categories', 'discount_type')) {
+        if (Schema::hasTable('categories') && Schema::hasColumn('categories', 'discount_type')) {
             Schema::table('categories', function (Blueprint $table) {
                 $table->dropColumn("discount_type");
             }); 
