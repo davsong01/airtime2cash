@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use App\Models\CustomerLevel;
 use App\Models\PaymentGateway;
 use App\Models\TransactionLog;
+use App\Models\Airtime2CashTransactions;
 use Illuminate\Support\Carbon;
 use App\Models\ReferralEarning;
 use Illuminate\Support\Facades\DB;
@@ -25,23 +26,57 @@ class DashboardController extends Controller
         $customer = $this->customerOfTheMonth();
         
         if (auth()->user()->type == 'admin') {
-            // Sum total wallet balance in a single query
-            $total_wallet_balance = Customer::sum('wallet');
+            $currency = getSettings()?->currency ?? 'NGN';
+            $walletSummary = Customer::selectRaw('COALESCE(SUM(wallet), 0) AS wallet_total')
+                ->selectRaw('COALESCE(SUM(referal_wallet), 0) AS referral_total')
+                ->selectRaw('COALESCE(SUM(a2cashwallet), 0) AS a2cash_total')
+                ->first();
 
-            // Count verified KYC customers
-            $kyc_verified = User::where('type', 'customer')
-                ->where('kyc_status', 'verified')
-                ->join('customers', 'customers.user_id', '=', 'users.id')
-                ->count();
+            $customerSummary = User::where('users.type', '!=', 'admin')
+                ->leftJoin('customers', 'customers.user_id', '=', 'users.id')
+                ->selectRaw('COUNT(*) AS total')
+                ->selectRaw("SUM(CASE WHEN users.status = 'active' THEN 1 ELSE 0 END) AS active")
+                ->selectRaw("SUM(CASE WHEN users.status = 'suspended' THEN 1 ELSE 0 END) AS suspended")
+                ->selectRaw("SUM(CASE WHEN customers.kyc_status = 'verified' THEN 1 ELSE 0 END) AS kyc_verified")
+                ->first();
 
-            // Count distinct active customers
-            $active_customers = TransactionLog::distinct('customer_id')->count('customer_id');
+            $transactionSummary = TransactionLog::selectRaw('COUNT(*) AS total')
+                ->selectRaw('SUM(CASE WHEN DATE(created_at) = CURRENT_DATE THEN 1 ELSE 0 END) AS today')
+                ->selectRaw("SUM(CASE WHEN status IN ('success', 'delivered', 'completed') THEN 1 ELSE 0 END) AS successful")
+                ->selectRaw("SUM(CASE WHEN status IN ('failed', 'declined') THEN 1 ELSE 0 END) AS failed")
+                ->selectRaw("COALESCE(SUM(CASE WHEN status IN ('success', 'delivered', 'completed') THEN provider_charge ELSE 0 END), 0) AS recorded_charges")
+                ->first();
 
-            // Count total customers
-            $customers = User::where('type', 'customer')->count();
-            $apis = API::get();
-            
-            return view('admin.dashboard', compact('customer', 'kyc_verified', 'active_customers', 'customers', 'total_wallet_balance','apis'));
+            $airtimeToCashSummary = Airtime2CashTransactions::where('type', 'credit')
+                ->selectRaw("SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending_count")
+                ->selectRaw("COALESCE(SUM(CASE WHEN status = 'approved' THEN amount_charged ELSE 0 END), 0) AS recorded_charges")
+                ->first();
+            $recordedEarnings = (float) $transactionSummary->recorded_charges
+                + (float) $airtimeToCashSummary->recorded_charges;
+
+            $active_customers = TransactionLog::distinct()->count('customer_id');
+            $apis = API::withCount('products')
+                ->withCount('transactions')
+                ->withSum('transactions', 'total_amount')
+                ->orderBy('name')
+                ->get();
+            $recentTransactions = TransactionLog::with([
+                'customer.user:id,firstname,middlename,lastname,email',
+                'product:id,name,display_name',
+            ])->latest()->limit(8)->get();
+
+            return view('admin.dashboard', compact(
+                'customer',
+                'customerSummary',
+                'walletSummary',
+                'transactionSummary',
+                'airtimeToCashSummary',
+                'recordedEarnings',
+                'active_customers',
+                'apis',
+                'recentTransactions',
+                'currency'
+            ));
         } else {
             return view(themeView('customer', 'dashboard'), compact('customer'));
         }

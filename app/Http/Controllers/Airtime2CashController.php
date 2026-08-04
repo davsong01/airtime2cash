@@ -36,7 +36,12 @@ class Airtime2CashController extends Controller
             "status" => "required",
             "seo_description" => "nullable",
             "fixed_price" => "nullable",
-            "rate" => "nullable",
+            "rate" => "required|numeric|min:0",
+            "auto_share_rate" => "required|numeric|min:0",
+            "manual_status" => "required|in:active,inactive",
+            "auto_share_status" => "required|in:active,inactive",
+            "min" => "required|numeric|min:0",
+            "max" => "required|numeric|gte:min",
             "image" => "required|mimes:jpeg,png|max:1024",
         ]);
 
@@ -62,6 +67,9 @@ class Airtime2CashController extends Controller
                 "slug" => $slug,
                 "api_id" => 1,
                 "rate" => $request->rate,
+                "auto_share_rate" => $request->auto_share_rate,
+                "manual_status" => $request->manual_status,
+                "auto_share_status" => $request->auto_share_status,
                 "status" => $request->status,
                 "has_variations" => 'no',
                 "seo_description" => $request->seo_description,
@@ -103,6 +111,19 @@ class Airtime2CashController extends Controller
     }
 
     public function update(Request $request, $id){
+        $this->validate($request, [
+            "name" => "required",
+            "category" => "required",
+            "status" => "required",
+            "rate" => "required|numeric|min:0",
+            "auto_share_rate" => "required|numeric|min:0",
+            "manual_status" => "required|in:active,inactive",
+            "auto_share_status" => "required|in:active,inactive",
+            "min" => "required|numeric|min:0",
+            "max" => "required|numeric|gte:min",
+            "image" => "nullable|mimes:jpeg,png|max:1024",
+        ]);
+
         $product = Product::where('id', $id)->first();
         
         if (!empty($request->image)) {
@@ -125,6 +146,9 @@ class Airtime2CashController extends Controller
                 "slug" => $slug,
                 "api_id" => 1,
                 "rate" => $request->rate,
+                "auto_share_rate" => $request->auto_share_rate,
+                "manual_status" => $request->manual_status,
+                "auto_share_status" => $request->auto_share_status,
                 "status" => $request->status,
                 "has_variations" => 'no',
                 "seo_description" => $request->seo_description,

@@ -35,7 +35,7 @@
     <div class="card customer-form-card mb-4">
         <div class="card-header d-flex align-items-center gap-3">
             <span class="purchase-heading-icon bg-label-primary"><i class="bx bx-filter-alt fs-4"></i></span>
-            <div><h5 class="mb-1">Filter requests</h5><small class="text-muted">Find an airtime conversion by product, status, ID, or date.</small></div>
+            <div><h5 class="mb-1">Filter requests</h5><small class="text-muted">Find a conversion by product, transfer mode, status, ID, or date.</small></div>
         </div>
         <div class="card-body">
             <form action="{{ route('customer.airtime2cash.transaction.history') }}" method="GET" class="customer-modern-form">
@@ -47,6 +47,14 @@
                             @foreach ($products as $product)
                                 <option value="{{ $product->id }}" {{ request('product_id') == $product->id ? 'selected' : '' }}>{{ $product->name }}</option>
                             @endforeach
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="transfer_mode">Transfer mode</label>
+                        <select class="form-select" name="transfer_mode" id="transfer_mode">
+                            <option value="">All modes</option>
+                            <option value="manual" @selected(request('transfer_mode') === 'manual')>Manual Transfer</option>
+                            <option value="auto_share" @selected(request('transfer_mode') === 'auto_share')>Auto Transfer</option>
                         </select>
                     </div>
                     <div class="col-md-3">
@@ -86,6 +94,7 @@
                         <th>Product</th>
                         <th>Amount</th>
                         <th>Charge</th>
+                        <th>Transfer mode</th>
                         <th>Status</th>
                         <th>Date</th>
                         <th></th>
@@ -94,9 +103,13 @@
                 <tbody>
                     @forelse ($transactions as $transaction)
                         <tr>
-                            <td>{{ $transaction->product->name ?? 'Not set' }}</td>
+                            <td>
+                                <span class="d-block fw-semibold text-heading">{{ $transaction->product->name ?? 'Not set' }}</span>
+                                <small class="d-block text-muted mt-1">{{ $transaction->transaction_id }}</small>
+                            </td>
                             <td>{{ getSettings()['currency'] }}{{ number_format($transaction->total_amount, 2) }}</td>
                             <td>{{ getSettings()['currency'] }}{{ number_format($transaction->amount_charged, 2) }}</td>
+                            <td><span class="badge bg-label-info">{{ $transaction->transfer_mode === 'auto_share' ? 'Auto Transfer' : 'Manual Transfer' }}</span></td>
                             <td>
                                 <span class="badge {{ $transaction->status == 'declined' ? 'bg-label-danger' : ($transaction->status == 'pending' ? 'bg-label-warning' : 'bg-label-success') }}">
                                     {{ ucfirst($transaction->status) }}
@@ -111,13 +124,13 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="6" class="text-center text-muted py-4">No airtime-to-cash transactions found.</td></tr>
+                        <tr><td colspan="7" class="text-center text-muted py-4">No airtime-to-cash transactions found.</td></tr>
                     @endforelse
                 </tbody>
             </table>
         </div>
         <div class="card-footer">
-            {{ $transactions->appends($_GET)->links() }}
+            {{ $transactions->withQueryString()->links() }}
         </div>
     </div>
 @endsection

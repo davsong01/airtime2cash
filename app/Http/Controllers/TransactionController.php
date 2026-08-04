@@ -58,13 +58,22 @@ class TransactionController extends Controller
             'products' => function ($query) {
                 return $query->where('status', 'active')
                     ->where('type', 'airtime2cash')
-                    ->get();
+                    ->where(function ($query) {
+                        $query->where('manual_status', 'active')
+                            ->orWhere('auto_share_status', 'active');
+                    });
             }
         ])->where('status', 'active')->where('type', 'airtime2cash')->first();
-    
+
+        if (empty($category)) {
+            return back()->with('error', 'Airtime to Cash is not currently available.');
+        }
+
         foreach ($category->products as $product) {
             $discount = Discount::where('product_id', $product->id)->where('customer_level', auth()->user()->customer->level->id)->first();
             $product->discounted_rate = (!empty($discount) && $discount->price < $product->rate) ? $discount->price : $product->rate;
+            $product->manual_discounted_rate = $product->discounted_rate;
+            $product->auto_share_discounted_rate = $product->auto_share_rate ?? $product->rate;
         }
 
         $banks = Bank::all();
@@ -236,18 +245,34 @@ class TransactionController extends Controller
 
     public function initializeAirtime2CashTransaction(Request $request)
     {
-        $product = Product::where('id', $request->product)->first();
+        $request->validate([
+            'product' => ['required', 'integer'],
+            'transfer_mode' => ['required', 'in:manual,auto_share'],
+        ]);
+
+        $statusColumn = $request->transfer_mode === 'auto_share'
+            ? 'auto_share_status'
+            : 'manual_status';
+
+        $product = Product::where('id', $request->product)
+            ->where('type', 'airtime2cash')
+            ->where('status', 'active')
+            ->where($statusColumn, 'active')
+            ->first();
 
         if (empty($product)) {
-            return back()->with('error', 'The selected product/service does not seem to exist, kindly check your selection');
+            return back()->withInput()->with('error', 'The selected network is not available for this transfer method.');
         }
 
-        $discount = Discount::where('product_id', $product->id)->where('customer_level', auth()->user()->customer->level->id)->first();
-        $product->discounted_rate = (!empty($discount) && $discount->price < $product->rate) ? $discount->price : $product->rate;
+        if ($request->transfer_mode === 'manual') {
+            $discount = Discount::where('product_id', $product->id)->where('customer_level', auth()->user()->customer->level->id)->first();
+            $rate = (!empty($discount) && $discount->price < $product->rate) ? $discount->price : $product->rate;
+        } else {
+            $rate = $product->auto_share_rate ?? $product->rate;
+        }
 
         $max = $product->max;
         $min = $product->min;
-        $rate = $product->discounted_rate;
         $amount = $this->removeCharsInAmount($request->amount);
 
         $amount_charged = ($rate / 100) * $amount;
@@ -271,6 +296,7 @@ class TransactionController extends Controller
             'amount_charged' => $amount_charged,
             'amount_paid' => $amount_paid,
             'charge_rate' => $rate,
+            'transfer_mode' => $request->transfer_mode,
             'product_id' => $product->id,
             'customer_id' => auth()->user()->customer->id,
             'type' => 'credit',
@@ -309,6 +335,7 @@ Please find below the details of the transaction:</p>';
 <strong>Amount Charged:</strong> ' . e(getSettings()->currency) . number_format($log->amount_charged, 2) . '<br>
 <strong>Amount to Receive:</strong> ' . e(getSettings()->currency) . number_format($log->amount_paid, 2) . '<br>
 <strong>Charge Rate:</strong> ' . number_format($log->charge_rate) . '%<br>
+<strong>Transfer Method:</strong> ' . e($log->transfer_mode === 'auto_share' ? 'Auto Transfer' : 'Manual Transfer') . '<br>
 <strong>Total Credit to transfer:</strong> ' . e(getSettings()->currency) . number_format($log->total_amount, 2) . '<br>
 <strong>Phone Numbers:</strong> ' . e($log->phone_numbers) . '<br>
 <strong>Transaction ID:</strong> ' . e($log->transaction_id) . '<br>
@@ -334,6 +361,7 @@ Please find below the details of the transaction:</p>';
             "*Amount Charged:* " . getSettings()->currency . number_format($log->amount_charged, 2) . "\n" .
             "*Amount to Receive:* " . getSettings()->currency . number_format($log->amount_paid, 2) . "\n" .
             "*Charge Rate:* " . number_format($log->charge_rate) . "%\n" .
+            "*Transfer Method:* " . ($log->transfer_mode === 'auto_share' ? 'Auto Transfer' : 'Manual Transfer') . "\n" .
             "*Total Credit to transfer:* " . getSettings()->currency . number_format($log->total_amount, 2) . "\n" .
             "*Phone Numbers:* " . $log->phone_numbers . "\n" .
             "*Transaction ID:* " . $log->transaction_id . "\n" .
@@ -494,7 +522,11 @@ Please find below the details of the transaction:</p>';
 
     public function Airtime2CashTransactionStatus($transaction_id)
     {
-        $transaction = Airtime2CashTransactions::where('transaction_id', $transaction_id)->first();
+        $transaction = Airtime2CashTransactions::with('product')
+            ->where('transaction_id', $transaction_id)
+            ->where('customer_id', auth()->user()->customer->id)
+            ->firstOrFail();
+
         return view(themeView('customer', 'airtime_2_cash_transaction_status'), compact('transaction'));
     }
 
@@ -891,6 +923,10 @@ Please find below the details of the transaction:</p>';
 
     public function customerAirtime2CashTransactionHistory(Request $request)
     {
+        $request->validate([
+            'transfer_mode' => ['nullable', 'in:manual,auto_share'],
+        ]);
+
         $transactions = Airtime2CashTransactions::with(['product', 'customer'])->where('customer_id', auth()->user()->customer->id);
 
         if (!empty($request->product_id)) {
@@ -903,6 +939,10 @@ Please find below the details of the transaction:</p>';
 
         if (!empty($request->status)) {
             $transactions = $transactions->where('status', $request->status);
+        }
+
+        if (!empty($request->transfer_mode)) {
+            $transactions = $transactions->where('transfer_mode', $request->transfer_mode);
         }
 
         if (!empty($request->from) && !empty($request->to)) {
@@ -1267,54 +1307,72 @@ Please find below the details of the transaction:</p>';
 
     public function airtimeToCashTransactions(Request $request)
     {
-        $transactions = Airtime2CashTransactions::with(['product', 'customer'])->where('type','credit')->latest();
-        $transactionsS = clone $transactions;
-        $transactionsProfit = clone $transactions;
-        $transactionsFailed = clone $transactions;
-        $transactionsPending = clone $transactions;
-        $totalTransSuccess = $transactionsS->whereIn('status', ['approved'])->sum('amount_paid');
-        $totalTransFailed = $transactionsFailed->where('status', 'declined')->count();
-        $totalProfit = $transactionsProfit->where('status', 'approved')->sum('amount_charged');
-        $totalPending = $transactionsPending->where('status', 'pending')->count();
+        $request->validate([
+            'status' => ['nullable', 'in:pending,approved,declined'],
+            'transfer_mode' => ['nullable', 'in:manual,auto_share'],
+            'product_id' => ['nullable', 'integer'],
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date', 'after_or_equal:from'],
+        ]);
+
+        $baseQuery = Airtime2CashTransactions::where('type', 'credit');
+        $metrics = (clone $baseQuery)->selectRaw("COALESCE(SUM(CASE WHEN status = 'approved' THEN amount_paid ELSE 0 END), 0) AS approved_payout")
+            ->selectRaw("COALESCE(SUM(CASE WHEN status = 'approved' THEN amount_charged ELSE 0 END), 0) AS conversion_income")
+            ->selectRaw("COALESCE(SUM(CASE WHEN status = 'pending' THEN amount_paid ELSE 0 END), 0) AS pending_value")
+            ->selectRaw("SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending_count")
+            ->selectRaw("SUM(CASE WHEN status = 'declined' THEN 1 ELSE 0 END) AS declined_count")
+            ->selectRaw("SUM(CASE WHEN DATE(created_at) = CURRENT_DATE THEN 1 ELSE 0 END) AS today_count")
+            ->first();
+
+        $transactions = $baseQuery->with(['product:id,name,display_name', 'customer.user:id,firstname,middlename,lastname,email,phone']);
 
         if ($request->email) {
-            $user = User::where('email', $request->email)->first();
-            if (!empty($user)) {
-                $customer = $user->customer;
-                $id = $customer->id;
-                $transactions = $transactions->where('customer_id', $id);
-            }
+            $email = trim($request->email);
+            $transactions->whereHas('customer.user', function ($query) use ($email) {
+                $query->where('email', 'like', '%' . $email . '%');
+            });
         }
 
         if ($request->transaction_id) {
-            $transactions = $transactions->where('transaction_id', $request->transaction_id);
+            $transactions->where('transaction_id', 'like', '%' . trim($request->transaction_id) . '%');
         }
 
         if ($request->status) {
-            $transactions = $transactions->where('status', $request->status);
+            $transactions->where('status', $request->status);
         }
 
-        if ($request->type) {
-            $transactions = $transactions->where('type', $request->type);
+        if ($request->transfer_mode) {
+            $transactions->where('transfer_mode', $request->transfer_mode);
         }
 
-        if ($request->from) {
-            $time = $request->from . ' 00:00:00';
-            $transactions = $transactions->where('created_at', '>', $time);
-        }
-        if ($request->to) {
-            $time = $request->to . ' 00:00:00';
-            $transactions = $transactions->where('created_at', $time);
+        if ($request->product_id) {
+            $transactions->where('product_id', $request->product_id);
         }
 
-        $transactions = $transactions->paginate(20);
+        if ($request->from && $request->to) {
+            $transactions->whereBetween('created_at', [
+                $request->from . ' 00:00:00',
+                $request->to . ' 23:59:59',
+            ]);
+        } elseif ($request->from) {
+            $transactions->where('created_at', '>=', $request->from . ' 00:00:00');
+        } elseif ($request->to) {
+            $transactions->where('created_at', '<=', $request->to . ' 23:59:59');
+        }
+
+        $transactions = $transactions
+            ->orderByRaw("CASE WHEN status = 'pending' THEN 0 ELSE 1 END")
+            ->orderByRaw("CASE WHEN status = 'pending' THEN created_at END ASC")
+            ->orderByDesc('created_at')
+            ->paginate(20)
+            ->withQueryString();
+
+        $products = Product::where('type', 'airtime2cash')->orderBy('name')->get(['id', 'name']);
 
         return view('admin.transaction.airtime2cash_transactions', [
             'transactions' => $transactions,
-            'success' => $totalTransSuccess,
-            'failed' => $totalTransFailed,
-            'total_profit' => $totalProfit,
-            'totalPending' => $totalPending,
+            'metrics' => $metrics,
+            'products' => $products,
             'query' => $request->query(),
         ]);
     }

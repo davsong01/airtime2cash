@@ -64,6 +64,7 @@ class RegistrationTest extends TestCase
         ])->assertRedirect('/dashboard');
 
         $this->assertAuthenticated();
+        $this->assertNotNull(auth()->user()->fresh()->email_verified_at);
         $this->get('/dashboard')->assertOk();
         $this->get('/profile')->assertOk();
         $this->get('/customer-update-kyc-info')->assertOk();

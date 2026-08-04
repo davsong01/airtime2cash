@@ -8,6 +8,12 @@
     <link rel="stylesheet" href="{{ asset('modern-assets/vendor/libs/select2/select2.css') }}" />
 @endsection
 
+@php
+    $manualProducts = $category->products->where('manual_status', 'active')->count();
+    $autoShareProducts = $category->products->where('auto_share_status', 'active')->count();
+    $defaultTransferMode = old('transfer_mode', $manualProducts ? 'manual' : 'auto_share');
+@endphp
+
 @section('content')
     @include('sneat.customer.partials.page-header', [
         'eyebrow' => 'Conversion',
@@ -34,6 +40,31 @@
 
                     <div class="card-body p-4">
                         <div class="row g-3">
+                            <div class="col-12">
+                                <label class="form-label">Transfer method</label>
+                                <div class="row g-3 conversion-mode-options">
+                                    <div class="col-md-6">
+                                        <input class="btn-check" type="radio" name="transfer_mode" id="transfer-mode-manual" value="manual" autocomplete="off" @checked($defaultTransferMode === 'manual') @disabled(!$manualProducts)>
+                                        <label class="conversion-mode-option" for="transfer-mode-manual">
+                                            <span class="conversion-mode-icon bg-label-success"><i class="bx bx-hand"></i></span>
+                                            <span><strong>Manual Transfer</strong><small>Send airtime manually to our number</small></span>
+                                            <i class="bx bx-check-circle conversion-mode-check"></i>
+                                        </label>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <input class="btn-check" type="radio" name="transfer_mode" id="transfer-mode-auto" value="auto_share" autocomplete="off" @checked($defaultTransferMode === 'auto_share') @disabled(!$autoShareProducts)>
+                                        <label class="conversion-mode-option" for="transfer-mode-auto">
+                                            <span class="conversion-mode-icon bg-label-warning"><i class="bx bx-bolt-circle"></i></span>
+                                            <span><strong>Auto Transfer</strong><small>Airtime moved through Auto Share</small></span>
+                                            <i class="bx bx-check-circle conversion-mode-check"></i>
+                                        </label>
+                                    </div>
+                                </div>
+                                @if(!$manualProducts || !$autoShareProducts)
+                                    <div class="form-text">Unavailable methods are disabled until a network is enabled by the administrator.</div>
+                                @endif
+                            </div>
+
                             <div class="col-12" id="product-image-div" style="display:none">
                                 <div class="purchase-product-preview d-flex align-items-center gap-3 p-3 rounded">
                                     <img id="product-image" src="" alt="" class="rounded">
@@ -51,7 +82,10 @@
                                     @foreach ($category->products as $item)
                                         <option
                                             value="{{ $item->id }}"
-                                            data-discounted_rate="{{ $item->discounted_rate }}"
+                                            data-manual_status="{{ $item->manual_status }}"
+                                            data-auto_share_status="{{ $item->auto_share_status }}"
+                                            data-manual_rate="{{ $item->manual_discounted_rate }}"
+                                            data-auto_share_rate="{{ $item->auto_share_discounted_rate }}"
                                             data-min="{{ $item->min }}"
                                             data-max="{{ $item->max }}"
                                             data-image="{{ asset($item->image) }}"
@@ -68,7 +102,7 @@
                             <div class="col-md-6" id="rate-div" style="display:none">
                                 <label for="rate" class="form-label">Charge rate (%)</label>
                                 <div class="input-group">
-                                    <span class="input-group-text"><i class="bx bx-percentage"></i></span>
+                                    <span class="input-group-text fw-semibold" aria-hidden="true">%</span>
                                     <input class="form-control" id="rate" name="rate" type="number" disabled>
                                 </div>
                             </div>
@@ -167,10 +201,14 @@
                     </div>
                     <div id="instruction-div" style="display:none">
                         <div id="instruction" class="text-body mb-4"></div>
-                        <div class="form-check p-3 ps-5 rounded bg-label-primary">
-                            <input type="checkbox" class="form-check-input" id="agreement" required>
-                            <label class="form-check-label" for="agreement">I have read and agree to these instructions</label>
-                        </div>
+                        <label class="conversion-agreement" for="agreement" id="agreement-panel">
+                            <input type="checkbox" class="form-check-input conversion-agreement-check" id="agreement" required>
+                            <span class="conversion-agreement-icon"><i class="bx bx-check-shield"></i></span>
+                            <span class="conversion-agreement-copy">
+                                <strong>I have read and agree to these instructions</strong>
+                                <small>Confirm this before submitting your airtime conversion.</small>
+                            </span>
+                        </label>
                     </div>
                 </div>
             </div>
@@ -203,6 +241,8 @@
             }
 
             if ($('#instruction-div').is(':visible') && !$('#agreement').prop('checked')) {
+                $('#agreement-panel').addClass('is-required');
+                $('#agreement').trigger('focus');
                 alert('You must agree to the transfer instructions');
                 return false;
             }
@@ -225,14 +265,37 @@
                 });
             });
 
+            const productSelect = $('#product');
+            const allProductOptions = productSelect.find('option').clone();
+
+            function refreshNetworks() {
+                const transferMode = $('input[name="transfer_mode"]:checked').val();
+                const statusKey = transferMode === 'auto_share' ? 'auto_share_status' : 'manual_status';
+
+                productSelect.empty();
+                allProductOptions.each(function (index) {
+                    const option = $(this);
+                    if (index === 0 || option.data(statusKey) === 'active') {
+                        productSelect.append(option.clone());
+                    }
+                });
+
+                productSelect.val('').trigger('change');
+            }
+
+            $('input[name="transfer_mode"]').on('change', refreshNetworks);
+            $('#agreement').on('change', function () {
+                $('#agreement-panel').removeClass('is-required');
+            });
+            refreshNetworks();
             $('#amount').val('');
-            $('#product').val('').trigger('change.select2');
             $('#payment_method').val('').trigger('change.select2');
 
             $('#product').on('change', function () {
                 const selected = $('#product').find(':selected');
                 const product = selected.val();
-                const discountedRate = parseFloat(selected.data('discounted_rate'));
+                const transferMode = $('input[name="transfer_mode"]:checked').val();
+                const discountedRate = parseFloat(transferMode === 'auto_share' ? selected.data('auto_share_rate') : selected.data('manual_rate'));
                 const max = parseFloat(selected.data('max'));
                 const min = parseFloat(selected.data('min'));
 
