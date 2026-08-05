@@ -141,7 +141,7 @@ class CustomerController extends Controller
 
         return view('admin.customers.unverified', compact('customers', 'summary'));
     }
-    
+
     function verifyCustomer($customer, $internal=null)
     {
         $customer = User::where('id', $customer)->first();
@@ -157,9 +157,9 @@ class CustomerController extends Controller
     }
 
     function deleteCustomer($customer, $internal=null)
-    {        
+    {
         $user = User::where('id', $customer)->first();
-        
+
         if ($user && is_null($user->email_verified_at)) {
             if($user->customer){
                 $user->customer->delete();
@@ -168,13 +168,13 @@ class CustomerController extends Controller
             if ($user->reserved_accounts) {
                 $user->reserved_accounts->delete();
             }
-            
+
             $user->delete();
-            
+
             if($internal){
                 return true;
             }
-            
+
             return back()->with('message', 'Operation successful');
         } else {
             if ($internal) {
@@ -187,14 +187,14 @@ class CustomerController extends Controller
     public function verifyMultiActions(Request $request){
         set_time_limit(3600);
         $customer_ids = $request->customer_ids;
-        
+
         if(!empty($customer_ids)){
             $customer_ids = explode(',', $customer_ids);
             foreach($customer_ids as $id){
                 if($request->action == 'verify'){
                     $this->verifyCustomer($id, 'internal');
                 }
-                
+
                 if($request->action == 'delete'){
                     $this->deleteCustomer($id, 'internal');
                 }
@@ -369,15 +369,15 @@ class CustomerController extends Controller
         $settings = getSettings();
         $user->password = $password;
         $user->save();
-        
+
         // Send email
-        $subject = "New Password Pin";
+        $subject = "New Password";
         $body = '<p>Hello! ' . $user->firstname . '</p>';
         $body .= '<p style="line-height: 2.0;">Your password has been reset by ADMIN on ' . config('app.name') . ' at ' . Carbon::now()->format('jS F, Y, h:iA') . '.</strong><br><br>Your new password is <br><strong>' . $request->new_password . '</strong><br>. If you did not request a password reset, Kindly notify us via WhatsApp us via whatsapp( ' . $settings->whatsapp_no . ') immediately.<b><hr/><br>Warm Regards. (' . config('app.name') . ')<br/></p>';
 
         logEmails($user->email, $subject, $body);
 
-        return back()->with('message', 'Transaction PIN successfully reset to: ' . $request->new_password);
+        return back()->with('message', 'Password successfully reset to: ' . $request->new_password);
     }
 
     public function processCustomerUpdateKycInfo(Request $request, Customer $customer)
@@ -393,7 +393,7 @@ class CustomerController extends Controller
         ]);
 
         $user = $customer->user;
-        
+
         if (!empty($request->IDCARD)) {
             $input['IDCARD'] = $this->uploadFile($request->IDCARD, 'kyc');
         }else{
@@ -415,7 +415,7 @@ class CustomerController extends Controller
             $firstname = $input['FIRST_NAME'];
             $lastname = $input['LAST_NAME'];
             $middlename = $input['MIDDLE_NAME'];
-    
+
             $user->update([
                 "firstname" => $firstname,
                 "middlename" => $middlename,
@@ -424,7 +424,7 @@ class CustomerController extends Controller
         }
 
         return back()->with('message', 'Information Update completed, click approve to generate reserved account');
-        
+
     }
 
     public function approveCustomerKyc(Customer $customer){
@@ -432,7 +432,7 @@ class CustomerController extends Controller
             "kyc_status" => 'verified',
             'kyc_rejection_reason' => null,
         ]);
-        
+
         KycData::where('customer_id', $customer->id)->update([
             'status' => 'verified',
         ]);
@@ -459,7 +459,7 @@ class CustomerController extends Controller
         } else {
             return back()->with('error', 'KYC Approved succesfully but NO reserved accounts created');
         }
-        
+
     }
 
     public function declineCustomerKyc(Request $request, Customer $customer)

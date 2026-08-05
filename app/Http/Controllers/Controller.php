@@ -2,18 +2,20 @@
 
 namespace App\Http\Controllers;
 
-use Image;
-use Carbon\Carbon;
-use App\Models\EmailLog;
-use App\Models\BillerLog;
 use App\Mail\EmailMessages;
-use App\Models\GeneralSetting;
+use App\Models\BillerLog;
 use App\Models\EmailApiSetting;
+use App\Models\EmailLog;
+use App\Models\GeneralSetting;
+use Carbon\Carbon;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Foundation\Validation\ValidatesRequests;
+use Illuminate\Routing\Controller as BaseController;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Session;
-use Illuminate\Routing\Controller as BaseController;
-use Illuminate\Foundation\Validation\ValidatesRequests;
-use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Image;
+use InvalidArgumentException;
+use RuntimeException;
 
 class Controller extends BaseController
 {
@@ -43,10 +45,11 @@ class Controller extends BaseController
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 
         $response = curl_exec($ch);
-       
+
         // \Log::info(['response' => $response, 'url' => $url, 'method' => $method, 'headers'=> $headers]);
         return json_decode($response, true);
     }
+    
 
     public function uploadFile($file, $location = null, $width = null, $height = null)
     {
@@ -253,7 +256,7 @@ class Controller extends BaseController
         // $this->purgeSentEmails();
         // Check how many have been sent within the hour
         $sentWithinTheHour = EmailLog::where('status', 'sent')->whereBetween('sent_at', [$oneHourAgo, now()])->count();
-      
+
         // \Log::info('Emails sending start at: ' .now());
         if ($sentWithinTheHour >= $hourlyRate) {
             \Log::info(now() . ' : Hourly email rate exceeded on server. ' . $sentWithinTheHour . ' emails already sent this hour');
@@ -263,7 +266,7 @@ class Controller extends BaseController
 
             $emails = EmailLog::where('status', 'pending')->whereNull('sent_at')->take($pick)->get();
             $count = 0;
-            
+
             foreach ($emails as $email) {
                 $data['recipient'] = $email->recipient;
                 $data['content'] = $email->content;
@@ -288,7 +291,7 @@ class Controller extends BaseController
     public function sendEmailReal($current)
     {
         $provider = EmailApiSetting::first();
-       
+
         if(!empty($provider)){
             config([
                 'mail.driver' => $provider->MAIL_DRIVER,
@@ -306,14 +309,14 @@ class Controller extends BaseController
             ]);
             $current['provider'] = $provider->toArray();
         }
-        
+
         try {
             Mail::to($current['recipient'])->send(new EmailMessages([
                 'subject' => $current['subject'],
                 'body' => $current['content'],
                 'provider' => $current['provider'] ?? [],
             ]));
-            
+
             return [
                 'message' => 'success',
             ];
@@ -327,7 +330,7 @@ class Controller extends BaseController
 
     public function checkRequestIDFormat($requestId) {
         $requestIdTime = date("Y-m-d H:i", strtotime(substr($requestId,0,12)));
-    
+
         if($requestIdTime > Carbon::now()->addMinutes(5) || $requestIdTime < Carbon::now()->addMinutes(-5)){
             return false;
         }else{

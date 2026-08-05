@@ -29,9 +29,10 @@
         .a2c-network-logo img { width: 100%; height: 100%; object-fit: contain; padding: .25rem; }
         .a2c-network-fallback { display: none; width: 100%; height: 100%; align-items: center; justify-content: center; color: var(--a2c-green); font-weight: 800; }
         .a2c-network-option strong { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .86rem; }
-        .a2c-calculator { padding: 1.35rem; background: linear-gradient(145deg, rgba(0,168,107,.055), rgba(3,195,236,.035)); border-bottom: 1px solid rgba(67,89,113,.08); }
-        .a2c-calculator .form-control, .a2c-calculator .input-group-text { min-height: 46px; }
-        .a2c-calculator .form-control { font-size: 1rem; font-weight: 600; }
+        /* unify calculator and form body styling */
+        .a2c-calculator, .a2c-form-body { padding: 1.35rem; background: linear-gradient(145deg, rgba(0,168,107,.055), rgba(3,195,236,.035)); border-bottom: 1px solid rgba(67,89,113,.08); }
+        .a2c-calculator .form-control, .a2c-calculator .input-group-text, .a2c-form-body .form-control, .a2c-form-body .input-group-text { min-height: 46px; }
+        .a2c-calculator .form-control, .a2c-form-body .form-control { font-size: 1rem; font-weight: 600; }
         .a2c-rate-box { height: 100%; min-height: 46px; padding: .5rem .85rem; border: 1px solid rgba(67,89,113,.11); border-radius: .55rem; background: rgba(255,255,255,.8); display: flex; align-items: center; justify-content: space-between; }
         .a2c-rate-box small { color: var(--bs-secondary-color); }
         .a2c-rate-box strong { color: var(--a2c-green); font-size: 1rem; }
@@ -171,14 +172,9 @@
                                             <input class="form-control text-success" id="receive" name="receive" type="number" disabled>
                                         </div>
                                     </div>
-                                    <div class="col-md-6" id="rate-div" style="display:none">
-                                        <label class="form-label">Charge rate</label>
-                                        <div class="a2c-rate-box">
-                                            <span>Applicable discount fee</span>
-                                            <strong><span id="rate-display">0</span>%</strong>
-                                        </div>
-                                        <input id="rate" name="rate" type="hidden" disabled>
-                                    </div>
+                                    <!-- charge rate now shown under the airtime amount -->
+                                    <small class="form-text text-muted mt-2" id="rate-text" style="display:none">Charge rate: <strong class="text-success"><span id="rate-display">0</span>%</strong></small>
+                                    <input id="rate" name="rate" type="hidden">
                                 </div>
                             </div>
                             <div class="a2c-form-body">
@@ -447,7 +443,7 @@
                     setActionButton('Sending OTP...', true, 'bx-loader-alt bx-spin');
                     showFlowError('');
 
-                    postAuto(autoUrls.initiate, { ...autoPayload(), sharePin: pin })
+                    postAuto(autoUrls.initiate, { ...autoPayload(), share_pin: pin })
                         .then(res => openOtpStage(res))
                         .catch(error => {
                             showFlowError(error.message);
@@ -548,7 +544,25 @@
                     ? 'Follow these steps to complete an automatic airtime transfer.'
                     : 'Instructions depend on the selected network.');
                 setActionButton(isAutoTransfer ? 'Initiate Auto Transfer' : 'Submit conversion', false, isAutoTransfer ? 'bx-bolt-circle' : 'bx-transfer');
+                // refresh the native select options
                 refreshNetworks();
+
+                // show/hide the network tiles to match the selected mode
+                const statusAttr = isAutoTransfer ? 'data-auto-share-status' : 'data-manual-status';
+                $('.a2c-network-option').each(function () {
+                    const status = $(this).attr(statusAttr);
+                    if (status === 'active') {
+                        $(this).removeClass('d-none');
+                        // small entrance transition
+                        $(this).css('opacity', 0).animate({ opacity: 1 }, 220);
+                    } else {
+                        $(this).addClass('d-none');
+                    }
+                });
+
+                // reset selection state
+                $('.a2c-network-option').removeClass('is-active');
+                productSelect.val('').trigger('change');
             });
 
             $('#agreement').on('change', function () {
@@ -580,20 +594,26 @@
 
                 if (!product) {
                     $('#rate').val('');
-                    $('#rate-div, #amount-div').hide();
+                    $('#rate-display').text('0');
+                    $('#rate-text, #amount-div').hide();
                     showInstruction(transferMode === 'auto_share' ? defaultAutoInstruction : null);
                     return;
                 }
 
-                const discountedRate = parseFloat(transferMode === 'auto_share' ? selected.data('auto_share_rate') : selected.data('manual_rate'));
+                // read raw data-attribute (use attr to avoid data normalization issues)
+                const rawRate = transferMode === 'auto_share'
+                    ? (selected.attr('data-auto_share_rate') ?? selected.data('auto_share_rate'))
+                    : (selected.attr('data-manual_rate') ?? selected.data('manual_rate'));
+                const discountedRate = parseFloat(rawRate) || 0;
                 const max = parseFloat(selected.data('max'));
                 const min = parseFloat(selected.data('min'));
                 const instruction = transferMode === 'auto_share'
-                    ? selected.data('auto_share_instruction') || defaultAutoInstruction
-                    : selected.data('manual_instruction');
+                    ? (selected.attr('data-auto_share_instruction') || selected.data('auto_share_instruction') || defaultAutoInstruction)
+                    : (selected.attr('data-manual_instruction') || selected.data('manual_instruction'));
 
                 showInstruction(instruction);
                 $('#rate').val(discountedRate);
+                $('#rate-display').text(discountedRate);
 
                 if (Number.isFinite(min)) {
                     $('#amount').attr('min', min);
@@ -613,7 +633,7 @@
                     $('#airtime-range').hide();
                 }
 
-                $('#rate-div, #amount-div').show();
+                $('#rate-text, #amount-div').show();
             });
 
             $('input[name="transfer_mode"]:checked').trigger('change');

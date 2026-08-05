@@ -1,8 +1,11 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Providers;
 
+use App\Http\Controllers\Controller;
+use App\Http\Controllers\TransactionController;
 use App\Models\Airtime2CashTransactions;
+use App\Models\API;
 use App\Models\Product;
 use App\Services\AutoSyncService;
 use App\Services\AutoSyncSettlementService;
@@ -13,10 +16,20 @@ use Illuminate\Validation\Rule;
 use RuntimeException;
 use Throwable;
 
-class AutoSyncAirtimeController extends Controller
+class AutoSyncController extends Controller
 {
+    private function credentials()
+    {
+        return API::where('slug', 'autosync')->firstOrFail();
+    }
+
     public function initiate(Request $request, AutoSyncService $autoSync): JsonResponse
     {
+        // normalize camelCase payloads from different clients (sharePin -> share_pin)
+        if ($request->has('sharePin') && !$request->has('share_pin')) {
+            $request->merge(['share_pin' => $request->input('sharePin')]);
+        }
+
         $validated = $request->validate([
             'product' => ['required', 'integer'],
             'transfer_mode' => ['required', Rule::in(['auto_share'])],
@@ -48,7 +61,7 @@ class AutoSyncAirtimeController extends Controller
             return response()->json(['message' => 'Enter an amount within the configured network limits.'], 422);
         }
 
-        if ($this->bounceBlacklist($validated['phone'], $request->user()->email, $validated['email'])) {
+        if (app(TransactionController::class)->bounceBlacklist($validated['phone'], $request->user()->email, $validated['email'])) {
             return response()->json(['message' => 'This account cannot use Auto Transfer. Please contact support.'], 403);
         }
 
@@ -66,6 +79,7 @@ class AutoSyncAirtimeController extends Controller
                 'customer_id' => $customer->id,
                 'transaction_id' => $transactionId,
             ]);
+
         } catch (RuntimeException $exception) {
             return response()->json(['message' => $exception->getMessage()], 422);
         }
@@ -75,7 +89,11 @@ class AutoSyncAirtimeController extends Controller
         if (!$providerReference) {
             return response()->json(['message' => 'AutoSync did not return a transaction reference. Please try again.'], 502);
         }
-
+        // logger()->info('AutoSync Initiate Response', [
+        //     'transaction_id' => $transactionId,
+        //     'provider_reference' => $providerReference,
+        //     'response' => $response,
+        // ]);
         $amountCharged = ($rate / 100) * $grossAmount;
         $transaction = Airtime2CashTransactions::create([
             'amount_charged' => $amountCharged,
@@ -110,8 +128,9 @@ class AutoSyncAirtimeController extends Controller
             'transaction_id' => ['required', 'string'],
             'otp' => ['required', 'digits_between:4,10'],
         ]);
-
+        
         $transaction = $this->customerTransaction($request, $validated['transaction_id']);
+
         if ($transaction->status === 'approved') {
             return response()->json([
                 'message' => 'This Auto Transfer has already been completed.',

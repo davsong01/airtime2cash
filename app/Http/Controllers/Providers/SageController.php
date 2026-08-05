@@ -37,15 +37,15 @@ class SageController extends Controller
         $url = $this->base_url . "wallet/balance";
         $headers = [
             "Content-Type: application/json",
-            "Authorization: Bearer " . $token . "",
+            "Authorization: Bearer " . $token,
         ];
-
+        
         return $this->control->basicApiCall($url, [], $headers, 'GET');
     }
 
     public function transfer($token, $bank_code, $account_number,$account_name, $amount, $reference){
         $url = $this->base_url . "transfer/fund-transfer";
-        
+
         $payload = [
             "bank_code" => $bank_code,
             "account_number" => $account_number,
@@ -54,7 +54,7 @@ class SageController extends Controller
             "amount" => $amount,
             "narration" => 'Transfer from ' . config('app.name'),
         ];
-        
+
         $headers = [
             "Content-Type: application/json",
             "Authorization: Bearer " . $token . "",
@@ -69,7 +69,7 @@ class SageController extends Controller
         } else {
             $response = $this->control->basicApiCall($url, json_encode($payload), $headers);
         }
-        
+
         return $response;
     }
 
@@ -80,16 +80,16 @@ class SageController extends Controller
 
         if (!empty($login) && $login['success'] == true) {
             $token = $login['data']['token']['access_token'] ?? null;
-            
+
             try {
                 $url = $this->base_url . "transaction/requery";
                 $payload = [
                     "reference" => $transaction->transaction_id,
                 ];
 
-                if(env('ENT') == 'local'){
-                    $payload['reference'] = 'A2C-2024041222599193140';
-                }
+                // if(env('ENT') == 'local'){
+                //     $payload['reference'] = 'A2C-2024041222599193140';
+                // }
 
                 $headers = [
                     "Content-Type: application/json",
@@ -134,10 +134,10 @@ class SageController extends Controller
             "Content-Type" => "application/json",
             "Authorization" => "Basic " . base64_encode($this->public_key . ":" . $this->secret_key),
         ];
-       
+
         $response = $this->control->basicApiCall($url, json_encode($payload), $headers);
 
         return $response;
-            
+
     }
 }

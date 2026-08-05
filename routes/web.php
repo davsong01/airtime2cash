@@ -1,38 +1,39 @@
 <?php
 
-use App\Models\User;
-use App\Models\RolePermission;
-use App\Http\Controllers\Controller;
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\APIController;
-use App\Http\Controllers\RoleController;
+use App\Http\Controllers\Admin\AutoSyncOperationsController;
 use App\Http\Controllers\AdminController;
-use App\Http\Controllers\KycDataController;
-use App\Http\Controllers\PaymentController;
-use App\Http\Controllers\ProductController;
-use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\CategoryController;
-use App\Http\Controllers\CustomerController;
-use App\Http\Controllers\CustomerAnnouncementController;
-use App\Http\Controllers\EmailApiController;
-use App\Http\Controllers\EmailLogController;
-use App\Http\Controllers\SettingsController;
-use App\Http\Controllers\BillerLogController;
-use App\Http\Controllers\BlackListController;
-use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\VariationController;
-use App\Http\Controllers\PermissionController;
-use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\Airtime2CashController;
+use App\Http\Controllers\AnnouncementController;
+use App\Http\Controllers\APIController;
 use App\Http\Controllers\AutoSyncAirtimeController;
 use App\Http\Controllers\AutoSyncWebhookController;
-use App\Http\Controllers\AnnouncementController;
+use App\Http\Controllers\BillerLogController;
+use App\Http\Controllers\BlackListController;
+use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\Controller;
+use App\Http\Controllers\CustomerAnnouncementController;
+use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\CustomerLevelController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\EmailApiController;
+use App\Http\Controllers\EmailLogController;
+use App\Http\Controllers\KycDataController;
+use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PaymentGatewayController;
-use App\Http\Controllers\RolePermissionController;
+use App\Http\Controllers\PermissionController;
+use App\Http\Controllers\ProductController;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\Providers\AutoSyncController;
 use App\Http\Controllers\ReservedAccountController;
 use App\Http\Controllers\ReservedAccountNumberController;
-use App\Http\Controllers\Admin\AutoSyncOperationsController;
+use App\Http\Controllers\RoleController;
+use App\Http\Controllers\RolePermissionController;
+use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\TransactionController;
+use App\Http\Controllers\VariationController;
+use App\Models\RolePermission;
+use App\Models\User;
+use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
@@ -51,7 +52,7 @@ Route::get('cron/analyze-callback', [PaymentController::class, 'analyzeCallbackR
 Route::get('cron/sendemails', [Controller::class, 'cronSendEmails']);
 Route::get('generate-api-keys', function(){
     $users = User::all();
-    
+
     foreach($users as $user){
         if(empty($user->api_key)){
             $user->update([
@@ -78,26 +79,26 @@ Route::middleware(['auth', 'verified', 'tpin', 'ipcheck'])->group(function () {
     // Route::post('change-pin', [HomeController::class, 'processResetPin'])->name('pin.process.reset');
     Route::get('airtime-to-cash', [TransactionController::class, 'airtimeToCash'])->name('airtime-to-cash');
     Route::get('wallet-to-bank/{sluhg}', [TransactionController::class, 'walletToBank'])->name('wallet-to-bank');
-    
+
     Route::get('customer-get-variations/{product}', [VariationController::class, 'getCustomerVariations'])->name('get.customer.variations');
 
     Route::middleware(['kyc'])->group(function () {
         Route::get('customer/{slug}', [TransactionController::class, 'showProductsPage'])->name('open.transaction.page');
         Route::post('customer-initialize-transaction', [TransactionController::class, 'initializeTransaction'])->name('initialize.transaction');
         Route::post('customer-initialize-airtime2cash-transaction', [TransactionController::class, 'initializeAirtime2CashTransaction'])->name('initialize.airtime2cashtransaction');
-        Route::post('airtime-to-cash/auto/initiate', [AutoSyncAirtimeController::class, 'initiate'])->middleware('throttle:5,1')->name('airtime2cash.auto.initiate');
-        Route::post('airtime-to-cash/auto/complete', [AutoSyncAirtimeController::class, 'complete'])->middleware('throttle:10,1')->name('airtime2cash.auto.complete');
-        Route::post('airtime-to-cash/auto/resend-otp', [AutoSyncAirtimeController::class, 'resendOtp'])->middleware('throttle:3,1')->name('airtime2cash.auto.resend-otp');
+        Route::post('airtime-to-cash/auto/initiate', [AutoSyncController::class, 'initiate'])->middleware('throttle:5,1')->name('airtime2cash.auto.initiate');
+        Route::post('airtime-to-cash/auto/complete', [AutoSyncController::class, 'complete'])->middleware('throttle:10,1')->name('airtime2cash.auto.complete');
+        Route::post('airtime-to-cash/auto/resend-otp', [AutoSyncController::class, 'resendOtp'])->middleware('throttle:3,1')->name('airtime2cash.auto.resend-otp');
         Route::post('customer-initialize-wallet2banktransaction/{product}', [TransactionController::class, 'initializeWalletToBankTransaction'])->name('initialize.wallet2banktransaction');
-        
+
 
         Route::get('customer-transactions', [TransactionController::class, 'customerTransactionHistory'])->name('customer.transaction.history');
         Route::get('customer-a2c-transactions', [TransactionController::class, 'customerAirtime2CashTransactionHistory'])->name('customer.airtime2cash.transaction.history');
-        
+
         Route::post('customer-verify', [TransactionController::class, 'verify'])->name('verify.unique.element');
         Route::get('customer-transaction_status/{transaction_id}', [TransactionController::class, 'transactionStatus'])->name('transaction.status');
         Route::get('customer-airtime-to-cash-transaction_status/{transaction_id}', [TransactionController::class, 'Airtime2CashTransactionStatus'])->name('airtime2cash.transaction.status');
-        
+
         Route::get('customer-transaction-report', [TransactionController::class, 'showTransactionReportPage'])->name('customer.transaction.report');
         Route::get('customer-load-wallet', [DashboardController::class, 'showLoadWalletPge'])->name('customer.load.wallet');
         Route::get('customer-level-upgrade', [DashboardController::class, 'showUpgradeForm'])->name('customer.level.upgrade');
@@ -105,13 +106,13 @@ Route::middleware(['auth', 'verified', 'tpin', 'ipcheck'])->group(function () {
         Route::post('level-upgrade', [DashboardController::class, 'upgradeAccount'])->name('customer.level.upgrade.process');
         Route::get('download-transaction-receipt/{transaction_id}', [TransactionController::class, 'transactionReceipt'])->name('transaction.receipt.download');
         Route::get('download-airtime2cash.transaction-receipt/{transaction_id}', [TransactionController::class, 'airtime2CashTransactionReceipt'])->name('airtime2cash.transaction.receipt.download');
-        
+
         Route::get('downlines/process/withdrawal', [DashboardController::class, 'downlinesWithdrawal'])->name('downlines.withdraw');
         Route::post('downlines/withdraw', [DashboardController::class, 'processWithdrawal'])->name('process.withdrawal');
         Route::get('downlines/{id?}', [DashboardController::class, 'downlines'])->name('downlines');
         Route::get('alldownlines', [DashboardController::class, 'allDownlines'])->name('alldownlines');
         Route::get('api-settings', [DashboardController::class, 'apiSettings'])->name('api.settings');
-        
+
     });
     Route::get('payment-callback/{provider_id?}', [PaymentController::class, 'analyzePaymentResponse'])->name('payment-callback');
     Route::get('customer-update-kyc-info', [DashboardController::class, 'updateKycInfo'])->name('update.kyc.details');
@@ -137,7 +138,7 @@ Route::middleware('auth')->group(function () {
 Route::middleware(['auth', 'verified', 'admin', 'ipcheck', 'adminRoute'])->prefix('admin')->group(function () {
     Route::resource('product', ProductController::class);
     Route::resource('airtime2cash', Airtime2CashController::class);
-    
+
     Route::get('pull-product', [ProductController::class, 'pullProducts'])->name('product.pull');
     Route::get('repull-product', [ProductController::class, 'pullProducts'])->name('product.repull');
 
@@ -173,7 +174,7 @@ Route::middleware(['auth', 'verified', 'admin', 'ipcheck', 'adminRoute'])->prefi
     Route::get('autosync-operations/webhooks', [AutoSyncOperationsController::class, 'webhooks'])->name('admin.autosync.webhooks.index');
     Route::get('autosync-operations/api-request-logs', [AutoSyncOperationsController::class, 'apiLogs'])->name('admin.autosync.api-logs.index');
     Route::post('autosync-webhooks/{webhook}/resolve', [AutoSyncOperationsController::class, 'resolve'])->name('admin.autosync.webhooks.resolve');
-    
+
     Route::get('admin-earninglog', [TransactionController::class, 'walletEarningView'])->name('admin.earninglog');
     Route::get('credit-customer', [TransactionController::class, 'creditCustomerPage'])->name('admin.credit.customer');
     Route::get('debit-customer', [TransactionController::class, 'debitCustomerPage'])->name('admin.debit.customer');
@@ -195,7 +196,7 @@ Route::middleware(['auth', 'verified', 'admin', 'ipcheck', 'adminRoute'])->prefi
     Route::get('query-wallet/{transactionlog?}', [TransactionController::class, 'queryWallet'])->name('admin.query.wallet');
     Route::get('requery-transaction/{transactionlog?}', [TransactionController::class, 'requery'])->name('admin.requery.transaction');
     Route::get('requery-callback-analysis/{reference}', [TransactionController::class, 'requeryCallback'])->name('admin.requery.callback');
-    
+
     Route::post('change-transaction-method/{transaction}', [TransactionController::class, 'changeTransactionMethod'])->name('admin.changetransactionmethod');
     Route::get('approve-airtime2cash-transaction/{transaction}', [TransactionController::class, 'approveAirtime2CashTransactions'])->name('admin.approve.airtime2cash.transaction');
     Route::post('decline-airtime2cash-transaction/{transaction}', [TransactionController::class, 'declineAirtime2CashTransactions'])->name('admin.decline.airtime2cash.transaction');
@@ -212,8 +213,8 @@ Route::middleware(['auth', 'verified', 'admin', 'ipcheck', 'adminRoute'])->prefi
     Route::get('customers-verify/{customer}', [CustomerController::class, 'verifyCustomer'])->name('customer.verify');
     Route::get('customer-delete/{customer}', [CustomerController::class, 'deleteCustomer'])->name('customer.delete');
     Route::post('verify-actions', [CustomerController::class, 'verifyMultiActions'])->name('verify-users-actions');
-    
-    
+
+
     Route::get('pull-variations/{product}', [VariationController::class, 'pullVariations'])->name('variations.pull');
     Route::post('update-variations/{product}', [VariationController::class, 'updateVariations'])->name('variations.update');
     Route::post('manual-variations-add/{product}', [VariationController::class, 'addManualVariations'])->name('manual.variations.add');

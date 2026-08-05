@@ -423,7 +423,7 @@ Please find below the details of the transaction:</p>';
         $request['quantity'] = 1;
         $request['total_amount'] = $amount;
         $request['amount'] = $amount - env('BANK_TRANSFER_CHARGES');
-        
+
         // Get Wallet Balance
         $balance = walletBalance(auth()->user());
 
@@ -459,7 +459,7 @@ Please find below the details of the transaction:</p>';
             // Log basic transaction
             $wallet = new WalletController();
             $transaction = $this->logTransaction($request->all());
-            
+
             // Log wallet
             $wallet->logWallet($request->all());
 
@@ -467,7 +467,7 @@ Please find below the details of the transaction:</p>';
             $wallet->updateCustomerWallet(auth()->user(), $request['total_amount'], $request['type']);
 
             $transfer = $this->transferToBankAccount($bank->cbn_code, $request->account_number, $request->account_name, $request['amount'], $transaction);
-            
+
             if (isset($transfer['status']) && $transfer['status'] == 'success') {
                 $user_status = 'success';
                 $status = 'success';
@@ -501,12 +501,12 @@ Please find below the details of the transaction:</p>';
 
             DB::commit();
             $this->sendTransactionEmail($transaction, auth()->user());
-            
+
             return redirect(route('transaction.status', $transaction->transaction_id));
         } catch (\Throwable $th) {
             \Log::error(['Transaction Error' => 'Message: ' . $th->getMessage() . ' File: ' . $th->getFile() . ' Line: ' . $th->getLine()]);
             DB::rollBack();
-            
+
             return back()->with('error', 'An error occured, please try again later');
         }
     }
@@ -1111,21 +1111,21 @@ Please find below the details of the transaction:</p>';
                         $host = env('APP_URL');
                         $rewardMail = <<<__here
                             Dear $user->firstname $user->lastname,
-    
+
                             Congratulations! We are excited to inform you that you have earned a commission from a transaction made by your referred friend. Your support and engagement in our referral program are truly appreciated.
-    
+
                             Here are the details of the transaction:
-    
+
                             Referred Friend's Name: $curUser->firstname
-    
+
                             Commission Earned: $cal
-    
+
                             Total Commission Earned: $cal
-    
+
                             Transaction Details: <a href="$host/downlines/$curUser->id">click here</a>
-    
+
                             Your dedication to spreading the word about our services is making a real impact, and we are grateful for your continued support. As a token of our appreciation, we have credited your wallet with the earned commission.
-    
+
                             Thank you once again for being a valued member of our community. We look forward to your continued success in our referral program!
                             __here;
 
@@ -1605,11 +1605,11 @@ Please find below the details of the transaction:</p>';
         return $query;
     }
 
-    
+
     public function requeryCallback($reference)
     {
         $transaction = ReservedAccountCallback::where('transaction_reference', $reference)->first();
-        
+
         if ($transaction->provider_id == 1) {
             $monnify = new MonnifyController($transaction->gateway);
             return $monnify->verifyTransaction($reference);
@@ -1709,111 +1709,158 @@ Please find below the details of the transaction:</p>';
         }
     }
 
-    public function transferToBankAccount($bank_code, $account_number, $account_name, $amount, $transaction = null)
-    {
+    public function transferToBankAccount(
+        string $bank_code,
+        string $account_number,
+        string $account_name,
+        string|float $amount,
+        $transaction = null
+    ) {
+        $skipBalance = true;
+
         $status = 'failed';
         $error = 'failed';
-        
+        $api_response = '';
+        $token = null;
+
         $request_data = [
-            $token ?? '',
-            $bank_code,
-            $account_number,
-            $account_name,
-            $amount,
-            $transaction->transaction_id
+            'bank_code' => $bank_code,
+            'account_number' => $account_number,
+            'account_name' => $account_name,
+            'amount' => $amount,
+            'reference' => $transaction->transaction_id ?? null,
         ];
 
-        $login = app('App\Http\Controllers\Providers\SageController')->login();
-        
-        if (!empty($login) && $login['success'] == true) {
+        $sageController = app(
+            'App\Http\Controllers\Providers\SageController'
+        );
+
+        $login = $sageController->login();
+
+        if (!empty($login) && ($login['success'] ?? false) === true) {
             $token = $login['data']['token']['access_token'] ?? null;
             $api_response = $login;
         } else {
             $error = 'Could not complete bank transfer at the moment, please try again later';
             $api_response = $login ?? 'NO RESPONSE WHEN LOGGING IN';
-            $status = 'failed';
         }
 
-        if (!empty($token)) {
-            // Get balance
-            $balance = app('App\Http\Controllers\Providers\SageController')->walletBalance($token);
-            $real_balance = 0;
-           
-            if (!empty($balance) && $balance['success'] == true && $balance['status'] == 'success') {
-                $status = $balance['status'];
-                $error = '';
-                $real_balance = $balance['general_wallet']['balance'] ?? null;
-                $api_response = $balance ?? 'NO RESPONSE';
-            } else {
-                $error = 'Could not fetch balance response from transfer provider';
-                $api_response = $balance ?? 'NO RESPONSE WHEN CHECKING BALANCE';
-                $status = 'failed';
-            }
-
-            // End get balance
-            if ($real_balance < $amount) {
-                $error = 'Not Enough balance to carry out transaction. ';
-                $status = 'failed';
-            } else {
-                $request_data = [
-                    "token" => $token,
-                    "bank_code" => $bank_code,
-                    "account_number" => $account_number,
-                    "reference" => $transaction->transaction_id,
-                    "account_name" => $account_name,
-                    "amount" => $amount - env('BANK_TRANSFER_CHARGES'),
-                    "narration" => 'Transfer from ' . config('app.name'),
-                ];
-                
-                $verify = app('App\Http\Controllers\Providers\SageController')->transfer($token,$bank_code, $account_number, $account_name, $amount, $transaction->transaction_id);
-                
-                $transaction->update([
-                    'bank_transfer_api_response' => array_merge(['Action: ' => 'TRANSFER'], $verify ?? ['Response:' => 'NO RESPONSE']),
-                    'request_data' => json_encode($request_data),
-                    'api_response' =>array_merge(['Action: ' => 'TRANSFER'], $verify ?? ['Response:' => 'NO RESPONSE']),
-                ]);
-                
-                if (!empty($verify) && $verify['success'] == true && $verify['status'] == 'success') {
-                    $status = $verify['status'];
-                    $error = '';
-                    $api_response = $verify ?? 'NO RESPONSE';
-                } else {
-                    $status = 'failed';
-                    $error = 'Transfer Error ';
-                    $api_response = $verify ?? 'NO RESPONSE';
-                }
-                
-                return [
-                    'error' => $error,
-                    'status' => $status,
-                    'request_data' => $request_data ?? '',
-                    'api_response' => $api_response ?? ''
-                ];
-            }
-        } else {
-            $error = 'Could not complete bank transfer at the moment, please try again later';
-            $status = 'failed';
-            $api_response = $login ?? 'PROVIDER TOKEN COULD NOT BE GENERATED';
-
+        if (empty($token)) {
             if (!empty($transaction)) {
                 $transaction->update([
-                    'bank_transfer_api_response' => $error . ' | API_RESPONSE: ' . json_encode($api_response),
-                    'api_response' => $error . ' | API_RESPONSE: ' . json_encode($api_response),
-                    'descr' => $status == 'success' ? 'Wallet to bank transfer of ' . $amount . ' was successful' : 'We could not complete this transaction',
-                    'request_data' => json_encode($request_data)
+                    'bank_transfer_api_response' => $error
+                        . ' | API_RESPONSE: '
+                        . json_encode($api_response),
+
+                    'api_response' => $error
+                        . ' | API_RESPONSE: '
+                        . json_encode($api_response),
+
+                    'descr' => 'We could not complete this transaction',
+                    'request_data' => json_encode($request_data),
                 ]);
             }
 
             return [
                 'error' => $error,
                 'status' => $status,
-                'api_response' => $api_response ?? '',
-                'request_data' => $request_data ?? '',
+                'api_response' => $api_response,
+                'request_data' => $request_data,
             ];
         }
 
-        
+        if (!$skipBalance) {
+            $balance = $sageController->walletBalance($token);
+
+            if (
+                empty($balance) ||
+                ($balance['success'] ?? false) !== true ||
+                ($balance['status'] ?? null) !== 'success'
+            ) {
+                return [
+                    'error' => 'Could not fetch balance response from transfer provider',
+                    'status' => 'failed',
+                    'api_response' => $balance ?? 'NO RESPONSE WHEN CHECKING BALANCE',
+                    'request_data' => $request_data,
+                ];
+            }
+
+            $real_balance = (float) (
+                $balance['general_wallet']['balance'] ?? 0
+            );
+
+            if ($real_balance < (float) $amount) {
+                return [
+                    'error' => 'Not enough balance to carry out transaction.',
+                    'status' => 'failed',
+                    'api_response' => $balance,
+                    'request_data' => $request_data,
+                ];
+            }
+        }
+
+        $transferAmount = (float) $amount
+            - (float) env('BANK_TRANSFER_CHARGES', 0);
+            
+        $request_data = [
+            'token' => $token,
+            'bank_code' => $bank_code,
+            'account_number' => $account_number,
+            'reference' => $transaction->transaction_id ?? null,
+            'account_name' => $account_name,
+            'amount' => $transferAmount,
+            'narration' => 'Transfer from ' . config('app.name'),
+        ];
+
+        $verify = $sageController->transfer(
+            $token,
+            $bank_code,
+            $account_number,
+            $account_name,
+            $amount,
+            $transaction->transaction_id ?? null
+        );
+
+        $responseData = is_array($verify)
+            ? $verify
+            : ['Response' => $verify ?? 'NO RESPONSE'];
+
+        if (!empty($transaction)) {
+            $transaction->update([
+                'bank_transfer_api_response' => array_merge(
+                    ['Action' => 'TRANSFER'],
+                    $responseData
+                ),
+                'request_data' => json_encode($request_data),
+                'api_response' => array_merge(
+                    ['Action' => 'TRANSFER'],
+                    $responseData
+                ),
+            ]);
+        }
+
+        if (
+            !empty($verify) &&
+            ($verify['success'] ?? false) === true &&
+            ($verify['status'] ?? null) === 'success'
+        ) {
+            $status = 'success';
+            $error = '';
+            $api_response = $verify;
+        } else {
+            $status = 'failed';
+            $error = 'Transfer Error';
+            $api_response = $verify ?? 'NO RESPONSE';
+        }
+
+        return [
+            'error' => $error,
+            'status' => $status,
+            'request_data' => $request_data,
+            'api_response' => $api_response,
+        ];
     }
+
     public function declineAirtime2CashTransactions(Request $request, Airtime2CashTransactions $transaction)
     {
         $transaction->update([
@@ -1839,7 +1886,7 @@ Please find below the details of the transaction:</p>';
     public function verifyBankDetails(Request $request)
     {
         $login = app('App\Http\Controllers\Providers\SageController')->login();
-        
+
         if (!empty($login) && $login['success'] == true) {
             $token = $login['data']['token']['access_token'] ?? null;
         } else {
@@ -1847,7 +1894,7 @@ Please find below the details of the transaction:</p>';
                 'message' => 'Could not verify account details at the moment, please try again later',
             ]);
         }
-        
+
         if (!empty($token)) {
             $url2 =  env('SAGE_BASE_URL') . "transfer/verify-bank-account";
             $payload = [

@@ -22,9 +22,7 @@ class AutoSyncService
         $providerId = getSettings()?->auto_share_provider_id;
         $provider = API::find($providerId);
         $this->providerEnabled = $provider !== null && $provider->status === 'active';
-        $this->baseUrl = rtrim($provider?->live_base_url ?: config('services.autosync.base_url'), '/');
-        $this->token = (string) ($provider?->secret_key ?: config('services.autosync.token'));
-        $this->fake = (bool) config('services.autosync.fake');
+        $this->baseUrl = env('ENT' == 'local') ? rtrim($provider?->sandbox_base_url) : rtrim($provider?->live_base_url);
     }
 
     public function initiate(array $payload, array $context = []): array
@@ -45,6 +43,7 @@ class AutoSyncService
     private function post(string $operation, string $path, array $payload, array $context): array
     {
         $endpoint = $this->baseUrl . $path;
+        dd($endpoint);
         $startedAt = microtime(true);
         $headers = [
             'Accept' => 'application/json',
