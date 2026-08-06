@@ -25,7 +25,7 @@ class DashboardController extends Controller
     public function index()
     {
         $customer = $this->customerOfTheMonth();
-        
+
         if (auth()->user()->type == 'admin') {
             $currency = getSettings()?->currency ?? 'NGN';
             $walletSummary = Customer::selectRaw('COALESCE(SUM(wallet), 0) AS wallet_total')
@@ -269,13 +269,13 @@ class DashboardController extends Controller
         if ($validator->fails()) {
             return back()->with('error', $validator->messages()->first());
         }
-    
+
         if (!Hash::check($request->password, auth()->user()->password)) {
             return back()->with('error', 'Incorrect password !!!');
         }
 
         $new_pin = base64_encode(base64_encode(base64_encode($request->transaction_pin)));
-    
+
         auth()->user()->transaction_pin = $new_pin;
         auth()->user()->save();
         // Send email
@@ -284,7 +284,7 @@ class DashboardController extends Controller
         $body .= '<p style="line-height: 2.0;">You have successfully created a transaction PIN on account ' . config('app.name') . ' Please use your PIN when carrying out transactions.<b><hr/><br>Warm Regards. (' . config('app.name') . ')<br/></p>';
 
         logEmails(auth()->user()->email, $subject, $body);
-        
+
         return redirect(route('dashboard'))->with('message', 'You have successfully created a transaction PIN');
     }
 
@@ -294,23 +294,23 @@ class DashboardController extends Controller
             $validator = Validator::make($request->all(), [
                 'password' => 'required',
             ]);
-    
+
             if ($validator->fails()) {
                 return back()->with('error', $validator->messages()->first());
             }
-    
+
             if (!Hash::check($request->password, auth()->user()->password)) {
                 return back()->with('error', 'Incorrect password !!!');
             }
 
             $user = auth()->user();
             $this->sendTransactionPinResetToken($user);
-            
+
             return back()->with('message', 'We have sent you a Transaction Pin reset email, please check your email and follow the instructions to reset Transaction PIN');
         }else{
             $user = User::where('id',$request->user_id)->first();
             $this->sendTransactionPinResetToken($user);
-            
+
             return back()->with('message', 'Transaction Pin reset email sent to '.$user->email);
         }
 
@@ -335,7 +335,7 @@ class DashboardController extends Controller
         $body = '<p>Hello! ' . $user->firstname . '</p>';
         $reset_link = url('/') . "/confirm_reset_pin?token=" . $hashedToken;
         $body .= '<p style="line-height: 2.0;">Please <strong>login</strong> to your account on ' . config('app.name') . ' and click the button below to reset your transaction pin. <br> <a class="btn btn-info" target="_blank" href="' . $reset_link . '" style="position: margin:5px; relative;margin-bottom:50px;color: #fff;font-weight: 500;padding: 8px 20px;font-size: 13px;line-height: 24px;letter-spacing: 0.01em;border-radius: 4px;border: 1px solid;transition: all .4s ease;background:#950eb3;text-align: center;white-space: nowrap;vertical-align: middle;text-decoration:none">RESET PIN</a><br/><br><strong>Please note that this link expires after ' . $expiry->format('jS F, Y, h:iA') . '.</strong><br><br>If you did not request a Transaction PIN change, Kindly notify us via WhatsApp us via whatsapp( ' . $settings->whatsapp_no . ') immediately.<b><hr/><br>Warm Regards. (' . config('app.name') . ')<br/></p>';
-    
+
         logEmails($user->email, $subject, $body);
     }
 
@@ -416,15 +416,23 @@ class DashboardController extends Controller
             );
         }
 
-        $input = $this->validate($request, [
-            "FIRST_NAME" => "required",
-            "MIDDLE_NAME" => "required",
-            "LAST_NAME" => "required",
-            "PHONE_NUMBER" => "required",
-            "BVN" => "required|digits:11",
-            "IDCARD" => "required|image|max:1024",
-            "IDCARDTYPE" => "required"
-        ]);
+        $input = $request->validate(
+            [
+                'FIRST_NAME'   => ['required'],
+                'MIDDLE_NAME'  => ['required'],
+                'LAST_NAME'    => ['required'],
+                'PHONE_NUMBER' => ['required'],
+                'BVN'          => ['required', 'digits:11'],
+                'IDCARD'       => ['required', 'image', 'mimes:jpg,jpeg', 'max:500'],
+                'IDCARDTYPE'   => ['required'],
+            ],
+            [
+                'IDCARD.required' => 'Please upload your ID card.',
+                'IDCARD.image'    => 'The uploaded file must be a valid image.',
+                'IDCARD.mimes'    => 'Only JPG and JPEG images are allowed.',
+                'IDCARD.max'      => 'Your ID card image must not be larger than 500 KB. Please upload a smaller image. You may upload a screenshot or clear photo of your ID card. Ensure all details are clearly visible.',
+            ]
+        );
 
         if (!empty($request->IDCARD)) {
             $input['IDCARD'] = $this->uploadFile($request->IDCARD, 'kyc');
@@ -460,7 +468,7 @@ class DashboardController extends Controller
             "kyc_status" => 'awaiting-approval',
             'kyc_rejection_reason' => null,
         ]);
-        
+
         // Create reserved account
         // $name = $firstname . ' ' . $lastname . ' ' . $middlename;
 
@@ -474,7 +482,7 @@ class DashboardController extends Controller
         // ];
 
         // $reserved = app('App\Http\Controllers\PaymentProcessors\MonnifyController')->createReservedAccount($data);
-        
+
         // if ($reserved['status'] && $reserved['status'] == 'success') {
         //     return back()->with('message', 'KYC Update completed and reserved accounts created');
         // } else {
@@ -484,7 +492,7 @@ class DashboardController extends Controller
         return back()->with('message', 'KYC Info Update. Awaiting Admin approval');
 
     }
-    
+
     public function updateKycData($key, $value, $customer_id, $status = null)
     {
         if(!empty($status)){
@@ -521,7 +529,7 @@ class DashboardController extends Controller
         //         'status' => $status
         //     ]);
         // }
-        
+
         return;
     }
 
@@ -546,13 +554,13 @@ class DashboardController extends Controller
         } else {
             $refs = $refs->groupBy('referred_customer_id')->get();
         }
-       
+
         return view(themeView('customer', 'downlines'), ['refs' => $refs, 'check' => $id]);
     }
 
     public function allDownlines(){
         $refs = User::where('referral', auth()->user()->username)->orderBy('created_at','DESC')->get();
-        
+
         return view(themeView('customer', 'referals'), ['refs' => $refs]);
 
     }

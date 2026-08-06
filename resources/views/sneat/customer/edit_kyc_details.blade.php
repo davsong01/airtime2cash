@@ -126,12 +126,24 @@
                             </div>
 
                             <div class="col-md-6">
-                                <label for="IDCARD" class="form-label">ID card</label>
+                                <label for="IDCARD" class="form-label">ID Card</label>
+
                                 @if(kycStatus('IDCARD', $customer->id)['status'] == 'verified' || $kycIsLocked)
                                     <input type="text" class="form-control" value="{{ kycStatus('IDCARDTYPE', $customer->id)['value'] }}" disabled>
                                 @else
-                                    <input type="file" name="IDCARD" accept="image/jpg, image/jpeg" class="form-control" required>
+                                    <input
+                                        type="file"
+                                        name="IDCARD"
+                                        accept=".jpg,.jpeg,image/jpeg"
+                                        class="form-control"
+                                        required
+                                    >
                                 @endif
+
+                                <div class="form-text text-danger">
+                                    You may upload a screenshot or clear photo of your ID card. Ensure all details are clearly visible.
+                                    <strong>Maximum file size: 500 KB.</strong>
+                                </div>
                             </div>
 
                             <div class="col-12">
