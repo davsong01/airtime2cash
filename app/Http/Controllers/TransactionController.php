@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\PaymentProcessors\MonnifyController;
 use App\Http\Controllers\PaymentProcessors\SquadController;
 use App\Http\Controllers\Providers\AutoSyncController;
+use App\Http\Controllers\Providers\SageController;
 use App\Http\Controllers\WalletController;
 use App\Models\Airtime2CashTransactions;
 use App\Models\API;
@@ -873,7 +874,7 @@ class TransactionController extends Controller
                 'decline_reason' => $statusCode === 0
                     ? ($providerResponse['message'] ?? data_get($providerResponse, 'data.transaction.details'))
                     : null,
-                
+
                 'completed_at' => $statusCode === 1
                     ? ($transaction->completed_at ?? now())
                     : $transaction->completed_at,
@@ -2184,36 +2185,9 @@ class TransactionController extends Controller
 
     public function verifyBankDetails(Request $request)
     {
-        $login = app('App\Http\Controllers\Providers\SageController')->login();
-
-        if (!empty($login) && $login['success'] == true) {
-            $token = $login['data']['token']['access_token'] ?? null;
-        } else {
-            return response()->json([
-                'message' => 'Could not verify account details at the moment, please try again later',
-            ]);
-        }
-
-        if (!empty($token)) {
-            $url2 =  env('SAGE_BASE_URL') . "transfer/verify-bank-account";
-            $payload = [
-                "bank_code" => $request->bank_code,
-                "account_number" => $request->account_number
-            ];
-            $headers = [
-                "Content-Type: application/json",
-                "Authorization: Bearer " . $token . "",
-            ];
-
-            $verify = $this->basicApiCall($url2, json_encode($payload), $headers);
-
-            return response()->json([
-                'message' => $verify,
-            ]);
-        } else {
-            return response()->json([
-                'message' => 'Could not verify account details at the moment, please try again later',
-            ]);
+        $provider = API::where('id', getSettings()->bank_transfer_provider_id)->where('status', 'active')->first();
+        if($provider->slug == 'sagecloud'){
+            return app(SageController::class)->verifyBankDetails($request->all());
         }
     }
 }

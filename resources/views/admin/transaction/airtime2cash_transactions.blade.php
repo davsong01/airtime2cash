@@ -151,7 +151,7 @@
 
                 <section class="card a2c-queue-card">
                     <div class="card-header d-flex align-items-center justify-content-between">
-                        <div><h5 class="mb-25">Transaction queue</h5><small class="text-muted">{{ number_format($transactions->total()) }} matching requests</small></div>
+                        <div><h5 class="mb-25">Transactions</h5><small class="text-muted">{{ number_format($transactions->total()) }} matching requests</small></div>
                         <span class="badge badge-light-warning px-1 py-50">Pending first</span>
                     </div>
                     <div class="table-responsive">

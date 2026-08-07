@@ -7,21 +7,23 @@ use App\Http\Controllers\Controller;
 
 class SageController extends Controller
 {
-    public $base_url;
-    public $email;
-    public $secret_key;
-    public $public_key;
+    public string $base_url;
+    public string $email;
+    public string $secret_key;
+    public string $public_key;
     public $control;
 
     public function __construct(){
-        $this->base_url = env('SAGE_BASE_URL');
-        $this->secret_key = getSettings()->sage_secret_key;
-        $this->public_key = getSettings()->sage_public_key;
+        $provider = API::where('slug', 'sagecloud')->first();
+
+        $this->base_url = $provider->live_base_url ?? env('SAGE_BASE_URL');
+        $this->secret_key = $provider->secret_key ?? getSettings()->sage_secret_key;
+        $this->public_key = $provider->public_key ?? getSettings()->sage_public_key;
         $this->control = new Controller();
     }
 
     public function login(){
-        $url = $this->base_url. "merchant/authorization";
+        $url = rtrim($this->base_url, '/') . '/merchant/authorization';
         $headers = [
             "Authorization: Basic " . base64_encode($this->public_key . ':' . $this->secret_key)
         ];
@@ -34,13 +36,13 @@ class SageController extends Controller
 
     public function walletBalance($token)
     {
-        $url = $this->base_url . "wallet/balance";
+        $url = rtrim($this->base_url, '/') . '/wallet/balance';
         $headers = [
             "Content-Type: application/json",
             "Authorization: Bearer " . $token,
         ];
-        
-        return $this->control->basicApiCall($url, [], $headers, 'GET');
+
+        return $this->basicApiCall($url, [], $headers, 'GET');
     }
 
     public function transfer($token, $bank_code, $account_number,$account_name, $amount, $reference){
@@ -87,10 +89,6 @@ class SageController extends Controller
                     "reference" => $transaction->transaction_id,
                 ];
 
-                // if(env('ENT') == 'local'){
-                //     $payload['reference'] = 'A2C-2024041222599193140';
-                // }
-
                 $headers = [
                     "Content-Type: application/json",
                     "Authorization: Bearer " . $token . "",
@@ -123,21 +121,40 @@ class SageController extends Controller
 
     }
 
-    public function verify($token, $bank_code, $account_number)
+    public function verifyBankDetails(array $data)
     {
-        $url = $this->base_url . "transfer/verify-bank-account";
-        $payload = [
-            "bank_code" => $bank_code,
-            "account_number" => $account_number
-        ];
-        $headers = [
-            "Content-Type" => "application/json",
-            "Authorization" => "Basic " . base64_encode($this->public_key . ":" . $this->secret_key),
-        ];
+        $login = $this->login();
 
-        $response = $this->control->basicApiCall($url, json_encode($payload), $headers);
+        if (!empty($login) && $login['success'] == true) {
+            $token = $login['data']['token']['access_token'] ?? null;
+        } else {
+            return response()->json([
+                'message' => 'Could not verify account details at the moment, please try again later',
+            ]);
+        }
 
-        return $response;
+        if (!empty($token)) {
+            $url = rtrim($this->base_url, '/') . '/transfer/verify-bank-account';
 
+            $payload = [
+                "bank_code" => $data['bank_code'] ?? null,
+                "account_number" => $data['account_number'] ?? null
+            ];
+            $headers = [
+                "Content-Type: application/json",
+                "Authorization: Bearer " . $token . "",
+            ];
+
+            $verify = $this->basicApiCall($url, json_encode($payload), $headers);
+
+            return response()->json([
+                'message' => $verify,
+            ]);
+        } else {
+            return response()->json([
+                'message' => 'Could not verify account details at the moment, please try again later',
+            ]);
+        }
     }
+
 }

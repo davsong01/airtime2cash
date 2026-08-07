@@ -31,6 +31,7 @@ use App\Http\Controllers\RolePermissionController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\VariationController;
+use App\Http\Controllers\WebhookController;
 use App\Models\RolePermission;
 use App\Models\User;
 use Illuminate\Support\Facades\Route;
@@ -45,10 +46,16 @@ use Illuminate\Support\Facades\Route;
 | be assigned to the "web" middleware group. Make something great!
 |
 */
-
-Route::post('log-p-callback/{provider}', [PaymentController::class, 'dumpCallback'])->name('log.payment.response');
+// Provider webhooks
+Route::post('log-provider-webhook/{provider_id}', [WebhookController::class, 'logWebhook'])->name('log.provider.webhook');
+Route::get('cron/analyze-provider-callback/{pick}', [PaymentController::class, 'analyzeProviderCallbackResponse'])->name('callback.provider.analyze');
 Route::post('webhooks/autosync', [AutoSyncWebhookController::class, 'store'])->middleware('throttle:120,1')->name('webhooks.autosync');
+// End provider webhooks
+
+// Payment provider webhooks
+Route::post('log-p-callback/{provider}', [PaymentController::class, 'dumpCallback'])->name('log.payment.response');
 Route::get('cron/analyze-callback', [PaymentController::class, 'analyzeCallbackResponse'])->name('callback.analyze');
+// End Payment provider webhooks
 Route::get('cron/sendemails', [Controller::class, 'cronSendEmails']);
 Route::get('generate-api-keys', function(){
     $users = User::all();

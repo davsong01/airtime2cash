@@ -1,4 +1,4 @@
-<?php 
+<?php
 use App\Models\PaymentGateway;
 ?>
 @extends('layouts.app')
@@ -94,239 +94,391 @@ use App\Models\PaymentGateway;
                                                 </div>
                                                 <div class="card-content">
                                                     <div class="card-body">
-                                                        <form action="{{route('settings.update')}}" method="POST" enctype="multipart/form-data">
+                                                       <form action="{{ route('settings.update') }}" method="POST" enctype="multipart/form-data">
                                                             @csrf
-                                                            <div class="row">
-                                                                <div class="col-md-6">
-                                                                    <fieldset class="form-group">
-                                                                        <label for="official_email">Official Email</label>
-                                                                        <input type="text" class="form-control" id="official_email" name="official_email" value="{{ $settings->official_email ?? old('official_email') }}" placeholder="Official email">
-                                                                    </fieldset>
-                                                                    <fieldset class="form-group">
-                                                                        <label for="a2cash_chat_engine">Airtime2cash Chat Engine</label>
-                                                                        <select name="a2cash_chat_engine" class="form-control" id="a2cash_chat_engine" required>
-                                                                            <option value="">Select</option>
-                                                                            <option value="whatsapp" {{ $settings->a2cash_chat_engine == 'whatsapp' ? 'selected' : ''}}>Whatsapp</option>
-                                                                            <option value="telegram" {{ $settings->a2cash_chat_engine == 'telegram' ? 'selected' : ''}}>Telegram</option>
-                                                                            
-                                                                        </select>
-                                                                    </fieldset>
-                                                                    <fieldset class="form-group">
-                                                                        <label for="auto_share_provider_id">Auto Share Provider</label>
-                                                                        <select name="auto_share_provider_id" class="form-control @error('auto_share_provider_id') is-invalid @enderror" id="auto_share_provider_id">
-                                                                            <option value="">Disable Auto Share integration</option>
-                                                                            @foreach($autoShareProviders as $provider)
-                                                                                <option value="{{ $provider->id }}" @selected((string) old('auto_share_provider_id', $settings->auto_share_provider_id) === (string) $provider->id)>
-                                                                                    {{ $provider->name }}{{ $provider->status !== 'active' ? ' (Inactive)' : '' }}
-                                                                                </option>
-                                                                            @endforeach
-                                                                        </select>
-                                                                        @error('auto_share_provider_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                                                                        <small class="text-muted d-block mt-50">Provider used for automatic airtime transfers. The selected provider must also be active and configured under APIs.</small>
-                                                                    </fieldset>
-                                                                    <fieldset class="form-group">
-                                                                        <label for="admin_layout">Admin Layout</label>
-                                                                        <select name="admin_layout" class="form-control" id="admin_layout">
-                                                                            <option value="legacy" {{ ($settings->admin_layout ?? 'legacy') === 'legacy' ? 'selected' : '' }}>Legacy Layout</option>
-                                                                        </select>
-                                                                        <small class="text-muted d-block mt-50">Admin stays on the legacy shell for now.</small>
-                                                                    </fieldset>
-                                                                    <fieldset class="form-group">
-                                                                        <label for="customer_layout">Customer Layout</label>
-                                                                        <select name="customer_layout" class="form-control" id="customer_layout">
-                                                                            <option value="legacy" {{ ($settings->customer_layout ?? 'legacy') === 'legacy' ? 'selected' : '' }}>Legacy Layout</option>
-                                                                            <option value="modern" {{ ($settings->customer_layout ?? 'legacy') === 'modern' ? 'selected' : '' }}>Modern Layout</option>
-                                                                        </select>
-                                                                        <small class="text-muted d-block mt-50">Customer pages will resolve through the template engine.</small>
-                                                                    </fieldset>
-                                                                    <fieldset class="form-group">
-                                                                        <label for="whatsapp_number">Whatsapp Number</label>
-                                                                        <input type="text" class="form-control" id="whatsapp_number" name="whatsapp_number" value="{{ $settings->whatsapp_number ?? old('whatsapp_number') }}" placeholder="Whatsapp number">
-                                                                    </fieldset>
-                                                                    <fieldset class="form-group">
-                                                                        <label for="telegram_username">Telegram Username</label>
-                                                                        <input type="text" class="form-control" id="telegram_username" name="telegram_username" value="{{ $settings->telegram_username ?? old('telegram_username') }}" placeholder="Telegram Username">
-                                                                    </fieldset>
-                                                                    <fieldset class="form-group">
-                                                                        <label for="login_email_notification">Customer Login Email Notification</label>
-                                                                        <select name="login_email_notification" class="form-control" id="login_email_notification" required>
-                                                                            <option value="">Select</option>
-                                                                            <option value="yes" {{ $settings->login_email_notification == 'yes' ? 'selected' : ''}}>Yes</option>
-                                                                            <option value="no" {{ $settings->login_email_notification == 'no' ? 'selected' : ''}}>No</option>
-                                                                            
-                                                                        </select>
-                                                                    </fieldset>
-                                                                    <fieldset class="form-group">
-                                                                        <label for="transaction_email_notification">Transaction Email Notification</label>
-                                                                        <select name="transaction_email_notification" class="form-control" id="transaction_email_notification" required>
-                                                                            <option value="">Select</option>
-                                                                            <option value="yes" {{ $settings->transaction_email_notification == 'yes' ? 'selected' : ''}}>Yes</option>
-                                                                            <option value="no" {{ $settings->transaction_email_notification == 'no' ? 'selected' : ''}}>No</option>
-                                                                            
-                                                                        </select>
-                                                                    </fieldset>
-                                                                    <fieldset class="form-group">
-                                                                        <label for="currency">Currency</label>
-                                                                        <select name="currency" class="form-control" id="currency" required>
-                                                                            <option value="">Select</option>
-                                                                            @foreach($currencies as $currency)
-                                                                                <option value="{{ $currency }}" {{ $currency == $settings->currency ? 'selected' : ''}}>{!! $currency !!}</option>
-                                                                            @endforeach
-                                                                        </select>
-                                                                    </fieldset>
-                                                                    <fieldset class="form-group">
-                                                                        <label for="allow_fund_with_card" style="color:blue">Allow Wallet Funding with card</label>
-                                                                        <select name="allow_fund_with_card" class="form-control" id="allow_fund_with_card">
-                                                                            <option value="">Select</option>
-                                                                            <option value="yes"{{ $settings->allow_fund_with_card == 'yes' ? 'selected' : ''}}>Yes</option>
-                                                                            <option value="no" {{ $settings->allow_fund_with_card == 'no' ? 'selected' : ''}}>No</option>
-                                                                        </select>
-                                                                    </fieldset>
-                                                                    <fieldset class="form-group">
-                                                                        <label for="card_funding_extra_charge" style="color:blue">Card Funding Extra Charge({!! getSettings()->currency !!})</label>
-                                                                        <input type="number" name="card_funding_extra_charge" value="{{ $settings->card_funding_extra_charge ?? old('card_funding_extra_charge') }}" class="form-control">
-                                                                    </fieldset>
-                                                                    <fieldset class="form-group">
-                                                                        <label for="allow_fund_with_reserved_account">Allow Wallet Funding with reserved account</label>
-                                                                        <select name="allow_fund_with_reserved_account" class="form-control" id="allow_fund_with_reserved_account">
-                                                                            <option value="">Select</option>
-                                                                            <option value="yes"{{ $settings->allow_fund_with_reserved_account == 'yes' ? 'selected' : ''}}>Yes</option>
-                                                                            <option value="no" {{ $settings->allow_fund_with_reserved_account == 'no' ? 'selected' : ''}}>No</option>
-                                                                        </select>
-                                                                    </fieldset>
-                                                                    <fieldset class="form-group">
-                                                                        <label for="sage_secret_key">Sage Secret Key</label>
-                                                                        <input type="text" class="form-control" name="sage_secret_key" value="{{ $settings->sage_secret_key }}">
-                                                                    </fieldset>
-                                                                    <fieldset class="form-group">
-                                                                        <label for="sage_public_key">Sage Public Key</label>
-                                                                        <input type="text" class="form-control" name="sage_public_key" value="{{ $settings->sage_public_key }}">
-                                                                    </fieldset>
-                                                                    <fieldset class="form-group">
-                                                                        <label for="captcha_settings_status">Allow Security Captcha on forms</label>
-                                                                        <select name="captcha_settings_status" class="form-control" id="captcha_settings_status">
-                                                                            <option value="">Select</option>
-                                                                            <option value="yes"{{ isset($settings->captcha_settings['captcha_settings_status']) && $settings->captcha_settings['captcha_settings_status'] == 'yes' ? 'selected' : ''}}>Yes</option>
-                                                                            <option value="no" {{  isset($settings->captcha_settings['captcha_settings_status']) && $settings->captcha_settings['captcha_settings_status'] == 'no' ? 'selected' : ''}}>No</option>
-                                                                        </select>
-                                                                    </fieldset>
-                                                                    <fieldset class="form-group">
-                                                                        <label for="captcha_settings_provider">Security Captcha Provider</label>
-                                                                        <select name="captcha_settings_provider" class="form-control" id="captcha_settings_provider">
-                                                                            <option value="">Select</option>
-                                                                            <option value="simple" {{  isset($settings->captcha_settings['captcha_settings_provider']) && $settings->captcha_settings['captcha_settings_provider'] == 'simple' ? 'selected' : ''}}>Simple Captcha</option>
-                                                                            <option value="google"{{ isset($settings->captcha_settings['captcha_settings_provider']) && $settings->captcha_settings['captcha_settings_provider'] == 'google' ? 'selected' : ''}}>Google Captcha</option>
-                                                                            <option value="all"{{ isset($settings->captcha_settings['captcha_settings_provider']) && $settings->captcha_settings['captcha_settings_provider'] == 'all' ? 'selected' : ''}}>All</option>
-                                                                        </select>
-                                                                    </fieldset>
-                                                                    <fieldset class="form-group">
-                                                                        <label for="RECAPTCHA_SITE_KEY">Google Captcha Site Key</label>
-                                                                        <input type="text" class="form-control" name="RECAPTCHA_SITE_KEY" value="{{ $settings->captcha_settings['google']['RECAPTCHA_SITE_KEY'] ?? old('RECAPTCHA_SITE_KEY') }}">
-                                                                    </fieldset>
-                                                                    <fieldset class="form-group">
-                                                                        <label for="RECAPTCHA_SECRET_KEY">Google Captcha Secret Key</label>
-                                                                        <input type="text" class="form-control" name="RECAPTCHA_SECRET_KEY" value="{{ $settings->captcha_settings['google']['RECAPTCHA_SECRET_KEY'] ?? old('RECAPTCHA_SECRET_KEY') }}">
-                                                                    </fieldset>
+
+                                                            <div class="card">
+                                                                <div class="card-header">
+                                                                    <h4 class="card-title mb-25">General Settings</h4>
+                                                                    <small class="text-muted">Core platform preferences and general configuration.</small>
                                                                 </div>
-                                                                <div class="col-md-6">
-                                                                    <fieldset class="form-group">
-                                                                        <label for="">Payment Gateway</label>
-                                                                        <select name="payment_gateway" class="form-control" id="payment_gateway" required>
-                                                                            <option value="">Select</option>
-                                                                            @foreach($payment_gateways as $gateway)
-                                                                            <option value="{{ $gateway->id }}" {{ $gateway->id == getSettings()->payment_gateway ? 'selected' : ''}}>{{$gateway->name}}</option>
-                                                                            @endforeach
-                                                                        </select>
-                                                                    </fieldset>
+
+                                                                <div class="card-body">
                                                                     <div class="row">
-                                                                        <div class="col-md-8">
+                                                                        <div class="col-md-6">
+                                                                            <fieldset class="form-group">
+                                                                                <label for="official_email">Official Email</label>
+                                                                                <input type="text" class="form-control" id="official_email" name="official_email" value="{{ old('official_email', $settings->official_email) }}" placeholder="Official email">
+                                                                            </fieldset>
+                                                                        </div>
+
+                                                                        <div class="col-md-6">
+                                                                            <fieldset class="form-group">
+                                                                                <label for="currency">Currency</label>
+                                                                                <select name="currency" class="form-control" id="currency" required>
+                                                                                    <option value="">Select</option>
+                                                                                    @foreach($currencies as $currency)
+                                                                                        <option value="{{ $currency }}" @selected($currency == old('currency', $settings->currency))>{!! $currency !!}</option>
+                                                                                    @endforeach
+                                                                                </select>
+                                                                            </fieldset>
+                                                                        </div>
+
+                                                                        <div class="col-md-6">
+                                                                            <fieldset class="form-group">
+                                                                                <label for="payment_gateway">Payment Gateway</label>
+                                                                                <select name="payment_gateway" class="form-control" id="payment_gateway" required>
+                                                                                    <option value="">Select</option>
+                                                                                    @foreach($payment_gateways as $gateway)
+                                                                                        <option value="{{ $gateway->id }}" @selected((string) $gateway->id === (string) old('payment_gateway', $settings->payment_gateway))>
+                                                                                            {{ $gateway->name }}
+                                                                                        </option>
+                                                                                    @endforeach
+                                                                                </select>
+                                                                            </fieldset>
+                                                                        </div>
+
+                                                                        <div class="col-md-6">
+                                                                            <fieldset class="form-group">
+                                                                                <label for="customer_layout">Customer Layout</label>
+                                                                                <select name="customer_layout" class="form-control" id="customer_layout">
+                                                                                    <option value="legacy" @selected(old('customer_layout', $settings->customer_layout ?? 'legacy') === 'legacy')>Legacy Layout</option>
+                                                                                    <option value="modern" @selected(old('customer_layout', $settings->customer_layout ?? 'legacy') === 'modern')>Modern Layout</option>
+                                                                                </select>
+                                                                                <small class="text-muted d-block mt-50">Customer pages will resolve through the template engine.</small>
+                                                                            </fieldset>
+                                                                        </div>
+
+                                                                        <div class="col-md-6">
+                                                                            <fieldset class="form-group">
+                                                                                <label for="admin_layout">Admin Layout</label>
+                                                                                <select name="admin_layout" class="form-control" id="admin_layout">
+                                                                                    <option value="legacy" @selected(old('admin_layout', $settings->admin_layout ?? 'legacy') === 'legacy')>Legacy Layout</option>
+                                                                                </select>
+                                                                                <small class="text-muted d-block mt-50">Admin stays on the legacy shell for now.</small>
+                                                                            </fieldset>
+                                                                        </div>
+
+                                                                        <div class="col-md-6">
+                                                                            <fieldset class="form-group">
+                                                                                <label for="support_link">Support Link</label>
+                                                                                <input type="text" class="form-control" id="support_link" name="support_link" value="{{ old('support_link', $settings->support_link) }}" placeholder="Support Link">
+                                                                            </fieldset>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            <div class="card">
+                                                                <div class="card-header">
+                                                                    <h4 class="card-title mb-25">Provider Configuration</h4>
+                                                                    <small class="text-muted">Select the providers used for automated platform operations.</small>
+                                                                </div>
+
+                                                                <div class="card-body">
+                                                                    <div class="row">
+                                                                        <div class="col-md-6">
+                                                                            <fieldset class="form-group">
+                                                                                <label for="auto_share_provider_id">Auto Share Provider</label>
+                                                                                <select name="auto_share_provider_id" class="form-control @error('auto_share_provider_id') is-invalid @enderror" id="auto_share_provider_id">
+                                                                                    <option value="">Disable Auto Share integration</option>
+                                                                                    @foreach($autoShareProviders as $provider)
+                                                                                        <option value="{{ $provider->id }}" @selected((string) old('auto_share_provider_id', $settings->auto_share_provider_id) === (string) $provider->id)>
+                                                                                            {{ $provider->name }}{{ $provider->status !== 'active' ? ' (Inactive)' : '' }}
+                                                                                        </option>
+                                                                                    @endforeach
+                                                                                </select>
+                                                                                @error('auto_share_provider_id')
+                                                                                    <div class="invalid-feedback">{{ $message }}</div>
+                                                                                @enderror
+                                                                                <small class="text-muted d-block mt-50">Provider used for automatic airtime transfers.</small>
+                                                                            </fieldset>
+                                                                        </div>
+
+                                                                        <div class="col-md-6">
+                                                                            <fieldset class="form-group">
+                                                                                <label for="bank_transfer_provider_id">Bank Transfer Provider</label>
+                                                                                <select name="bank_transfer_provider_id" class="form-control @error('bank_transfer_provider_id') is-invalid @enderror" id="bank_transfer_provider_id">
+                                                                                    <option value="">Select provider</option>
+                                                                                    @foreach($autoShareProviders as $provider)
+                                                                                        <option value="{{ $provider->id }}" @selected((string) old('bank_transfer_provider_id', $settings->bank_transfer_provider_id) === (string) $provider->id)>
+                                                                                            {{ $provider->name }}{{ $provider->status !== 'active' ? ' (Inactive)' : '' }}
+                                                                                        </option>
+                                                                                    @endforeach
+                                                                                </select>
+                                                                                @error('bank_transfer_provider_id')
+                                                                                    <div class="invalid-feedback">{{ $message }}</div>
+                                                                                @enderror
+                                                                                <small class="text-muted d-block mt-50">Provider used for admin bank transfers.</small>
+                                                                            </fieldset>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            <div class="card">
+                                                                <div class="card-header">
+                                                                    <h4 class="card-title mb-25">Wallet & Payments</h4>
+                                                                    <small class="text-muted">Configure wallet funding methods and related charges.</small>
+                                                                </div>
+
+                                                                <div class="card-body">
+                                                                    <div class="row">
+                                                                        <div class="col-md-6">
+                                                                            <fieldset class="form-group">
+                                                                                <label for="allow_fund_with_card">Allow Wallet Funding with Card</label>
+                                                                                <select name="allow_fund_with_card" class="form-control" id="allow_fund_with_card">
+                                                                                    <option value="">Select</option>
+                                                                                    <option value="yes" @selected(old('allow_fund_with_card', $settings->allow_fund_with_card) === 'yes')>Yes</option>
+                                                                                    <option value="no" @selected(old('allow_fund_with_card', $settings->allow_fund_with_card) === 'no')>No</option>
+                                                                                </select>
+                                                                            </fieldset>
+                                                                        </div>
+
+                                                                        <div class="col-md-6">
+                                                                            <fieldset class="form-group">
+                                                                                <label for="card_funding_extra_charge">Card Funding Extra Charge ({!! $settings->currency !!})</label>
+                                                                                <input type="number" name="card_funding_extra_charge" id="card_funding_extra_charge" value="{{ old('card_funding_extra_charge', $settings->card_funding_extra_charge) }}" class="form-control">
+                                                                            </fieldset>
+                                                                        </div>
+
+                                                                        <div class="col-md-6">
+                                                                            <fieldset class="form-group">
+                                                                                <label for="allow_fund_with_reserved_account">Allow Wallet Funding with Reserved Account</label>
+                                                                                <select name="allow_fund_with_reserved_account" class="form-control" id="allow_fund_with_reserved_account">
+                                                                                    <option value="">Select</option>
+                                                                                    <option value="yes" @selected(old('allow_fund_with_reserved_account', $settings->allow_fund_with_reserved_account) === 'yes')>Yes</option>
+                                                                                    <option value="no" @selected(old('allow_fund_with_reserved_account', $settings->allow_fund_with_reserved_account) === 'no')>No</option>
+                                                                                </select>
+                                                                            </fieldset>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            <div class="card">
+                                                                <div class="card-header">
+                                                                    <h4 class="card-title mb-25">Communication</h4>
+                                                                    <small class="text-muted">Configure customer communication and airtime-to-cash support channels.</small>
+                                                                </div>
+
+                                                                <div class="card-body">
+                                                                    <div class="row">
+                                                                        <div class="col-md-6">
+                                                                            <fieldset class="form-group">
+                                                                                <label for="a2cash_chat_engine">Airtime2Cash Chat Engine</label>
+                                                                                <select name="a2cash_chat_engine" class="form-control" id="a2cash_chat_engine" required>
+                                                                                    <option value="">Select</option>
+                                                                                    <option value="whatsapp" @selected(old('a2cash_chat_engine', $settings->a2cash_chat_engine) === 'whatsapp')>Whatsapp</option>
+                                                                                    <option value="telegram" @selected(old('a2cash_chat_engine', $settings->a2cash_chat_engine) === 'telegram')>Telegram</option>
+                                                                                </select>
+                                                                            </fieldset>
+                                                                        </div>
+
+                                                                        <div class="col-md-6">
+                                                                            <fieldset class="form-group">
+                                                                                <label for="whatsapp_number">Whatsapp Number</label>
+                                                                                <input type="text" class="form-control" id="whatsapp_number" name="whatsapp_number" value="{{ old('whatsapp_number', $settings->whatsapp_number) }}" placeholder="Whatsapp number">
+                                                                            </fieldset>
+                                                                        </div>
+
+                                                                        <div class="col-md-6">
+                                                                            <fieldset class="form-group">
+                                                                                <label for="telegram_username">Telegram Username</label>
+                                                                                <input type="text" class="form-control" id="telegram_username" name="telegram_username" value="{{ old('telegram_username', $settings->telegram_username) }}" placeholder="Telegram Username">
+                                                                            </fieldset>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            <div class="card">
+                                                                <div class="card-header">
+                                                                    <h4 class="card-title mb-25">Notifications</h4>
+                                                                    <small class="text-muted">Control the emails sent for customer and transaction events.</small>
+                                                                </div>
+
+                                                                <div class="card-body">
+                                                                    <div class="row">
+                                                                        <div class="col-md-6">
+                                                                            <fieldset class="form-group">
+                                                                                <label for="login_email_notification">Customer Login Email Notification</label>
+                                                                                <select name="login_email_notification" class="form-control" id="login_email_notification" required>
+                                                                                    <option value="">Select</option>
+                                                                                    <option value="yes" @selected(old('login_email_notification', $settings->login_email_notification) === 'yes')>Yes</option>
+                                                                                    <option value="no" @selected(old('login_email_notification', $settings->login_email_notification) === 'no')>No</option>
+                                                                                </select>
+                                                                            </fieldset>
+                                                                        </div>
+
+                                                                        <div class="col-md-6">
+                                                                            <fieldset class="form-group">
+                                                                                <label for="transaction_email_notification">Transaction Email Notification</label>
+                                                                                <select name="transaction_email_notification" class="form-control" id="transaction_email_notification" required>
+                                                                                    <option value="">Select</option>
+                                                                                    <option value="yes" @selected(old('transaction_email_notification', $settings->transaction_email_notification) === 'yes')>Yes</option>
+                                                                                    <option value="no" @selected(old('transaction_email_notification', $settings->transaction_email_notification) === 'no')>No</option>
+                                                                                </select>
+                                                                            </fieldset>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            <div class="card">
+                                                                <div class="card-header">
+                                                                    <h4 class="card-title mb-25">Security</h4>
+                                                                    <small class="text-muted">Captcha and automated form protection settings.</small>
+                                                                </div>
+
+                                                                <div class="card-body">
+                                                                    <div class="row">
+                                                                        <div class="col-md-6">
+                                                                            <fieldset class="form-group">
+                                                                                <label for="captcha_settings_status">Allow Security Captcha on Forms</label>
+                                                                                <select name="captcha_settings_status" class="form-control" id="captcha_settings_status">
+                                                                                    <option value="">Select</option>
+                                                                                    <option value="yes" @selected(old('captcha_settings_status', $settings->captcha_settings['captcha_settings_status'] ?? '') === 'yes')>Yes</option>
+                                                                                    <option value="no" @selected(old('captcha_settings_status', $settings->captcha_settings['captcha_settings_status'] ?? '') === 'no')>No</option>
+                                                                                </select>
+                                                                            </fieldset>
+                                                                        </div>
+
+                                                                        <div class="col-md-6">
+                                                                            <fieldset class="form-group">
+                                                                                <label for="captcha_settings_provider">Security Captcha Provider</label>
+                                                                                <select name="captcha_settings_provider" class="form-control" id="captcha_settings_provider">
+                                                                                    <option value="">Select</option>
+                                                                                    <option value="simple" @selected(old('captcha_settings_provider', $settings->captcha_settings['captcha_settings_provider'] ?? '') === 'simple')>Simple Captcha</option>
+                                                                                    <option value="google" @selected(old('captcha_settings_provider', $settings->captcha_settings['captcha_settings_provider'] ?? '') === 'google')>Google Captcha</option>
+                                                                                    <option value="all" @selected(old('captcha_settings_provider', $settings->captcha_settings['captcha_settings_provider'] ?? '') === 'all')>All</option>
+                                                                                </select>
+                                                                            </fieldset>
+                                                                        </div>
+
+                                                                        <div class="col-md-6">
+                                                                            <fieldset class="form-group">
+                                                                                <label for="RECAPTCHA_SITE_KEY">Google Captcha Site Key</label>
+                                                                                <input type="text" class="form-control" id="RECAPTCHA_SITE_KEY" name="RECAPTCHA_SITE_KEY" value="{{ old('RECAPTCHA_SITE_KEY', $settings->captcha_settings['google']['RECAPTCHA_SITE_KEY'] ?? '') }}">
+                                                                            </fieldset>
+                                                                        </div>
+
+                                                                        <div class="col-md-6">
+                                                                            <fieldset class="form-group">
+                                                                                <label for="RECAPTCHA_SECRET_KEY">Google Captcha Secret Key</label>
+                                                                                <input type="text" class="form-control" id="RECAPTCHA_SECRET_KEY" name="RECAPTCHA_SECRET_KEY" value="{{ old('RECAPTCHA_SECRET_KEY', $settings->captcha_settings['google']['RECAPTCHA_SECRET_KEY'] ?? '') }}">
+                                                                            </fieldset>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            <div class="card">
+                                                                <div class="card-header">
+                                                                    <h4 class="card-title mb-25">Branding</h4>
+                                                                    <small class="text-muted">Manage logos and visual assets used across the application.</small>
+                                                                </div>
+
+                                                                <div class="card-body">
+                                                                    <div class="row">
+                                                                        <div class="col-md-6">
                                                                             <fieldset class="form-group">
                                                                                 <label for="logo">Logo</label>
                                                                                 <div class="custom-file">
                                                                                     <input type="file" accept="image/*" class="custom-file-input" id="logo" name="logo">
-                                                                                    <label class="custom-file-label" for="image">Replace Logo</label>
+                                                                                    <label class="custom-file-label" for="logo">Replace Logo</label>
                                                                                 </div>
+
+                                                                                @if(!empty($settings->logo))
+                                                                                    <div class="settings-image-preview mt-1">
+                                                                                        <img src="{{ asset($settings->logo) }}" alt="Current logo">
+                                                                                    </div>
+                                                                                @endif
                                                                             </fieldset>
                                                                         </div>
-                                                                        <div class="col-md-4">
-                                                                            @if(!empty(getSettings()->logo))
-                                                                                <div class="settings-image-preview">
-                                                                                    <img src="{{ asset(getSettings()->logo)}}" alt="Current logo">
-                                                                                </div>
-                                                                            @endif
-                                                                        </div>
-                                                                    </div>
-                                                                    <div class="row">
-                                                                        <div class="col-md-8">
+
+                                                                        <div class="col-md-6">
                                                                             <fieldset class="form-group">
                                                                                 <label for="favicon">Favicon</label>
                                                                                 <div class="custom-file">
                                                                                     <input type="file" accept="image/*" class="custom-file-input" id="favicon" name="favicon">
-                                                                                    <label class="custom-file-label" for="image">Replace Favicon</label>
+                                                                                    <label class="custom-file-label" for="favicon">Replace Favicon</label>
                                                                                 </div>
+
+                                                                                @if(!empty($settings->favicon))
+                                                                                    <div class="settings-image-preview mt-1">
+                                                                                        <img src="{{ asset($settings->favicon) }}" alt="Current favicon">
+                                                                                    </div>
+                                                                                @endif
                                                                             </fieldset>
                                                                         </div>
-                                                                        <div class="col-md-4">
-                                                                            @if(!empty(getSettings()->favicon))
-                                                                                <div class="settings-image-preview">
-                                                                                    <img src="{{ asset(getSettings()->favicon)}}" alt="Current favicon">
-                                                                                </div>
-                                                                            @endif
-                                                                        </div>
-                                                                    </div>
-                                                                    
-                                                                    <div class="row">
-                                                                        <div class="col-md-8">
+
+                                                                        <div class="col-md-6">
                                                                             <fieldset class="form-group">
                                                                                 <label for="dashboard_logo">Dashboard Logo</label>
                                                                                 <div class="custom-file">
-                                                                                    <input type="file" style="height:auto;width:100%;max-width: 100%;" accept="image/*" class="custom-file-input" id="dashboard_logo" name="dashboard_logo">
+                                                                                    <input type="file" accept="image/*" class="custom-file-input" id="dashboard_logo" name="dashboard_logo">
                                                                                     <label class="custom-file-label" for="dashboard_logo">Replace Dashboard Logo</label>
                                                                                 </div>
+
+                                                                                @if(!empty($settings->dashboard_logo))
+                                                                                    <div class="settings-image-preview settings-image-preview--dashboard mt-1">
+                                                                                        <img src="{{ asset($settings->dashboard_logo) }}" alt="Current dashboard logo">
+                                                                                    </div>
+                                                                                @endif
                                                                             </fieldset>
                                                                         </div>
-                                                                        <div class="col-md-4">
-                                                                            @if(!empty(getSettings()->dashboard_logo))
-                                                                                <div class="settings-image-preview settings-image-preview--dashboard">
-                                                                                    <img src="{{ asset(getSettings()->dashboard_logo)}}" alt="Current dashboard logo">
-                                                                                </div>
-                                                                            @endif
-                                                                        </div>
                                                                     </div>
-                                                                    <fieldset class="form-group">
-                                                                        <label for="seo_title">SEO Title</label>
-                                                                        <input type="text" class="form-control" id="seo_title" name="seo_title" value="{{ $settings->seo_title ?? old('seo_title') }}" placeholder="SEO Title">
-                                                                    </fieldset>
-                                                                    <fieldset class="form-group">
-                                                                        <label for="support_link">Support Link</label>
-                                                                        <input type="text" class="form-control" id="support_link" name="support_link" value="{{ $settings->support_link ?? old('support_link') }}" placeholder="Support Link">
-                                                                    </fieldset>
-                                                                    
-                                                                    <fieldset class="form-group">
-                                                                        <label for="seo_description">SEO Description</label>
-                                                                        <textarea class="form-control" id="seo_description" rows="3" name="seo_description" value="{{ $settings->seo_description ?? old('seo_description') }}" placeholder="SEO Description" required>{{ $settings->seo_description ?? old('seo_description') }}</textarea>
-                                                                    </fieldset>
-                                                                    <fieldset class="form-group">
-                                                                        <label for="google_ad_code">Google Ad Code</label>
-                                                                        <textarea class="form-control" id="google_ad_code" rows="3" name="google_ad_code" value="{{ $settings->google_ad_code ?? old('google_ad_code') }}" placeholder="Google ad code">{{ $settings->google_ad_code ?? old('google_ad_code') }}</textarea>
-                                                                    </fieldset>
-                                                                    <fieldset class="form-group">
-                                                                        <label for="google_dashboard_ad_code">Google Dashboard Ad Code</label>
-                                                                        <textarea class="form-control" id="google_dashboard_ad_code" rows="5" name="google_dashboard_ad_code" value="{{ $settings->google_dashboard_ad_code ?? old('google_dashboard_ad_code') }}" placeholder="Google dashboard ad code">{{ $settings->google_dashboard_ad_code ?? old('google_dashboard_ad_code') }}</textarea>
-                                                                    </fieldset>
-                                                                    <fieldset class="form-group">
-                                                                        <label for="google_dashboard_ad_enabled">Google Dashboard Ad</label>
-                                                                        <select class="form-control" id="google_dashboard_ad_enabled" name="google_dashboard_ad_enabled">
-                                                                            <option value="1" {{ old('google_dashboard_ad_enabled', $settings->google_dashboard_ad_enabled ?? true) ? 'selected' : '' }}>Enabled</option>
-                                                                            <option value="0" {{ !old('google_dashboard_ad_enabled', $settings->google_dashboard_ad_enabled ?? true) ? 'selected' : '' }}>Disabled</option>
-                                                                        </select>
-                                                                        <small class="text-muted d-block mt-50">Controls the dashboard ad in both customer layouts.</small>
-                                                                    </fieldset>
                                                                 </div>
                                                             </div>
-                                                            <div class="row">
-                                                                <div class="col-md-12">
-                                                                    <h4 class="card-title">Theme Settings</h4>
+
+                                                            <div class="card">
+                                                                <div class="card-header">
+                                                                    <h4 class="card-title mb-25">SEO & Advertising</h4>
+                                                                    <small class="text-muted">Search metadata and advertising configuration.</small>
+                                                                </div>
+
+                                                                <div class="card-body">
+                                                                    <div class="row">
+                                                                        <div class="col-md-6">
+                                                                            <fieldset class="form-group">
+                                                                                <label for="seo_title">SEO Title</label>
+                                                                                <input type="text" class="form-control" id="seo_title" name="seo_title" value="{{ old('seo_title', $settings->seo_title) }}" placeholder="SEO Title">
+                                                                            </fieldset>
+                                                                        </div>
+
+                                                                        <div class="col-md-6">
+                                                                            <fieldset class="form-group">
+                                                                                <label for="google_dashboard_ad_enabled">Google Dashboard Ad</label>
+                                                                                <select class="form-control" id="google_dashboard_ad_enabled" name="google_dashboard_ad_enabled">
+                                                                                    <option value="1" @selected((bool) old('google_dashboard_ad_enabled', $settings->google_dashboard_ad_enabled ?? true))>Enabled</option>
+                                                                                    <option value="0" @selected(! (bool) old('google_dashboard_ad_enabled', $settings->google_dashboard_ad_enabled ?? true))>Disabled</option>
+                                                                                </select>
+                                                                                <small class="text-muted d-block mt-50">Controls the dashboard ad in both customer layouts.</small>
+                                                                            </fieldset>
+                                                                        </div>
+
+                                                                        <div class="col-md-6">
+                                                                            <fieldset class="form-group">
+                                                                                <label for="seo_description">SEO Description</label>
+                                                                                <textarea class="form-control" id="seo_description" rows="4" name="seo_description" placeholder="SEO Description" required>{{ old('seo_description', $settings->seo_description) }}</textarea>
+                                                                            </fieldset>
+                                                                        </div>
+
+                                                                        <div class="col-md-6">
+                                                                            <fieldset class="form-group">
+                                                                                <label for="google_ad_code">Google Ad Code</label>
+                                                                                <textarea class="form-control" id="google_ad_code" rows="4" name="google_ad_code" placeholder="Google ad code">{{ old('google_ad_code', $settings->google_ad_code) }}</textarea>
+                                                                            </fieldset>
+                                                                        </div>
+
+                                                                        <div class="col-md-12">
+                                                                            <fieldset class="form-group">
+                                                                                <label for="google_dashboard_ad_code">Google Dashboard Ad Code</label>
+                                                                                <textarea class="form-control" id="google_dashboard_ad_code" rows="5" name="google_dashboard_ad_code" placeholder="Google dashboard ad code">{{ old('google_dashboard_ad_code', $settings->google_dashboard_ad_code) }}</textarea>
+                                                                            </fieldset>
+                                                                        </div>
+                                                                    </div>
                                                                 </div>
                                                             </div>
 
@@ -339,50 +491,64 @@ use App\Models\PaymentGateway;
                                                                     'dasboard_customer_details_color' => ['Dashboard Customer Details Color', '#F4E85A'],
                                                                 ];
                                                             @endphp
-                                                            <div class="row">
-                                                                @foreach($themeColors as $field => [$label, $defaultColor])
-                                                                    @php
-                                                                        $colorValue = old($field, $settings->{$field} ?? $defaultColor);
-                                                                        $colorValue = preg_match('/^#[0-9a-fA-F]{6}$/', (string) $colorValue)
-                                                                            ? strtoupper($colorValue)
-                                                                            : $defaultColor;
-                                                                    @endphp
-                                                                    <div class="col-md-6">
-                                                                        <fieldset class="form-group" data-color-control>
-                                                                            <label for="{{ $field }}">{{ $label }}</label>
-                                                                            <div class="theme-color-control">
-                                                                                <input
-                                                                                    class="theme-color-swatch"
-                                                                                    type="color"
-                                                                                    value="{{ $colorValue }}"
-                                                                                    data-color-picker
-                                                                                    aria-label="Choose {{ strtolower($label) }}">
-                                                                                <div class="input-group">
-                                                                                    <input
-                                                                                        class="form-control theme-color-hex"
-                                                                                        type="text"
-                                                                                        id="{{ $field }}"
-                                                                                        name="{{ $field }}"
-                                                                                        value="{{ $colorValue }}"
-                                                                                        maxlength="7"
-                                                                                        pattern="#[0-9A-Fa-f]{6}"
-                                                                                        title="Enter a six-digit hex color, for example #123F43"
-                                                                                        spellcheck="false"
-                                                                                        autocomplete="off"
-                                                                                        required
-                                                                                        data-color-hex>
-                                                                                    <div class="input-group-append">
-                                                                                        <button class="btn btn-outline-secondary theme-color-copy" type="button" data-copy-color>Copy</button>
+
+                                                            <div class="card mb-2">
+                                                                <div class="card-header">
+                                                                    <h4 class="card-title mb-25">Theme Settings</h4>
+                                                                    <small class="text-muted">Customize the main colors used throughout the application.</small>
+                                                                </div>
+
+                                                                <div class="card-body">
+                                                                    <div class="row">
+                                                                        @foreach($themeColors as $field => [$label, $defaultColor])
+                                                                            @php
+                                                                                $colorValue = old($field, $settings->{$field} ?? $defaultColor);
+                                                                                $colorValue = preg_match('/^#[0-9a-fA-F]{6}$/', (string) $colorValue) ? strtoupper($colorValue) : $defaultColor;
+                                                                            @endphp
+
+                                                                            <div class="col-md-6">
+                                                                                <fieldset class="form-group" data-color-control>
+                                                                                    <label for="{{ $field }}">{{ $label }}</label>
+
+                                                                                    <div class="theme-color-control">
+                                                                                        <input class="theme-color-swatch" type="color" value="{{ $colorValue }}" data-color-picker aria-label="Choose {{ strtolower($label) }}">
+
+                                                                                        <div class="input-group">
+                                                                                            <input
+                                                                                                class="form-control theme-color-hex"
+                                                                                                type="text"
+                                                                                                id="{{ $field }}"
+                                                                                                name="{{ $field }}"
+                                                                                                value="{{ $colorValue }}"
+                                                                                                maxlength="7"
+                                                                                                pattern="#[0-9A-Fa-f]{6}"
+                                                                                                title="Enter a six-digit hex color, for example #123F43"
+                                                                                                spellcheck="false"
+                                                                                                autocomplete="off"
+                                                                                                required
+                                                                                                data-color-hex
+                                                                                            >
+
+                                                                                            <div class="input-group-append">
+                                                                                                <button class="btn btn-outline-secondary theme-color-copy" type="button" data-copy-color>
+                                                                                                    Copy
+                                                                                                </button>
+                                                                                            </div>
+                                                                                        </div>
                                                                                     </div>
-                                                                                </div>
+                                                                                </fieldset>
                                                                             </div>
-                                                                        </fieldset>
+                                                                        @endforeach
                                                                     </div>
-                                                                @endforeach
+                                                                </div>
                                                             </div>
-                                                            <div class="row">
-                                                                <div class="col-md-12">
-                                                                    <button class="btn btn-primary" type="submit">Update</button>
+
+                                                            <div class="card">
+                                                                <div class="card-body d-flex justify-content-end">
+                                                                    <button class="btn btn-primary" type="submit">
+                                                                        <i class="bx bx-save mr-50"></i>
+                                                                        Update Settings
+                                                                    </button>
                                                                 </div>
                                                             </div>
                                                         </form>
@@ -485,7 +651,7 @@ use App\Models\PaymentGateway;
 <script>
     $('#referral_system_status').on('change', function (e) {
         var referral_system_status = $('#referral_system_status').val();
-       
+
         if (referral_system_status == '' || referral_system_status == 'inactive') {
             $('#referral_percentage_div').hide();
             $("#referral_percentage").attr({
@@ -500,7 +666,7 @@ use App\Models\PaymentGateway;
             });
         }
     });
-   
+
 </script>
 
 @endsection

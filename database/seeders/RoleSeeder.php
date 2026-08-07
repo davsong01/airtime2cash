@@ -2,13 +2,14 @@
 
 namespace Database\Seeders;
 
-use App\Models\Bank;
-use App\Models\Role;
-use App\Models\Category;
-use App\Models\RolePermission;
-use Illuminate\Database\Seeder;
 use App\Http\Controllers\Controller;
+use App\Models\API;
+use App\Models\Bank;
+use App\Models\Category;
+use App\Models\Role;
+use App\Models\RolePermission;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use Illuminate\Database\Seeder;
 
 class RoleSeeder extends Seeder
 {
@@ -64,7 +65,7 @@ class RoleSeeder extends Seeder
             'role.update',
             'role.destroy',
             'role.create',
-    
+
             'category.show',
             'category.index',
             'category.edit',
@@ -87,7 +88,7 @@ class RoleSeeder extends Seeder
             'announcement.edit',
             'announcement.update',
             'announcement.destroy',
-        
+
             'api.show',
             'api.index',
             'api.edit',
@@ -238,24 +239,27 @@ class RoleSeeder extends Seeder
         // DB::statement("INSERT INTO `announcements` (`id`, `title`, `status`, `type`, `message`, `created_at`, `updated_at`) VALUES
         // (1, 'Pop-up Announcement', 'inactive', 'popup', '<p>sdd</p>', '2024-04-14 20:00:10', '2024-04-14 20:00:10'),
         // (2, 'Scroll Announcement', 'inactive', 'scroll', '<p>sddsds</p>', '2024-04-14 20:00:10', '2024-04-14 20:00:10');");
-        
+
         // Create default user and admin
-        
+
         // Banks for airtime to cash
-        $url = "https://sagecloud.ng/api/v2/merchant/authorization";
+        $provider = API::where('slug', 'sagecloud')->first();
+        $url = $provider->live_base_url . "/merchant/authorization";
+
         $payload = [
-            "email" => env('SAGECLOUD_EMAIL'),
-            "password" =>   env('SAGECLOUD_PASSWORD'),
+            "email" => $provider->api_key,
+            "password" =>   $provider->secret_key,
         ];
+
         $control = new Controller();
         $login = $control->basicApiCall($url, $payload, []);
-        
+
         if(!empty($login) && $login['success'] == true){
             $token = $login['data']['token']['access_token'] ?? null;
         }
 
         if(!empty($token)){
-            $url2 = "https://sagecloud.ng/api/v2/transfer/get-transfer-data";
+            $url2 = $provider->live_base_url . "/transfer/get-transfer-data";
 
             $headers = [
                 "Content-Type: application/json",
@@ -263,10 +267,10 @@ class RoleSeeder extends Seeder
             ];
 
             $callBanks = $control->basicApiCall($url2, [], $headers, 'GET');
-            
+
             if (!empty($callBanks) && $callBanks['success'] == true) {
                 $banks = $callBanks['banks'] ?? null;
-                
+
                 if (!empty($banks)) {
                     foreach($banks as $bank){
                         Bank::updateOrCreate([
@@ -279,6 +283,6 @@ class RoleSeeder extends Seeder
                 }
             }
         }
-        
+
     }
 }

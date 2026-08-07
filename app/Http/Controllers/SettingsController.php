@@ -95,6 +95,8 @@ class SettingsController extends Controller
             ->mapWithKeys(fn (string $field) => [$field => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/']])
             ->all() + [
                 'auto_share_provider_id' => ['nullable', 'integer', 'exists:a_p_is,id'],
+                'bank_transfer_provider_id' => ['required', 'integer', 'exists:a_p_is,id'],
+
             ]);
 
         // captcha settings
@@ -119,9 +121,9 @@ class SettingsController extends Controller
         foreach ($colorFields as $field) {
             $data[$field] = strtoupper($request->string($field)->toString());
         }
-        
+
         $data['captcha_settings'] = $captcha_settings;
-        
+
         if (!empty($request->logo)) {
             $data['logo'] = $this->uploadFile($request->logo, 'site');
         }
@@ -133,9 +135,9 @@ class SettingsController extends Controller
         if (!empty($request->favicon)) {
             $data['favicon'] = $this->uploadFile($request->favicon, 'site');
         }
-        
+
         $settings->update($data);
-        
+
         return back()->with('message', 'Operation successful');
     }
 
