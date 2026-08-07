@@ -43,9 +43,9 @@
                     </div>
                 </section>
 
-                <section class="row">
-                    <div class="col-sm-6 col-xl-3">
-                        <a href="{{ route('customers') }}" class="card ops-metric-card">
+               <section class="row">
+                    <div class="col-sm-6 col-xl-3 mb-2">
+                        <a href="{{ route('customers') }}" class="card ops-metric-card h-100">
                             <div class="card-body">
                                 <span class="ops-metric-icon is-primary"><i class="bx bx-group"></i></span>
                                 <span class="ops-metric-label">Customer portfolio</span>
@@ -54,8 +54,9 @@
                             </div>
                         </a>
                     </div>
-                    <div class="col-sm-6 col-xl-3">
-                        <a href="{{ route('admin.walletlog') }}" class="card ops-metric-card">
+
+                    <div class="col-sm-6 col-xl-3 mb-2">
+                        <a href="{{ route('admin.walletlog') }}" class="card ops-metric-card h-100">
                             <div class="card-body">
                                 <span class="ops-metric-icon is-success"><i class="bx bx-wallet"></i></span>
                                 <span class="ops-metric-label">Wallet exposure</span>
@@ -64,8 +65,9 @@
                             </div>
                         </a>
                     </div>
-                    <div class="col-sm-6 col-xl-3">
-                        <a href="{{ route('admin.trans') }}" class="card ops-metric-card">
+
+                    <div class="col-sm-6 col-xl-3 mb-2">
+                        <a href="{{ route('admin.trans') }}" class="card ops-metric-card h-100">
                             <div class="card-body">
                                 <span class="ops-metric-icon is-info"><i class="bx bx-line-chart"></i></span>
                                 <span class="ops-metric-label">All transactions</span>
@@ -74,41 +76,55 @@
                             </div>
                         </a>
                     </div>
-                    <div class="col-sm-6 col-xl-3">
-                        @if(!empty($customer?->customer?->user))
-                        <a href="{{ route('customers.edit', $customer->customer->user_id) }}" class="card ops-metric-card">
-                            <div class="card-body">
-                                <span class="ops-metric-icon is-warning"><i class="bx bx-trophy"></i></span>
-                                <span class="ops-metric-label">Customer of the month</span>
-                                <strong class="text-truncate pr-2">{{ $customer->customer->user->username ?: $customer->customer->user->name }}</strong>
-                                <small>{{ number_format((int) $customer->count) }} transactions · {{ $currency }}{{ number_format((float) $customer->total_amount, 2) }}</small>
-                            </div>
-                        </a>
+
+                    <div class="col-sm-6 col-xl-3 mb-2">
+                        @if($customer?->customer?->user)
+                            <a href="{{ route('customers.edit', $customer->customer->user_id) }}" class="card ops-metric-card h-100">
+                                <div class="card-body">
+                                    <span class="ops-metric-icon is-warning"><i class="bx bx-trophy"></i></span>
+                                    <span class="ops-metric-label">Customer of the month</span>
+                                    <strong class="text-truncate">
+                                        {{ $customer->customer->user->username ?: $customer->customer->user->name }}
+                                    </strong>
+                                    <small>
+                                        {{ number_format((int) $customer->count) }} transactions ·
+                                        {{ $currency }}{{ number_format((float) $customer->total_amount, 2) }}
+                                    </small>
+                                </div>
+                            </a>
                         @else
-                        <div class="card ops-metric-card"><div class="card-body"><span class="ops-metric-icon is-warning"><i class="bx bx-trophy"></i></span><span class="ops-metric-label">Customer of the month</span><strong>Not available</strong><small>No qualifying transactions this month</small></div></div>
+                            <div class="card ops-metric-card h-100">
+                                <div class="card-body">
+                                    <span class="ops-metric-icon is-warning"><i class="bx bx-trophy"></i></span>
+                                    <span class="ops-metric-label">Customer of the month</span>
+                                    <strong>Not available</strong>
+                                    <small>No qualifying transactions this month</small>
+                                </div>
+                            </div>
                         @endif
                     </div>
-                    <div class="col-sm-6 col-xl-3">
-                        <a href="{{ route('admin.walletlog') }}" class="card ops-metric-card">
+
+                    <div class="col-sm-6 col-xl-3 mb-2">
+                        <div class="card ops-metric-card h-100">
                             <div class="card-body">
-                                <span class="ops-metric-icon is-success"><i class="fa fa-server"></i></span>
-                                <span class="ops-metric-label">SERVER ADDRESS</span>
-                                <strong>{{ $_SERVER['SERVER_ADDR'] ?? 'NOT SET' }}</strong>
-                                <small></small>
+                                <span class="ops-metric-icon is-success"><i class="bx bx-server"></i></span>
+                                <span class="ops-metric-label">Server address</span>
+                                <strong>{{ request()->server('SERVER_ADDR', 'NOT SET') }}</strong>
+                                <small>Application server IP</small>
                             </div>
-                        </a>
-                    </div>
-                    <div class="col-sm-6 col-xl-3">
-                        <a href="{{ route('admin.walletlog') }}" class="card ops-metric-card">
-                            <div class="card-body">
-                                <span class="ops-metric-icon is-primary"><i class="fa fa-server"></i></span>
-                                <span class="ops-metric-label">REMOTE ADDRESS</span>
-                                <strong>{{ $_SERVER['REMOTE_ADDR'] ?? 'NOT SET' }}</strong>
-                                <small></small>
-                            </div>
-                        </a>
+                        </div>
                     </div>
 
+                    <div class="col-sm-6 col-xl-3 mb-2">
+                        <div class="card ops-metric-card h-100">
+                            <div class="card-body">
+                                <span class="ops-metric-icon is-primary"><i class="bx bx-globe"></i></span>
+                                <span class="ops-metric-label">Remote address</span>
+                                <strong>{{ request()->ip() }}</strong>
+                                <small>Current client IP</small>
+                            </div>
+                        </div>
+                    </div>
                 </section>
 
                 <section class="card ops-panel mb-2">
