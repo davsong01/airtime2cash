@@ -86,9 +86,9 @@ Route::middleware(['auth', 'verified', 'tpin', 'ipcheck'])->group(function () {
         Route::get('customer/{slug}', [TransactionController::class, 'showProductsPage'])->name('open.transaction.page');
         Route::post('customer-initialize-transaction', [TransactionController::class, 'initializeTransaction'])->name('initialize.transaction');
         Route::post('customer-initialize-airtime2cash-transaction', [TransactionController::class, 'initializeAirtime2CashTransaction'])->name('initialize.airtime2cashtransaction');
-        Route::post('airtime-to-cash/auto/initiate', [AutoSyncController::class, 'initiate'])->middleware('throttle:5,1')->name('airtime2cash.auto.initiate');
-        Route::post('airtime-to-cash/auto/complete', [AutoSyncController::class, 'complete'])->middleware('throttle:10,1')->name('airtime2cash.auto.complete');
-        Route::post('airtime-to-cash/auto/resend-otp', [AutoSyncController::class, 'resendOtp'])->middleware('throttle:3,1')->name('airtime2cash.auto.resend-otp');
+        Route::post('airtime-to-cash/auto/initiate', [TransactionController::class, 'initializeAirtime2CashTransaction'])->middleware('throttle:5,1')->name('airtime2cash.auto.initiate');
+        Route::post('airtime-to-cash/auto/complete', [TransactionController::class, 'processAirtime2CashTransaction'])->middleware('throttle:10,1')->name('airtime2cash.auto.complete');
+        Route::post('airtime-to-cash/auto/resend-otp', [TransactionController::class, 'resendOtp'])->middleware('throttle:3,1')->name('airtime2cash.auto.resend-otp');
         Route::post('customer-initialize-wallet2banktransaction/{product}', [TransactionController::class, 'initializeWalletToBankTransaction'])->name('initialize.wallet2banktransaction');
 
 

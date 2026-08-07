@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="{{ asset('modern-assets/vendor/libs/select2/select2.css') }}" />
     <style>
         .a2c-workspace { --a2c-green: #00a86b; --a2c-ink: #263446; position: relative; isolation: isolate; }
-        .a2c-workspace::before { content: ''; position: absolute; z-index: -1; inset: -2rem -1.5rem auto; height: 360px; border-radius: 2.25rem; background: radial-gradient(circle at 8% 8%, rgba(0,168,107,.18), transparent 38%), radial-gradient(circle at 88% 2%, rgba(3,195,236,.16), transparent 34%); pointer-events: none; }
+        .a2c-workspace::before { content: ''; position: absolute; z-index: -1; inset: -2rem -1.5rem auto; height: 360px; border-radius: 2.25rem; pointer-events: none; }
         .a2c-card { border: 1px solid rgba(67,89,113,.1); border-radius: 1.15rem; background: rgba(255,255,255,.92); box-shadow: 0 1rem 2.6rem rgba(67,89,113,.09); overflow: hidden; backdrop-filter: blur(12px); }
         .a2c-mode-deck { padding: 1.35rem; }
         .a2c-mode-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
@@ -63,6 +63,8 @@
         @media (max-width: 991.98px) { .a2c-instruction-card { position: static; } }
         @media (max-width: 767.98px) { .a2c-network-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .a2c-mode-heading { align-items: flex-start; flex-direction: column; } }
         @media (max-width: 575.98px) { .a2c-workspace::before { inset-inline: -.5rem; } .a2c-card { border-radius: .95rem; } .a2c-mode-deck, .a2c-form-body, .a2c-calculator { padding: 1rem; } .conversion-mode-option { min-height: 92px; padding: .8rem; } .a2c-network-option { min-height: 102px; } .a2c-stage-summary { grid-template-columns: 1fr; } .a2c-secure-flow { padding: 1.25rem !important; } .a2c-action-bar { align-items: stretch; flex-direction: column; } .a2c-action-bar .purchase-submit { width: 100%; min-width: 0; } }
+
+
     </style>
 
 @endsection
@@ -82,7 +84,11 @@
     ])
 
     @include('sneat.layouts.alerts')
-
+    <div
+        id="pending-transaction-alert"
+        class="alert alert-warning"
+        style="display:none"
+    ></div>
     <div class="a2c-workspace">
         <form action="{{ route('initialize.airtime2cashtransaction') }}" method="POST" id="initialize" class="purchase-form">
             @csrf
@@ -99,7 +105,7 @@
                     <div class="col-md-6">
                         <input class="btn-check" type="radio" name="transfer_mode" id="transfer-mode-manual" value="manual" autocomplete="off" @checked($defaultTransferMode === 'manual') @disabled(!$manualProducts)>
                         <label class="conversion-mode-option" for="transfer-mode-manual">
-                            <span class="conversion-mode-icon bg-label-success"><i class="bx bx-hand"></i></span>
+                            <span class="conversion-mode-icon bg-label-success"><i class="bx bx-transfer"></i></span>
                             <span><strong>Manual Transfer</strong><small>Send airtime to the provided destination number</small></span>
                             <i class="bx bx-check-circle conversion-mode-check"></i>
                         </label>
@@ -141,10 +147,25 @@
                                     @endforeach
                                 </div>
                                 <label for="product" class="visually-hidden">Network</label>
+
                                 <select class="a2c-native-select" name="product" id="product" required tabindex="-1">
                                     <option value="">Select a network</option>
+
                                     @foreach ($category->products as $item)
-                                        <option value="{{ $item->id }}" data-manual_status="{{ $item->manual_status }}" data-auto_share_status="{{ $item->auto_share_status }}" data-manual_rate="{{ $item->manual_discounted_rate }}" data-auto_share_rate="{{ $item->auto_share_discounted_rate }}" data-min="{{ $item->min }}" data-max="{{ $item->max }}" data-image="{{ asset($item->image) }}" data-name="{{ $item->name }}" data-manual_instruction="{{ $item->instruction }}" data-auto_share_instruction="{{ $item->auto_share_instruction }}" data-description="{{ $item->description }}">{{ $item->display_name }}</option>
+                                        <option
+                                            value="{{ $item->id }}"
+                                            data-manual-status="{{ $item->manual_status }}"
+                                            data-auto-share-status="{{ $item->auto_share_status }}"
+                                            data-manual-rate="{{ $item->manual_discounted_rate }}"
+                                            data-auto-share-rate="{{ $item->auto_share_discounted_rate }}"
+                                            data-min="{{ $item->min }}"
+                                            data-max="{{ $item->max }}"
+                                            data-name="{{ $item->display_name }}"
+                                            data-manual-instruction="{{ $item->instruction }}"
+                                            data-auto-share-instruction="{{ $item->auto_share_instruction }}"
+                                        >
+                                            {{ $item->display_name }}
+                                        </option>
                                     @endforeach
                                 </select>
                             </div>
@@ -258,7 +279,7 @@
 
                     <section class="a2c-card a2c-action-bar">
                         <span class="a2c-action-note"><i class="bx bx-lock-alt fs-5 text-success"></i>Your conversion details are transmitted securely.</span>
-                        <button id="buy-button" class="purchase-submit btn btn-primary" type="submit" onclick="return submitForm()">
+                        <button id="buy-button" class="purchase-submit btn btn-primary" type="submit">
                             <i class="bx bx-transfer me-1"></i>
                             <span>Submit conversion</span>
                         </button>
@@ -296,382 +317,1201 @@
 
 @section('page-script')
     <script src="{{ asset('modern-assets/vendor/libs/select2/select2.js') }}"></script>
-    <script>
-        function submitForm() {
-            return window.handleAirtimeToCashSubmit ? window.handleAirtimeToCashSubmit() : false;
-        }
 
-        $(document).ready(function () {
+    <script>
+        $(function () {
+            'use strict';
+
+            /*
+            |--------------------------------------------------------------------------
+            | Elements
+            |--------------------------------------------------------------------------
+            */
+
+            const form = document.getElementById('initialize');
+
+            if (!form) {
+                return;
+            }
+
+            const $form = $(form);
+            const $product = $('#product');
+            const $amount = $('#amount');
+            const $receive = $('#receive');
+            const $phone = $('#phone');
+            const $email = $('#email');
+            const $rate = $('#rate');
+            const $rateDisplay = $('#rate-display');
+            const $rateText = $('#rate-text');
+            const $airtimeRange = $('#airtime-range');
+
+            const $paymentMethod = $('#payment_method');
+            const $bank = $('#bank');
+            const $accountNumber = $('#account_number');
+            const $accountName = $('#account_name');
+
+            const $amountDiv = $('#amount-div');
+            const $receiveDiv = $('#receive-div');
+            const $paymentDiv = $('#payment-div');
+            const $bankDetailsDiv = $('#bank-details-div');
+
+            const $conversionDetailsPanel = $('#conversion-details-panel');
+            const $autoSecureFlow = $('#auto-secure-flow');
+            const $autoPinStage = $('#auto-pin-stage');
+            const $autoOtpStage = $('#auto-otp-stage');
+            const $autoFlowError = $('#auto-flow-error');
+
+            const $sharePin = $('#share-pin');
+            const $autoOtp = $('#auto-otp');
+            const $buyButton = $('#buy-button');
+            const $resendOtpButton = $('#resend-auto-otp');
+
+            const $agreement = $('#agreement');
+            const $agreementPanel = $('#agreement-panel');
+
+            const productOptions = $product.find('option[value!=""]').clone();
+            /*
+            |--------------------------------------------------------------------------
+            | Server values
+            |--------------------------------------------------------------------------
+            */
+
+            const currency = @json(
+                html_entity_decode(
+                    strip_tags(getSettings()['currency'])
+                )
+            );
+
+            const defaultAutoInstruction = @json($autoTransferInstruction);
+            const csrfToken = @json(csrf_token());
+
+            const endpoints = {
+                initiate: @json(route('initialize.airtime2cashtransaction')),
+                complete: @json(route('airtime2cash.auto.complete')),
+                resend: @json(route('airtime2cash.auto.resend-otp'))
+            };
+
+            /*
+            |--------------------------------------------------------------------------
+            | State
+            |--------------------------------------------------------------------------
+            */
+
+            const AUTO_STAGE_DETAILS = 'details';
+            const AUTO_STAGE_PIN = 'pin';
+            const AUTO_STAGE_OTP = 'otp';
+
+            let autoStage = AUTO_STAGE_DETAILS;
+            let autoTransactionId = null;
+            let requestInProgress = false;
+
+            const originalProductOptions = $product
+                .find('option')
+                .filter(function () {
+                    return this.value !== '';
+                })
+                .clone();
+
+            /*
+            |--------------------------------------------------------------------------
+            | Select2
+            |--------------------------------------------------------------------------
+            */
+
             $('.modern-select2').each(function () {
-                const select = $(this);
-                select.select2({
+                const $select = $(this);
+
+                $select.select2({
                     width: '100%',
-                    placeholder: select.data('placeholder'),
+                    placeholder: $select.data('placeholder') || '',
                     minimumResultsForSearch: 0
                 });
             });
 
-            const productSelect = $('#product');
-            const allProductOptions = productSelect.find('option').clone();
-            const defaultAutoInstruction = @json($autoTransferInstruction);
-            const currency = @json(html_entity_decode(strip_tags(getSettings()['currency'])));
-            const csrfToken = @json(csrf_token());
-            const autoUrls = {
-                initiate: @json(route('airtime2cash.auto.initiate')),
-                complete: @json(route('airtime2cash.auto.complete')),
-                resend: @json(route('airtime2cash.auto.resend-otp'))
-            };
-            let autoStage = 'details';
-            let autoTransactionId = null;
+            /*
+            |--------------------------------------------------------------------------
+            | General helpers
+            |--------------------------------------------------------------------------
+            */
 
             function isAutoTransfer() {
-                return $('input[name="transfer_mode"]:checked').val() === 'auto_share';
+                return $('input[name="transfer_mode"]:checked').val()
+                    === 'auto_share';
             }
 
-            function setActionButton(label, disabled, icon) {
-                $('#buy-button').prop('disabled', disabled).html(`<i class="bx ${icon} me-1"></i><span>${label}</span>`);
+            function normalizePhone(value) {
+                return String(value || '').replace(/\s+/g, '');
             }
 
-            function showFlowError(message) {
-                $('#auto-flow-error').text(message).toggle(Boolean(message));
-            }
+            function formatMoney(value) {
+                const amount = Number(value);
 
-            function firstError(data) {
-                if (data.errors) {
-                    const errors = Object.values(data.errors).flat();
-                    if (errors.length) return errors[0];
+                if (!Number.isFinite(amount)) {
+                    return currency + '0.00';
                 }
-                return data.message || 'The request could not be completed. Please try again.';
-            }
 
-            async function postAuto(url, payload) {
-                const response = await fetch(url, {
-                    method: 'POST',
-                    credentials: 'same-origin',
-                    headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
-                    body: JSON.stringify(payload)
+                return currency + amount.toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
                 });
-                const data = await response.json().catch(() => ({}));
-                if (!response.ok) throw new Error(firstError(data));
-                return data;
             }
 
-            function autoPayload() {
+            function setActionButton(
+                label,
+                disabled = false,
+                icon = 'bx-transfer'
+            ) {
+                $buyButton
+                    .prop('disabled', disabled)
+                    .html(
+                        `<i class="bx ${icon} me-1"></i>` +
+                        `<span>${label}</span>`
+                    );
+            }
+
+            function setRequestInProgress(value) {
+                requestInProgress = value;
+            }
+
+            function showAutoError(message) {
+                const normalizedMessage = String(message || '').trim();
+
+                $autoFlowError
+                    .text(normalizedMessage)
+                    .toggle(normalizedMessage !== '');
+
+                if (normalizedMessage !== '' && $autoSecureFlow.is(':visible')) {
+                    $autoFlowError[0]?.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'center'
+                    });
+                }
+            }
+
+            function clearAutoError() {
+                showAutoError('');
+            }
+
+            function extractFirstError(data, fallbackMessage) {
+                if (
+                    data
+                    && typeof data === 'object'
+                    && data.errors
+                    && typeof data.errors === 'object'
+                ) {
+                    const messages = Object.values(data.errors).flat();
+
+                    if (messages.length > 0) {
+                        return String(messages[0]);
+                    }
+                }
+
+                if (
+                    data
+                    && typeof data === 'object'
+                    && typeof data.message === 'string'
+                    && data.message.trim() !== ''
+                ) {
+                    return data.message;
+                }
+
+                return fallbackMessage;
+            }
+
+            async function parseResponse(response) {
+                const contentType = response.headers.get('content-type') || '';
+
+                if (contentType.includes('application/json')) {
+                    return response.json().catch(function () {
+                        return {};
+                    });
+                }
+
+                const text = await response.text();
+
                 return {
-                    product: $('#product').val(),
-                    transfer_mode: 'auto_share',
-                    amount: $('#amount').val(),
-                    phone: $('#phone').val().replace(/\s+/g, ''),
-                    email: $('#email').val(),
-                    payment_method: 'Transfer to Wallet',
-                    agreement: $('#agreement').prop('checked') ? 1 : 0
+                    message: text
                 };
             }
 
-            function validateDetails() {
-                if (isAutoTransfer()) {
-                    $('#payment_method').val('Transfer to Wallet').trigger('change.select2');
-                }
+            async function postJson(url, payload) {
+                let response;
 
-                // Ensure hidden select has a value before running validity check
-                if (!productSelect.val()) {
-                    showFlowError('Please select a network to continue.');
-                    $('html, body').animate({ scrollTop: productSelect.offset().top - 100 }, 200);
-                    return false;
-                }
-
-                const form = document.getElementById('initialize');
-                if (!form.reportValidity()) return false;
-
-                if (!$('#agreement').prop('checked')) {
-                    $('#agreement-panel').addClass('is-required');
-                    $('#agreement').trigger('focus');
-                    return false;
-                }
-                return true;
-            }
-
-            function openPinStage() {
-                const selected = productSelect.find(':selected');
-                $('#auto-pin-phone').text($('#phone').val());
-                $('#auto-summary-network').text(selected.data('name') || selected.text());
-                $('#auto-summary-amount').text(currency + Number($('#amount').val()).toLocaleString());
-                $('#auto-summary-payout').text(currency + Number($('#receive').val()).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
-                $('#conversion-details-panel').hide();
-                $('#auto-secure-flow, #auto-pin-stage').show();
-                $('#auto-otp-stage').hide();
-                $('#share-pin, #auto-otp').val('');
-                showFlowError('');
-
-                const pinVal = $('#share-pin').val();
-                const isValidPin = /^\d{4,8}$/.test(pinVal);
-                setActionButton('Submit PIN and enter OTP', !isValidPin, 'bx-lock-open-alt');
-                document.getElementById('auto-secure-flow').scrollIntoView({ behavior: 'smooth', block: 'center' });
-                autoStage = 'pin';
-                $('#share-pin').trigger('focus');
-            }
-
-            function openOtpStage(data) {
-                autoTransactionId = data.transaction_id || data.data?.transaction?.reference;
-                autoStage = 'otp';
-                $('#auto-pin-stage').hide();
-                $('#auto-otp-stage').show();
-                $('#auto-otp-phone').text(data.phone || $('#phone').val());
-
-                const otpVal = $('#auto-otp').val();
-                const isValidOtp = /^\d{4,10}$/.test(otpVal);
-                setActionButton('Share Airtime', !isValidOtp, 'bx-bolt-circle');
-                $('#auto-otp').trigger('focus');
-            }
-
-            window.handleAirtimeToCashSubmit = function () {
-                if (!isAutoTransfer()) {
-                    if (!validateDetails()) return false;
-                    setActionButton('Processing...', true, 'bx-loader-alt bx-spin');
-                    document.getElementById('initialize').submit();
-                    return false;
-                }
-
-                if (autoStage === 'details') {
-                    if (validateDetails()) openPinStage();
-                    return false;
-                }
-
-                if (autoStage === 'pin') {
-                    const pin = $('#share-pin').val();
-                    if (!/^\d{4,8}$/.test(pin)) return false;
-                    setActionButton('Sending OTP...', true, 'bx-loader-alt bx-spin');
-                    showFlowError('');
-
-                    postAuto(autoUrls.initiate, { ...autoPayload(), share_pin: pin })
-                        .then(res => openOtpStage(res))
-                        .catch(error => {
-                            showFlowError(error.message);
-                            setActionButton('Submit PIN and enter OTP', false, 'bx-lock-open-alt');
-                        });
-                    return false;
-                }
-
-                const otp = $('#auto-otp').val();
-                if (!/^\d{4,10}$/.test(otp)) return false;
-                setActionButton('Sharing airtime...', true, 'bx-loader-alt bx-spin');
-                showFlowError('');
-
-                postAuto(autoUrls.complete, { transaction_id: autoTransactionId, otp })
-                    .then(data => {
-                        window.location.href = data.redirect_url || data.redirect || window.location.href;
-                    })
-                    .catch(error => {
-                        showFlowError(error.message);
-                        setActionButton('Share Airtime', false, 'bx-bolt-circle');
+                try {
+                    response = await fetch(url, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {
+                            Accept: 'application/json',
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken
+                        },
+                        body: JSON.stringify(payload)
                     });
-                return false;
-            };
-
-            $('#share-pin').on('input', function () {
-                this.value = this.value.replace(/\D/g, '').slice(0, 8);
-                if (autoStage === 'pin') {
-                    setActionButton('Submit PIN and enter OTP', !/^\d{4,8}$/.test(this.value), 'bx-lock-open-alt');
+                } catch (error) {
+                    throw new Error(
+                        'Unable to connect to the server. Check your internet connection and try again.'
+                    );
                 }
-            });
 
-            $('#auto-otp').on('input', function () {
-                this.value = this.value.replace(/\D/g, '').slice(0, 10);
-                if (autoStage === 'otp') {
-                    setActionButton('Share Airtime', !/^\d{4,10}$/.test(this.value), 'bx-bolt-circle');
+                const data = await parseResponse(response);
+
+                if (!response.ok) {
+                    throw new Error(
+                        extractFirstError(
+                            data,
+                            'The request could not be completed. Please try again.'
+                        )
+                    );
                 }
-            });
 
-            $('#edit-auto-details').on('click', function () {
-                autoStage = 'details';
-                $('#auto-secure-flow').hide();
-                $('#conversion-details-panel').show();
-                setActionButton('Initiate Auto Transfer', false, 'bx-bolt-circle');
-            });
+                return data;
+            }
 
-            $('#resend-auto-otp').on('click', function () {
-                if (!autoTransactionId) return;
-                const button = $(this);
-                button.prop('disabled', true).html('<i class="bx bx-loader-alt bx-spin me-1"></i>Sending...');
-                showFlowError('');
-                postAuto(autoUrls.resend, { transaction_id: autoTransactionId })
-                    .then(data => {
-                        button.html('<i class="bx bx-check me-1"></i>OTP sent');
-                        setTimeout(() => button.prop('disabled', false).html('<i class="bx bx-refresh me-1"></i>Resend OTP'), 2500);
-                    })
-                    .catch(error => {
-                        showFlowError(error.message);
-                        button.prop('disabled', false).html('<i class="bx bx-refresh me-1"></i>Resend OTP');
-                    });
-            });
+            function getResponseData(response) {
+                if (
+                    response
+                    && typeof response === 'object'
+                    && response.data
+                    && typeof response.data === 'object'
+                ) {
+                    return response.data;
+                }
+
+                return response || {};
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Instruction helpers
+            |--------------------------------------------------------------------------
+            */
 
             function showInstruction(instruction) {
                 if (!instruction) {
+                    $('#instruction').empty();
                     $('#instruction-div').hide();
                     $('#instruction-empty').show();
+
                     return;
                 }
+
                 $('#instruction').html(instruction);
                 $('#instruction-div').show();
                 $('#instruction-empty').hide();
             }
 
-            function refreshNetworks() {
-                const transferMode = $('input[name="transfer_mode"]:checked').val();
-                const statusKey = transferMode === 'auto_share' ? 'auto_share_status' : 'manual_status';
 
-                productSelect.empty();
-                productSelect.append('<option value="">Select a network</option>');
+            function resetBankDetails() {
+                $bankDetailsDiv.hide();
 
-                allProductOptions.each(function () {
-                    const option = $(this);
-                    if (option.val() && option.data(statusKey) === 'active') {
-                        productSelect.append(option.clone());
-                    }
-                });
+                $bank
+                    .prop('required', false)
+                    .val('')
+                    .trigger('change');
 
-                productSelect.val('').trigger('change');
+                $accountNumber
+                    .prop('required', false)
+                    .val('');
+
+                $accountName
+                    .prop('required', false)
+                    .val('');
             }
 
-            $('input[name="transfer_mode"]').on('change', function () {
-                const isAutoTransfer = this.value === 'auto_share';
-                autoStage = 'details';
+            function resetSelectedProductDetails() {
+                $('.a2c-network-option').removeClass('is-active');
+
+                $agreement.prop('checked', false);
+                $agreementPanel.removeClass('is-required');
+
+                $amount
+                    .val('')
+                    .removeAttr('min')
+                    .removeAttr('max');
+
+                $receive.val('');
+                $rate.val('');
+                $rateDisplay.text('0');
+                $airtimeRange.empty().hide();
+
+                $paymentMethod
+                    .val('')
+                    .trigger('change');
+
+                $rateText.hide();
+                $amountDiv.hide();
+                $receiveDiv.hide();
+                $paymentDiv.hide();
+
+                resetBankDetails();
+            }
+
+            function resetAutoFlow() {
+                autoStage = AUTO_STAGE_DETAILS;
                 autoTransactionId = null;
-                $('#auto-secure-flow').hide();
-                $('#conversion-details-panel').show();
-                $('#payment_method option[value="Transfer to Bank Account"]').prop('disabled', isAutoTransfer);
-                $('#instruction-context').text(isAutoTransfer
-                    ? 'Follow these steps to complete an automatic airtime transfer.'
-                    : 'Instructions depend on the selected network.');
-                setActionButton(isAutoTransfer ? 'Initiate Auto Transfer' : 'Submit conversion', false, isAutoTransfer ? 'bx-bolt-circle' : 'bx-transfer');
-                // refresh the native select options
-                refreshNetworks();
+                setRequestInProgress(false);
 
-                // show/hide the network tiles to match the selected mode
-                const statusAttr = isAutoTransfer ? 'data-auto-share-status' : 'data-manual-status';
-                $('.a2c-network-option').each(function () {
-                    const status = $(this).attr(statusAttr);
-                    if (status === 'active') {
-                        $(this).removeClass('d-none');
-                        // small entrance transition
-                        $(this).css('opacity', 0).animate({ opacity: 1 }, 220);
-                    } else {
-                        $(this).addClass('d-none');
-                    }
-                });
+                $sharePin.val('');
+                $autoOtp.val('');
 
-                // reset selection state
-                $('.a2c-network-option').removeClass('is-active');
-                productSelect.val('').trigger('change');
-            });
+                $autoSecureFlow.hide();
+                $autoPinStage.show();
+                $autoOtpStage.hide();
+                $conversionDetailsPanel.show();
 
-            $('#agreement').on('change', function () {
-                $('#agreement-panel').removeClass('is-required');
-            });
+                clearAutoError();
+            }
 
-            $(document).on('click', '.a2c-network-option', function () {
-                $('.a2c-network-option').removeClass('is-active');
-                $(this).addClass('is-active');
-                const productId = $(this).data('product-id');
-                productSelect.val(productId).trigger('change');
-            });
+            /*
+            |--------------------------------------------------------------------------
+            | Product selection
+            |--------------------------------------------------------------------------
+            */
 
-            productSelect.on('change', function () {
-                const selected = $(this).find(':selected');
-                const product = selected.val();
-                const transferMode = $('input[name="transfer_mode"]:checked').val();
+            function updateSelectedProduct() {
+                const $selected = $product.find(':selected');
+                const productId = String($selected.val() || '');
 
-                if (product) {
-                    $('.a2c-network-option').removeClass('is-active');
-                    $(`.a2c-network-option[data-product-id="${product}"]`).addClass('is-active');
-                }
+                resetSelectedProductDetails();
 
-                $('#agreement').prop('checked', false);
-                $('#amount').val('');
-                $('#receive').val('');
-                $('#payment_method').val('').trigger('change');
-                $('#receive-div, #payment-div, #bank-details-div').hide();
+                if (productId === '') {
+                    showInstruction(
+                        isAutoTransfer()
+                            ? defaultAutoInstruction
+                            : null
+                    );
 
-                if (!product) {
-                    $('#rate').val('');
-                    $('#rate-display').text('0');
-                    $('#rate-text, #amount-div').hide();
-                    showInstruction(transferMode === 'auto_share' ? defaultAutoInstruction : null);
                     return;
                 }
 
-                // read raw data-attribute (use attr to avoid data normalization issues)
-                const rawRate = transferMode === 'auto_share'
-                    ? (selected.attr('data-auto_share_rate') ?? selected.data('auto_share_rate'))
-                    : (selected.attr('data-manual_rate') ?? selected.data('manual_rate'));
-                const discountedRate = parseFloat(rawRate) || 0;
-                const max = parseFloat(selected.data('max'));
-                const min = parseFloat(selected.data('min'));
-                const instruction = transferMode === 'auto_share'
-                    ? (selected.attr('data-auto_share_instruction') || selected.data('auto_share_instruction') || defaultAutoInstruction)
-                    : (selected.attr('data-manual_instruction') || selected.data('manual_instruction'));
+                $(
+                    `.a2c-network-option[data-product-id="${productId}"]`
+                ).addClass('is-active');
 
-                showInstruction(instruction);
-                $('#rate').val(discountedRate);
-                $('#rate-display').text(discountedRate);
+                const rawRate = isAutoTransfer()
+                    ? $selected.attr('data-auto_share_rate')
+                        ?? $selected.attr('data-auto-share-rate')
+                    : $selected.attr('data-manual_rate')
+                        ?? $selected.attr('data-manual-rate');
 
-                if (Number.isFinite(min)) {
-                    $('#amount').attr('min', min);
-                } else {
-                    $('#amount').removeAttr('min');
+                const rawInstruction = isAutoTransfer()
+                    ? $selected.attr('data-auto_share_instruction')
+                        ?? $selected.attr('data-auto-share-instruction')
+                    : $selected.attr('data-manual_instruction')
+                        ?? $selected.attr('data-manual-instruction');
+
+                const selectedInstruction = isAutoTransfer()
+                    ? rawInstruction || defaultAutoInstruction
+                    : rawInstruction;
+
+                const discountedRate = Number.parseFloat(rawRate);
+                const minimum = Number.parseFloat(
+                    $selected.attr('data-min')
+                );
+                const maximum = Number.parseFloat(
+                    $selected.attr('data-max')
+                );
+
+                const normalizedRate = Number.isFinite(discountedRate)
+                    ? discountedRate
+                    : 0;
+
+                $rate.val(normalizedRate);
+                $rateDisplay.text(normalizedRate);
+
+                if (Number.isFinite(minimum)) {
+                    $amount.attr('min', minimum);
                 }
 
-                if (Number.isFinite(max)) {
-                    $('#amount').attr('max', max);
-                } else {
-                    $('#amount').removeAttr('max');
+                if (Number.isFinite(maximum)) {
+                    $amount.attr('max', maximum);
                 }
 
-                if (Number.isFinite(min) && Number.isFinite(max)) {
-                    $('#airtime-range').text(`Allowed range: ${currency}${min.toLocaleString()} - ${currency}${max.toLocaleString()}`).show();
-                } else {
-                    $('#airtime-range').hide();
+                if (
+                    Number.isFinite(minimum)
+                    && Number.isFinite(maximum)
+                ) {
+                    $airtimeRange
+                        .text(
+                            `Allowed range: ${currency}` +
+                            `${minimum.toLocaleString()} - ` +
+                            `${currency}${maximum.toLocaleString()}`
+                        )
+                        .show();
                 }
 
-                $('#rate-text, #amount-div').show();
+                showInstruction(selectedInstruction);
+
+                $rateText.show();
+                $amountDiv.show();
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Amount calculation
+            |--------------------------------------------------------------------------
+            */
+
+            function recalculatePayout() {
+                const amount = Number.parseFloat($amount.val());
+                const rate = Number.parseFloat($rate.val());
+                const minimum = Number.parseFloat($amount.attr('min'));
+                const maximum = Number.parseFloat($amount.attr('max'));
+
+                const amountIsValid = Number.isFinite(amount)
+                    && amount > 0
+                    && Number.isFinite(rate)
+                    && (
+                        !Number.isFinite(minimum)
+                        || amount >= minimum
+                    )
+                    && (
+                        !Number.isFinite(maximum)
+                        || amount <= maximum
+                    );
+
+                if (!amountIsValid) {
+                    $receive.val('');
+                    $receiveDiv.hide();
+                    $paymentDiv.hide();
+
+                    $paymentMethod
+                        .val('')
+                        .trigger('change');
+
+                    resetBankDetails();
+
+                    return;
+                }
+
+                const charge = (rate / 100) * amount;
+                const payout = amount - charge;
+
+                $receive.val(payout.toFixed(2));
+                $receiveDiv.show();
+                $paymentDiv.show();
+
+                if (isAutoTransfer()) {
+                    $paymentMethod
+                        .val('Transfer to Wallet')
+                        .trigger('change');
+                }
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Detail validation
+            |--------------------------------------------------------------------------
+            */
+
+            function validateConversionDetails() {
+                clearAutoError();
+                $agreementPanel.removeClass('is-required');
+
+                if (!$product.val()) {
+                    showAutoError('Please select a network to continue.');
+
+                    document
+                        .querySelector('.a2c-network-grid')
+                        ?.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'center'
+                        });
+
+                    return false;
+                }
+
+                if (isAutoTransfer()) {
+                    $paymentMethod
+                        .val('Transfer to Wallet')
+                        .trigger('change');
+                }
+
+                if (!form.reportValidity()) {
+                    return false;
+                }
+
+                if (!$agreement.prop('checked')) {
+                    $agreementPanel.addClass('is-required');
+                    $agreement.trigger('focus');
+
+                    return false;
+                }
+
+                return true;
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Auto-transfer payloads
+            |--------------------------------------------------------------------------
+            */
+
+            function buildAutoInitiationPayload() {
+                return {
+                    product: $product.val(),
+                    transfer_mode: 'auto_share',
+                    amount: $amount.val(),
+                    phone: normalizePhone($phone.val()),
+                    email: $email.val(),
+                    payment_method: 'Transfer to Wallet',
+                    agreement: $agreement.prop('checked') ? 1 : 0,
+                    share_pin: $sharePin.val()
+                };
+            }
+
+            function extractTransactionId(response) {
+                const data = getResponseData(response);
+
+                return data.transaction_id
+                    || data.transaction?.id
+                    || data.transaction?.reference
+                    || response?.transaction_id
+                    || response?.transaction?.id
+                    || response?.transaction?.reference
+                    || null;
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Auto-transfer stage rendering
+            |--------------------------------------------------------------------------
+            */
+
+            function openPinStage() {
+                const $selected = $product.find(':selected');
+
+                autoStage = AUTO_STAGE_PIN;
+                autoTransactionId = null;
+
+                $('#auto-pin-phone').text($phone.val());
+
+                $('#auto-summary-network').text(
+                    $selected.attr('data-name')
+                    || $selected.text()
+                );
+
+                $('#auto-summary-amount').text(
+                    formatMoney($amount.val())
+                );
+
+                $('#auto-summary-payout').text(
+                    formatMoney($receive.val())
+                );
+
+                $sharePin.val('');
+                $autoOtp.val('');
+
+                clearAutoError();
+
+                $conversionDetailsPanel.hide();
+                $autoSecureFlow.show();
+                $autoPinStage.show();
+                $autoOtpStage.hide();
+
+                setActionButton(
+                    'Submit PIN and send OTP',
+                    true,
+                    'bx-lock-open-alt'
+                );
+
+                $autoSecureFlow[0]?.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'center'
+                });
+
+                window.setTimeout(function () {
+                    $sharePin.trigger('focus');
+                }, 250);
+            }
+
+            function openOtpStage(response) {
+                const data = getResponseData(response);
+                const transactionId = extractTransactionId(response);
+
+                if (!transactionId) {
+                    throw new Error(
+                        'The PIN was accepted, but the server did not return a transaction reference.'
+                    );
+                }
+
+                autoTransactionId = transactionId;
+                autoStage = AUTO_STAGE_OTP;
+
+                $autoPinStage.hide();
+                $autoOtpStage.show();
+
+                $('#auto-otp-phone').text(
+                    data.phone
+                    || response.phone
+                    || $phone.val()
+                );
+
+                $autoOtp.val('');
+                clearAutoError();
+
+                setActionButton(
+                    'Verify OTP and share airtime',
+                    true,
+                    'bx-bolt-circle'
+                );
+
+                window.setTimeout(function () {
+                    $autoOtp.trigger('focus');
+                }, 250);
+            }
+
+            function resetPendingFlow(message) {
+                autoStage = AUTO_STAGE_DETAILS;
+                autoTransactionId = null;
+
+                $sharePin.val('');
+                $autoOtp.val('');
+
+                $autoSecureFlow.hide();
+                $autoPinStage.show();
+                $autoOtpStage.hide();
+                $conversionDetailsPanel.show();
+
+                $('#pending-transaction-alert')
+                    .html(
+                        '<strong>Transaction pending.</strong> '
+                        + message
+                        + ' Please do not submit another request while this transaction is being processed.'
+                    )
+                    .show();
+
+                setActionButton(
+                    'Continue to secure transfer',
+                    false,
+                    'bx-bolt-circle'
+                );
+
+                document
+                    .getElementById('pending-transaction-alert')
+                    ?.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'center'
+                    });
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Submit SIM share PIN
+            |--------------------------------------------------------------------------
+            */
+
+            async function submitSharePin() {
+                const pin = String($sharePin.val() || '');
+
+                if (!/^\d{4,8}$/.test(pin)) {
+                    showAutoError(
+                        'Enter a valid airtime share PIN containing 4 to 8 digits.'
+                    );
+
+                    $sharePin.trigger('focus');
+
+                    return;
+                }
+
+                if (requestInProgress) {
+                    return;
+                }
+
+                setRequestInProgress(true);
+                clearAutoError();
+
+                setActionButton(
+                    'Submitting PIN...',
+                    true,
+                    'bx-loader-alt bx-spin'
+                );
+
+                try {
+                    const response = await postJson(
+                        endpoints.initiate,
+                        buildAutoInitiationPayload()
+                    );
+
+                    /*
+                     * The OTP stage is opened only when the PIN request
+                     * succeeds and returns a valid transaction reference.
+                     */
+                    openOtpStage(response);
+                } catch (error) {
+                    /*
+                     * Stop the process at the PIN stage.
+                     * Do not open the OTP stage.
+                     */
+                    autoStage = AUTO_STAGE_PIN;
+                    autoTransactionId = null;
+
+                    $autoPinStage.show();
+                    $autoOtpStage.hide();
+
+                    showAutoError(
+                        error.message
+                        || 'The PIN could not be submitted. Please check it and try again.'
+                    );
+
+                    setActionButton(
+                        'Submit PIN and send OTP',
+                        false,
+                        'bx-lock-open-alt'
+                    );
+
+                    $sharePin.trigger('focus');
+                } finally {
+                    setRequestInProgress(false);
+                }
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Submit OTP
+            |--------------------------------------------------------------------------
+            */
+
+            // async function submitOtp() {
+            //     const otp = String($autoOtp.val() || '');
+
+            //     if (!/^\d{4,10}$/.test(otp)) {
+            //         showAutoError(
+            //             'Enter a valid OTP containing 4 to 10 digits.'
+            //         );
+
+            //         $autoOtp.trigger('focus');
+
+            //         return;
+            //     }
+
+            //     if (!autoTransactionId) {
+            //         showAutoError(
+            //             'The transaction reference is missing. Return to the previous step and submit your PIN again.'
+            //         );
+
+            //         return;
+            //     }
+
+            //     if (requestInProgress) {
+            //         return;
+            //     }
+
+            //     setRequestInProgress(true);
+            //     clearAutoError();
+
+            //     setActionButton(
+            //         'Verifying OTP...',
+            //         true,
+            //         'bx-loader-alt bx-spin'
+            //     );
+
+            //     try {
+            //         const response = await postJson(
+            //             endpoints.complete,
+            //             {
+            //                 transaction_id: autoTransactionId,
+            //                 otp: otp
+            //             }
+            //         );
+
+            //         const data = getResponseData(response);
+
+            //         const redirectUrl = data.redirect_url
+            //             || data.redirect
+            //             || response.redirect_url
+            //             || response.redirect;
+
+            //         if (redirectUrl) {
+            //             window.location.assign(redirectUrl);
+
+            //             return;
+            //         }
+
+            //         window.location.reload();
+            //     } catch (error) {
+            //         autoStage = AUTO_STAGE_OTP;
+
+            //         showAutoError(
+            //             error.message
+            //             || 'The OTP could not be verified. Please check the code and try again.'
+            //         );
+
+            //         setActionButton(
+            //             'Verify OTP and share airtime',
+            //             false,
+            //             'bx-bolt-circle'
+            //         );
+
+            //         $autoOtp.trigger('focus');
+            //     } finally {
+            //         setRequestInProgress(false);
+            //     }
+            // }
+            async function submitOtp() {
+                const otp = String($autoOtp.val() || '');
+
+                if (!/^\d{4,10}$/.test(otp)) {
+                    showAutoError('Enter a valid OTP.');
+                    return;
+                }
+
+                if (requestInProgress) {
+                    return;
+                }
+
+                setRequestInProgress(true);
+                clearAutoError();
+
+                setActionButton('Verifying OTP...', true, 'bx-loader-alt bx-spin');
+
+                try {
+                    const response = await postJson(endpoints.complete, {
+                        transaction_id: autoTransactionId,
+                        otp: otp
+                    });
+
+                    if (response.transaction_status === 'successful') {
+                        window.location.href = response.redirect
+                            || '{{ route('customer.airtime2cash.transaction.history') }}';
+
+                        return;
+                    }
+
+                    if (response.transaction_status === 'pending') {
+                        resetPendingFlow(
+                            response.message
+                            || 'Your transaction is pending. Please do not retry.'
+                        );
+
+                        return;
+                    }
+
+                    throw new Error(
+                        response.message
+                        || 'The airtime conversion could not be completed.'
+                    );
+                } catch (error) {
+                    showAutoError(error.message);
+
+                    setActionButton(
+                        'Verify OTP and share airtime',
+                        false,
+                        'bx-bolt-circle'
+                    );
+                } finally {
+                    setRequestInProgress(false);
+                }
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Resend OTP
+            |--------------------------------------------------------------------------
+            */
+
+            async function resendOtp() {
+                if (!autoTransactionId || requestInProgress) {
+                    return;
+                }
+
+                setRequestInProgress(true);
+                clearAutoError();
+
+                $resendOtpButton
+                    .prop('disabled', true)
+                    .html(
+                        '<i class="bx bx-loader-alt bx-spin me-1"></i>' +
+                        'Sending...'
+                    );
+
+                try {
+                    await postJson(
+                        endpoints.resend,
+                        {
+                            transaction_id: autoTransactionId
+                        }
+                    );
+
+                    $resendOtpButton.html(
+                        '<i class="bx bx-check me-1"></i>OTP sent'
+                    );
+
+                    window.setTimeout(function () {
+                        $resendOtpButton
+                            .prop('disabled', false)
+                            .html(
+                                '<i class="bx bx-refresh me-1"></i>' +
+                                'Resend OTP'
+                            );
+                    }, 2500);
+                } catch (error) {
+                    showAutoError(
+                        error.message
+                        || 'The OTP could not be resent. Please try again.'
+                    );
+
+                    $resendOtpButton
+                        .prop('disabled', false)
+                        .html(
+                            '<i class="bx bx-refresh me-1"></i>' +
+                            'Resend OTP'
+                        );
+                } finally {
+                    setRequestInProgress(false);
+                }
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Main form submission
+            |--------------------------------------------------------------------------
+            */
+
+            $form.on('submit', function (event) {
+                event.preventDefault();
+
+                if (requestInProgress) {
+                    return;
+                }
+
+                /*
+                 * Manual transfer uses the regular browser form submission.
+                 */
+                if (!isAutoTransfer()) {
+                    if (!validateConversionDetails()) {
+                        return;
+                    }
+
+                    setRequestInProgress(true);
+
+                    setActionButton(
+                        'Processing...',
+                        true,
+                        'bx-loader-alt bx-spin'
+                    );
+
+                    form.submit();
+
+                    return;
+                }
+
+                /*
+                 * Auto-transfer stage 1:
+                 * validate details and reveal the PIN screen.
+                 */
+                if (autoStage === AUTO_STAGE_DETAILS) {
+                    if (validateConversionDetails()) {
+                        openPinStage();
+                    }
+
+                    return;
+                }
+
+                /*
+                 * Auto-transfer stage 2:
+                 * submit share PIN.
+                 *
+                 * OTP stage is opened only after a successful response.
+                 */
+                if (autoStage === AUTO_STAGE_PIN) {
+                    submitSharePin();
+
+                    return;
+                }
+
+                /*
+                 * Auto-transfer stage 3:
+                 * submit OTP.
+                 */
+                if (autoStage === AUTO_STAGE_OTP) {
+                    submitOtp();
+                }
             });
 
-            $('input[name="transfer_mode"]:checked').trigger('change');
 
-            $('#payment_method').on('change', function () {
-                const useBank = this.value === 'Transfer to Bank Account';
-                $('#bank-details-div').toggle(useBank);
-                $('#bank, #account_number, #account_name').prop('required', useBank);
+            $('input[name="transfer_mode"]').on('change', function () {
+                const autoMode = this.value === 'auto_share';
+
+                resetAutoFlow();
+                refreshAvailableNetworks();
+
+                $product.val('');
+                resetSelectedProductDetails();
+
+                $paymentMethod
+                    .find('option[value="Transfer to Bank Account"]')
+                    .prop('disabled', autoMode);
+
+                $('#instruction-context').text(
+                    autoMode
+                        ? 'Follow these steps to complete an automatic airtime transfer.'
+                        : 'Instructions depend on the selected network.'
+                );
+
+                showInstruction(
+                    autoMode
+                        ? defaultAutoInstruction
+                        : null
+                );
+
+                setActionButton(
+                    autoMode
+                        ? 'Continue to secure transfer'
+                        : 'Submit conversion',
+                    false,
+                    autoMode
+                        ? 'bx-bolt-circle'
+                        : 'bx-transfer'
+                );
+            });
+
+            function isAutoTransfer() { return $('input[name="transfer_mode"]:checked').val() === 'auto_share'; }
+
+            function refreshAvailableNetworks() {
+                const statusKey = isAutoTransfer() ? 'data-auto-share-status' : 'data-manual-status';
+
+                $product.html('<option value="">Select a network</option>');
+
+                productOptions.each(function () {
+                    const $option = $(this);
+
+                    if ($option.attr(statusKey) === 'active') {
+                        $product.append($option.clone());
+                    }
+                });
+
+                $('.a2c-network-option').each(function () {
+                    $(this).toggleClass('d-none', $(this).attr(statusKey) !== 'active');
+                });
+
+                $product.val('');
+                $('.a2c-network-option').removeClass('is-active');
+            }
+
+            $(document).on('click', '.a2c-network-option:not(.d-none)', function () {
+                const productId = String($(this).data('product-id'));
+                const exists = $product.find(`option[value="${productId}"]`).length > 0;
+
+                if (!exists) {
+                    showAutoError('This network is unavailable for the selected transfer method.');
+                    return;
+                }
+
+                $('.a2c-network-option').removeClass('is-active');
+                $(this).addClass('is-active');
+                $product.val(productId).trigger('change');
+            });
+
+            $product.on('change', updateSelectedProduct);
+
+            $paymentMethod.on('change', function () {
+                const useBank = this.value
+                    === 'Transfer to Bank Account';
+
+                $bankDetailsDiv.toggle(useBank);
+
+                $bank.prop('required', useBank);
+                $accountNumber.prop('required', useBank);
+                $accountName.prop('required', useBank);
 
                 if (!useBank) {
-                    $('#bank').val('').trigger('change.select2');
-                    $('#account_number, #account_name').val('');
+                    resetBankDetails();
                 }
             });
 
-            $('#amount').on('input', function () {
-                const rate = parseFloat($('#rate').val());
-                const amount = parseFloat(this.value);
-                const min = parseFloat(this.min);
-                const max = parseFloat(this.max);
-                const isValidAmount = Number.isFinite(amount)
-                    && Number.isFinite(rate)
-                    && (!Number.isFinite(min) || amount >= min)
-                    && (!Number.isFinite(max) || amount <= max);
+            $amount.on('input', recalculatePayout);
 
-                if (isValidAmount) {
-                    const receive = amount - ((rate / 100) * amount);
-                    $('#receive').val(receive.toFixed(2));
-                    $('#receive-div, #payment-div').show();
-                    if (isAutoTransfer()) {
-                        $('#payment_method').val('Transfer to Wallet').trigger('change');
-                    }
-                } else {
-                    $('#receive').val('');
-                    $('#payment_method').val('').trigger('change');
-                    $('#receive-div, #payment-div, #bank-details-div').hide();
+            $sharePin.on('input', function () {
+                this.value = this.value
+                    .replace(/\D/g, '')
+                    .slice(0, 8);
+
+                if (autoStage === AUTO_STAGE_PIN) {
+                    const valid = /^\d{4,8}$/.test(this.value);
+
+                    setActionButton(
+                        'Submit PIN and send OTP',
+                        !valid || requestInProgress,
+                        'bx-lock-open-alt'
+                    );
+                }
+
+                clearAutoError();
+            });
+
+            $autoOtp.on('input', function () {
+                this.value = this.value
+                    .replace(/\D/g, '')
+                    .slice(0, 10);
+
+                if (autoStage === AUTO_STAGE_OTP) {
+                    const valid = /^\d{4,10}$/.test(this.value);
+
+                    setActionButton(
+                        'Verify OTP and share airtime',
+                        !valid || requestInProgress,
+                        'bx-bolt-circle'
+                    );
+                }
+
+                clearAutoError();
+            });
+
+            /*
+            |--------------------------------------------------------------------------
+            | Agreement
+            |--------------------------------------------------------------------------
+            */
+
+            $agreement.on('change', function () {
+                if (this.checked) {
+                    $agreementPanel.removeClass('is-required');
                 }
             });
+
+            /*
+            |--------------------------------------------------------------------------
+            | Return to details
+            |--------------------------------------------------------------------------
+            */
+
+            $('#edit-auto-details').on('click', function () {
+                if (requestInProgress) {
+                    return;
+                }
+
+                resetAutoFlow();
+
+                setActionButton(
+                    'Continue to secure transfer',
+                    false,
+                    'bx-bolt-circle'
+                );
+
+                $conversionDetailsPanel[0]?.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+            });
+
+            /*
+            |--------------------------------------------------------------------------
+            | Resend OTP
+            |--------------------------------------------------------------------------
+            */
+
+            $resendOtpButton.on('click', resendOtp);
+
+            /*
+            |--------------------------------------------------------------------------
+            | Initialize
+            |--------------------------------------------------------------------------
+            */
+
+            $('input[name="transfer_mode"]:checked')
+                .trigger('change');
         });
     </script>
 @endsection

@@ -74,22 +74,153 @@
                                     <td>{{ $apiLogs->firstItem() + $loop->index }}</td>
                                     <td><strong>{{ str($log->operation)->replace('_', ' ')->title() }}</strong><small class="d-block text-muted text-truncate" style="max-width:300px">{{ $log->method }} {{ $log->endpoint }}</small></td>
                                     <td>{{ $log->transaction_id ?: '-' }}<small class="d-block text-muted">{{ $log->customer?->user?->email }}</small></td>
-                                    <td><span class="badge badge-light-{{ $log->response_status >= 200 && $log->response_status < 300 ? 'success' : 'danger' }}">{{ $log->response_status ?: 'No response' }}</span></td>
+                                    @php
+                                        $body = is_array($log->response_body)
+                                            ? $log->response_body
+                                            : json_decode($log->response_body ?? '{}', true);
+
+                                        $providerStatus = strtolower(
+                                            (string) data_get($body, 'data.transaction.status', 'failed')
+                                        );
+
+                                        [$badge, $label] = match ($providerStatus) {
+                                            'successful' => ['success', 'Successful'],
+                                            'pending', 'processing', 'initiated' => ['warning', 'Pending'],
+                                            default => ['danger', 'Failed'],
+                                        };
+                                    @endphp
+
+                                    <td>
+                                        <span class="badge badge-light-{{ $badge }}">
+                                            {{ $label }}
+                                        </span>
+
+                                        <small class="d-block text-muted">
+                                            HTTP {{ $log->response_status ?: '-' }}
+                                        </small>
+                                    </td>
                                     <td>{{ $log->duration_ms !== null ? $log->duration_ms . ' ms' : '-' }}</td>
                                     <td>{{ $log->created_at->format('M j, Y') }}<small class="d-block text-muted">{{ $log->created_at->format('g:i:s A') }}</small></td>
-                                    <td class="text-right">
-                                        <details>
-                                            <summary class="btn btn-sm btn-light-secondary">View exchange</summary>
-                                            <div class="card position-absolute mt-50" style="right:2rem;z-index:20;max-width:760px;width:calc(100vw - 4rem)">
-                                                <div class="card-body text-left">
-                                                    @if($log->error)<div class="alert alert-danger">{{ $log->error }}</div>@endif
-                                                    <h6>Request headers</h6><pre class="bg-light p-1 rounded text-wrap">{{ json_encode($log->request_headers, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
-                                                    <h6>Request payload</h6><pre class="bg-light p-1 rounded text-wrap">{{ json_encode($log->request_payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
-                                                    <h6>Response headers</h6><pre class="bg-light p-1 rounded text-wrap">{{ json_encode($log->response_headers, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
-                                                    <h6>Response body</h6><pre class="bg-light p-1 rounded text-wrap">{{ json_encode($log->response_body, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
+                                    <td class="text-left">
+                                        <button
+                                            type="button"
+                                            class="btn btn-sm btn-light-primary"
+                                            data-toggle="modal"
+                                            data-target="#logModal{{ $log->id }}"
+                                        >
+                                            <i class="bx bx-show"></i> View
+                                        </button>
+
+                                        <div
+                                            class="modal fade"
+                                            id="logModal{{ $log->id }}"
+                                            tabindex="-1"
+                                            role="dialog"
+                                            aria-hidden="true"
+                                        >
+                                            <div class="modal-dialog modal-lg modal-dialog-scrollable" role="document">
+                                                <div class="modal-content">
+                                                    <div class="modal-header">
+                                                        <div>
+                                                            <h5 class="modal-title mb-0">
+                                                                {{ str($log->operation)->replace('_', ' ')->title() }}
+                                                            </h5>
+                                                            <small class="text-muted">
+                                                                {{ $log->method }} {{ $log->endpoint }}
+                                                            </small>
+                                                        </div>
+
+                                                        <button
+                                                            type="button"
+                                                            class="close"
+                                                            data-dismiss="modal"
+                                                        >
+                                                            <span>&times;</span>
+                                                        </button>
+                                                    </div>
+
+                                                    <div class="modal-body">
+
+                                                        @if($log->error)
+                                                            <div class="alert alert-danger">
+                                                                {{ $log->error }}
+                                                            </div>
+                                                        @endif
+
+                                                        <div class="row mb-2">
+                                                            <div class="col-md-6">
+                                                                <strong>Transaction</strong><br>
+                                                                {{ $log->transaction_id ?: '-' }}
+                                                            </div>
+
+                                                            <div class="col-md-6">
+                                                                <strong>Customer</strong><br>
+                                                                {{ $log->customer?->user?->email ?? '-' }}
+                                                            </div>
+
+                                                            <div class="col-md-4 mt-1">
+                                                                <strong>Status</strong><br>
+
+                                                                <span class="badge badge-light-{{ $badge }}">
+                                                                    {{ $label }}
+                                                                </span>
+
+                                                                <small class="d-block text-muted">
+                                                                    HTTP {{ $log->response_status ?: '-' }}
+                                                                </small>
+                                                            </div>
+
+                                                            <div class="col-md-4 mt-1">
+                                                                <strong>Duration</strong><br>
+                                                                {{ $log->duration_ms ? $log->duration_ms.' ms' : '-' }}
+                                                            </div>
+
+                                                            <div class="col-md-4 mt-1">
+                                                                <strong>Created</strong><br>
+                                                                {{ $log->created_at->format('M j, Y g:i:s A') }}
+                                                            </div>
+                                                        </div>
+
+                                                        <hr>
+
+                                                        <div class="mb-2">
+                                                            <h6>Request Headers</h6>
+
+                                                            <pre class="bg-light rounded p-2 text-wrap">{{ json_encode($log->request_headers, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
+                                                        </div>
+
+                                                        <div class="mb-2">
+                                                            <h6>Request Payload</h6>
+
+                                                            <pre class="bg-light rounded p-2 text-wrap">{{ json_encode($log->request_payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
+                                                        </div>
+
+                                                        <div class="mb-2">
+                                                            <h6>Response Headers</h6>
+
+                                                            <pre class="bg-light rounded p-2 text-wrap">{{ json_encode($log->response_headers, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
+                                                        </div>
+
+                                                        <div>
+                                                            <h6>Response Body</h6>
+
+                                                            <pre class="bg-light rounded p-2 text-wrap">{{ json_encode($log->response_body, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
+                                                        </div>
+
+                                                    </div>
+
+                                                    <div class="modal-footer">
+                                                        <button
+                                                            type="button"
+                                                            class="btn btn-light-secondary"
+                                                            data-dismiss="modal"
+                                                        >
+                                                            Close
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </details>
+                                        </div>
                                     </td>
                                 </tr>
                             @empty

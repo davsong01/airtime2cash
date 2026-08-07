@@ -23,190 +23,294 @@ class AutoSyncController extends Controller
         return API::where('slug', 'autosync')->firstOrFail();
     }
 
-    public function initiate(Request $request, AutoSyncService $autoSync): JsonResponse
-    {
-        // normalize camelCase payloads from different clients (sharePin -> share_pin)
-        if ($request->has('sharePin') && !$request->has('share_pin')) {
-            $request->merge(['share_pin' => $request->input('sharePin')]);
-        }
 
-        $validated = $request->validate([
-            'product' => ['required', 'integer'],
-            'transfer_mode' => ['required', Rule::in(['auto_share'])],
-            'amount' => ['required', 'numeric', 'gt:0'],
-            'phone' => ['required', 'regex:/^[0-9]{10,15}$/'],
-            'email' => ['required', 'email'],
-            'payment_method' => ['required', Rule::in(['Transfer to Wallet'])],
-            'agreement' => ['accepted'],
-            'share_pin' => ['required', 'digits_between:4,8'],
-        ], [
-            'phone.regex' => 'Enter a valid phone number using digits only.',
-            'payment_method.in' => 'Auto Transfer currently supports wallet payout only.',
-            'share_pin.digits_between' => 'Enter a valid airtime share PIN containing 4 to 8 digits.',
-        ]);
-
-        $customer = $request->user()->customer;
-        $product = Product::whereKey($validated['product'])
-            ->where('type', 'airtime2cash')
-            ->where('status', 'active')
-            ->where('auto_share_status', 'active')
-            ->first();
-
-        if (!$product || !$product->auto_share_product_code) {
-            return response()->json(['message' => 'This network is not configured for Auto Transfer.'], 422);
-        }
-
-        $grossAmount = (float) $validated['amount'];
-        if ($grossAmount < (float) $product->min || $grossAmount > (float) $product->max) {
-            return response()->json(['message' => 'Enter an amount within the configured network limits.'], 422);
-        }
-
-        if (app(TransactionController::class)->bounceBlacklist($validated['phone'], $request->user()->email, $validated['email'])) {
-            return response()->json(['message' => 'This account cannot use Auto Transfer. Please contact support.'], 403);
-        }
-
-        $transactionId = 'A2C-' . $this->generateRequestId();
-        $rate = (float) ($product->auto_share_rate ?? $product->rate);
-
-        try {
-            $response = $autoSync->initiate([
-                'request_ref' => $transactionId,
-                'phone' => $validated['phone'],
-                'product_id' => $product->auto_share_product_code,
-                'amount' => $grossAmount,
-                'sharePin' => $validated['share_pin'],
-            ], [
-                'customer_id' => $customer->id,
-                'transaction_id' => $transactionId,
-            ]);
-
-        } catch (RuntimeException $exception) {
-            return response()->json(['message' => $exception->getMessage()], 422);
-        }
-
-        $providerTransaction = data_get($response, 'data.transaction', []);
-        $providerReference = $providerTransaction['reference'] ?? null;
-        if (!$providerReference) {
-            return response()->json(['message' => 'AutoSync did not return a transaction reference. Please try again.'], 502);
-        }
-        // logger()->info('AutoSync Initiate Response', [
-        //     'transaction_id' => $transactionId,
-        //     'provider_reference' => $providerReference,
-        //     'response' => $response,
-        // ]);
-        $amountCharged = ($rate / 100) * $grossAmount;
-        $transaction = Airtime2CashTransactions::create([
-            'amount_charged' => $amountCharged,
-            'amount_paid' => $grossAmount - $amountCharged,
-            'charge_rate' => $rate,
-            'transfer_mode' => 'auto_share',
-            'product_id' => $product->id,
-            'customer_id' => $customer->id,
-            'type' => 'credit',
-            'transaction_id' => $transactionId,
-            'total_amount' => $grossAmount,
-            'phone_numbers' => $validated['phone'],
-            'payment_method' => 'Transfer to Wallet',
-            'status' => 'pending',
-            'description' => 'Auto Transfer initiated. Awaiting OTP confirmation.',
-            'provider_reference' => $providerReference,
-            'provider_request_ref' => $providerTransaction['request_ref'] ?? $transactionId,
-            'provider_status' => $providerTransaction['status'] ?? 'pending',
-            'provider_response' => json_encode($autoSync->redact($response)),
-        ]);
-
-        return response()->json([
-            'message' => $response['message'] ?? 'OTP sent successfully.',
-            'transaction_id' => $transaction->transaction_id,
-            'phone' => $transaction->phone_numbers,
-        ]);
+    public function query(
+        Airtime2CashTransactions $transaction,
+        string $otp,
+        API $provider
+    ): array {
+        return app(AutoSyncService::class)->complete(
+            transaction: $transaction,
+            otp: $otp,
+            provider: $provider,
+        );
     }
 
-    public function complete(Request $request, AutoSyncService $autoSync, AutoSyncSettlementService $settlement): JsonResponse
-    {
-        $validated = $request->validate([
-            'transaction_id' => ['required', 'string'],
-            'otp' => ['required', 'digits_between:4,10'],
-        ]);
-        
-        $transaction = $this->customerTransaction($request, $validated['transaction_id']);
+    // public function requery($transaction)
+    // {
+    //     $api = $transaction->api;
+    //     $external_reference_id = $transaction->external_reference_id;
+    //     try {
+    //         $url =  $url = $api->live_base_url ."transaction/{$external_reference_id}";
 
-        if ($transaction->status === 'approved') {
-            return response()->json([
-                'message' => 'This Auto Transfer has already been completed.',
-                'redirect' => route('airtime2cash.transaction.status', $transaction->transaction_id),
-            ]);
+    //         $headers = [
+    //             'Content-Type: application/json',
+    //             'Authorization: Bearer ' . $api->api_key,
+    //         ];
+
+    //         $res = $this->basicApiCall($url, [], $headers, 'GET');
+
+    //         return $this->formatResponse($res);
+
+    //     } catch (\Throwable $th) {
+    //         return [
+    //             'status' => 'attention-required',
+    //             'user_status' => 'completed',
+    //             'api_response' => isset($res) ? json_encode($res) : '',
+    //             'description' => 'Transaction completed',
+    //             'message' => $res['message'] ?? null,
+    //             'status_code' => 2,
+    //             'failure_reason' => $th->getMessage().' Line: '.$th->getLine().' File: '.$th->getFile(),
+    //             'extras' => null,
+    //         ];
+    //     }
+
+    //     return $format;
+    // }
+
+    // private function formatResponse($res, $payload=null)
+    // {
+    //     $transaction = $res['data']['transaction'] ?? $res['transaction'];
+
+    //     $status = strtolower($transaction['status'] ?? 'attention-required');
+
+    //     $base = [
+    //         'api_response' => $res,
+    //         'payload' => $payload,
+    //         'extras' => null,
+    //     ];
+
+    //     return match ($status) {
+    //         'successful' => array_merge($base, [
+    //             'status' => 'delivered',
+    //             'user_status' => 'delivered',
+    //             'description' => 'Transaction successful',
+    //             'message' => $res['data']['msg'] ?? null,
+    //             'status_code' => 1,
+    //             'external_reference_id' => $res['data']['transaction']['reference'] ?? null,
+    //         ]),
+
+    //         // 'completed' => array_merge($base, [
+    //         //     'status' => 'delivered',
+    //         //     'user_status' => 'delivered',
+    //         //     'description' => 'Transaction successful',
+    //         //     'message' => $res['data']['msg'] ?? null,
+    //         //     'status_code' => 1,
+    //         // ]),
+
+    //         'pending' => array_merge($base, [
+    //             'status' => 'attention-required',
+    //             'user_status' => 'completed',
+    //             'description' => 'Transaction pending',
+    //             'message' => $res['message'] ?? null,
+    //             'failure_reason' => $res['message'] ?? 'Pending',
+    //             'status_code' => 2,
+    //             'external_reference_id' => $res['data']['transaction']['reference'] ?? null,
+    //         ]),
+
+    //         'failed' => array_merge($base, [
+    //             'status' => 'failed',
+    //             'user_status' => 'failed',
+    //             'description' => 'Transaction failed',
+    //             'message' => $res['message'] ?? null,
+    //             'failure_reason' => $res['message'] ?? 'Unknown Reason',
+    //             'status_code' => 0,
+    //             'external_reference_id' => $res['data']['transaction']['reference'] ?? null,
+    //         ]),
+
+    //         default => array_merge($base, [
+    //             'status' => 'attention-required',
+    //             'user_status' => 'completed',
+    //             'description' => 'Transaction requires attention',
+    //             'message' => $res['message'] ?? null,
+    //             'status_code' => 2,
+    //             'external_reference_id' => $res['data']['transaction']['reference'] ?? null,
+    //         ]),
+    //     };
+    // }
+
+    // public function balance($api, $no_format = null)
+    // {
+    //     try {
+    //         $url = $api->live_base_url;
+    //         $url = "https://simhosting.ogdams.ng/api/v1/get/balances";
+
+    //         $headers = [
+    //             'Content-Type: application/json',
+    //             'Authorization: Bearer ' . $api->api_key,
+    //         ];
+
+
+    //         $curl = curl_init();
+
+    //         curl_setopt_array($curl, array(
+    //             CURLOPT_URL => 'https://simhosting.ogdams.ng/api/v1/get/balances',
+    //             CURLOPT_RETURNTRANSFER => true,
+    //             CURLOPT_ENCODING => '',
+    //             CURLOPT_MAXREDIRS => 10,
+    //             CURLOPT_TIMEOUT => 0,
+    //             CURLOPT_FOLLOWLOCATION => true,
+    //             CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+    //             CURLOPT_CUSTOMREQUEST => 'GET',
+    //             CURLOPT_HTTPHEADER => array(
+    //                 "Authorization: Bearer {$api->api_key}",
+    //             ),
+    //         ));
+
+    //         $response = curl_exec($curl);
+
+    //         curl_close($curl);
+
+    //         $response = json_decode($response, true);
+
+    //         if (isset($response['code']) && $response['code'] == 200 && $response['status'] == true) {
+    //             $balance = '<br>';
+
+    //             foreach($response['data']['msg'] as $key=>$value){
+    //                 if($value > 0) $balance .= $key . ' : '. $value .'<br>';
+    //             }
+
+    //             $status = 'success';
+    //             $status_code = 1;
+
+    //             $api->update([
+    //                 'balance' => $response['data']['msg']['mainBalance'] ?? null,
+    //             ]);
+    //         } else {
+    //             $status = 'failed';
+    //             $status_code = 0;
+    //             $balance = null;
+    //         }
+
+    //         $format = [
+    //             'status' => $status,
+    //             'balance' => $balance,
+    //             'status_code' => $status_code,
+    //         ];
+    //     } catch (\Throwable $th) {
+    //         $format = [
+    //             'status' => 'failed',
+    //             'status_code' => 0,
+    //             'balance' => $th->getMessage() . '. File: ' . $th->getFile() . '. Line:' . $th->getLine(),
+    //         ];
+    //     }
+
+    //     if (isset($no_format)) {
+    //         $format = [
+    //             'status' => $status,
+    //             'balance' => $response['data']['msg']['mainBalance'] ?? null,
+    //             'status_code' => $status_code,
+    //         ];
+    //     }
+
+    //     return $format;
+    // }
+
+    public function verifyWebhookSignature(Request $request)
+    {
+        $reference = $request->input('transaction.reference');
+
+        if (!$reference || !$request->has('hash')) {
+            return ['status' => false, 'message' => 'Missing reference or hash'];
         }
 
-        try {
-            return Cache::lock('autosync-complete:' . $transaction->id, 45)->block(2, function () use ($autoSync, $settlement, $transaction, $validated) {
-                $response = $autoSync->complete($transaction->provider_reference, $validated['otp'], [
-                    'customer_id' => $transaction->customer_id,
-                    'transaction_id' => $transaction->transaction_id,
-                    'provider_reference' => $transaction->provider_reference,
-                    'amount' => $transaction->total_amount,
-                ]);
-                $providerTransaction = data_get($response, 'data.transaction', []);
-                $providerStatus = $providerTransaction['status'] ?? null;
+        $hash = hash('sha256', sprintf('%s:%s', '1234', $reference));
 
-                if ($providerStatus !== 'successful') {
-                    $transaction->update([
-                        'provider_status' => $providerStatus ?? 'pending',
-                        'provider_response' => json_encode($autoSync->redact($response)),
-                        'description' => $response['message'] ?? 'Auto Transfer is still being processed.',
-                    ]);
+        if (!hash_equals($request->input('hash'), $hash)) {
+            return ['status' => false, 'message' => 'Invalid signature'];
+        }
 
-                    return response()->json(['message' => $response['message'] ?? 'Auto Transfer is still being processed.'], 422);
+        return [
+            'status' => true,
+            'reference' => $reference
+        ];
+    }
+
+    public function analyzeWebhookResponse($webhook){
+        $data = json_decode($webhook->request_payload, true);
+        return $this->formatResponse($data);
+    }
+
+    public function dummySuccess(){
+        $response = '{
+        "status": "ok",
+        "message": "Request successfully",
+        "data": {
+            "transaction": {
+            "id": 95,
+            "user_id": 1,
+            "user_product_id": 6,
+            "user_variation_id": null,
+            "reference": "9bdbe400-76da-4d12-bccc-90d040704dc8",
+            "request_ref": "pZxmX4qjpOLRCx8d6jRc",
+            "type": "MTN Gifting",
+            "details": "MTN Gifting 15GB Weekly Digital Bundle sent to 07047341144",
+            "amount": "2000.00",
+            "status": "successful",
+            "request_data": {
+                "phone": "07047341144",
+                "product_id": 2,
+                "variation_code": "NACT_NG_Data_2003",
+                "request_ref": "pZxmX4qjpOLRCx8d6jRc"
+            },
+            "created_at": "2024-04-21T08:14:13.000000Z",
+            "updated_at": "2024-04-21T08:14:29.000000Z",
+            "gateway": {
+                "id": 7,
+                "name": "MTN Gateway",
+                "status": "connected",
+                "phone": "08134679853",
+                "is_site": false,
+                "created_at": "2024-04-12T06:35:38.000000Z"
+            },
+            "logs": [
+                {
+                "id": 604,
+                "user_id": 1,
+                "ip_address": "69.57.163.195",
+                "logger_type": "App\\\\Models\\\\Transaction",
+                "logger_id": 95,
+                "message": "",
+                "data": {
+                    "name": "Unknown",
+                    "subscriptionId": "",
+                    "productId": "416",
+                    "productName": "15GB Weekly Digital Bundle",
+                    "rechargeType": "Normal",
+                    "phoneNumber": "2347047341144",
+                    "traceId": "UgeFwW6dVvcEq3JH7HL79pQZ5N7mQR",
+                    "currency": "NGN",
+                    "feeBearer": "M",
+                    "amount": 2000,
+                    "autoRenew": false
+                },
+                "is_admin_only": false,
+                "created_at": "2024-04-21T08:14:20.000000Z",
+                "updated_at": "2024-04-21T08:14:20.000000Z"
+                },
+                {
+                "id": 605,
+                "user_id": 1,
+                "ip_address": "69.57.163.195",
+                "logger_type": "App\\\\Models\\\\Transaction",
+                "logger_id": 95,
+                "message": "",
+                "data": {
+                    "Pin": "1234",
+                    "TranId": "54020240421091419869719",
+                    "PhoneNumber": "8134679853"
+                },
+                "is_admin_only": false,
+                "created_at": "2024-04-21T08:14:28.000000Z",
+                "updated_at": "2024-04-21T08:14:28.000000Z"
                 }
-
-                $completedAmount = (float) ($providerTransaction['amount'] ?? $transaction->total_amount);
-                $settled = $settlement->settle($transaction, $completedAmount, $autoSync->redact($response));
-
-                return response()->json([
-                    'message' => 'Airtime shared successfully. Your wallet has been credited.',
-                    'redirect' => route('airtime2cash.transaction.status', $settled->transaction_id),
-                ]);
-            });
-        } catch (RuntimeException $exception) {
-            return response()->json(['message' => $exception->getMessage()], 422);
-        } catch (Throwable $exception) {
-            report($exception);
-            return response()->json(['message' => 'The transfer could not be completed right now. Please try again.'], 503);
+            ]
+            }
         }
-    }
-
-    public function resendOtp(Request $request, AutoSyncService $autoSync): JsonResponse
-    {
-        $validated = $request->validate(['transaction_id' => ['required', 'string']]);
-        $transaction = $this->customerTransaction($request, $validated['transaction_id']);
-
-        if ($transaction->status !== 'pending') {
-            return response()->json(['message' => 'OTP can only be resent for a pending Auto Transfer.'], 422);
         }
+        ';
 
-        try {
-            $response = $autoSync->resendOtp($transaction->provider_reference, [
-                'customer_id' => $transaction->customer_id,
-                'transaction_id' => $transaction->transaction_id,
-            ]);
-        } catch (RuntimeException $exception) {
-            return response()->json(['message' => $exception->getMessage()], 422);
-        }
-
-        $transaction->update([
-            'provider_status' => data_get($response, 'data.transaction.status', 'pending'),
-            'provider_response' => json_encode($autoSync->redact($response)),
-        ]);
-
-        return response()->json(['message' => $response['message'] ?? 'OTP sent successfully.']);
-    }
-
-    private function customerTransaction(Request $request, string $transactionId): Airtime2CashTransactions
-    {
-        return Airtime2CashTransactions::where('transaction_id', $transactionId)
-            ->where('customer_id', $request->user()->customer->id)
-            ->where('transfer_mode', 'auto_share')
-            ->firstOrFail();
+        return $response;
     }
 
 }

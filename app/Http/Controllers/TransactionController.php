@@ -2,30 +2,38 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\PaymentProcessors\MonnifyController;
+use App\Http\Controllers\PaymentProcessors\SquadController;
+use App\Http\Controllers\Providers\AutoSyncController;
+use App\Http\Controllers\WalletController;
+use App\Models\Airtime2CashTransactions;
+use App\Models\API;
 use App\Models\Bank;
-use App\Models\User;
-use App\Models\Wallet;
-use App\Models\Product;
-use App\Models\Category;
-use App\Models\Discount;
 use App\Models\BillerLog;
 use App\Models\BlackList;
-use App\Models\Variation;
-use Illuminate\Http\Request;
+use App\Models\Category;
+use App\Models\Discount;
 use App\Models\PaymentGateway;
-use App\Models\TransactionLog;
-use App\Services\ExcelService;
+use App\Models\Product;
 use App\Models\ReferralEarning;
-use Barryvdh\DomPDF\Facade\Pdf;
-use Illuminate\Support\Facades\DB;
 use App\Models\ReservedAccountCallback;
-use Illuminate\Support\Facades\Session;
-use App\Models\Airtime2CashTransactions;
-use Illuminate\Support\Facades\Validator;
-use App\Http\Controllers\WalletController;
+use App\Models\TransactionLog;
+use App\Models\User;
+use App\Models\Variation;
+use App\Models\Wallet;
+use App\Services\AutoSyncService;
+use App\Services\ExcelService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Contracts\Database\Query\Builder;
-use App\Http\Controllers\PaymentProcessors\SquadController;
-use App\Http\Controllers\PaymentProcessors\MonnifyController;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
+use RuntimeException;
+use Throwable;
 
 class TransactionController extends Controller
 {
@@ -318,72 +326,198 @@ class TransactionController extends Controller
                 ['transaction_id' => $transaction_id],
                 $transaction
             );
-        } catch (\Throwable $th) {
-            \Log::error(['Transaction Error' => 'Message: ' . $th->getMessage() . ' File: ' . $th->getFile() . ' Line: ' . $th->getLine()]);
-            return back()->with('error', 'An error occured, please try again later');
+
+            if ($request->input('transfer_mode') === 'auto_share') {
+                $providerId = getSettings()?->auto_share_provider_id;
+                $provider = API::query()->find($providerId);
+
+                if (! $provider) {
+                    return response()->json([
+                        'status' => false,
+                        'message' => 'The auto-transfer provider is not configured.',
+                    ], 422);
+                }
+
+                $log->update(['provider_id' => $providerId]);
+
+                if ($provider->slug == 'autosync') {
+                    $response = (new AutoSyncService())->initiate(
+                        $log,
+                        $provider
+                    );
+
+                    return response()->json([
+                        'status' => true,
+                        'message' => $response['message'] ?? 'Share PIN submitted successfully. Enter the OTP sent to your phone.',
+                        'data' => [
+                            'transaction_id' => $log->transaction_id,
+                            'phone' => $log->phone ?? $request->input('phone'),
+                            'provider_response' => $response,
+                        ],
+                    ]);
+                }else{
+                    return response()->json([
+                        'status' => false,
+                        'message' => 'The selected auto-transfer provider is not supported.',
+                    ], 422);
+                }
+            }
+
+              // Log Transaction Email
+            $subject = "Airtime2Cash Transaction Alert";
+
+            $body = '<p>Hello ' . e(auth()->user()->name) . ',</p>';
+            $body .= '<p style="line-height: 2;">You have just indicated a request to convert your airtime to cash on ' . e(config('app.name')) . '.<br>
+                Please find below the details of the transaction:</p>';
+
+                        $body .= '
+                <p style="line-height: 1.8;">
+                <strong>Amount Charged:</strong> ' . e(getSettings()->currency) . number_format($log->amount_charged, 2) . '<br>
+                <strong>Amount to Receive:</strong> ' . e(getSettings()->currency) . number_format($log->amount_paid, 2) . '<br>
+                <strong>Charge Rate:</strong> ' . number_format($log->charge_rate) . '%<br>
+                <strong>Transfer Method:</strong> ' . e($log->transfer_mode === 'auto_share' ? 'Auto Transfer' : 'Manual Transfer') . '<br>
+                <strong>Total Credit to transfer:</strong> ' . e(getSettings()->currency) . number_format($log->total_amount, 2) . '<br>
+                <strong>Phone Numbers:</strong> ' . e($log->phone_numbers) . '<br>
+                <strong>Transaction ID:</strong> ' . e($log->transaction_id) . '<br>
+                <strong>Network:</strong> ' . e($product->name) . '<br>
+                <strong>Payment Method:</strong> ' . e($log->payment_method) . '<br>
+                <strong>Transaction Date:</strong> ' . date("M jS, Y g:iA", strtotime($log->created_at)) . '<br>';
+
+            if ($log->payment_method == 'Transfer to Bank Account') {
+                $body .= '
+                <strong>Bank Name:</strong> ' . e($log->bank_name) . '<br>
+                <strong>Account Name:</strong> ' . e($log->account_name) . '<br>
+                <strong>Account Number:</strong> ' . e($log->account_number) . '<br>';
+            }
+
+            $body .= '<br>Warm Regards,<br>' . e(config('app.name')) . '.</p>';
+
+            $email = $request->email;
+            logEmails($email, $subject, $body);
+
+            // build formatted plain-text message for WhatsApp/Telegram
+            $message = "Hello Admin, I want to convert Airtime to cash on " . config("app.name") . ". Please find below details of the transaction:\n\n" .
+                "*Name:* " . auth()->user()->name . "\n" .
+                "*Amount Charged:* " . getSettings()->currency . number_format($log->amount_charged, 2) . "\n" .
+                "*Amount to Receive:* " . getSettings()->currency . number_format($log->amount_paid, 2) . "\n" .
+                "*Charge Rate:* " . number_format($log->charge_rate) . "%\n" .
+                "*Transfer Method:* " . ($log->transfer_mode === 'auto_share' ? 'Auto Transfer' : 'Manual Transfer') . "\n" .
+                "*Total Credit to transfer:* " . getSettings()->currency . number_format($log->total_amount, 2) . "\n" .
+                "*Phone Numbers:* " . $log->phone_numbers . "\n" .
+                "*Transaction ID:* " . $log->transaction_id . "\n" .
+                "*Network:* " . $product->name . "\n" .
+                "*Payment Method:* " . $log->payment_method . "\n" .
+                "*Transaction Date:* " . date("M jS, Y g:iA", strtotime($log->created_at)) . "\n";
+
+            if ($log->payment_method == 'Transfer to Bank Account') {
+                $message .= "\n*Bank Name:* " . $log->bank_name .
+                    "\n*Account Name:* " . $log->account_name .
+                    "\n*Account Number:* " . $log->account_number;
+            }
+
+            // generate correct link
+            if (getSettings()->a2cash_chat_engine == 'telegram') {
+                $chatLink = "https://t.me/" . ltrim(getSettings()->telegram_username, '@') . "?text=" . urlencode($message);
+            } else {
+                $chatLink = "https://api.whatsapp.com/send?phone=" . getSettings()->whatsapp_number . "&text=" . urlencode($message);
+            }
+
+            return redirect()->away($chatLink);
+        } catch (\Throwable $exception) {
+            Log::error('Airtime-to-cash transaction failed.', [
+                'message' => $exception->getMessage(),
+                'file' => $exception->getFile(),
+                'line' => $exception->getLine(),
+                'transaction_id' => $transaction_id,
+                'user_id' => auth()->id(),
+            ]);
+
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => $exception->getMessage() ?? 'The transaction could not be completed. Please try again later.',
+                ], 500);
+            }
+
+            return back()
+                ->withInput()
+                ->with('error', 'The transaction could not be completed. Please try again later.');
         }
-
-        // Log Transaction Email
-        $subject = "Airtime2Cash Transaction Alert";
-
-        $body = '<p>Hello ' . e(auth()->user()->name) . ',</p>';
-        $body .= '<p style="line-height: 2;">You have just indicated a request to convert your airtime to cash on ' . e(config('app.name')) . '.<br>
-Please find below the details of the transaction:</p>';
-
-        $body .= '
-<p style="line-height: 1.8;">
-<strong>Amount Charged:</strong> ' . e(getSettings()->currency) . number_format($log->amount_charged, 2) . '<br>
-<strong>Amount to Receive:</strong> ' . e(getSettings()->currency) . number_format($log->amount_paid, 2) . '<br>
-<strong>Charge Rate:</strong> ' . number_format($log->charge_rate) . '%<br>
-<strong>Transfer Method:</strong> ' . e($log->transfer_mode === 'auto_share' ? 'Auto Transfer' : 'Manual Transfer') . '<br>
-<strong>Total Credit to transfer:</strong> ' . e(getSettings()->currency) . number_format($log->total_amount, 2) . '<br>
-<strong>Phone Numbers:</strong> ' . e($log->phone_numbers) . '<br>
-<strong>Transaction ID:</strong> ' . e($log->transaction_id) . '<br>
-<strong>Network:</strong> ' . e($product->name) . '<br>
-<strong>Payment Method:</strong> ' . e($log->payment_method) . '<br>
-<strong>Transaction Date:</strong> ' . date("M jS, Y g:iA", strtotime($log->created_at)) . '<br>';
-
-        if ($log->payment_method == 'Transfer to Bank Account') {
-            $body .= '
-<strong>Bank Name:</strong> ' . e($log->bank_name) . '<br>
-<strong>Account Name:</strong> ' . e($log->account_name) . '<br>
-<strong>Account Number:</strong> ' . e($log->account_number) . '<br>';
-        }
-
-        $body .= '<br>Warm Regards,<br>' . e(config('app.name')) . '.</p>';
-
-        $email = $request->email;
-        logEmails($email, $subject, $body);
-
-        // build formatted plain-text message for WhatsApp/Telegram
-        $message = "Hello Admin, I want to convert Airtime to cash on " . config("app.name") . ". Please find below details of the transaction:\n\n" .
-            "*Name:* " . auth()->user()->name . "\n" .
-            "*Amount Charged:* " . getSettings()->currency . number_format($log->amount_charged, 2) . "\n" .
-            "*Amount to Receive:* " . getSettings()->currency . number_format($log->amount_paid, 2) . "\n" .
-            "*Charge Rate:* " . number_format($log->charge_rate) . "%\n" .
-            "*Transfer Method:* " . ($log->transfer_mode === 'auto_share' ? 'Auto Transfer' : 'Manual Transfer') . "\n" .
-            "*Total Credit to transfer:* " . getSettings()->currency . number_format($log->total_amount, 2) . "\n" .
-            "*Phone Numbers:* " . $log->phone_numbers . "\n" .
-            "*Transaction ID:* " . $log->transaction_id . "\n" .
-            "*Network:* " . $product->name . "\n" .
-            "*Payment Method:* " . $log->payment_method . "\n" .
-            "*Transaction Date:* " . date("M jS, Y g:iA", strtotime($log->created_at)) . "\n";
-
-        if ($log->payment_method == 'Transfer to Bank Account') {
-            $message .= "\n*Bank Name:* " . $log->bank_name .
-                "\n*Account Name:* " . $log->account_name .
-                "\n*Account Number:* " . $log->account_number;
-        }
-
-        // generate correct link
-        if (getSettings()->a2cash_chat_engine == 'telegram') {
-            $chatLink = "https://t.me/" . ltrim(getSettings()->telegram_username, '@') . "?text=" . urlencode($message);
-        } else {
-            $chatLink = "https://api.whatsapp.com/send?phone=" . getSettings()->whatsapp_number . "&text=" . urlencode($message);
-        }
-
-        return redirect()->away($chatLink);
     }
+
+    public function resendOtp(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'transaction_id' => ['required', 'string'],
+        ]);
+
+
+        $transaction = Airtime2CashTransactions::where('transaction_id', $validated['transaction_id'])->firstOrFail();
+
+        if ($transaction->status !== 'pending') {
+            return response()->json([
+                'status' => false,
+                'message' => 'OTP can only be resent for a pending Auto Transfer.',
+            ], 422);
+        }
+
+        if (blank($transaction->provider_request_ref)) {
+            return response()->json([
+                'status' => false,
+                'message' => 'The provider transaction reference is missing.',
+            ], 422);
+        }
+
+        try {
+            $provider = API::query()->find(
+                $transaction->provider_id ?: getSettings()?->auto_share_provider_id
+            );
+
+            if (! $provider) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'The auto-transfer provider is not configured.',
+                ], 422);
+            }
+
+            $response = match ($provider->slug) {
+                'autosync' => app(AutoSyncService::class)->resendOtp(
+                    $transaction,
+                    $provider
+                ),
+                default => throw new RuntimeException(
+                    "Auto-transfer provider '{$provider->slug}' does not support OTP resend."
+                ),
+            };
+
+            return response()->json([
+                'status' => true,
+                'message' => $response['message'] ?? 'OTP resent successfully.',
+                'data' => [
+                    'transaction_id' => $transaction->transaction_id,
+                    'phone' => $transaction->phone_numbers,
+                    'provider_response' => $response,
+                ],
+            ]);
+        } catch (RuntimeException $exception) {
+            return response()->json([
+                'status' => false,
+                'message' => $exception->getMessage(),
+            ], 422);
+        } catch (Throwable $exception) {
+            Log::error('Auto Transfer OTP resend failed.', [
+                'message' => $exception->getMessage(),
+                'transaction_id' => $transaction->transaction_id,
+                'customer_id' => $transaction->customer_id,
+            ]);
+
+            return response()->json([
+                'status' => false,
+                'message' => 'The OTP could not be resent. Please try again later.',
+            ], 500);
+        }
+    }
+
 
     public function initializeWalletToBankTransaction(Request $request, Product $product)
     {
@@ -647,6 +781,171 @@ Please find below the details of the transaction:</p>';
         }
 
         return $transaction;
+    }
+
+    public function processAirtime2CashTransaction(Request $request): JsonResponse
+    {
+        $transaction = Airtime2CashTransactions::with(['product', 'provider', 'customer.user'])
+            ->where('transaction_id', $request->transaction_id)
+            ->firstOrFail();
+
+        $provider = $transaction->provider;
+
+        if (! $provider) {
+            return response()->json([
+                'status' => false,
+                'message' => 'The transaction provider is not configured.',
+            ], 422);
+        }
+
+        $providerController = match ($provider->slug) {
+            'autosync' => app(AutoSyncController::class),
+            default => null,
+        };
+
+        if (! $providerController) {
+            return response()->json([
+                'status' => false,
+                'message' => "Unsupported provider: {$provider->slug}",
+            ], 422);
+        }
+
+        try {
+            $providerResponse = $providerController->query(
+                transaction: $transaction,
+                otp: $request->string('otp')->toString(),
+                provider: $provider
+            );
+
+            $providerStatus = strtolower((string) data_get(
+                $providerResponse,
+                'data.transaction.status',
+                'failed'
+            ));
+
+            $statusCode = match ($providerStatus) {
+                'successful' => 1,
+                'pending', 'processing', 'initiated' => 2,
+                default => 0,
+            };
+
+            DB::beginTransaction();
+
+            $transaction = Airtime2CashTransactions::with('customer.user')
+                ->whereKey($transaction->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            // Only prevents duplicate wallet credit; provider response determines success.
+            $alreadySettled = $transaction->status === 'successful';
+
+            if ($statusCode === 1 && ! $alreadySettled && (float) $transaction->amount_paid > 0) {
+                $user = $transaction->customer->user;
+                $wallet = new WalletController();
+                $balanceBefore = (float) $user->fresh()->customer->wallet_balance;
+                $balanceAfter = $balanceBefore + (float) $transaction->amount_paid;
+
+                $wallet->logWallet([
+                    'customer_id' => $transaction->customer_id,
+                    'type' => 'credit',
+                    'total_amount' => (float) $transaction->amount_paid,
+                    'transaction_id' => $transaction->transaction_id,
+                    'reason' => 'Airtime-to-cash conversion',
+                    'balance_after' => $balanceAfter,
+                ]);
+
+                $wallet->updateCustomerWallet(
+                    $user,
+                    (float) $transaction->amount_paid,
+                    'credit'
+                );
+            }
+
+            $transaction->update([
+                'provider_status' => $providerStatus,
+                'bank_transfer_api_response' => json_encode($providerResponse, JSON_THROW_ON_ERROR),
+                'status' => match ($statusCode) {
+                    1 => 'successful',
+                    2 => 'pending',
+                    default => 'failed',
+                },
+
+                'decline_reason' => $statusCode === 0
+                    ? ($providerResponse['message'] ?? data_get($providerResponse, 'data.transaction.details'))
+                    : null,
+                
+                'completed_at' => $statusCode === 1
+                    ? ($transaction->completed_at ?? now())
+                    : $transaction->completed_at,
+            ]);
+
+            DB::commit();
+
+            if ($statusCode === 1) {
+                return response()->json([
+                    'status' => true,
+                    'transaction_status' => 'successful',
+                    'message' => $providerResponse['message'] ?? 'Airtime conversion completed successfully.',
+                    'redirect' => route('customer.airtime2cash.transaction.history'),
+                    'data' => [
+                        'transaction_id' => $transaction->transaction_id,
+                        'provider_status' => $providerStatus,
+                    ],
+                ]);
+            }
+
+            if ($statusCode === 2) {
+                return response()->json([
+                    'status' => true,
+                    'transaction_status' => 'pending',
+                    'message' => $providerResponse['message']
+                        ?? 'Your airtime conversion is pending. Please do not retry while it is being processed.',
+                    'reset_flow' => true,
+                    'data' => [
+                        'transaction_id' => $transaction->transaction_id,
+                        'provider_status' => $providerStatus,
+                    ],
+                ], 202);
+            }
+
+            return response()->json([
+                'status' => false,
+                'transaction_status' => 'failed',
+                'message' => $providerResponse['message']
+                    ?? data_get($providerResponse, 'data.transaction.details')
+                    ?? 'The airtime conversion could not be completed.',
+                'data' => [
+                    'transaction_id' => $transaction->transaction_id,
+                    'provider_status' => $providerStatus,
+                ],
+            ], 422);
+        } catch (Throwable $exception) {
+            if (DB::transactionLevel() > 0) {
+                DB::rollBack();
+            }
+
+            Log::error('Airtime-to-cash settlement failed.', [
+                'message' => $exception->getMessage(),
+                'transaction_id' => $transaction->transaction_id,
+                'provider' => $provider->slug,
+            ]);
+
+            return response()->json([
+                'status' => false,
+                'message' => $exception->getMessage(),
+            ], 422);
+        }
+    }
+
+    private function resolveWalletAction(int $statusCode, Airtime2CashTransactions $transaction): string
+    {
+        if ($statusCode !== 1) {
+            return 'none';
+        }
+
+        return $transaction->payment_method === 'Transfer to Wallet'
+            ? 'credit'
+            : 'none';
     }
 
     public function verify(Request $request, $admin = null)
@@ -1801,7 +2100,7 @@ Please find below the details of the transaction:</p>';
 
         $transferAmount = (float) $amount
             - (float) env('BANK_TRANSFER_CHARGES', 0);
-            
+
         $request_data = [
             'token' => $token,
             'bank_code' => $bank_code,
