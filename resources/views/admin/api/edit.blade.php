@@ -44,6 +44,11 @@
                                                         <input type="text" class="form-control" id="name" name="name" value="{{ $api->name ?? old('name') }}" placeholder="Enter name" required>
                                                     </fieldset>
                                                     <fieldset class="form-group">
+                                                        <label for="slug">Slug</label>
+                                                        <input type="text" class="form-control" name="slug" value="{{ $api->slug ?? old('slug') }}" placeholder="Enter slug" id="slug" required>
+                                                    </fieldset>
+
+                                                    <fieldset class="form-group">
                                                         <label for="warning_threshold_status">Warning Threshold Status</label>
                                                         <select class="form-control" name="warning_threshold_status" id="warning_threshold_status" required>
                                                             <option value="">Select</option>
@@ -73,7 +78,7 @@
                                                             <option value="inactive" {{ $api->status == 'inactive' ? 'selected' : ''}}>InActive</option>
                                                         </select>
                                                     </fieldset>
-                                                    
+
                                                     <fieldset class="form-group">
                                                         <label for="api_key">API Key</label>
                                                         <input type="text" class="form-control" name="api_key" value="{{ $api->api_key }}" placeholder="Enter api key" id="api_key">
@@ -89,7 +94,7 @@
                                                 </div>
                                                 <div class="col-md-12">
                                                 <button class="btn btn-primary" type="submit">Update</button>
-    
+
                                                 </div>
                                             </div>
                                         </form>
