@@ -6,13 +6,15 @@ use App\Http\Controllers\Controller;
 use App\Models\Airtime2CashTransactions;
 use App\Models\API;
 use App\Models\AutoSyncApiLog;
+use App\Services\ProviderUtilityService;
+use GuzzleHttp\Psr7\Response as GuzzleResponse;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use RuntimeException;
-use GuzzleHttp\Psr7\Response as GuzzleResponse;
+use Throwable;
 
 
 class AutoSyncService
@@ -20,7 +22,7 @@ class AutoSyncService
     public function initiate(Airtime2CashTransactions $transaction, API $provider): array
     {
         $productName = strtolower($transaction->product->name);
-        
+
         $payload = [
             'request_ref' => $transaction->transaction_id,
             'phone' => $transaction->phone_numbers,
@@ -168,55 +170,6 @@ class AutoSyncService
         $startedAt = microtime(true);
 
         try {
-            // if (env('ENT') === 'local') {
-            //     $dummyStatus = strtolower((string) env('AUTOSYNC_DUMMY_STATUS', 'successful'));
-            //     $dummyHttpStatus = (int) env('AUTOSYNC_DUMMY_HTTP_STATUS', 200);
-
-            //     $message = match ($dummyStatus) {
-            //         'successful' => 'Transaction successful',
-            //         'pending', 'processing', 'initiated' => 'Transaction is pending. Please do not retry while it is being processed.',
-            //         default => 'Transaction failed',
-            //     };
-
-            //     $data = [
-            //         'status' => $dummyHttpStatus >= 200 && $dummyHttpStatus < 300 ? 'ok' : 'error',
-            //         'message' => $message,
-            //         'data' => [
-            //             'transaction' => [
-            //                 'reference' => $transaction->provider_request_ref,
-            //                 'request_ref' => $transaction->transaction_id,
-            //                 'type' => ($transaction->product?->name ?? 'Airtime').' Airtime to Cash',
-            //                 'details' => $message,
-            //                 'amount' => number_format((float) $transaction->total_amount, 2, '.', ''),
-            //                 'status' => $dummyStatus,
-            //                 'request_data' => [
-            //                     'phone' => $transaction->phone_numbers,
-            //                     'amount' => (float) $transaction->total_amount,
-            //                     'request_ref' => $transaction->transaction_id,
-            //                 ],
-            //                 'created_at' => now()->toISOString(),
-            //                 'updated_at' => now()->toISOString(),
-            //             ],
-            //         ],
-            //     ];
-
-            //     $response = new Response(
-            //         new GuzzleResponse(
-            //             $dummyHttpStatus,
-            //             ['Content-Type' => 'application/json'],
-            //             json_encode($data, JSON_THROW_ON_ERROR)
-            //         )
-            //     );
-            // } else {
-            //     $response = Http::withHeaders($headers)
-            //         ->asJson()
-            //         ->connectTimeout(10)
-            //         ->timeout(40)
-            //         ->post($endpoint, $payload);
-
-            //     $data = $response->json();
-            // }
-
             $response = Http::withHeaders($headers)
                 ->asJson()
                 ->connectTimeout(10)
@@ -270,6 +223,11 @@ class AutoSyncService
                 ? ($transaction->completed_at ?? now())
                 : $transaction->completed_at,
         ]);
+
+        if($providerStatus == 'successful'){
+            $this->balance($provider);
+            app(ProviderUtilityService::class)->sendWarningEmail($provider);
+        }
 
         if (! $response->successful() || ($data['status'] ?? null) !== 'ok') {
             throw new RuntimeException(
@@ -409,6 +367,198 @@ class AutoSyncService
         }
 
         return $data;
+    }
+
+    public function settle(Airtime2CashTransactions $transaction, float $completedAmount, array $providerResponse): Airtime2CashTransactions
+    {
+        if ($completedAmount <= 0 || $completedAmount > (float) $transaction->total_amount) {
+            throw new RuntimeException('AutoSync returned an invalid completed amount.');
+        }
+
+        return DB::transaction(function () use ($transaction, $completedAmount, $providerResponse) {
+            $lockedTransaction = Airtime2CashTransactions::whereKey($transaction->id)->lockForUpdate()->firstOrFail();
+            if ($lockedTransaction->status === 'approved') {
+                return $lockedTransaction;
+            }
+
+            if ($lockedTransaction->transfer_mode !== 'auto_share' || $lockedTransaction->payment_method !== 'Transfer to Wallet') {
+                throw new RuntimeException('This transaction cannot be settled automatically.');
+            }
+
+            $customer = $lockedTransaction->customer()->lockForUpdate()->firstOrFail();
+            $amountCharged = ((float) $lockedTransaction->charge_rate / 100) * $completedAmount;
+            $amountPaid = $completedAmount - $amountCharged;
+
+            Wallet::create([
+                'customer_id' => $customer->id,
+                'amount' => $amountPaid,
+                'type' => 'credit',
+                'transaction_id' => $lockedTransaction->transaction_id,
+                'reason' => 'Auto Airtime2Cash Payment',
+                'payment_method' => 'wallet',
+            ]);
+
+            $customer->increment('wallet', $amountPaid);
+            $lockedTransaction->update([
+                'amount_charged' => $amountCharged,
+                'amount_paid' => $amountPaid,
+                'total_amount' => $completedAmount,
+                'status' => 'approved',
+                'provider_status' => 'successful',
+                'provider_response' => json_encode($providerResponse),
+                'description' => 'Auto Transfer completed and wallet credited automatically.',
+                'completed_at' => now(),
+            ]);
+
+            return $lockedTransaction->fresh();
+        });
+    }
+
+    public function process(AutoSyncWebhook $webhook, ?int $resolvedBy = null): AutoSyncWebhook
+    {
+        $webhook->refresh();
+        if (!$webhook->signature_valid) {
+            throw new RuntimeException('This webhook has an invalid AutoSync signature.');
+        }
+
+        if ($webhook->processing_status === 'processed') {
+            return $webhook;
+        }
+
+        $webhook->update([
+            'processing_status' => 'processing',
+            'attempts' => $webhook->attempts + 1,
+            'last_error' => null,
+        ]);
+
+        try {
+            $payload = $webhook->payload;
+            $providerTransaction = data_get($payload, 'transaction', []);
+            $transaction = Airtime2CashTransactions::where(function ($query) use ($webhook) {
+                if ($webhook->provider_reference) {
+                    $query->where('provider_reference', $webhook->provider_reference);
+                }
+                if ($webhook->request_ref) {
+                    $method = $webhook->provider_reference ? 'orWhere' : 'where';
+                    $query->{$method}('provider_request_ref', $webhook->request_ref)
+                        ->orWhere('transaction_id', $webhook->request_ref);
+                }
+            })->first();
+
+            if (!$transaction) {
+                throw new RuntimeException('No local Airtime2Cash transaction matches this webhook.');
+            }
+
+            $webhook->update([
+                'customer_id' => $transaction->customer_id,
+                'transaction_id' => $transaction->transaction_id,
+            ]);
+
+            $providerStatus = strtolower((string) ($providerTransaction['status'] ?? ''));
+            if (in_array($providerStatus, ['successful', 'success', 'completed'], true)) {
+                $completedAmount = (float) ($providerTransaction['actual_amount'] ?? $providerTransaction['amount'] ?? 0);
+                $this->settlement->settle($transaction, $completedAmount, $payload);
+            } elseif (in_array($providerStatus, ['failed', 'declined', 'cancelled'], true)) {
+                if ($transaction->status !== 'approved') {
+                    $transaction->update([
+                        'status' => 'declined',
+                        'provider_status' => $providerStatus,
+                        'provider_response' => json_encode($payload),
+                        'description' => $providerTransaction['details'] ?? 'Auto Transfer failed at AutoSync.',
+                    ]);
+                }
+            } else {
+                throw new RuntimeException('Webhook does not contain a final AutoSync transaction status.');
+            }
+
+            $webhook->update([
+                'processing_status' => 'processed',
+                'processed_at' => now(),
+                'resolved_by' => $resolvedBy,
+                'resolved_at' => $resolvedBy ? now() : null,
+            ]);
+        } catch (Throwable $exception) {
+            $webhook->update([
+                'processing_status' => 'failed',
+                'last_error' => $exception->getMessage(),
+                'resolved_by' => $resolvedBy,
+                'resolved_at' => $resolvedBy ? now() : null,
+            ]);
+
+            throw $exception;
+        }
+
+        return $webhook->fresh();
+    }
+
+    public function balance(API $provider, $no_format = null)
+    {
+        return [
+            'status' => 'success',
+            'balance' => 'N/A',
+            'status_code' => 1,
+        ];
+        return 'N/A'; // Autosync doesnt have a balance API
+        // $baseUrl = env('ENT') === 'local' ? $provider->sandbox_base_url : $provider->live_base_url;
+
+        // if (blank($baseUrl)) {
+        //     throw new RuntimeException('The AutoSync provider endpoint is not configured.');
+        // }
+
+        // $endpoint = rtrim($baseUrl, '/').'/airtime/cash/'.rawurlencode($transaction->provider_request_ref);
+        // $payload = ['otp' => $otp];
+        // $headers = [
+        //     'Accept' => 'application/json',
+        //     'Authorization' => 'Bearer '.$provider->api_key,
+        // ];
+        // $startedAt = microtime(true);
+
+        // try {
+        //     $response = Http::withHeaders($headers)
+        //         ->asJson()
+        //         ->connectTimeout(10)
+        //         ->timeout(40)
+        //         ->post($endpoint, $payload);
+
+        //     $data = $response->json();
+
+        //     if (isset($response['status']) && $response['status'] == 'success' && !empty($response['data'])) {
+        //         $result = $response;
+        //         $balance = '#' . number_format($response['data']['wallet_balance'], 2);
+        //         $status = 'success';
+        //         $status_code = 1;
+
+        //         $this->api->update([
+        //             'balance' => $response['data']['wallet_balance'],
+        //         ]);
+        //     } else {
+        //         $status = 'failed';
+        //         $status_code = 0;
+        //         $balance = null;
+        //     }
+
+        //     $format = [
+        //         'status' => $status,
+        //         'balance' => $balance,
+        //         'status_code' => $status_code,
+        //     ];
+        // } catch (\Throwable $th) {
+        //     $format = [
+        //         'status' => 'failed',
+        //         'status_code' => 0,
+        //         'balance' => $th->getMessage() . '. File: ' . $th->getFile() . '. Line:' . $th->getLine(),
+        //     ];
+        // }
+
+        // if (isset($no_format)) {
+        //     $format = [
+        //         'status' => $status,
+        //         'balance' => $response['contents']['balance'] ?? null,
+        //         'status_code' => $status_code,
+        //     ];
+        // }
+
+        // return $format;
     }
 
 }

@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Providers\KingsVtuController;
 use App\Models\API;
+use App\Services\AutoSyncService;
 use Illuminate\Http\Request;
 
 class APIController extends Controller
@@ -91,8 +93,12 @@ class APIController extends Controller
 
     public function getBalance(API $api)
     {
-        $res = app("App\Http\Controllers\Providers\KingsVtuController")->balance();
-        
+        if($api->slug == 'autosync'){
+            $res = app(AutoSyncService::class)->balance($api);
+        }else{
+            $res = app(KingsVtuController::class)->balance();
+        }
+
         return response()->json($res);
     }
 }

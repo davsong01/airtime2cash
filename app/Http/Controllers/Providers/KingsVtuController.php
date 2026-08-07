@@ -2,11 +2,12 @@
 
 namespace App\Http\Controllers\Providers;
 
-use App\Models\API;
-use App\Http\Requests;
-use App\Models\Variation;
 use App\Http\Controllers\Controller;
+use App\Http\Requests;
+use App\Models\API;
 use App\Models\Category;
+use App\Models\Variation;
+use App\Services\ProviderUtilityService;
 
 class KingsVtuController extends Controller
 {
@@ -18,14 +19,14 @@ class KingsVtuController extends Controller
     public function getCategories(){
         $url = $this->api->live_base_url;
         $url = $url . "category";
-        
+
         $headers = [
             'Content-Type' => 'application/json',
             'Accept' =>  'application/json',
         ];
 
         return $this->basicApiCall($url, [], $headers, 'GET');
-        
+
     }
 
     public function getProducts($category_slug)
@@ -145,8 +146,7 @@ class KingsVtuController extends Controller
         try {
             //code...
             $this->balance($this->api);
-            // $this->fetchAndUpdateBalance($this->api);
-            $this->sendWarningEmail($this->api);
+            app(ProviderUtilityService::class)->sendWarningEmail($this->api);
         } catch (\Throwable $th) {
             //throw $th;
         }
@@ -174,10 +174,10 @@ class KingsVtuController extends Controller
             ];
 
             $response = $this->basicApiCall($url, $payload, $headers, 'POST');
-            
+
             $successCodes = ['000'];
             $failCodes = ['016'];
-            
+
             if (isset($response['status']) && $response['status'] == 'success') {
                 // success
                 $format = [
@@ -223,7 +223,7 @@ class KingsVtuController extends Controller
                 'message' => $th->getMessage() . '. File: ' . $th->getFile() . '. Line:' . $th->getLine(),
             ];
         }
-        
+
         return $format;
     }
 
@@ -231,12 +231,11 @@ class KingsVtuController extends Controller
     {
         $url = $this->api->live_base_url;
         $url = $url . "category";
-        
+
         $headers = [
             'Content-Type' => 'application/json',
             'Accept' =>  'application/json',
         ];
-
 
         try {
             $url = env('ENV') == 'local' ? $this->api->sandbox_base_url : $this->api->live_base_url;
@@ -249,7 +248,7 @@ class KingsVtuController extends Controller
             ];
 
             $response = $this->basicApiCall($url, [], $headers, 'GET');
-        
+
             if (isset($response['status']) && $response['status'] == 'success' && !empty($response['data'])) {
                 $result = $response;
                 $balance = '#' . number_format($response['data']['wallet_balance'], 2);
@@ -311,7 +310,7 @@ class KingsVtuController extends Controller
             ];
 
             $response = $this->basicApiCall($url, $payload, $headers, 'POST');
-            
+
             if (isset($response['status']) && $response['status'] == 'success' && !empty($response['data']) && !empty($response['data']['Customer_Name'])) {
                 $message = '';
                 $message .= isset($response['data']['Customer Name']) ? 'Account Name: ' . $response['data']['Customer_Name'] : '';
