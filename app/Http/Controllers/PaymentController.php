@@ -93,7 +93,7 @@ class PaymentController extends Controller
     public function analyzeCallbackResponse()
     {
         try {
-            
+
             $calls = ReservedAccountCallback::where(['status' => 'pending'])->orderBy('id', 'ASC')
                 ->take(5)
                 ->get()
@@ -108,14 +108,14 @@ class PaymentController extends Controller
             ReservedAccountCallback::whereIn('id', $ids)->update(['status' => $tlk]);
 
             $calls = ReservedAccountCallback::where(['status' => $tlk])->get();
-            
+
             foreach ($calls as $call) {
                 // DB::beginTransaction();
-                
+
                 $decodeCall = json_decode($call['raw'], true);
                 $account = ReservedAccountNumber::with('customer')->where('account_number', $call['account_number'])->first();
                 $provider = PaymentGateway::where('id', $call->provider_id)->first();
-                
+
                 if (!$account) {
                     ReservedAccountCallback::whereIn('id', $ids)->update(['status' => 'no-account']);
                     continue;
@@ -123,7 +123,7 @@ class PaymentController extends Controller
 
                 $customer = $account->customer;
                 $user = $account->customer->user;
-                
+
                 if ($call['provider_id'] == 1) {
                     $payment_type = $call->payment_method;
 
@@ -140,7 +140,7 @@ class PaymentController extends Controller
 
                     if (isset($analyze) && $analyze['status'] == 'success') {
                         $payment_method = $provider->name . '(' . $decodeCall['eventData']['paymentMethod'] . ')';
-        
+
                         // $provider_charge = $provider_charge + $extra_charge;
                         $original_amount = $analyze['data']['amountPaid'] ?? $decodeCall['eventData']['amountPaid'];
                         $transaction_id = $analyze['data']['transactionReference'] ?? $decodeCall['eventData']['transactionReference'];
@@ -162,7 +162,7 @@ class PaymentController extends Controller
                         ReservedAccountCallback::whereIn('id', $ids)->update(['status' => 'no-payment']);
                     }
                 }
-                
+
                 if (isset($analyze) && $analyze['status'] == 'success') {
                     // Log Transaction
                     $wallet = new WalletController();
@@ -171,7 +171,7 @@ class PaymentController extends Controller
 
                     $provider_charge_setting = getPaymentGatewayReservedAccountCharge($provider->id) ?? 0;
                     $provider_charge = calculatePaymentGatewayReservedAccountCharge($provider_charge_setting, $original_amount) ?? 0;
-                    
+
                     $amount = $original_amount - $provider_charge;
 
                     $request['type'] = 'credit';
@@ -197,7 +197,7 @@ class PaymentController extends Controller
                     $request['account_number'] =  $call['account_number'];
 
                     $transaction =  app('App\Http\Controllers\TransactionController')->logTransaction($request);
-                    
+
                     $transaction->update([
                         'balance_after' => $balance + $amount,
                         'status' => 'delivered',
@@ -224,7 +224,6 @@ class PaymentController extends Controller
             }
         } catch (\Throwable $th) {
             DB::rollBack();
-            dd($th->getMessage(), $th->getFile(), $th->getLine());
         }
     }
 
@@ -279,7 +278,6 @@ class PaymentController extends Controller
                     'status' => 'attention-required',
                     'descr' => 'Wallet Funding of ' . getSettings()->currency . number_format($paid, 2) . ' failed. Transaction unverified',
                 ]);
-                // dd($th->getMessage(), $th->getLine(), $th->getFile());
                 return redirect(route('transaction.status', $transaction->transaction_id));
             }
         } else {

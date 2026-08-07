@@ -399,12 +399,10 @@ class CustomerController extends Controller
         }else{
             $input['IDCARD'] = kycStatus('IDCARD', $user->customer->id)['value'];
         }
-        // dd($input, kycStatus('IDCARD', $user->customer->id)['value']);
         $items = 0;
         foreach ($input as $key => $value) {
             if(!empty($value)){
                 // if($key == 'IDCARD'){
-                //     dd($value, 'sdds');
                 // }
                 app('App\Http\Controllers\DashboardController')->updateKycData($key, $value, $customer->id);
                 $items += 1;

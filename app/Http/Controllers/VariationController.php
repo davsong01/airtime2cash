@@ -13,7 +13,7 @@ class VariationController extends Controller
     public function pullVariations(Product $product)
     {
         $variations = app("App\Http\Controllers\Providers\KingsVtuController")->getVariations($product->slug);
-       
+
         if (isset($variations['status']) && $variations['status'] == 'success') {
             $variations = $variations['data']['variations'] ?? [];
             if (!empty($variations)) {
@@ -58,10 +58,9 @@ class VariationController extends Controller
             ]);
 
             $discount = app('App\Http\Controllers\TransactionController')->getCustomerDiscount($req);
-            
+
             $variation->discount = $discount;
-    
-            // dd(in_array('utme-no-mock', array_keys(specialVerifiableVariations())), specialVerifiableVariations());
+
             if (in_array($variation->category->unique_element, verifiableUniqueElements()) || in_array($variation->slug, array_keys(specialVerifiableVariations()))) {
                 $variation->verifiable = 'yes';
             } else {
@@ -71,7 +70,7 @@ class VariationController extends Controller
             if (($variation->fixed_price == 'Yes') && empty($variation->system_price) || $variation->system_price < 0) {
                 unset($variations[$key]);
             }
-            
+
             if (in_array($variation->slug, array_keys(specialVerifiableVariations()))) {
                 $variation->unique_element = specialVerifiableVariations()[$variation->slug];
             } else {
@@ -129,7 +128,6 @@ class VariationController extends Controller
         // Create the variation
         if (isset($request->system_name)) {
             foreach ($request->system_name as $key => $variation) {
-                // dd($variation, $key, $request->all(), $request->slug[$key]);
                 $variation = Variation::updateOrCreate([
                     'product_id' => $product->id,
                     'category_id' => $product->category_id,
@@ -186,7 +184,6 @@ class VariationController extends Controller
             }
         }
 
-        // dd($variation);
         $variation->delete();
 
         return back()->with('message', 'Variation deleted successfully');

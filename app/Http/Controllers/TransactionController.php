@@ -586,6 +586,7 @@ class TransactionController extends Controller
         $request['unique_element'] = 'Wallet2Bank';
         $request['discount'] = 0;
         $request['provider_charge'] = env('BANK_TRANSFER_CHARGES') ?? null;
+        $request['api_id'] = getSettings()->bank_transfer_provider_id ?? null;
 
         // Process Transaction
         try {
@@ -639,7 +640,7 @@ class TransactionController extends Controller
 
             return redirect(route('transaction.status', $transaction->transaction_id));
         } catch (\Throwable $th) {
-            \Log::error(['Transaction Error' => 'Message: ' . $th->getMessage() . ' File: ' . $th->getFile() . ' Line: ' . $th->getLine()]);
+            Log::error(['Transaction Error' => 'Message: ' . $th->getMessage() . ' File: ' . $th->getFile() . ' Line: ' . $th->getLine()]);
             DB::rollBack();
 
             return back()->with('error', 'An error occured, please try again later');
@@ -1106,7 +1107,6 @@ class TransactionController extends Controller
         if ($resource->fixed_price == 'Yes') {
             $discounted_price = $discounted_price <= $resource->system_price ? $discounted_price : $resource->system_price;
         }
-        // dd($resource->category->discount_type, $amount, $discount, $discounted_price);
         $discounted_price = $discounted_price <= 0 ? $resource->system_price : $discounted_price;
 
         if (!empty($getRate)) {
@@ -1156,16 +1156,14 @@ class TransactionController extends Controller
             'variation_name' => $data['variation_name'] ?? null,
             'category_id' => $data['category_id'] ?? null,
             'unique_element' => $data['unique_element'],
-            'ip_address' => $data['ip_address'] ?? null,
-            'domain_name' => $data['domain_name'] ?? null,
+            'ip_address' => $data['ip_address']  ?? Session::get('ip_address') ?? null,
+            'domain_name' => Session::get('domain_name') ?? null,
             'app_version' => Session::get('app_version') ?? null,
             'api_id' => $data['api_id'] ?? null,
             'reason' => $data['reason'] ?? null,
             'wallet_funding_provider' => $data['wallet_funding_provider'] ?? null,
             'provider_charge' => $data['provider_charge'] ?? null,
             'account_number' => $data['account_number'] ?? null,
-            'ip_address' => Session::get('ip_address') ?? null,
-            'domain_name' => Session::get('domain_name') ?? null,
         ];
 
         $trans = TransactionLog::create($pre);
@@ -1990,6 +1988,9 @@ class TransactionController extends Controller
                     'status' => 'approved',
                     'description' => 'Airtime2Cash Request was approved and completed by ADMIN',
                     'approved_by' => auth()->user()->admin->id,
+                    'provider_id' => getSettings()->bank_transfer_provider_id ?? null,
+                    'completed_at' => now(),
+                    'provider_status' => 'successful',
                 ]);
 
                 $subject = "Airtime2Cash Transaction Update";

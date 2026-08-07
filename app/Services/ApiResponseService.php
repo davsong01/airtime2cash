@@ -15,7 +15,7 @@ use App\Models\TransactionLog;
 class ApiResponseService
 {
     public function __construct(private ResponseService $responseService) {
-    
+
     }
 
     public function generateAccessToken() {
@@ -42,7 +42,7 @@ class ApiResponseService
 
         $response = curl_exec($ch);
         $decodedResponse = json_decode($response, true);
-        
+
         if(isset($decodedResponse['status']) && $decodedResponse['status'] == "1000" && isset($decodedResponse['data'])) {
             ServiceAuthToken::updateOrCreate(["service" => "POS_SERVICE_ACCESS_TOKEN"],[
                 'service' => "POS_SERVICE_ACCESS_TOKEN",
@@ -75,24 +75,24 @@ class ApiResponseService
         if (empty($category)) {
             return $this->responseService->formatServiceResponse("error", '', ['Invalid slug provided'], null);
         }
-        
+
         $products = $category->products->select('id', 'display_name', 'slug', 'description', 'has_variations');
-        
+
         $data = [
             'display_name' => $category->display_name,
             'products' => $products,
         ];
 
-        return $this->responseService->formatServiceResponse("success", "Retrieved successfully", [], $data);        
+        return $this->responseService->formatServiceResponse("success", "Retrieved successfully", [], $data);
     }
 
 
     public function getVariationsByProductSlug($slug){
         $product = Product::where('slug',$slug)->where('status','active')->where('has_variations','yes')->where('type', 'general')->first();
         if(empty($product)) return $this->responseService->formatServiceResponse("error", '', ['Invalid product slug provided'], null);
-        
+
         $variations = Variation::select('id','product_id','slug','category_id','system_price as price','system_name as name','min','max','fixed_price')->where('product_id', $product->id)->where('status', 'active')->orderBy('id', 'DESC')->get();
-        
+
         $allVariations = [];
         foreach ($variations as $key => $variation) {
             $req = new Request([
@@ -124,7 +124,7 @@ class ApiResponseService
                 'name' => $variation->name,
                 'price' =>  $variation->price,
                 'variation_slug' =>  $variation->slug,
-                'min' => $variation->min, 
+                'min' => $variation->min,
                 'max' => $variation->max,
                 'fixed_price' => $variation->fixed_price,
                 'verifiable' => $variation->verifiable,
@@ -137,13 +137,13 @@ class ApiResponseService
             'variations' => $allVariations,
         ];
 
-        return $this->responseService->formatServiceResponse("success", "Retrieved successfully", [], $variations);        
+        return $this->responseService->formatServiceResponse("success", "Retrieved successfully", [], $variations);
     }
 
     public function verifyBiller(Request $request)
     {
         $variation = Variation::where('slug', $request->variation_slug)->first();
-        
+
         if (in_array($variation->slug, array_keys(specialVerifiableVariations()))) {
             $element = specialVerifiableVariations()[$variation->slug];
         } else {
@@ -168,16 +168,16 @@ class ApiResponseService
             'api' => $api,
             'request' => $request
         ];
-    
+
         // Get Api
         $verify = app("App\Http\Controllers\Providers\KingsVtuController")->verify($data);
-        
+
         if (isset($verify) && $verify['status_code'] == 1) {
             if (isset($verify['raw_response'])) {
                 $refinedData = app('App\Http\Controllers\TransactionController')->refineAndLogBiller($verify, $variation->category, $request['unique_element'], $request['product_slug']);
             }
 
-            return $this->responseService->formatServiceResponse("success", "Retrieved successfully", [], $refinedData);        
+            return $this->responseService->formatServiceResponse("success", "Retrieved successfully", [], $refinedData);
 
         } else {
             $res = $verify['message'] ?? 'Biller not reachable at the moment, please try again later';
@@ -192,7 +192,7 @@ class ApiResponseService
             'wallet_balance' => $balance,
         ];
 
-        return $this->responseService->formatServiceResponse("success", "Retrieved successfully", [], $balances);        
+        return $this->responseService->formatServiceResponse("success", "Retrieved successfully", [], $balances);
     }
 
     public function initializeTransaction(Request $request){
@@ -207,7 +207,7 @@ class ApiResponseService
             // Get product
             $product = Product::where('slug', $request->product_slug)->first();
             $category = $product->category_id;
-            
+
             if (empty($product)) {
                 return $this->responseService->formatServiceResponse("error", '', ['Invalid product slug!, kindly try again!'], null);
             }
@@ -263,12 +263,12 @@ class ApiResponseService
                 if ($request['amount'] < $product->min && !empty($product->min)) {
                     return $this->responseService->formatServiceResponse("error", '', ['You cannot purchase below ' . $product->min . ' for this product!'], null);
                 }
-            
+
                 if ($request['amount'] > $product->max && !empty($product->max)) {
                     return $this->responseService->formatServiceResponse("error", '', ['You cannot purchase above ' . $product->max . ' for this product!'], null);
                 }
             }
-        
+
 
             // Verify Meter
             if ($product->allow_meter_validation) {
@@ -279,13 +279,13 @@ class ApiResponseService
             }
 
             $request['discount'] = 0;
-            
+
             if ($product->has_variations == 'yes') {
                 $discount = app('App\Http\Controllers\TransactionController')->getDiscount($variation, 'variation', $request['amount'], 'yes');
             } else {
                 $discount = app('App\Http\Controllers\TransactionController')->getDiscount($product, 'product', $request['amount'], 'yes');
             }
-            
+
             $discountedAmount = $discount['discounted_price'];
             $disCountApplied = $discount['discount_applied'];
 
@@ -296,7 +296,7 @@ class ApiResponseService
             // Get Wallet Balance
             $wallet = new WalletController();
             $balance = $wallet->getWalletBalance(auth()->user());
-            
+
             if ($balance < $request['total_amount']) {
                 return back()->with('error', 'Insufficient Wallet Balance, Please try again');
             }
@@ -358,7 +358,7 @@ class ApiResponseService
             // Update Customer Wallet
             $wallet->updateCustomerWallet(auth()->user(), $request['total_amount'], $request['type']);
         } catch (\Throwable $th) {
-            
+
         }
         // Process Transaction
         try {
@@ -369,10 +369,10 @@ class ApiResponseService
 
             return $this->responseService->formatServiceResponse("unknown", '', ['An error occured, please try again later'], null);
         }
-       
+
         // Log Transaction Email
         app('App\Http\Controllers\TransactionController')->sendTransactionEmail($transaction, auth()->user());
-        
+
         if(isset($transaction) && $transaction->status == 'success'){
             $data = [
                 'status' => $transaction->status,
@@ -392,7 +392,7 @@ class ApiResponseService
             return $this->responseService->formatServiceResponse("success", '', [], $data);
 
         }
-       
+
     }
 
 
@@ -402,7 +402,6 @@ class ApiResponseService
 
     //     $serviceToken = ServiceAuthToken::where(["service" => "POS_SERVICE_ACCESS_TOKEN"])->first();
 
-    //     // dd($this->posWebServiceUrl.$url, $serviceToken->token);
     //     $ch = curl_init();
     //     curl_setopt($ch, CURLOPT_URL, url($this->posWebServiceUrl.$url));
     //     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
@@ -714,7 +713,6 @@ class ApiResponseService
     //         $this->updatePosCallback('TERMINAL SETUP',$this->posWebServiceUrl.'/hooks/terminal_setup',$dataToExtend, 3, 1, $customerId);
     //         return;
     //     }catch(Exception $err) {
-    //         dd($err);
     //         Log::error($err);
     //         $errorMessage = env("ENT") == "live" ? "Error: Failed to extend to POS web service" : $err->getMessage();
     //         return $this->responseService->formatServiceResponse("failed", $errorMessage, [], null);
@@ -1775,7 +1773,7 @@ class ApiResponseService
     //         }
 
     //         $response = $this->responseService->formatServiceResponse("success", 'Requery processed', [], $transactionDets);
-        
+
     //         return $response;
     //     } catch (\Throwable $err) {
     //         $errorMessage = env("ENT") == "live" ? "VTpass Internal Server Exception" : $err->getMessage();

@@ -25,9 +25,8 @@ class RouteProtectionMiddleware
             'admin.autosync.api-logs.index' => ['admin.autosync.api-logs.index', 'admin.autosync.index'],
             default => [$curRouteName],
         };
-        
+
         $routes = auth()->user()->admin->rolepermissions();
-        // dd($routes, $curRouteName);
         if (array_intersect($permissionRoutes, $routes) || in_array(1, auth()->user()->admin->roleIds())) {
             return $next($request);
         } else {

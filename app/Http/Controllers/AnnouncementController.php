@@ -46,7 +46,6 @@ class AnnouncementController extends Controller
      */
     public function store(Request $request)
     {
-        // dd($request->all());
         foreach($request->status as $key => $val) {
             $announcement = Announcement::updateOrCreate([
                 'type' => $request->type[$key]
@@ -68,7 +67,7 @@ class AnnouncementController extends Controller
      */
     public function show(Announcement $announcement)
     {
-        
+
     }
 
     /**

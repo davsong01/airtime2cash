@@ -55,7 +55,7 @@ class WebhookService {
     {
         try {
             $provider = API::find($provider_id);
-            dd($provider);
+
             if (!$provider) {
                 return false;
             }

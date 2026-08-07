@@ -25,7 +25,7 @@ class MonnifyController extends Controller
 
         $url = 'https://api.monnify.com/api/v1/auth/login';
         $response = $this->basicApiCall($url, [], $headers, 'POST');
-        
+
         $accessToken = $response['responseBody']['accessToken'] ?? null;
 
         return $accessToken;
@@ -86,7 +86,6 @@ class MonnifyController extends Controller
 
             $response = $this->basicApiCall($url, $data, $headers, 'POST');
 
-            dd($url, $response);
             // if (
             //     $response && $response['responseCode'] == 0 && $response['responseBody']['paymentStatus'] == 'PAID' &&
             //     $response['responseMessage'] == 'success'
@@ -138,7 +137,7 @@ class MonnifyController extends Controller
             ]);
 
             $response = $this->basicApiCall($url, $payload, $headers, 'POST');
-            
+
             if (
                 $response && $response['responseCode'] == 0 &&
                 $response['responseMessage'] == 'success'
@@ -166,7 +165,7 @@ class MonnifyController extends Controller
                             'response' => json_encode($response)
                         ]);
                     }
-                    
+
                     $data = [
                         'status' => 'success',
                         'data' => '',
@@ -184,7 +183,7 @@ class MonnifyController extends Controller
                     'data' => $response['responseMessage'] ?? 'no-response',
                 ];
             }
-            
+
             return $data;
         }
     }
