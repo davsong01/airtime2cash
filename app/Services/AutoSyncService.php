@@ -20,7 +20,7 @@ class AutoSyncService
     public function initiate(Airtime2CashTransactions $transaction, API $provider): array
     {
         $productName = strtolower($transaction->product->name);
-
+        
         $payload = [
             'request_ref' => $transaction->transaction_id,
             'phone' => $transaction->phone_numbers,

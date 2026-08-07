@@ -88,6 +88,27 @@
                         <div class="card ops-metric-card"><div class="card-body"><span class="ops-metric-icon is-warning"><i class="bx bx-trophy"></i></span><span class="ops-metric-label">Customer of the month</span><strong>Not available</strong><small>No qualifying transactions this month</small></div></div>
                         @endif
                     </div>
+                    <div class="col-sm-6 col-xl-3">
+                        <a href="{{ route('admin.walletlog') }}" class="card ops-metric-card">
+                            <div class="card-body">
+                                <span class="ops-metric-icon is-success"><i class="fa fa-server"></i></span>
+                                <span class="ops-metric-label">SERVER ADDRESS</span>
+                                <strong>{{ $_SERVER['SERVER_ADDR'] ?? 'NOT SET' }}</strong>
+                                <small></small>
+                            </div>
+                        </a>
+                    </div>
+                    <div class="col-sm-6 col-xl-3">
+                        <a href="{{ route('admin.walletlog') }}" class="card ops-metric-card">
+                            <div class="card-body">
+                                <span class="ops-metric-icon is-primary"><i class="fa fa-server"></i></span>
+                                <span class="ops-metric-label">REMOTE ADDRESS</span>
+                                <strong>{{ $_SERVER['REMOTE_ADDR'] ?? 'NOT SET' }}</strong>
+                                <small></small>
+                            </div>
+                        </a>
+                    </div>
+
                 </section>
 
                 <section class="card ops-panel mb-2">

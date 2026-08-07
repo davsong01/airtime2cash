@@ -438,7 +438,6 @@ class DashboardController extends Controller
             $input['IDCARD'] = $this->uploadFile($request->IDCARD, 'kyc');
         }
 
-
         // $instantVerify = ['FIRST_NAME', 'LAST_NAME', 'MIDDLE_NAME', 'DOB', 'PHONE_NUMBER', 'COUNTRY', 'STATE', 'LGA', 'DOB', 'IDCARD', 'IDCARDTYPE'];
         // foreach ($input as $key => $value) {
         //     if (in_array($key, $instantVerify)) {
@@ -447,7 +446,7 @@ class DashboardController extends Controller
         //         $this->updateKycData($key, $value, auth()->user()->customer->id, 'unverified');
         //     }
         // }
-
+        
         // $firstname = $input['FIRST_NAME'] ?? auth()->user()->firstname;
         // $lastname = $input['LAST_NAME'] ?? auth()->user()->lastname;
         // $middlename = $input['MIDDLE_NAME'] ?? auth()->user()->middlename;
