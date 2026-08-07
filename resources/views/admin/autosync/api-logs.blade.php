@@ -29,7 +29,7 @@
                             <h2 class="mb-50">API request logs</h2>
                             <p class="text-muted mb-0">Review AutoSync requests, responses, failures, and response times. Sensitive credentials are redacted.</p>
                         </div>
-                        <a href="{{ route('api.index') }}" class="btn btn-outline-primary mt-1 mt-md-0"><i class="bx bx-cog mr-50"></i>Provider settings</a>
+                        <a href="{{ route('admin.autosync.api-request.clear') }}" onsubmit="confirm('This will truncate all logs, are you sure?')" class="btn btn-danger mt-1 mt-md-0"><i class="bx bx-cog mr-50"></i>Clear Log</a>
                     </div>
                     <div class="row mt-2">
                         @foreach ([['Total requests', $summary->total, 'primary'], ['Successful', $summary->successful, 'success'], ['Failed', $summary->failed, 'danger'], ['Average response', $summary->average_duration === null ? '-' : number_format((float) $summary->average_duration) . ' ms', 'info']] as [$label, $value, $color])

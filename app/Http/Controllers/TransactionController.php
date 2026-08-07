@@ -2011,155 +2011,58 @@ class TransactionController extends Controller
     }
 
     public function transferToBankAccount(
-        string $bank_code,
-        string $account_number,
-        string $account_name,
+        string $bankCode,
+        string $accountNumber,
+        string $accountName,
         string|float $amount,
-        $transaction = null
-    ) {
-        $skipBalance = true;
+        ?TransactionLog $transaction = null
+    ): array {
+        $provider = API::query()
+            ->whereKey(getSettings()->bank_transfer_provider_id)
+            ->where('status', 'active')
+            ->first();
 
-        $status = 'failed';
-        $error = 'failed';
-        $api_response = '';
-        $token = null;
-
-        $request_data = [
-            'bank_code' => $bank_code,
-            'account_number' => $account_number,
-            'account_name' => $account_name,
-            'amount' => $amount,
-            'reference' => $transaction->transaction_id ?? null,
-        ];
-
-        $sageController = app(
-            'App\Http\Controllers\Providers\SageController'
-        );
-
-        $login = $sageController->login();
-
-        if (!empty($login) && ($login['success'] ?? false) === true) {
-            $token = $login['data']['token']['access_token'] ?? null;
-            $api_response = $login;
-        } else {
-            $error = 'Could not complete bank transfer at the moment, please try again later';
-            $api_response = $login ?? 'NO RESPONSE WHEN LOGGING IN';
-        }
-
-        if (empty($token)) {
-            if (!empty($transaction)) {
-                $transaction->update([
-                    'bank_transfer_api_response' => $error
-                        . ' | API_RESPONSE: '
-                        . json_encode($api_response),
-
-                    'api_response' => $error
-                        . ' | API_RESPONSE: '
-                        . json_encode($api_response),
-
-                    'descr' => 'We could not complete this transaction',
-                    'request_data' => json_encode($request_data),
-                ]);
-            }
-
+        if (! $provider) {
             return [
-                'error' => $error,
-                'status' => $status,
-                'api_response' => $api_response,
-                'request_data' => $request_data,
+                'status' => 'failed',
+                'error' => 'No active bank transfer provider configured.',
             ];
         }
 
-        if (!$skipBalance) {
-            $balance = $sageController->walletBalance($token);
+        $controller = match ($provider->slug) {
+            'sagecloud' => app(SageController::class),
+            default => throw new RuntimeException(
+                "Unsupported bank transfer provider: {$provider->slug}"
+            ),
+        };
 
-            if (
-                empty($balance) ||
-                ($balance['success'] ?? false) !== true ||
-                ($balance['status'] ?? null) !== 'success'
-            ) {
-                return [
-                    'error' => 'Could not fetch balance response from transfer provider',
-                    'status' => 'failed',
-                    'api_response' => $balance ?? 'NO RESPONSE WHEN CHECKING BALANCE',
-                    'request_data' => $request_data,
-                ];
-            }
-
-            $real_balance = (float) (
-                $balance['general_wallet']['balance'] ?? 0
-            );
-
-            if ($real_balance < (float) $amount) {
-                return [
-                    'error' => 'Not enough balance to carry out transaction.',
-                    'status' => 'failed',
-                    'api_response' => $balance,
-                    'request_data' => $request_data,
-                ];
-            }
-        }
-
-        $transferAmount = (float) $amount
-            - (float) env('BANK_TRANSFER_CHARGES', 0);
-
-        $request_data = [
-            'token' => $token,
-            'bank_code' => $bank_code,
-            'account_number' => $account_number,
-            'reference' => $transaction->transaction_id ?? null,
-            'account_name' => $account_name,
-            'amount' => $transferAmount,
-            'narration' => 'Transfer from ' . config('app.name'),
+        $data = [
+            'bank_code' => $bankCode,
+            'account_number' => $accountNumber,
+            'account_name' => $accountName,
+            'amount' => (float) $amount,
+            'transaction_id' => $transaction?->transaction_id,
         ];
 
-        $verify = $sageController->transfer(
-            $token,
-            $bank_code,
-            $account_number,
-            $account_name,
-            $amount,
-            $transaction->transaction_id ?? null
-        );
+        $response = $controller->transfer($data);
 
-        $responseData = is_array($verify)
-            ? $verify
-            : ['Response' => $verify ?? 'NO RESPONSE'];
-
-        if (!empty($transaction)) {
+        if ($transaction) {
             $transaction->update([
-                'bank_transfer_api_response' => array_merge(
-                    ['Action' => 'TRANSFER'],
-                    $responseData
+                'api_id' => $provider->id,
+                'api_response' => $response['api_response'] ?? $response,
+                'request_data' => json_encode(
+                    $response['request_data'] ?? $data
                 ),
-                'request_data' => json_encode($request_data),
-                'api_response' => array_merge(
-                    ['Action' => 'TRANSFER'],
-                    $responseData
-                ),
+                'failure_reason' => $response['status'] === 'success'
+                    ? null
+                    : ($response['error'] ?? 'Bank transfer failed.'),
+                'descr' => $response['status'] === 'success'
+                    ? 'Bank transfer completed successfully.'
+                    : ($response['error'] ?? 'Bank transfer failed.'),
             ]);
         }
 
-        if (
-            !empty($verify) &&
-            ($verify['success'] ?? false) === true &&
-            ($verify['status'] ?? null) === 'success'
-        ) {
-            $status = 'success';
-            $error = '';
-            $api_response = $verify;
-        } else {
-            $status = 'failed';
-            $error = 'Transfer Error';
-            $api_response = $verify ?? 'NO RESPONSE';
-        }
-
-        return [
-            'error' => $error,
-            'status' => $status,
-            'request_data' => $request_data,
-            'api_response' => $api_response,
-        ];
+        return $response;
     }
 
     public function declineAirtime2CashTransactions(Request $request, Airtime2CashTransactions $transaction)

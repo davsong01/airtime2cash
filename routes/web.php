@@ -180,7 +180,10 @@ Route::middleware(['auth', 'verified', 'admin', 'ipcheck', 'adminRoute'])->prefi
     Route::get('autosync-operations', [AutoSyncOperationsController::class, 'index'])->name('admin.autosync.index');
     Route::get('autosync-operations/webhooks', [AutoSyncOperationsController::class, 'webhooks'])->name('admin.autosync.webhooks.index');
     Route::get('autosync-operations/api-request-logs', [AutoSyncOperationsController::class, 'apiLogs'])->name('admin.autosync.api-logs.index');
+    Route::get('clear-autosync-api-request-log', [AutoSyncOperationsController::class, 'clearApiLogs'])->name('admin.autosync.api-request.clear');
+
     Route::post('autosync-webhooks/{webhook}/resolve', [AutoSyncOperationsController::class, 'resolve'])->name('admin.autosync.webhooks.resolve');
+    Route::get('clear-autosync-webhooks-log', [AutoSyncOperationsController::class, 'clearWebhookLogs'])->name('admin.autosync.webhooks.clear');
 
     Route::get('admin-earninglog', [TransactionController::class, 'walletEarningView'])->name('admin.earninglog');
     Route::get('credit-customer', [TransactionController::class, 'creditCustomerPage'])->name('admin.credit.customer');

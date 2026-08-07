@@ -45,34 +45,76 @@ class SageController extends Controller
         return $this->basicApiCall($url, [], $headers, 'GET');
     }
 
-    public function transfer($token, $bank_code, $account_number,$account_name, $amount, $reference){
-        $url = $this->base_url . "transfer/fund-transfer";
+
+
+    public function transfer(array $data): array
+    {
+        $login = $this->login();
+
+        if (
+            empty($login) ||
+            ($login['success'] ?? false) !== true
+        ) {
+            return [
+                'status' => 'failed',
+                'error' => 'Could not authenticate with SageCloud.',
+                'request_data' => $data,
+                'api_response' => $login ?? 'NO RESPONSE WHEN LOGGING IN',
+            ];
+        }
+
+        $token = data_get($login, 'data.token.access_token');
+
+        if (blank($token)) {
+            return [
+                'status' => 'failed',
+                'error' => 'SageCloud did not return a valid access token.',
+                'request_data' => $data,
+                'api_response' => $login,
+            ];
+        }
+
+        $url = rtrim($this->base_url, '/').'/transfer/fund-transfer';
+        // $url = rtrim($this->base_url, '/').'/transfer';
+
 
         $payload = [
-            "bank_code" => $bank_code,
-            "account_number" => $account_number,
-            "reference" => $reference ?? $this->generateRequestId(),
-            "account_name" => $account_name,
-            "amount" => $amount,
-            "narration" => 'Transfer from ' . config('app.name'),
+            'bank_code' => $data['bank_code'],
+            'account_number' => $data['account_number'],
+            'account_name' => $data['account_name'],
+            'amount' => $data['amount'],
+            'reference' => $data['transaction_id'] ?? $this->generateRequestId(),
+            'narration' => 'Transfer from '.config('app.name'),
         ];
 
         $headers = [
-            "Content-Type: application/json",
-            "Authorization: Bearer " . $token . "",
+            'Content-Type: application/json',
+            'Authorization: Bearer '.$token,
         ];
 
-        if (env('ENT') == 'local') {
-            $response = [
+        $response = env('ENT') === 'local'
+            ? [
                 'success' => true,
                 'status' => 'success',
-                'message' => 'all done'
-            ];
-        } else {
-            $response = $this->control->basicApiCall($url, json_encode($payload), $headers);
-        }
+                'message' => 'Transfer completed.',
+            ]
+            : $this->control->basicApiCall(
+                $url,
+                json_encode($payload),
+                $headers
+            );
 
-        return $response;
+        $successful = ($response['success'] ?? false) === true
+            && ($response['status'] ?? null) === 'success';
+
+        return [
+            'status' => $successful ? 'success' : 'failed',
+            'error' => $successful
+                ? ''
+                : ($response['message'] ?? 'Bank transfer failed.'),
+            'request_data' => $payload,
+            'api_response' => $response,
+        ];
     }
 
     public function requery($transaction)
