@@ -97,6 +97,11 @@ class SageController extends Controller
                 'success' => true,
                 'status' => 'success',
                 'message' => 'Transfer completed.',
+                'data' => [
+                    'transaction' => [
+                        'status' => 'successful',
+                    ],
+                ],
             ]
             : $this->control->basicApiCall(
                 $url,
@@ -104,14 +109,17 @@ class SageController extends Controller
                 $headers
             );
 
-        $successful = ($response['success'] ?? false) === true
-            && ($response['status'] ?? null) === 'success';
+        $providerStatus = strtolower((string) data_get($response, 'data.transaction.status', data_get($response, 'status', 'failed')));
+        $successful = in_array($providerStatus, ['successful', 'success', 'completed'], true)
+            || (($response['success'] ?? false) === true && ($response['status'] ?? null) === 'success');
+        $pending = in_array($providerStatus, ['pending', 'processing', 'initiated'], true);
 
         return [
-            'status' => $successful ? 'success' : 'failed',
+            'status' => $successful ? 'success' : ($pending ? 'pending' : 'failed'),
+            'provider_status' => $providerStatus,
             'error' => $successful
                 ? ''
-                : ($response['message'] ?? 'Bank transfer failed.'),
+                : ($pending ? '' : ($response['message'] ?? 'Bank transfer failed.')),
             'request_data' => $payload,
             'api_response' => $response,
         ];

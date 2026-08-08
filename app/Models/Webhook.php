@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\API;
+use Illuminate\Support\Str;
 use App\Models\TransactionLog;
 use Illuminate\Database\Eloquent\Model;
 
@@ -71,6 +72,24 @@ class Webhook extends Model
             'completed',
             'delivered',
         ], true);
+    }
+
+    public function isWalletToBankTransaction(): bool
+    {
+        $transaction = $this->linkedTransaction();
+
+        if (! $transaction instanceof TransactionLog) {
+            return false;
+        }
+
+        return Str::of((string) ($transaction->product?->type ?? $transaction->unique_element ?? ''))
+            ->lower()
+            ->contains('wallet2bank');
+    }
+
+    public function isAirtime2CashTransaction(): bool
+    {
+        return $this->linkedTransaction() instanceof Airtime2CashTransactions;
     }
 
     public function resolver()

@@ -159,6 +159,10 @@ class CallbackOperationsController extends Controller
 
     public function resolve(Webhook $webhook)
     {
+        if (! $webhook->isWalletToBankTransaction()) {
+            return back()->with('error', 'This resolve action is only available for wallet-to-bank transactions.');
+        }
+
         try {
             app(WebhookProcessor::class)->process($webhook, auth()->user()->admin->id, true);
         } catch (Throwable $exception) {

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Airtime2CashTransactions;
 use App\Models\TransactionLog;
 use App\Models\Webhook;
+use App\Http\Controllers\WalletController;
 use Illuminate\Support\Str;
 use RuntimeException;
 
@@ -58,8 +59,9 @@ class WebhookProcessor
             $providerStatus = strtolower((string) $webhook->provider_status);
             $isSuccessful = in_array($providerStatus, ['successful', 'success', 'completed', 'approved'], true);
             $isFailed = in_array($providerStatus, ['failed', 'declined', 'cancelled', 'canceled', 'reversed'], true);
+            $isPending = in_array($providerStatus, ['pending', 'processing', 'initiated'], true);
 
-            if (! $isSuccessful && ! $isFailed) {
+            if (! $isSuccessful && ! $isFailed && ! $isPending) {
                 throw new RuntimeException('Webhook does not contain a final transaction status.');
             }
 
@@ -143,21 +145,57 @@ class WebhookProcessor
             ->lower()
             ->contains('wallet2bank');
 
+        if ($isWalletToBank && $isFailed && ! in_array(strtolower((string) $transaction->status), ['failed', 'declined'], true)) {
+            $this->refundWalletToBankTransaction($transaction);
+        }
+
         return [
             'status' => $isWalletToBank
-                ? ($isSuccessful ? 'success' : 'failed')
-                : ($isSuccessful ? 'approved' : 'declined'),
+                ? ($isSuccessful ? 'success' : ($isFailed ? 'failed' : 'pending'))
+                : ($isSuccessful ? 'approved' : ($isFailed ? 'declined' : 'pending')),
             'user_status' => $isWalletToBank
-                ? ($isSuccessful ? 'success' : 'failed')
-                : ($isSuccessful ? 'success' : 'failed'),
+                ? ($isSuccessful ? 'success' : ($isFailed ? 'failed' : 'pending'))
+                : ($isSuccessful ? 'success' : ($isFailed ? 'failed' : 'pending')),
             'provider_status' => $providerStatus ?: ($isSuccessful ? 'successful' : 'failed'),
             'api_response' => json_encode($payload, JSON_THROW_ON_ERROR),
             'failure_reason' => $isFailed ? ($message ?? 'Transaction failed.') : null,
             'descr' => $message ?? ($isSuccessful
                 ? 'Transaction completed successfully.'
-                : 'Transaction failed.'),
+                : ($isPending ? 'Transaction is pending provider confirmation.' : 'Transaction failed.')),
             'completed_at' => $isSuccessful ? ($transaction->completed_at ?? now()) : $transaction->completed_at,
+            'admin_id' => $isWalletToBank ? auth()->user()?->admin?->id ?? ($transaction->admin_id ?? null) : ($transaction->admin_id ?? null),
         ];
+    }
+
+    private function refundWalletToBankTransaction(TransactionLog $transaction): void
+    {
+        $transaction->loadMissing('customer.user');
+
+        if (! $transaction->customer?->user) {
+            throw new RuntimeException('Unable to refund wallet because the customer record is missing.');
+        }
+
+        $wallet = app(WalletController::class);
+        $amount = (float) ($transaction->total_amount ?? $transaction->amount ?? 0);
+
+        if ($amount <= 0) {
+            throw new RuntimeException('Unable to refund an invalid wallet amount.');
+        }
+
+        $wallet->logWallet([
+            'customer_id' => $transaction->customer_id,
+            'type' => 'credit',
+            'total_amount' => $amount,
+            'transaction_id' => $transaction->transaction_id,
+            'reason' => 'Wallet to Bank Transfer refund',
+            'payment_method' => 'wallet',
+        ]);
+
+        $wallet->updateCustomerWallet($transaction->customer->user, $amount, 'credit');
+
+        $transaction->update([
+            'balance_after' => (float) ($transaction->balance_before ?? 0) + $amount,
+        ]);
     }
 
     private function extractReference(array $payload): ?string

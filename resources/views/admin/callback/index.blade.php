@@ -229,7 +229,7 @@
                                     };
 
                                     $linkedTransaction = $webhook->linkedTransaction();
-                                    $canResolve = $webhook->hasUnresolvedTransaction();
+                                    $canResolve = $webhook->isWalletToBankTransaction() && $webhook->hasUnresolvedTransaction();
                                 @endphp
 
                                 <tr>

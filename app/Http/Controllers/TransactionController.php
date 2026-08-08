@@ -619,60 +619,106 @@ class TransactionController extends Controller
         $request['discount'] = 0;
         $request['api_id'] = $chargeDetails['provider_id'] ?? getSettings()->bank_transfer_provider_id ?? null;
 
-        // Process Transaction
+        $wallet = new WalletController();
+
         try {
             DB::beginTransaction();
 
-            // Log basic transaction
-            $wallet = new WalletController();
+            $request['balance_after'] = $request['balance_before'] - $request['total_amount'];
+            $request['status'] = 'pending';
+            $request['user_status'] = 'pending';
+            $request['descr'] = 'Wallet to Bank Transfer initiated.';
+
             $transaction = $this->logTransaction($request->all());
 
-            // Log wallet
             $wallet->logWallet($request->all());
-
-            // Update Customer Wallet
             $wallet->updateCustomerWallet(auth()->user(), $request['total_amount'], $request['type']);
 
-            $transfer = $this->transferToBankAccount($bank->cbn_code, $request->account_number, $request->account_name, $request['amount'], $transaction);
+            DB::commit();
+        } catch (\Throwable $th) {
+            if (DB::transactionLevel() > 0) {
+                DB::rollBack();
+            }
 
-            if (isset($transfer['status']) && $transfer['status'] == 'success') {
-                $user_status = 'success';
+            Log::error(['Transaction Error' => 'Message: ' . $th->getMessage() . ' File: ' . $th->getFile() . ' Line: ' . $th->getLine()]);
+
+            return back()->with('error', 'An error occured, please try again later');
+        }
+
+        try {
+            $transfer = $this->transferToBankAccount($bank->cbn_code, $request->account_number, $request->account_name, $request['amount'], $transaction);
+            $providerStatus = strtolower((string) ($transfer['provider_status'] ?? $transfer['status'] ?? 'failed'));
+            $transferStatus = strtolower((string) ($transfer['status'] ?? 'failed'));
+
+            if (in_array($transferStatus, ['success', 'successful', 'completed'], true)) {
                 $status = 'success';
+                $user_status = 'success';
                 $description = 'Wallet to Bank Transfer transaction was completed';
-                $api_response = $transfer['api_response'] ?? null;
                 $balance_after = $request['balance_before'] - $request['total_amount'];
+                $failure_reason = null;
+            } elseif (in_array($providerStatus, ['pending', 'processing', 'initiated'], true) || $transferStatus === 'pending') {
+                $status = 'pending';
+                $user_status = 'pending';
+                $description = 'Wallet to Bank Transfer is pending provider confirmation.';
+                $balance_after = $request['balance_before'] - $request['total_amount'];
+                $failure_reason = null;
             } else {
-                $wallet = new WalletController();
-                $request['type'] = 'credit';
-                $wallet->logWallet($request);
+                DB::transaction(function () use ($wallet, $request, $transaction) {
+                    $refund = [
+                        'customer_id' => $request['customer_id'],
+                        'type' => 'credit',
+                        'total_amount' => $request['total_amount'],
+                        'transaction_id' => $request['transaction_id'],
+                        'reason' => 'Wallet to Bank Transfer refund',
+                        'payment_method' => 'wallet',
+                    ];
+
+                    $wallet->logWallet($refund);
+                    $wallet->updateCustomerWallet(auth()->user(), $request['total_amount'], 'credit');
+                });
 
                 $status = 'failed';
-                $failure_reason = 'Wallet to Bank Transfer transaction could not be completed';
-
-                // Update Customer Wallet
-                $wallet->updateCustomerWallet(auth()->user(), $request['total_amount'], 'credit');
-                $balance_after = $request['balance_before'];
                 $user_status = 'failed';
                 $description = 'Wallet to Bank Transfer transaction could not be completed';
-                $api_response = $transfer['api_response'] ?? null;
+                $balance_after = $request['balance_before'];
+                $failure_reason = $transfer['error'] ?? 'Wallet to Bank Transfer transaction could not be completed';
             }
 
             $transaction->update([
                 'balance_after' => $balance_after,
-                'api_response' => $api_response ?? null,
+                'api_response' => $transfer['api_response'] ?? null,
                 'failure_reason' => $failure_reason ?? null,
                 'status' => $status ?? '',
                 'descr' => $description ?? null,
-                'user_status' => $user_status ?? null
+                'user_status' => $user_status ?? null,
             ]);
 
-            DB::commit();
             $this->sendTransactionEmail($transaction, auth()->user());
 
             return redirect(route('transaction.status', $transaction->transaction_id));
         } catch (\Throwable $th) {
+            DB::transaction(function () use ($wallet, $request, $transaction, $th) {
+                $wallet->logWallet([
+                    'customer_id' => $request['customer_id'],
+                    'type' => 'credit',
+                    'total_amount' => $request['total_amount'],
+                    'transaction_id' => $request['transaction_id'],
+                    'reason' => 'Wallet to Bank Transfer refund',
+                    'payment_method' => 'wallet',
+                ]);
+
+                $wallet->updateCustomerWallet(auth()->user(), $request['total_amount'], 'credit');
+
+                $transaction->update([
+                    'balance_after' => $request['balance_before'],
+                    'status' => 'failed',
+                    'user_status' => 'failed',
+                    'failure_reason' => $th->getMessage(),
+                    'descr' => 'Wallet to Bank Transfer transaction could not be completed',
+                ]);
+            });
+
             Log::error(['Transaction Error' => 'Message: ' . $th->getMessage() . ' File: ' . $th->getFile() . ' Line: ' . $th->getLine()]);
-            DB::rollBack();
 
             return back()->with('error', 'An error occured, please try again later');
         }
