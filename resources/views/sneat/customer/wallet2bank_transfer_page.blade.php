@@ -115,10 +115,12 @@
                         $pricingBands = $pricingBands ?? [];
                         $pricingEnabled = (bool) ($pricingEnabled ?? false);
                         $pricingAvailable = (bool) ($pricingAvailable ?? false);
+                        $pricingAmountRange = $pricingAmountRange ?? [];
                         $pricingConfigured = $pricingEnabled && $pricingAvailable;
                         $minimumCharge = $pricingConfigured ? getBankTransferChargeDetails($providerMin, $pricingProvider?->id) : ['transfer_fee' => 0];
                         $minimumRequiredBalance = $providerMin + (float) ($minimumCharge['transfer_fee'] ?? 0);
                         $maxAmount = max(0, $walletBal);
+                        $validTransferMin = max($providerMin, (float) ($pricingAmountRange['min_amount'] ?? $providerMin));
                         $canWithdraw = $pricingConfigured && $walletBal >= $minimumRequiredBalance;
                     @endphp
 
@@ -139,7 +141,10 @@
                                     </div>
                                 @else
                                     <label for="amount" class="form-label">Amount to withdraw from wallet</label>
-                                    <input class="form-control" id="amount" name="amount" type="number" placeholder="Enter amount to transfer" required min="{{ $providerMin }}" max="{{ $maxAmount }}" data-wallet-balance="{{ $walletBal }}" data-min-transfer="{{ $providerMin }}" data-pricing-bands='@json($pricingBands)' data-global-extra-charges='@json($pricingProvider?->extra_charges ?? [])'>
+                                    <input class="form-control" id="amount" name="amount" type="number" placeholder="Enter amount to transfer" required min="{{ $validTransferMin }}" max="{{ $maxAmount }}" data-wallet-balance="{{ $walletBal }}" data-min-transfer="{{ $providerMin }}" data-pricing-bands='@json($pricingBands)' data-global-extra-charges='@json($pricingProvider?->extra_charges ?? [])' data-valid-range-text='@json($pricingAmountRange["range_text"] ?? null)'>
+                                    @if(!empty($pricingAmountRange['range_text']))
+                                        <small class="d-block mt-1 text-muted">Valid transfer amount range: <strong>{{ $pricingAmountRange['range_text'] }}</strong></small>
+                                    @endif
                                     <div class="transfer-preview-card mt-3 mb-0 p-3" id="transfer-preview">
                                         <div class="d-flex justify-content-between align-items-start">
                                             <div>
@@ -177,7 +182,7 @@
                                             </div>
                                             <small class="d-none mt-2 d-block text-danger" id="preview-shortfall"></small>
                                         </div>
-                                        <small class="d-block mt-2 text-danger d-none" id="preview-error">The amount must fall within a configured pricing band.</small>
+                                        <small class="d-block mt-2 text-danger d-none" id="preview-error">Valid transfer amount range: {{ $pricingAmountRange['range_text'] ?? 'not available' }}</small>
                                     </div>
                                 @endif
                             </div>
@@ -234,6 +239,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const minimumTransfer = parseFloat(amountInput.dataset.minTransfer) || 0;
     const pricingBands = JSON.parse(amountInput.dataset.pricingBands || '[]');
     const globalExtraCharges = JSON.parse(amountInput.dataset.globalExtraCharges || '[]');
+    const validRangeText = amountInput.dataset.validRangeText ? JSON.parse(amountInput.dataset.validRangeText) : null;
     const currency = `{!! getSettings()['currency'] !!}`;
 
     const normalizeCharge = (charge) => ({
@@ -307,6 +313,9 @@ document.addEventListener('DOMContentLoaded', function () {
         const isValid = Boolean(band) && amount >= minimumTransfer && total <= walletBalance;
 
         if (previewError) {
+            if (validRangeText) {
+                previewError.textContent = `Valid transfer amount range: ${validRangeText}`;
+            }
             previewError.classList.toggle('d-none', isValid || amount <= 0);
         }
 

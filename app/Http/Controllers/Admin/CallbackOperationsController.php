@@ -6,8 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\API;
 use App\Models\ApiRequestLog;
 use App\Models\Webhook;
-use App\Models\Webhook;
-use App\Services\WebhookProcessor;
+use App\Services\WebhookService;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Throwable;
@@ -15,7 +14,6 @@ use Throwable;
 class CallbackOperationsController extends Controller
 {
     public function logWebhook(Request $request, int $provider_id){
-        dd($request->all());
         return app(WebhookService::class)->logWebhookResponse($request, $provider_id);
     }
 

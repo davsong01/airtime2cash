@@ -83,6 +83,73 @@ if (!function_exists("normalizeChargeBreakdown")) {
     }
 }
 
+if (!function_exists("getBankTransferPricingAmountRange")) {
+    function getBankTransferPricingAmountRange($providerId = null): array
+    {
+        $settings = getSettings();
+        $provider = API::query()
+            ->when($providerId, fn ($query) => $query->whereKey($providerId), fn ($query) => $query->whereKey($settings?->bank_transfer_provider_id))
+            ->where('status', 'active')
+            ->first();
+
+        $result = [
+            'provider_id' => $provider?->id,
+            'pricing_enabled' => (bool) ($provider?->pricing_data_status ?? false),
+            'pricing_available' => false,
+            'min_amount' => null,
+            'max_amount' => null,
+            'range_text' => null,
+        ];
+
+        if (! $provider || ! $result['pricing_enabled']) {
+            return $result;
+        }
+
+        $pricingData = is_array($provider->pricing_data ?? null)
+            ? $provider->pricing_data
+            : (json_decode($provider->pricing_data ?? '[]', true) ?: []);
+
+        $bands = collect($pricingData)->filter(fn ($band) => is_array($band));
+        $result['pricing_available'] = $bands->isNotEmpty();
+
+        if (! $result['pricing_available']) {
+            return $result;
+        }
+
+        $minValues = $bands->map(function ($band) {
+            if (!isset($band['min_amount']) || $band['min_amount'] === '') {
+                return null;
+            }
+
+            return (float) $band['min_amount'];
+        })->filter(fn ($value) => $value !== null)->values();
+
+        $maxValues = $bands->map(function ($band) {
+            if (!isset($band['max_amount']) || $band['max_amount'] === '') {
+                return null;
+            }
+
+            return (float) $band['max_amount'];
+        })->filter(fn ($value) => $value !== null)->values();
+
+        $minAmount = $minValues->isNotEmpty() ? (float) $minValues->min() : null;
+        $maxAmount = $maxValues->isNotEmpty() ? (float) $maxValues->max() : null;
+
+        $result['min_amount'] = $minAmount;
+        $result['max_amount'] = $maxAmount;
+
+        if ($minAmount !== null && $maxAmount !== null) {
+            $result['range_text'] = getSettings()->currency . number_format($minAmount, 2) . ' - ' . getSettings()->currency . number_format($maxAmount, 2);
+        } elseif ($minAmount !== null) {
+            $result['range_text'] = 'At least ' . getSettings()->currency . number_format($minAmount, 2);
+        } elseif ($maxAmount !== null) {
+            $result['range_text'] = 'Up to ' . getSettings()->currency . number_format($maxAmount, 2);
+        }
+
+        return $result;
+    }
+}
+
 if (!function_exists("getPaymentGatewayReservedAccountCharge")) {
     function getPaymentGatewayReservedAccountCharge($provider = null)
     {

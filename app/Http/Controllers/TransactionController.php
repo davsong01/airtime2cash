@@ -111,6 +111,7 @@ class TransactionController extends Controller
         $pricingBands = $pricingProvider?->pricing_data ?? [];
         $pricingEnabled = (bool) ($pricingProvider?->pricing_data_status ?? false);
         $pricingAvailable = $pricingEnabled && !empty($pricingBands);
+        $pricingAmountRange = getBankTransferPricingAmountRange($pricingProvider?->id);
         $providerMin = 60;
         $minimumCharge = $pricingAvailable
             ? getBankTransferChargeDetails($providerMin, $pricingProvider?->id)
@@ -119,7 +120,7 @@ class TransactionController extends Controller
         $walletBalance = walletBalance(auth()->user());
 
         if (!empty($product) && $product->status == 'active') {
-            return view(themeView('customer', 'wallet2bank_transfer_page'), compact('product', 'banks', 'pricingProvider', 'pricingBands', 'providerMin', 'minimumRequiredBalance', 'pricingEnabled', 'pricingAvailable', 'walletBalance'));
+            return view(themeView('customer', 'wallet2bank_transfer_page'), compact('product', 'banks', 'pricingProvider', 'pricingBands', 'pricingAmountRange', 'providerMin', 'minimumRequiredBalance', 'pricingEnabled', 'pricingAvailable', 'walletBalance'));
         } else {
             return back();
         }
@@ -549,7 +550,14 @@ class TransactionController extends Controller
         }
 
         if (!($chargeDetails['matched'] ?? false)) {
-            return back()->with('error', 'The transfer amount does not match any configured pricing band.');
+            $pricingRange = getBankTransferPricingAmountRange($chargeDetails['provider_id'] ?? null);
+            $rangeText = $pricingRange['range_text'] ?? null;
+
+            if (!empty($rangeText)) {
+                return back()->with('error', 'Valid transfer amounts are ' . $rangeText . '.');
+            }
+
+            return back()->with('error', 'Unable to determine the valid transfer amount range from the active pricing bands.');
         }
 
         $transferFee = (float) ($chargeDetails['transfer_fee'] ?? 0);

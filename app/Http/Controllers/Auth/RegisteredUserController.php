@@ -82,6 +82,7 @@ class RegisteredUserController extends Controller
             'email' => $request->email,
             'password' => Hash::make($request->password),
             'status' => 'active',
+            'email_verified_at' => $modernOnboarding ? now() : null,
         ]);
 
         $user->update([
