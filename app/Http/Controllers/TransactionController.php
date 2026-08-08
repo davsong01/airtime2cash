@@ -1626,7 +1626,8 @@ class TransactionController extends Controller
         ]);
 
         $baseQuery = Airtime2CashTransactions::where('type', 'credit');
-        $metrics = (clone $baseQuery)->selectRaw("COALESCE(SUM(CASE WHEN status = 'approved' THEN amount_paid ELSE 0 END), 0) AS approved_payout")
+        $metrics = (clone $baseQuery)
+            ->selectRaw("SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END) AS approved_count")
             ->selectRaw("COALESCE(SUM(CASE WHEN status = 'approved' THEN amount_charged ELSE 0 END), 0) AS conversion_income")
             ->selectRaw("COALESCE(SUM(CASE WHEN status = 'pending' THEN amount_paid ELSE 0 END), 0) AS pending_value")
             ->selectRaw("SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending_count")

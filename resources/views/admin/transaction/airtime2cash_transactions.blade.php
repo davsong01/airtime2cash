@@ -58,8 +58,8 @@
                         <div class="card a2c-metric-card">
                             <div class="card-body">
                                 <span class="a2c-metric-icon is-primary"><i class="bx bx-line-chart"></i></span>
-                                <span class="a2c-metric-label">Conversion income</span>
-                                <strong>{{ $currency }}{{ number_format((float) $metrics->conversion_income, 2) }}</strong>
+                                <span class="a2c-metric-label">Approved Count</span>
+                                <strong>{{ $currency }}{{ number_format((float) $metrics->approved_count, 2) }}</strong>
                                 <small>Charges from approved requests</small>
                             </div>
                         </div>
