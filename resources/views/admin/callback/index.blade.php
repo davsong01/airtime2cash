@@ -227,6 +227,9 @@
                                         'processing' => 'bx-loader-alt bx-spin',
                                         default => 'bx-time-five',
                                     };
+
+                                    $linkedTransaction = $webhook->linkedTransaction();
+                                    $canResolve = $webhook->hasUnresolvedTransaction();
                                 @endphp
 
                                 <tr>
@@ -284,14 +287,14 @@
                                             Inspect
                                         </button>
 
-                                        @if($webhook->signature_valid && $webhook->processing_status !== 'processed')
+                                        @if($canResolve)
                                             <form method="POST" action="{{ route('admin.autosync.webhooks.resolve', $webhook) }}" class="d-inline-block">
                                                 @csrf
 
                                                 <button
                                                     type="submit"
                                                     class="btn btn-sm btn-primary"
-                                                    onclick="return confirm('Process this webhook now? Wallet settlement is idempotent.')"
+                                                    onclick="return confirm('Resolve this transaction from the attached webhook now?')"
                                                 >
                                                     <i class="bx bx-refresh mr-25"></i>
                                                     Resolve
@@ -347,6 +350,25 @@
                                                         <span class="badge badge-light-{{ $webhook->signature_valid ? 'success' : 'danger' }}">
                                                             {{ $webhook->signature_valid ? 'Valid' : 'Invalid' }}
                                                         </span>
+                                                    </div>
+                                                </div>
+
+                                                <div class="row mb-2">
+                                                    <div class="col-md-4">
+                                                        <small class="text-muted d-block">Attached Transaction</small>
+                                                        <strong>{{ $webhook->transaction_id ?: 'Not matched' }}</strong>
+                                                    </div>
+
+                                                    <div class="col-md-4">
+                                                        <small class="text-muted d-block">Transaction Status</small>
+                                                        <span class="badge badge-light-{{ $webhook->hasUnresolvedTransaction() ? 'warning' : 'success' }}">
+                                                            {{ $linkedTransaction?->status ? ucfirst($linkedTransaction->status) : 'Not resolved' }}
+                                                        </span>
+                                                    </div>
+
+                                                    <div class="col-md-4">
+                                                        <small class="text-muted d-block">Bank</small>
+                                                        <strong>{{ $linkedTransaction?->bank?->bank_name ?? $linkedTransaction?->bank_name ?? '-' }}</strong>
                                                     </div>
                                                 </div>
 

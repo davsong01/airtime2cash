@@ -1,22 +1,26 @@
 <?php
+
 namespace App\Services;
 
 use App\Http\Controllers\TransactionController;
 use App\Models\API;
-use App\Models\ProviderWebhook;
+use App\Models\Airtime2CashTransactions;
 use App\Models\TransactionLog;
+use App\Models\Webhook;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 define('LIMIT', 50000);
 
-class WebhookService {
-
+class WebhookService
+{
     public function analyzeWebhookResponse($pick)
     {
-        $webhooks = ProviderWebhook::with('provider')
-            ->where('status', 'pending')
+        $webhooks = Webhook::with(['provider', 'transaction', 'transactionLog'])
+            ->where('processing_status', 'pending')
+            ->where('signature_valid', true)
             ->take($pick)
             ->get();
 
@@ -25,102 +29,194 @@ class WebhookService {
         }
 
         foreach ($webhooks as $webhook) {
-            // Check for pending/attention-required transaction logs for this reference
-            $transaction = TransactionLog::where('external_reference_id', $webhook->reference)->first();
-
-            if (in_array($transaction->status, ['attention-required','pending'])) {
-                $file_name = $webhook->provider->file_name;
-                $class = "App\\Http\\Controllers\\Providers\\" . $file_name;
-
-                if (class_exists($class) && method_exists($class, 'analyzeWebhookResponse')) {
-                    $analyze = app($class)->analyzeWebhookResponse($webhook);
-
-                    if (!empty($analyze['status']) && in_array($analyze['status_code'], [1,0]) && isset($transaction)) {
-                        app(TransactionController::class)->handleTransactionProcessing($transaction, $analyze);
-
-                        $webhook->update([
-                            'status' => 'resolved'
-                        ]);
-                    }
-                }
-            } else {
-                $webhook->update([
-                    'status' => 'analyzed'
-                ]);
-            }
+            app(WebhookProcessor::class)->process($webhook);
         }
+
+        return 'Webhook queue processed successfully.';
     }
 
-    public function logWebhookResponse(Request $request, API $provider_id)
+    public function logWebhookResponse(Request $request, int $providerId)
     {
         try {
-            $provider = API::find($provider_id);
+            $provider = API::find($providerId);
 
-            if (!$provider) {
+            if (! $provider) {
                 return false;
             }
 
-            $class = "App\\Http\\Controllers\\Providers\\" . $provider->file_name;
+            $payload = $request->all();
+            $headers = $this->normalizeHeaders($request->headers->all());
+            $controller = $this->resolveProviderController($provider);
+            $verification = ['status' => true, 'reference' => null];
 
-            if (!class_exists($class)) {
-                return false;
+            if ($controller && method_exists($controller, 'verifyWebhookSignature')) {
+                $verification = (array) $controller->verifyWebhookSignature($request);
             }
 
-            $providerService = app($class);
+            $providerReference = $this->extractProviderReference($payload, $verification['reference'] ?? null);
+            $requestRef = $this->extractRequestReference($payload);
+            $transactionId = $this->extractTransactionId($payload, $providerReference, $requestRef);
+            $providerStatus = $this->extractProviderStatus($payload);
+            $customerId = $this->resolveCustomerId($transactionId);
 
-            if (!method_exists($providerService, 'verifyWebhookSignature')) {
-                return false;
+            $query = Webhook::query()->where('api_id', $provider->id);
+
+            if (filled($providerReference)) {
+                $query->where('provider_reference', $providerReference);
+            } elseif (filled($requestRef)) {
+                $query->where('request_ref', $requestRef);
+            } elseif (filled($transactionId)) {
+                $query->where('transaction_id', $transactionId);
+            } else {
+                $query = null;
             }
 
-            $verifySignature = $providerService->verifyWebhookSignature($request);
-
-            if (
-                empty($verifySignature['status']) ||
-                empty($verifySignature['reference'])
-            ) {
-                return false;
+            if ($query) {
+                $webhook = $query->latest('id')->first() ?? new Webhook();
+                $attempts = (int) ($webhook->attempts ?? 0);
+            } else {
+                $webhook = new Webhook();
+                $attempts = 0;
             }
 
-            // Prevent duplicate webhook
-            if (ProviderWebhook::where('reference', $verifySignature['reference'])->exists()) {
-                return true;
-            }
+            $webhook->fill([
+                'api_id' => $provider->id,
+                'customer_id' => $customerId,
+                'transaction_id' => $transactionId,
+                'provider_reference' => $providerReference,
+                'request_ref' => $requestRef,
+                'provider_status' => $providerStatus,
+                'processing_status' => 'pending',
+                'signature_valid' => (bool) ($verification['status'] ?? false),
+                'headers' => $headers,
+                'payload' => $payload,
+                'attempts' => $attempts + 1,
+                'last_error' => ! ($verification['status'] ?? false)
+                    ? ($verification['message'] ?? 'Signature verification failed.')
+                    : null,
+            ]);
 
-            DB::beginTransaction();
+            DB::transaction(function () use ($webhook) {
+                $webhook->save();
+            });
 
-            try {
-                ProviderWebhook::create([
-                    'api_id'          => $provider_id,
-                    'reference'       => $verifySignature['reference'],
-                    'status'          => 'pending',
-                    'request_payload'=> json_encode($request->all()),
-                    'type'            => $request->input('type', 'transaction'),
-                ]);
-
-                DB::commit();
-                return true;
-
-            } catch (\Throwable $e) {
-                DB::rollBack();
-
-                Log::error('Webhook DB insert failed', [
-                    'provider_id' => $provider_id,
-                    'error'       => $e->getMessage(),
-                    'payload'     => $request->all(),
-                ]);
-
-                return false;
-            }
-
-        } catch (\Throwable $e) {
+            return true;
+        } catch (\Throwable $exception) {
             Log::error('Webhook processing failed', [
-                'provider_id' => $provider_id,
-                'error'       => $e->getMessage(),
-                'payload'     => $request->all(),
+                'provider_id' => $providerId,
+                'error' => $exception->getMessage(),
+                'payload' => $request->all(),
             ]);
 
             return false;
         }
     }
 
+    private function resolveProviderController(API $provider): mixed
+    {
+        $class = 'App\\Http\\Controllers\\Providers\\'.$provider->file_name;
+
+        if (! class_exists($class)) {
+            return null;
+        }
+
+        return app($class);
+    }
+
+    private function resolveCustomerId(?string $transactionId): ?int
+    {
+        if (blank($transactionId)) {
+            return null;
+        }
+
+        $airtimeTransaction = Airtime2CashTransactions::where('transaction_id', $transactionId)->first();
+
+        if ($airtimeTransaction) {
+            return $airtimeTransaction->customer_id;
+        }
+
+        $transactionLog = TransactionLog::where('transaction_id', $transactionId)->first();
+
+        return $transactionLog?->customer_id;
+    }
+
+    private function extractProviderReference(array $payload, ?string $fallback = null): ?string
+    {
+        return $this->firstString([
+            $fallback,
+            data_get($payload, 'transaction.reference'),
+            data_get($payload, 'data.transaction.reference'),
+            data_get($payload, 'reference'),
+            data_get($payload, 'provider_reference'),
+            data_get($payload, 'transaction_id'),
+        ]);
+    }
+
+    private function extractRequestReference(array $payload): ?string
+    {
+        return $this->firstString([
+            data_get($payload, 'transaction.request_ref'),
+            data_get($payload, 'data.transaction.request_ref'),
+            data_get($payload, 'request_ref'),
+        ]);
+    }
+
+    private function extractTransactionId(array $payload, ?string $providerReference, ?string $requestRef): ?string
+    {
+        $candidates = array_filter([
+            data_get($payload, 'transaction_id'),
+            data_get($payload, 'transaction.reference'),
+            data_get($payload, 'data.transaction.reference'),
+            $requestRef,
+            $providerReference,
+        ]);
+
+        foreach ($candidates as $candidate) {
+            $transactionId = (string) $candidate;
+
+            if (Airtime2CashTransactions::where('transaction_id', $transactionId)->exists()) {
+                return $transactionId;
+            }
+
+            if (TransactionLog::where('transaction_id', $transactionId)->exists()) {
+                return $transactionId;
+            }
+        }
+
+        return $this->firstString($candidates);
+    }
+
+    private function extractProviderStatus(array $payload): ?string
+    {
+        return $this->firstString([
+            data_get($payload, 'provider_status'),
+            data_get($payload, 'transaction.status'),
+            data_get($payload, 'data.transaction.status'),
+            data_get($payload, 'status'),
+        ]);
+    }
+
+    private function normalizeHeaders(array $headers): array
+    {
+        return collect($headers)
+            ->map(function ($value) {
+                if (is_array($value) && count($value) === 1) {
+                    return $value[0];
+                }
+
+                return $value;
+            })
+            ->all();
+    }
+
+    private function firstString(array $values): ?string
+    {
+        foreach ($values as $value) {
+            if (is_string($value) && trim($value) !== '') {
+                return trim($value);
+            }
+        }
+
+        return null;
+    }
 }

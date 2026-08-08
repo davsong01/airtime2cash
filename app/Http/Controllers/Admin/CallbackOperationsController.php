@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\API;
 use App\Models\ApiRequestLog;
 use App\Models\Webhook;
+use App\Services\WebhookProcessor;
 use App\Services\WebhookService;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\RedirectResponse;
@@ -28,7 +29,7 @@ class CallbackOperationsController extends Controller
 
     public function webhooks(Request $request)
     {
-        $webhooks = Webhook::with(['customer.user', 'resolver.user', 'provider'])
+        $webhooks = Webhook::with(['customer.user', 'resolver.user', 'provider', 'transaction', 'transactionLog.bank'])
             ->when($request->filled('api_id'), fn ($query) => $query->where('api_id', $request->api_id))
             ->when($request->filled('processing_status'), fn ($query) => $query->where('processing_status', $request->processing_status))
             ->when($request->filled('provider_status'), fn ($query) => $query->where('provider_status', 'like', '%'.$request->provider_status.'%'))
@@ -159,7 +160,7 @@ class CallbackOperationsController extends Controller
     public function resolve(Webhook $webhook)
     {
         try {
-            $processor->process($webhook, auth()->user()->admin->id);
+            app(WebhookProcessor::class)->process($webhook, auth()->user()->admin->id, true);
         } catch (Throwable $exception) {
             return back()->with('error', 'Webhook could not be resolved: ' . $exception->getMessage());
         }

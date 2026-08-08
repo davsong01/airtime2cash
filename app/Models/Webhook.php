@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\API;
+use App\Models\TransactionLog;
 use Illuminate\Database\Eloquent\Model;
 
 class Webhook extends Model
@@ -27,6 +28,49 @@ class Webhook extends Model
     public function transaction()
     {
         return $this->belongsTo(Airtime2CashTransactions::class, 'transaction_id', 'transaction_id');
+    }
+
+    public function transactionLog()
+    {
+        return $this->belongsTo(TransactionLog::class, 'transaction_id', 'transaction_id');
+    }
+
+    public function linkedTransaction()
+    {
+        if ($this->relationLoaded('transaction') && $this->transaction) {
+            return $this->transaction;
+        }
+
+        if ($this->relationLoaded('transactionLog') && $this->transactionLog) {
+            return $this->transactionLog;
+        }
+
+        if ($this->transaction) {
+            return $this->transaction;
+        }
+
+        return $this->transactionLog;
+    }
+
+    public function hasUnresolvedTransaction(): bool
+    {
+        $transaction = $this->linkedTransaction();
+
+        if (! $transaction) {
+            return false;
+        }
+
+        $status = strtolower((string) ($transaction->status ?? ''));
+
+        return ! in_array($status, [
+            'approved',
+            'declined',
+            'failed',
+            'successful',
+            'success',
+            'completed',
+            'delivered',
+        ], true);
     }
 
     public function resolver()

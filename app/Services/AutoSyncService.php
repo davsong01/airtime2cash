@@ -377,13 +377,13 @@ class AutoSyncService
         return $data;
     }
 
-    public function settle(Airtime2CashTransactions $transaction, float $completedAmount, array $providerResponse): Airtime2CashTransactions
+    public function settle(Airtime2CashTransactions $transaction, float $completedAmount, array $providerResponse, ?int $resolvedBy = null): Airtime2CashTransactions
     {
         if ($completedAmount <= 0 || $completedAmount > (float) $transaction->total_amount) {
             throw new RuntimeException('AutoSync returned an invalid completed amount.');
         }
 
-        return DB::transaction(function () use ($transaction, $completedAmount, $providerResponse) {
+        return DB::transaction(function () use ($transaction, $completedAmount, $providerResponse, $resolvedBy) {
             $lockedTransaction = Airtime2CashTransactions::whereKey($transaction->id)->lockForUpdate()->firstOrFail();
             if ($lockedTransaction->status === 'approved') {
                 return $lockedTransaction;
@@ -416,16 +416,17 @@ class AutoSyncService
                 'provider_response' => json_encode($providerResponse),
                 'description' => 'Auto Transfer completed and wallet credited automatically.',
                 'completed_at' => now(),
+                'approved_by' => $resolvedBy ?? $lockedTransaction->approved_by,
             ]);
 
             return $lockedTransaction->fresh();
         });
     }
 
-    public function process(Webhook $webhook, ?int $resolvedBy = null): Webhook
+    public function process(Webhook $webhook, ?int $resolvedBy = null, bool $force = false): Webhook
     {
         $webhook->refresh();
-        if (!$webhook->signature_valid) {
+        if (! $webhook->signature_valid && ! $force) {
             throw new RuntimeException('This webhook has an invalid AutoSync signature.');
         }
 
@@ -465,7 +466,7 @@ class AutoSyncService
             $providerStatus = strtolower((string) ($providerTransaction['status'] ?? ''));
             if (in_array($providerStatus, ['successful', 'success', 'completed'], true)) {
                 $completedAmount = (float) ($providerTransaction['actual_amount'] ?? $providerTransaction['amount'] ?? 0);
-                $this->settlement->settle($transaction, $completedAmount, $payload);
+                $this->settlement->settle($transaction, $completedAmount, $payload, $resolvedBy);
             } elseif (in_array($providerStatus, ['failed', 'declined', 'cancelled'], true)) {
                 if ($transaction->status !== 'approved') {
                     $transaction->update([
@@ -473,6 +474,7 @@ class AutoSyncService
                         'provider_status' => $providerStatus,
                         'provider_response' => json_encode($payload),
                         'description' => $providerTransaction['details'] ?? 'Auto Transfer failed at AutoSync.',
+                        'approved_by' => $resolvedBy ?? $transaction->approved_by,
                     ]);
                 }
             } else {

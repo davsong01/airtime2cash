@@ -57,8 +57,19 @@ class AutoSyncController extends Controller
     }
 
     public function analyzeWebhookResponse($webhook){
-        $data = json_decode($webhook->request_payload, true);
-        return $this->formatResponse($data);
+        $data = is_array($webhook->payload ?? null)
+            ? $webhook->payload
+            : json_decode((string) ($webhook->request_payload ?? '{}'), true);
+
+        $providerStatus = strtolower((string) data_get($data, 'transaction.status', data_get($data, 'data.transaction.status', data_get($data, 'status', 'pending'))));
+
+        return [
+            'status' => true,
+            'status_code' => in_array($providerStatus, ['successful', 'success', 'completed'], true) ? 1 : 0,
+            'provider_status' => $providerStatus,
+            'api_response' => $data,
+            'payload' => data_get($data, 'transaction', data_get($data, 'data.transaction', [])),
+        ];
     }
 
     public function dummySuccess(){

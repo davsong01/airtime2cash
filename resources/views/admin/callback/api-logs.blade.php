@@ -326,27 +326,47 @@
                                                         <hr>
 
                                                         <div class="mb-2">
-                                                            <h6>Request Headers</h6>
+                                                            <div class="d-flex align-items-center justify-content-between mb-50">
+                                                                <h6 class="mb-0">Request Headers</h6>
+                                                                <button type="button" class="btn btn-sm btn-outline-secondary" data-copy-target="request-headers-{{ $log->id }}" onclick="copyLogBlock(this)">
+                                                                    <i class="bx bx-copy mr-25"></i>Copy
+                                                                </button>
+                                                            </div>
 
-                                                            <pre class="bg-light rounded p-2 text-wrap">{{ json_encode($log->request_headers, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
+                                                            <pre id="request-headers-{{ $log->id }}" class="bg-light rounded p-2 text-wrap">{{ json_encode($log->request_headers, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
                                                         </div>
 
                                                         <div class="mb-2">
-                                                            <h6>Request Payload</h6>
+                                                            <div class="d-flex align-items-center justify-content-between mb-50">
+                                                                <h6 class="mb-0">Request Payload</h6>
+                                                                <button type="button" class="btn btn-sm btn-outline-secondary" data-copy-target="request-payload-{{ $log->id }}" onclick="copyLogBlock(this)">
+                                                                    <i class="bx bx-copy mr-25"></i>Copy
+                                                                </button>
+                                                            </div>
 
-                                                            <pre class="bg-light rounded p-2 text-wrap">{{ json_encode($log->request_payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
+                                                            <pre id="request-payload-{{ $log->id }}" class="bg-light rounded p-2 text-wrap">{{ json_encode($log->request_payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
                                                         </div>
 
                                                         <div class="mb-2">
-                                                            <h6>Response Headers</h6>
+                                                            <div class="d-flex align-items-center justify-content-between mb-50">
+                                                                <h6 class="mb-0">Response Headers</h6>
+                                                                <button type="button" class="btn btn-sm btn-outline-secondary" data-copy-target="response-headers-{{ $log->id }}" onclick="copyLogBlock(this)">
+                                                                    <i class="bx bx-copy mr-25"></i>Copy
+                                                                </button>
+                                                            </div>
 
-                                                            <pre class="bg-light rounded p-2 text-wrap">{{ json_encode($log->response_headers, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
+                                                            <pre id="response-headers-{{ $log->id }}" class="bg-light rounded p-2 text-wrap">{{ json_encode($log->response_headers, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
                                                         </div>
 
                                                         <div>
-                                                            <h6>Response Body</h6>
+                                                            <div class="d-flex align-items-center justify-content-between mb-50">
+                                                                <h6 class="mb-0">Response Body</h6>
+                                                                <button type="button" class="btn btn-sm btn-outline-secondary" data-copy-target="response-body-{{ $log->id }}" onclick="copyLogBlock(this)">
+                                                                    <i class="bx bx-copy mr-25"></i>Copy
+                                                                </button>
+                                                            </div>
 
-                                                            <pre class="bg-light rounded p-2 text-wrap">{{ json_encode($log->response_body, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
+                                                            <pre id="response-body-{{ $log->id }}" class="bg-light rounded p-2 text-wrap">{{ json_encode($log->response_body, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
                                                         </div>
 
                                                     </div>
@@ -376,4 +396,38 @@
         </div>
     </div>
 </div>
+
+<script>
+    function copyLogBlock(button) {
+        const targetId = button.getAttribute('data-copy-target');
+        const target = document.getElementById(targetId);
+
+        if (!target) {
+            return;
+        }
+
+        const text = target.innerText || target.textContent || '';
+
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(text);
+        } else {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.focus();
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+        }
+
+        const originalHtml = button.innerHTML;
+        button.innerHTML = '<i class="bx bx-check mr-25"></i>Copied';
+
+        window.setTimeout(function () {
+            button.innerHTML = originalHtml;
+        }, 1400);
+    }
+</script>
 @endsection
