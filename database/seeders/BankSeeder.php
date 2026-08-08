@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Providers\SageController;
 use App\Models\API;
 use App\Models\Bank;
 use Illuminate\Database\Seeder;
@@ -22,18 +23,9 @@ class BankSeeder extends Seeder
             return;
         }
 
-        $loginUrl = rtrim($provider->live_base_url, '/').'/merchant/authorization';
+        $control = app(SageController::class);
 
-        $control = new Controller();
-
-        $login = $control->basicApiCall(
-            $loginUrl,
-            [
-                'email' => $provider->api_key,
-                'password' => $provider->secret_key,
-            ],
-            []
-        );
+        $login = $control->login();
 
         if (empty($login) || ($login['success'] ?? false) !== true) {
             $this->command?->warn('Unable to authenticate with SageCloud. Bank seeding skipped.');
