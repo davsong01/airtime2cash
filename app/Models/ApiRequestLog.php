@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\API;
 use Illuminate\Database\Eloquent\Model;
 
 class ApiRequestLog extends Model
@@ -20,5 +21,10 @@ class ApiRequestLog extends Model
     public function customer()
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    public function provider()
+    {
+        return $this->belongsTo(API::class, 'api_id');
     }
 }
