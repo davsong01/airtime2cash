@@ -5,9 +5,9 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\API;
 use App\Models\ApiRequestLog;
-use App\Models\AutoSyncWebhook;
 use App\Models\Webhook;
-use App\Services\AutoSyncWebhookProcessor;
+use App\Models\Webhook;
+use App\Services\WebhookProcessor;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Throwable;
@@ -22,7 +22,7 @@ class CallbackOperationsController extends Controller
     public function analyzeProviderCallbackResponse($pick){
         return app(WebhookService::class)->analyzeWebhookResponse($pick);
     }
-    
+
     public function index()
     {
         return redirect()->route('admin.webhooks.index');

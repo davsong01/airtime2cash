@@ -1473,6 +1473,7 @@ class TransactionController extends Controller
             ->selectRaw("COALESCE(SUM(CASE WHEN status = 'failed' THEN amount ELSE 0 END), 0) AS failed")
             ->selectRaw("COALESCE(SUM(CASE WHEN status = 'attention-required' THEN amount ELSE 0 END), 0) AS attention_required")
             ->first();
+
         $transactions = $baseQuery->with(['category', 'variation', 'api', 'airtime2cash'])->latest();
         $products = Product::orderBy('display_name')->get(['id', 'display_name']);
 
@@ -1632,7 +1633,7 @@ class TransactionController extends Controller
             ->selectRaw("SUM(CASE WHEN status = 'declined' THEN 1 ELSE 0 END) AS declined_count")
             ->selectRaw("SUM(CASE WHEN DATE(created_at) = CURRENT_DATE THEN 1 ELSE 0 END) AS today_count")
             ->first();
-
+    // dd($metrics);
         $transactions = $baseQuery->with(['product:id,name,display_name', 'customer.user:id,firstname,middlename,lastname,email,phone']);
 
         if ($request->email) {

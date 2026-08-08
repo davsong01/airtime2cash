@@ -17,7 +17,7 @@ use App\Models\ReferralEarning;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use App\Models\TransactionPinResetToken;
-use App\Models\AutoSyncWebhook;
+use App\Models\Webhook;
 use Illuminate\Support\Facades\Validator;
 
 class DashboardController extends Controller
@@ -65,7 +65,7 @@ class DashboardController extends Controller
                 'customer.user:id,firstname,middlename,lastname,email',
                 'product:id,name,display_name',
             ])->latest()->limit(8)->get();
-            $autoSyncWebhookSummary = AutoSyncWebhook::selectRaw('COUNT(*) AS total')
+            $autoSyncWebhookSummary = Webhook::selectRaw('COUNT(*) AS total')
                 ->selectRaw("SUM(CASE WHEN processing_status = 'pending' THEN 1 ELSE 0 END) AS pending")
                 ->selectRaw("SUM(CASE WHEN processing_status = 'failed' THEN 1 ELSE 0 END) AS failed")
                 ->first();
@@ -446,7 +446,7 @@ class DashboardController extends Controller
         //         $this->updateKycData($key, $value, auth()->user()->customer->id, 'unverified');
         //     }
         // }
-        
+
         // $firstname = $input['FIRST_NAME'] ?? auth()->user()->firstname;
         // $lastname = $input['LAST_NAME'] ?? auth()->user()->lastname;
         // $middlename = $input['MIDDLE_NAME'] ?? auth()->user()->middlename;

@@ -422,7 +422,7 @@ class AutoSyncService
         });
     }
 
-    public function process(AutoSyncWebhook $webhook, ?int $resolvedBy = null): AutoSyncWebhook
+    public function process(Webhook $webhook, ?int $resolvedBy = null): Webhook
     {
         $webhook->refresh();
         if (!$webhook->signature_valid) {
