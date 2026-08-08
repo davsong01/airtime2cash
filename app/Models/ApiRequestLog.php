@@ -4,9 +4,9 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class AutoSyncApiLog extends Model
+class ApiRequestLog extends Model
 {
-    protected $table = 'autosync_api_logs';
+    protected $table = 'api_request_logs';
 
     protected $guarded = [];
 

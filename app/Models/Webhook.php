@@ -2,11 +2,12 @@
 
 namespace App\Models;
 
+use App\Models\API;
 use Illuminate\Database\Eloquent\Model;
 
-class AutoSyncWebhook extends Model
+class Webhook extends Model
 {
-    protected $table = 'autosync_webhooks';
+    protected $table = 'webhooks';
 
     protected $guarded = [];
 
@@ -31,5 +32,10 @@ class AutoSyncWebhook extends Model
     public function resolver()
     {
         return $this->belongsTo(Admin::class, 'resolved_by');
+    }
+
+    public function provider()
+    {
+        return $this->belongsTo(API::class, 'api_id');
     }
 }

@@ -99,7 +99,7 @@
                 </li>
             @endif
             @if (in_array('Customers', $allowedMenu) || in_array(1, auth()->user()->admin->roleIds()))
-                <li class="svg nav-item"><a href="#"><svg xmlns="http://www.w3.org/2000/svg" 
+                <li class="svg nav-item"><a href="#"><svg xmlns="http://www.w3.org/2000/svg"
                             height="24" viewBox="0 -960 960 960" width="24">
                             <path
                                 d="M660-570q-25 0-42.5-17.5T600-630q0-25 17.5-42.5T660-690q25 0 42.5 17.5T720-630q0 25-17.5 42.5T660-570Zm-360 0q-25 0-42.5-17.5T240-630q0-25 17.5-42.5T300-690q25 0 42.5 17.5T360-630q0 25-17.5 42.5T300-570Zm180 110q-25 0-42.5-17.5T420-520q0-25 17.5-42.5T480-580q25 0 42.5 17.5T540-520q0 25-17.5 42.5T480-460Zm0-220q-25 0-42.5-17.5T420-740q0-25 17.5-42.5T480-800q25 0 42.5 17.5T540-740q0 25-17.5 42.5T480-680Zm0 520q-20 0-40.5-3t-39.5-8v-143q0-35 23.5-60.5T480-400q33 0 56.5 25.5T560-314v143q-19 5-39.5 8t-40.5 3Zm-140-32q-20-8-38.5-18T266-232q-28-20-44.5-52T205-352q0-26-5.5-48.5T180-443q-10-13-37.5-39.5T92-532q-11-11-11-28t11-28q11-11 28-11t28 11l153 145q20 18 29.5 42.5T340-350v158Zm280 0v-158q0-26 10-51t29-42l153-145q12-11 28.5-11t27.5 11q11 11 11 28t-11 28q-23 23-50.5 49T780-443q-14 20-19.5 42.5T755-352q0 36-16.5 68.5T693-231q-16 11-34.5 21T620-192Z" />
@@ -187,18 +187,7 @@
                 <li class="svg {{ Request::path() == 'admin.airtime.2.cash.log' ? 'active' : '' }}"><a href="{{ route('admin.airtime.2.cash.log') }}"><svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24"><path  d="M480-120q-138 0-240.5-91.5T122-440h82q14 104 92.5 172T480-200q117 0 198.5-81.5T760-480q0-117-81.5-198.5T480-760q-69 0-129 32t-101 88h110v80H120v-240h80v94q51-64 124.5-99T480-840q75 0 140.5 28.5t114 77q48.5 48.5 77 114T840-480q0 75-28.5 140.5t-77 114q-48.5 48.5-114 77T480-120Zm112-192L440-464v-216h80v184l128 128-56 56Z"/></svg><span class="menu-title">&nbsp;A2Cash Management</span></a>
                 </li>
             @endif
-            @if (in_array('admin.autosync.index', $allowedRoutes) || in_array('admin.autosync.webhooks.index', $allowedRoutes) || in_array('admin.autosync.api-logs.index', $allowedRoutes) || in_array(1, auth()->user()->admin->roleIds()))
-                <li class="nav-item svg {{ Route::is('admin.autosync.*') ? 'active open' : '' }}"><a href="#"><svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24"><path d="M480-160q-134 0-227-93t-93-227q0-134 93-227t227-93q69 0 132 28.5T720-690v-110h80v280H520v-80h168q-32-56-87.5-88T480-720q-100 0-170 70t-70 170q0 100 70 170t170 70q77 0 139-44t87-116h84q-28 106-114 173t-196 67Z" /></svg><span class="menu-title">&nbsp;AutoSync Operations</span></a>
-                    <ul class="menu-content">
-                        @if (in_array('admin.autosync.index', $allowedRoutes) || in_array('admin.autosync.webhooks.index', $allowedRoutes) || in_array(1, auth()->user()->admin->roleIds()))
-                            <li class="svg {{ Route::is('admin.autosync.webhooks.*') ? 'active' : '' }}"><a href="{{ route('admin.autosync.webhooks.index') }}"><i class="bx bx-right-arrow-alt"></i><span class="menu-item">Webhooks</span></a></li>
-                        @endif
-                        @if (in_array('admin.autosync.index', $allowedRoutes) || in_array('admin.autosync.api-logs.index', $allowedRoutes) || in_array(1, auth()->user()->admin->roleIds()))
-                            <li class="svg {{ Route::is('admin.autosync.api-logs.*') ? 'active' : '' }}"><a href="{{ route('admin.autosync.api-logs.index') }}"><i class="bx bx-right-arrow-alt"></i><span class="menu-item">API Request Logs</span></a></li>
-                        @endif
-                    </ul>
-                </li>
-            @endif
+
             @if (in_array('Financials', $allowedMenu) || in_array(1, auth()->user()->admin->roleIds()))
                 <li class="svg nav-item"><a href="#"><svg  xmlns="http://www.w3.org/2000/svg"
                             height="24" viewBox="0 -960 960 960" width="24">
@@ -219,7 +208,7 @@
                                         Log</span></a>
                             </li>
                         @endif
-                        
+
                         @if (in_array('admin.walletlog', $allowedRoutes) || in_array(1, auth()->user()->admin->roleIds()))
                             <li class="svg {{ Route::is('admin.walletlog') ? 'active' : '' }}"><a
                                     href="{{ route('admin.walletlog') }}"><i class="bx bx-right-arrow-alt"></i><span
@@ -270,6 +259,22 @@
                     </ul>
                 </li>
             @endif
+            @if (in_array('admin.autosync.index', $allowedRoutes) || in_array('admin.webhooks.index', $allowedRoutes) || in_array('admin.api-logs.index', $allowedRoutes) || in_array(1, auth()->user()->admin->roleIds()))
+                <li class="nav-item svg {{ Route::is('admin.autosync.*') ? 'active open' : '' }}"><a href="#"><svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24"><path d="M480-160q-134 0-227-93t-93-227q0-134 93-227t227-93q69 0 132 28.5T720-690v-110h80v280H520v-80h168q-32-56-87.5-88T480-720q-100 0-170 70t-70 170q0 100 70 170t170 70q77 0 139-44t87-116h84q-28 106-114 173t-196 67Z" /></svg><span class="menu-title">&nbsp;Callback Operations</span></a>
+                    <ul class="menu-content">
+                        @if (in_array('admin.autosync.index', $allowedRoutes) || in_array('admin.webhooks.index', $allowedRoutes) || in_array(1, auth()->user()->admin->roleIds()))
+                            <li class="svg {{ Route::is('admin.autosync.webhooks.*') ? 'active' : '' }}"><a href="{{ route('admin.webhooks.index') }}"><i class="bx bx-right-arrow-alt"></i><span class="menu-item">Webhooks</span></a></li>
+                        @endif
+                        @if (in_array('admin.autosync.index', $allowedRoutes) || in_array('admin.api-logs.index', $allowedRoutes) || in_array(1, auth()->user()->admin->roleIds()))
+                            <li class="svg {{ Route::is('admin.autosync.api-logs.*') ? 'active' : '' }}"><a href="{{ route('admin.api-logs.index') }}"><i class="bx bx-right-arrow-alt"></i><span class="menu-item">API Request Logs</span></a></li>
+                        @endif
+                        @if (in_array('Callback Analysis', $allowedMenu) || in_array(1, auth()->user()->admin->roleIds()))
+                        <li class="svg {{ Route::is('callback.analysis*') ? 'active' : '' }}"><a href="{{ route('callback.analysis') }}"><i class="bx bx-right-arrow-alt"></i><span class="menu-item">Callback Analysis</span></a></li>
+
+                    @endif
+                    </ul>
+                </li>
+            @endif
             {{-- @if (in_array('Profile', $allowedMenu) || in_array(1, auth()->user()->admin->roleIds())) --}}
                 <li class="svg {{ Request::path() == 'profile' ? 'active' : '' }}"><a
                         href="{{ route('profile.edit') }}"><svg xmlns="http://www.w3.org/2000/svg"
@@ -279,16 +284,7 @@
                         </svg><span class="menu-title">&nbsp;My Profile</span></a>
                 </li>
             {{-- @endif --}}
-            @if (in_array('Callback Analysis', $allowedMenu) || in_array(1, auth()->user()->admin->roleIds()))
-                <li class="svg {{ Route::is('callback.analysis') ? 'active' : '' }}"><a
-                        href="{{ route('callback.analysis') }}"><svg xmlns="http://www.w3.org/2000/svg"
-                            height="24" viewBox="0 -960 960 960" width="24">
-                            <path
-                                d="M440-280H280q-83 0-141.5-58.5T80-480q0-83 58.5-141.5T280-680h160v80H280q-50 0-85 35t-35 85q0 50 35 85t85 35h160v80ZM320-440v-80h320v80H320Zm200 160v-80h160q50 0 85-35t35-85q0-50-35-85t-85-35H520v-80h160q83 0 141.5 58.5T880-480q0 83-58.5 141.5T680-280H520Z"
-                                 />
-                        </svg><span class="menu-title">&nbsp;Callback Analysis</span></a>
-                </li>
-            @endif
+
             @if (in_array('KYC Management', $allowedMenu) || in_array(1, auth()->user()->admin->roleIds()))
                 <li class="svg {{ Route::is('admin.kyc.*') ? 'active' : '' }}"><a
                         href="{{ route('admin.kyc') }}"><svg xmlns="http://www.w3.org/2000/svg" height="24"

@@ -20,9 +20,9 @@ class RouteProtectionMiddleware
         $curRouteName = Route::currentRouteName();
         $permissionRoutes = match ($curRouteName) {
             'admin.kyc.customer-suggestions' => ['admin.kyc'],
-            'admin.autosync.webhooks.index' => ['admin.autosync.webhooks.index', 'admin.autosync.index'],
-            'admin.autosync.webhooks.resolve' => ['admin.autosync.webhooks.resolve', 'admin.autosync.webhooks.index', 'admin.autosync.index'],
-            'admin.autosync.api-logs.index' => ['admin.autosync.api-logs.index', 'admin.autosync.index'],
+            'admin.webhooks.index' => ['admin.webhooks.index', 'admin.autosync.index'],
+            'admin.autosync.webhooks.resolve' => ['admin.autosync.webhooks.resolve', 'admin.webhooks.index', 'admin.autosync.index'],
+            'admin.api-logs.index' => ['admin.api-logs.index', 'admin.autosync.index'],
             default => [$curRouteName],
         };
 

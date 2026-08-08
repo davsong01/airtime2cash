@@ -5,7 +5,7 @@ namespace App\Services;
 use App\Http\Controllers\Controller;
 use App\Models\Airtime2CashTransactions;
 use App\Models\API;
-use App\Models\AutoSyncApiLog;
+use App\Models\ApiRequestLog;
 use App\Services\ProviderUtilityService;
 use GuzzleHttp\Psr7\Response as GuzzleResponse;
 use Illuminate\Http\Client\ConnectionException;
@@ -73,6 +73,7 @@ class AutoSyncService
         } catch (ConnectionException $exception) {
             $this->writeLog(
                 'initiate',
+                $provider->id,
                 $endpoint,
                 $headers,
                 $payload,
@@ -92,6 +93,7 @@ class AutoSyncService
 
         $this->writeLog(
             'initiate',
+            $provider->id,
             $endpoint,
             $headers,
             $payload,
@@ -180,6 +182,7 @@ class AutoSyncService
 
             $this->writeLog(
                 'complete',
+                $provider->id,
                 $endpoint,
                 $headers,
                 $payload,
@@ -194,6 +197,7 @@ class AutoSyncService
         } catch (ConnectionException $exception) {
             $this->writeLog(
                 'complete',
+                $provider->id,
                 $endpoint,
                 $headers,
                 $payload,
@@ -271,6 +275,7 @@ class AutoSyncService
 
             $this->writeLog(
                 'resend_otp',
+                $provider->id,
                 $endpoint,
                 $headers,
                 $payload,
@@ -285,6 +290,7 @@ class AutoSyncService
         } catch (ConnectionException $exception) {
             $this->writeLog(
                 'resend_otp',
+                $provider->id,
                 $endpoint,
                 $headers,
                 $payload,
@@ -327,6 +333,7 @@ class AutoSyncService
 
     private function writeLog(
         string $operation,
+        int $apiId,
         string $endpoint,
         array $headers,
         array $payload,
@@ -337,7 +344,8 @@ class AutoSyncService
         ?string $error = null,
         ?int $fallbackStatus = null
     ): void {
-        AutoSyncApiLog::create([
+        ApiRequestLog::create([
+            'api_id' => $apiId ?? null,
             'customer_id' => $context['customer_id'] ?? null,
             'transaction_id' => $context['transaction_id'] ?? null,
             'operation' => $operation,

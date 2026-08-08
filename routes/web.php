@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\AutoSyncOperationsController;
+use App\Http\Controllers\Admin\CallbackOperationsController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\Airtime2CashController;
 use App\Http\Controllers\AnnouncementController;
@@ -47,9 +48,8 @@ use Illuminate\Support\Facades\Route;
 |
 */
 // Provider webhooks
-Route::post('log-provider-webhook/{provider_id}', [WebhookController::class, 'logWebhook'])->name('log.provider.webhook');
-Route::get('cron/analyze-provider-callback/{pick}', [PaymentController::class, 'analyzeProviderCallbackResponse'])->name('callback.provider.analyze');
-Route::post('webhooks/autosync', [AutoSyncWebhookController::class, 'store'])->middleware('throttle:120,1')->name('webhooks.autosync');
+Route::post('log-provider-webhook/{provider_id}', [CallbackOperationsController::class, 'logWebhook'])->name('log.provider.webhook');
+Route::get('cron/analyze-webhook/{pick}', [CallbackOperationsController::class, 'analyzeProviderCallbackResponse'])->name('callback.provider.analyze');
 // End provider webhooks
 
 // Payment provider webhooks
@@ -177,13 +177,13 @@ Route::middleware(['auth', 'verified', 'admin', 'ipcheck', 'adminRoute'])->prefi
     Route::get('wallet-transactions', [TransactionController::class, 'walletTransView'])->name('admin.walletlog');
     Route::get('admin-wallet-funding-log', [TransactionController::class, 'walletFundingLogView'])->name('admin.walletfundinglog');
     Route::get('admin-airtime-2-cash-log', [TransactionController::class, 'airtimeToCashTransactions'])->name('admin.airtime.2.cash.log');
-    Route::get('autosync-operations', [AutoSyncOperationsController::class, 'index'])->name('admin.autosync.index');
-    Route::get('autosync-operations/webhooks', [AutoSyncOperationsController::class, 'webhooks'])->name('admin.autosync.webhooks.index');
-    Route::get('autosync-operations/api-request-logs', [AutoSyncOperationsController::class, 'apiLogs'])->name('admin.autosync.api-logs.index');
-    Route::get('clear-autosync-api-request-log', [AutoSyncOperationsController::class, 'clearApiLogs'])->name('admin.autosync.api-request.clear');
+    Route::get('callback-operations', [CallbackOperationsController::class, 'index'])->name('admin.autosync.index');
+    Route::get('operations/webhooks', [CallbackOperationsController::class, 'webhooks'])->name('admin.webhooks.index');
+    Route::get('operations/api-request-logs', [CallbackOperationsController::class, 'apiLogs'])->name('admin.api-logs.index');
+    Route::get('clear-api-request-log', [CallbackOperationsController::class, 'clearApiRequestLogs'])->name('admin.autosync.api-request.clear');
+    Route::get('admin.webhook-log', [CallbackOperationsController::class, 'clearWebhookLogs'])->name('admin.api-request.clear');
 
-    Route::post('autosync-webhooks/{webhook}/resolve', [AutoSyncOperationsController::class, 'resolve'])->name('admin.autosync.webhooks.resolve');
-    Route::get('clear-autosync-webhooks-log', [AutoSyncOperationsController::class, 'clearWebhookLogs'])->name('admin.autosync.webhooks.clear');
+    Route::post('webhooks/{webhook}/resolve', [CallbackOperationsController::class, 'resolve'])->name('admin.autosync.webhooks.resolve');
 
     Route::get('admin-earninglog', [TransactionController::class, 'walletEarningView'])->name('admin.earninglog');
     Route::get('credit-customer', [TransactionController::class, 'creditCustomerPage'])->name('admin.credit.customer');

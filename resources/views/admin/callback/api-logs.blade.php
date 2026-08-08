@@ -11,7 +11,7 @@
                 <div class="breadcrumb-wrapper col-12">
                     <ol class="breadcrumb p-0 mb-0">
                         <li class="breadcrumb-item"><a href="{{ route('dashboard') }}"><i class="bx bx-home-alt"></i></a></li>
-                        <li class="breadcrumb-item">AutoSync operations</li>
+                        <li class="breadcrumb-item">Callback operations</li>
                         <li class="breadcrumb-item active">API Request Logs</li>
                     </ol>
                 </div>
@@ -46,24 +46,166 @@
 
             <section class="card">
                 <div class="card-header d-flex flex-column flex-lg-row align-items-lg-center justify-content-between">
-                    <div class="mb-1 mb-lg-0"><h4 class="mb-25">Request and response history</h4><small>Newest provider exchanges appear first.</small></div>
-                    <form method="GET" class="form-inline">
-                        <select name="operation" class="form-control form-control-sm mr-50">
-                            <option value="">All operations</option>
-                            @foreach($operations as $operation)
-                                <option value="{{ $operation }}" @selected(request('operation') === $operation)>{{ str($operation)->replace('_', ' ')->title() }}</option>
-                            @endforeach
-                        </select>
-                        <select name="api_status" class="form-control form-control-sm mr-50">
-                            <option value="">All responses</option>
-                            <option value="success" @selected(request('api_status') === 'success')>Successful</option>
-                            <option value="failed" @selected(request('api_status') === 'failed')>Failed</option>
-                        </select>
-                        <button class="btn btn-sm btn-primary mr-50">Filter</button>
-                        @if(request()->hasAny(['operation', 'api_status']))
-                            <a href="{{ route('admin.autosync.api-logs.index') }}" class="btn btn-sm btn-light-secondary">Clear</a>
-                        @endif
-                    </form>
+                    <div class="card-header">
+                        <div class="w-100">
+                            <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between mb-1">
+                                <div>
+                                    <h4 class="mb-25">Request and Response History</h4>
+                                    <small>Newest provider exchanges appear first.</small>
+                                </div>
+
+
+                            </div>
+
+                            <form method="GET">
+                                <div class="row">
+                                    <div class="col-md-3">
+                                        <fieldset class="form-group">
+                                            <label for="transaction_id">Transaction ID</label>
+                                            <input
+                                                type="text"
+                                                name="transaction_id"
+                                                id="transaction_id"
+                                                class="form-control"
+                                                value="{{ request('transaction_id') }}"
+                                                placeholder="e.g. A2C-123456789"
+                                            >
+                                        </fieldset>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <fieldset class="form-group">
+                                            <label for="api_id">API Provider</label>
+                                            <select
+                                                name="api_id"
+                                                id="api_id"
+                                                class="form-control form-control-sm"
+                                            >
+                                                <option value="">All Providers</option>
+
+                                                @foreach($providers as $provider)
+                                                    <option
+                                                        value="{{ $provider->id }}"
+                                                        @selected((string) request('api_id') === (string) $provider->id)
+                                                    >
+                                                        {{ $provider->name }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                        </fieldset>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <fieldset class="form-group">
+                                            <label for="operation">Operation</label>
+                                            <select name="operation" id="operation" class="form-control">
+                                                <option value="">All operations</option>
+
+                                                @foreach($operations as $operation)
+                                                    <option value="{{ $operation }}" @selected(request('operation') === $operation)>
+                                                        {{ str($operation)->replace('_', ' ')->title() }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                        </fieldset>
+                                    </div>
+
+                                    <div class="col-md-3">
+                                        <fieldset class="form-group">
+                                            <label for="provider_status">Provider Status</label>
+                                            <select name="provider_status" id="provider_status" class="form-control">
+                                                <option value="">All statuses</option>
+                                                <option value="successful" @selected(request('provider_status') === 'successful')>Successful</option>
+                                                <option value="pending" @selected(request('provider_status') === 'pending')>Pending</option>
+                                                <option value="failed" @selected(request('provider_status') === 'failed')>Failed</option>
+                                            </select>
+                                        </fieldset>
+                                    </div>
+
+                                    <div class="col-md-2">
+                                        <fieldset class="form-group">
+                                            <label for="http_status">HTTP Status</label>
+                                            <select name="http_status" id="http_status" class="form-control">
+                                                <option value="">All HTTP</option>
+                                                <option value="success" @selected(request('http_status') === 'success')>2xx</option>
+                                                <option value="client_error" @selected(request('http_status') === 'client_error')>4xx</option>
+                                                <option value="server_error" @selected(request('http_status') === 'server_error')>5xx</option>
+                                                <option value="no_response" @selected(request('http_status') === 'no_response')>No Response</option>
+                                            </select>
+                                        </fieldset>
+                                    </div>
+
+
+
+                                    <div class="col-md-2">
+                                        <fieldset class="form-group">
+                                            <label for="method">Method</label>
+                                            <select name="method" id="method" class="form-control">
+                                                <option value="">All methods</option>
+                                                @foreach(['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as $method)
+                                                    <option value="{{ $method }}" @selected(request('method') === $method)>
+                                                        {{ $method }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                        </fieldset>
+                                    </div>
+
+                                    
+
+                                    <div class="col-md-3">
+                                        <fieldset class="form-group">
+                                            <label for="from_date">From Date</label>
+                                            <input
+                                                type="date"
+                                                name="from_date"
+                                                id="from_date"
+                                                class="form-control"
+                                                value="{{ request('from_date') }}"
+                                            >
+                                        </fieldset>
+                                    </div>
+
+                                    <div class="col-md-3">
+                                        <fieldset class="form-group">
+                                            <label for="to_date">To Date</label>
+                                            <input
+                                                type="date"
+                                                name="to_date"
+                                                id="to_date"
+                                                class="form-control"
+                                                value="{{ request('to_date') }}"
+                                            >
+                                        </fieldset>
+                                    </div>
+
+                                    <div class="col-12">
+                                        <div class="d-flex justify-content-end">
+                                            @if(request()->hasAny([
+                                                'operation',
+                                                'provider_status',
+                                                'http_status',
+                                                'search',
+                                                'method',
+                                                'min_duration',
+                                                'max_duration',
+                                                'from_date',
+                                                'to_date'
+                                            ]))
+                                                <a href="{{ route('admin.api-logs.index') }}" class="btn btn-sm btn-light-secondary mr-50">
+                                                    <i class="bx bx-x mr-25"></i>
+                                                    Clear Filters
+                                                </a>
+                                            @endif
+
+                                            <button type="submit" class="btn btn-sm btn-primary">
+                                                <i class="bx bx-filter-alt mr-25"></i>
+                                                Apply Filters
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
                 </div>
                 <div class="table-responsive">
                     <table class="table table-hover mb-0">
