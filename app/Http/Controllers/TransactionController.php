@@ -104,12 +104,22 @@ class TransactionController extends Controller
 
         $product = Product::where('slug', $slug)->first();
         $banks = Bank::all();
+        $pricingProvider = API::query()
+            ->whereKey(getSettings()->bank_transfer_provider_id)
+            ->where('status', 'active')
+            ->first();
+        $pricingBands = $pricingProvider?->pricing_data ?? [];
+        $pricingEnabled = (bool) ($pricingProvider?->pricing_data_status ?? false);
+        $pricingAvailable = $pricingEnabled && !empty($pricingBands);
+        $providerMin = 60;
+        $minimumCharge = $pricingAvailable
+            ? getBankTransferChargeDetails($providerMin, $pricingProvider?->id)
+            : ['transfer_fee' => 0];
+        $minimumRequiredBalance = $providerMin + (float) ($minimumCharge['transfer_fee'] ?? 0);
+        $walletBalance = walletBalance(auth()->user());
 
-        if (walletBalance(auth()->user()) <= env('BANK_TRANSFER_CHARGES')) {
-            return redirect(route('dashboard'))->with('error', 'You need above ' . getSettings()['currency'] . number_format(env('BANK_TRANSFER_CHARGES')) . ' wallet balance to use this feature!');
-        }
         if (!empty($product) && $product->status == 'active') {
-            return view(themeView('customer', 'wallet2bank_transfer_page'), compact('product', 'banks'));
+            return view(themeView('customer', 'wallet2bank_transfer_page'), compact('product', 'banks', 'pricingProvider', 'pricingBands', 'providerMin', 'minimumRequiredBalance', 'pricingEnabled', 'pricingAvailable', 'walletBalance'));
         } else {
             return back();
         }
@@ -297,6 +307,7 @@ class TransactionController extends Controller
         $bank = Bank::where('cbn_code', $request->bank)->first();
         if (!empty($bank)) {
             $bank_name = $bank->bank_name;
+            $request['bank_id'] = $bank->id;
         } else {
             $bank_name = '';
         }
@@ -526,41 +537,54 @@ class TransactionController extends Controller
             return back()->with('error', 'The selected product/service does not seem to exist, kindly try again');
         }
 
-        $bankCharge  = (float) env('BANK_TRANSFER_CHARGES');
         $providerMin = 60;
-
-        $walletBal = walletBalance(auth()->user());
-        $max       = $walletBal;
-        $min       = $bankCharge + $providerMin;
-
-        $amount = $this->removeCharsInAmount($request->amount);
-
-        // amount must be enough to cover bank charge + provider minimum
-        if ($amount < $min) {
-            return back()->with(
-                'error',
-                'Amount too low. You must withdraw at least ₦' . number_format($min)
-            );
+        $amount = (float) $this->removeCharsInAmount($request->amount);
+        $chargeDetails = getBankTransferChargeDetails($amount);
+        if (!($chargeDetails['pricing_enabled'] ?? false)) {
+            return back()->with('error', 'Wallet to bank transfer pricing has been turned off by admin.');
         }
 
-        if ($amount > $max) {
-            return back()->with('error', 'Insufficient wallet balance for this transaction.');
+        if (!($chargeDetails['pricing_available'] ?? false)) {
+            return back()->with('error', 'Wallet to bank transfer pricing is not configured yet.');
+        }
+
+        if (!($chargeDetails['matched'] ?? false)) {
+            return back()->with('error', 'The transfer amount does not match any configured pricing band.');
+        }
+
+        $transferFee = (float) ($chargeDetails['transfer_fee'] ?? 0);
+        $totalDebit = (float) ($chargeDetails['total_debit'] ?? ($amount + $transferFee));
+        $walletBal = walletBalance(auth()->user());
+
+        if ($amount < $providerMin) {
+            return back()->with('error', 'Amount too low. You must transfer at least ₦' . number_format($providerMin));
+        }
+
+        if ($walletBal < $totalDebit) {
+            return back()->with('error', 'Insufficient wallet balance. This transfer will debit ₦' . number_format($totalDebit, 2));
         }
 
         $bank = Bank::where('cbn_code', $request->bank)->first();
 
         if (!empty($bank)) {
             $bank_name = $bank->bank_name;
+            $request['bank_id'] = $bank->id;
         } else {
             return back()->with('error', 'Invalid bank selected');
         }
 
         $request['quantity'] = 1;
-        $request['total_amount'] = $amount;
-        $request['amount'] = $amount - env('BANK_TRANSFER_CHARGES');
+        $request['transfer_amount'] = $amount;
+        $request['amount'] = $amount;
+        $request['total_amount'] = $totalDebit;
+        $request['provider_charge'] = $transferFee;
+        $request['provider_fee'] = (float) ($chargeDetails['provider_fee'] ?? 0);
+        $request['extra_charge'] = (float) ($chargeDetails['extra_charge'] ?? 0);
+        $request['pricing_band_name'] = $chargeDetails['band_name'] ?? null;
+        $request['charge_breakdown'] = $chargeDetails['charge_breakdown'] ?? [];
 
         // Get Wallet Balance
-        $balance = walletBalance(auth()->user());
+        $balance = $walletBal;
 
         if ($balance < $request['total_amount']) {
             return redirect(route('dashboard'))->with('error', 'Insufficient Wallet Balance, Please try again');
@@ -585,8 +609,7 @@ class TransactionController extends Controller
         $request['reason'] = 'Wallet to Bank Transfer';
         $request['unique_element'] = 'Wallet2Bank';
         $request['discount'] = 0;
-        $request['provider_charge'] = env('BANK_TRANSFER_CHARGES') ?? null;
-        $request['api_id'] = getSettings()->bank_transfer_provider_id ?? null;
+        $request['api_id'] = $chargeDetails['provider_id'] ?? getSettings()->bank_transfer_provider_id ?? null;
 
         // Process Transaction
         try {
@@ -649,7 +672,7 @@ class TransactionController extends Controller
 
     public function transactionStatus($transaction_id)
     {
-        $transaction = TransactionLog::with(['product', 'variation'])
+        $transaction = TransactionLog::with(['product', 'variation', 'bank'])
             ->where('transaction_id', $transaction_id)
             ->firstOrFail();
 
@@ -668,7 +691,7 @@ class TransactionController extends Controller
 
     public function transactionReceipt($transaction_id)
     {
-        $transaction = TransactionLog::with(['product', 'category', 'variation'])
+        $transaction = TransactionLog::with(['product', 'category', 'variation', 'bank'])
             ->where('id', $transaction_id)
             ->firstOrFail()
             ->toArray();
@@ -1163,6 +1186,9 @@ class TransactionController extends Controller
             'reason' => $data['reason'] ?? null,
             'wallet_funding_provider' => $data['wallet_funding_provider'] ?? null,
             'provider_charge' => $data['provider_charge'] ?? null,
+            'charge_breakdown' => $data['charge_breakdown'] ?? null,
+            'bank_id' => $data['bank_id'] ?? null,
+            'account_name' => $data['account_name'] ?? null,
             'account_number' => $data['account_number'] ?? null,
         ];
 
@@ -1740,6 +1766,8 @@ class TransactionController extends Controller
 
     public function singleTransactionView(TransactionLog $transaction)
     {
+        $transaction->loadMissing(['bank']);
+
         return view('admin.transaction.single_transaction', compact('transaction'));
     }
 

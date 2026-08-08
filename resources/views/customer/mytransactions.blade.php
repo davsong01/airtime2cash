@@ -137,6 +137,24 @@
                                                         <small class="{{$transaction->type == 'debit' ? 'red' : 'green' }}">{{$transaction->type == 'debit' ? '- ' : '+ '}}{!! getSettings()['currency']!!}{{ number_format($transaction->total_amount, 2) }}
                                                         {{$transaction->type == 'debit' ? '(Debit)' : '(Credit)' }}
                                                         </small> <br>
+                                                        <span class="title">Charges</span> <br>
+                                                        @php
+                                                            $chargeBreakdown = collect(normalizeChargeBreakdown($transaction->charge_breakdown ?? []))->filter(fn ($charge) => is_array($charge));
+                                                        @endphp
+                                                        @if($chargeBreakdown->count())
+                                                            @foreach ($chargeBreakdown as $charge)
+                                                                <small class="d-block text-muted">
+                                                                    {{ $charge['label'] ?? 'Charge' }}: {!! getSettings()['currency'] !!}{{ number_format((float) ($charge['amount'] ?? 0), 2) }}
+                                                                </small>
+                                                            @endforeach
+                                                        @elseif((float) $transaction->provider_charge > 0)
+                                                            <small class="d-block text-muted">
+                                                                Transfer Fee: {!! getSettings()['currency'] !!}{{ number_format($transaction->provider_charge, 2) }}
+                                                            </small>
+                                                        @else
+                                                            <small class="d-block text-muted">-</small>
+                                                        @endif
+                                                        <br>
                                                         <span class="title">Transaction Id</span> <br>
                                                         <small>
                                                             {{ $transaction->transaction_id }}</strong>

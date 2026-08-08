@@ -24,6 +24,8 @@
     $canDownloadReceipt = !in_array($transaction->reason, ['LEVEL-UPGRADE', 'WALLET-FUNDING'], true)
         && $status !== 'failed';
     $extraInfo = [];
+    $isWalletToBank = strtolower((string) ($transaction->reason ?? '')) === 'wallet to bank transfer';
+    $chargeBreakdown = collect(normalizeChargeBreakdown($transaction->charge_breakdown ?? []))->filter(fn ($charge) => is_array($charge));
 
     if (filled($transaction->extra_info)) {
         $decodedExtraInfo = json_decode($transaction->extra_info, true);
@@ -181,6 +183,92 @@
             flex: 0 0 auto;
         }
 
+        .wallet-bank-breakdown-card {
+            margin-top: 1rem;
+            padding: 1rem;
+            border: 1px solid rgba(37, 99, 235, .16);
+            border-radius: .95rem;
+            background: linear-gradient(180deg, rgba(248, 251, 255, .95), rgba(238, 245, 255, .95));
+            box-shadow: 0 .9rem 2rem rgba(37, 99, 235, .08);
+        }
+
+        .wallet-bank-breakdown-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: .8rem;
+        }
+
+        .wallet-bank-breakdown-title {
+            margin: 0;
+            color: var(--bs-heading-color);
+            font-size: 1rem;
+            font-weight: 700;
+        }
+
+        .wallet-bank-breakdown-subtitle {
+            color: var(--bs-secondary-color);
+            font-size: .78rem;
+        }
+
+        .wallet-bank-breakdown-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
+            padding: .3rem .6rem;
+            border-radius: 100rem;
+            background: rgba(var(--bs-primary-rgb), .12);
+            color: var(--bs-primary);
+            font-size: .72rem;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .wallet-bank-breakdown-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: .46rem 0;
+        }
+
+        .wallet-bank-breakdown-row + .wallet-bank-breakdown-row {
+            border-top: 1px dashed var(--bs-border-color);
+        }
+
+        .wallet-bank-breakdown-row span {
+            color: var(--bs-secondary-color);
+            font-size: .88rem;
+        }
+
+        .wallet-bank-breakdown-row strong {
+            color: var(--bs-heading-color);
+            font-size: .9rem;
+        }
+
+        .wallet-bank-breakdown-section {
+            margin-top: .8rem;
+            padding-top: .8rem;
+            border-top: 1px solid rgba(var(--bs-border-color-rgb), .55);
+        }
+
+        .wallet-bank-breakdown-section-label {
+            margin-bottom: .45rem;
+            color: var(--bs-secondary-color);
+            font-size: .72rem;
+            font-weight: 700;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+        }
+
+        .wallet-bank-breakdown-total {
+            margin-top: .7rem;
+            padding-top: .7rem;
+            border-top: 1px solid rgba(var(--bs-border-color-rgb), .75);
+            font-weight: 700;
+        }
+
         [data-bs-theme="dark"] .transaction-detail-card {
             border-color: rgba(255, 255, 255, .08);
             background: linear-gradient(145deg, rgba(47, 51, 73, .9), rgba(38, 41, 60, .78));
@@ -319,6 +407,20 @@
                                 <span class="transaction-detail-label">Email</span>
                                 <span class="transaction-detail-value">{{ $transaction->customer_email ?: 'Not provided' }}</span>
                             </div>
+                            @if($isWalletToBank)
+                                <div class="transaction-detail-item">
+                                    <span class="transaction-detail-label">Bank name</span>
+                                    <span class="transaction-detail-value">{{ $transaction->bank?->bank_name ?: $transaction->bank_name ?: 'Not provided' }}</span>
+                                </div>
+                                <div class="transaction-detail-item">
+                                    <span class="transaction-detail-label">Account name</span>
+                                    <span class="transaction-detail-value">{{ $transaction->account_name ?: 'Not provided' }}</span>
+                                </div>
+                                <div class="transaction-detail-item">
+                                    <span class="transaction-detail-label">Account number</span>
+                                    <span class="transaction-detail-value">{{ $transaction->account_number ?: 'Not provided' }}</span>
+                                </div>
+                            @endif
                             @foreach($extraInfo as $key => $value)
                                 <div class="transaction-detail-item">
                                     <span class="transaction-detail-label">{{ str($key)->replace(['_', '-'], ' ')->title() }}</span>
@@ -344,7 +446,75 @@
                             <span class="text-muted">Quantity</span>
                             <span class="fw-medium">{{ number_format($transaction->quantity ?: 1) }}</span>
                         </div>
-                        @if((float) $transaction->provider_charge > 0)
+                        @if($isWalletToBank)
+                            @php
+                                $baseTransferCharge = $chargeBreakdown->whereIn('type', ['provider_fee', 'our_charge'])->sum(fn ($charge) => (float) ($charge['amount'] ?? 0));
+                                $bandExtraCharges = $chargeBreakdown->where('type', 'band_extra_charge')->values();
+                                $additionalCharges = $chargeBreakdown->where('type', 'global_extra_charge')->values();
+                                $extraChargesTotal = $bandExtraCharges->sum(fn ($charge) => (float) ($charge['amount'] ?? 0)) + $additionalCharges->sum(fn ($charge) => (float) ($charge['amount'] ?? 0));
+                                $totalFee = $baseTransferCharge + $extraChargesTotal;
+
+                                if ($baseTransferCharge <= 0 && (float) $transaction->provider_charge > 0) {
+                                    $baseTransferCharge = (float) $transaction->provider_charge;
+                                    $totalFee = $baseTransferCharge + $extraChargesTotal;
+                                }
+                            @endphp
+                            <div class="wallet-bank-breakdown-card">
+                                <div class="wallet-bank-breakdown-header">
+                                    <div>
+                                        <h6 class="wallet-bank-breakdown-title">Charge Breakdown</h6>
+                                        <div class="wallet-bank-breakdown-subtitle">Wallet to bank transfer charges</div>
+                                    </div>
+                                    <span class="wallet-bank-breakdown-pill"><i class="bx bx-receipt"></i> Wallet to bank</span>
+                                </div>
+                                <div class="wallet-bank-breakdown-row">
+                                    <span>Transfer Amount</span>
+                                    <strong>{!! $currency !!}{{ number_format((float) $transaction->amount, 2) }}</strong>
+                                </div>
+                                <div class="wallet-bank-breakdown-row">
+                                    <span>Base Transfer Charge</span>
+                                    <strong>{!! $currency !!}{{ number_format($baseTransferCharge, 2) }}</strong>
+                                </div>
+                                @if($bandExtraCharges->count())
+                                    <div class="wallet-bank-breakdown-section">
+                                        <div class="wallet-bank-breakdown-section-label">Band Extra Charges</div>
+                                        @foreach ($bandExtraCharges as $charge)
+                                            <div class="wallet-bank-breakdown-row">
+                                                <span>{{ $charge['label'] ?? 'Band charge' }}</span>
+                                                <strong>{!! $currency !!}{{ number_format((float) ($charge['amount'] ?? 0), 2) }}</strong>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @endif
+                                @if($additionalCharges->count())
+                                    <div class="wallet-bank-breakdown-section">
+                                        <div class="wallet-bank-breakdown-section-label">Additional Charges</div>
+                                        @foreach ($additionalCharges as $charge)
+                                            <div class="wallet-bank-breakdown-row">
+                                                <span>{{ $charge['label'] ?? 'Additional charge' }}</span>
+                                                <strong>{!! $currency !!}{{ number_format((float) ($charge['amount'] ?? 0), 2) }}</strong>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @endif
+                                @if(!empty($transaction->pricing_band_name))
+                                    <div class="wallet-bank-breakdown-section">
+                                        <div class="wallet-bank-breakdown-row mb-0">
+                                            <span>Matched Band</span>
+                                            <strong>{{ $transaction->pricing_band_name }}</strong>
+                                        </div>
+                                    </div>
+                                @endif
+                                <div class="wallet-bank-breakdown-row wallet-bank-breakdown-total">
+                                    <span>Total Fee</span>
+                                    <strong>{!! $currency !!}{{ number_format($totalFee, 2) }}</strong>
+                                </div>
+                                <div class="wallet-bank-breakdown-row wallet-bank-breakdown-total">
+                                    <span>Total Debit</span>
+                                    <strong>{!! $currency !!}{{ number_format($transaction->total_amount, 2) }}</strong>
+                                </div>
+                            </div>
+                        @elseif($isWalletToBank && (float) $transaction->provider_charge > 0)
                             <div class="transaction-financial-row">
                                 <span class="text-muted">Convenience fee</span>
                                 <span class="fw-medium">{!! $currency !!}{{ number_format($transaction->provider_charge, 2) }}</span>

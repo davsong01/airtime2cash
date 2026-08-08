@@ -49,6 +49,50 @@
         box-shadow: inset 0 1px 1px rgba(0,0,0,.05);
         margin-top: 10px;
     }
+    .txn-breakdown-box {
+        background: #f8fafc;
+        border: 1px solid #dbe3ee;
+        border-radius: 10px;
+        padding: 14px 16px;
+        color: #1f2937;
+    }
+    .txn-breakdown-title {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: .08em;
+        color: #6b7280;
+        font-weight: 700;
+        margin-bottom: 10px;
+    }
+    .txn-breakdown-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 8px;
+    }
+    .txn-breakdown-row:last-child {
+        margin-bottom: 0;
+    }
+    .txn-breakdown-section {
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px solid #e5e7eb;
+    }
+    .txn-breakdown-section-label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: .06em;
+        color: #6b7280;
+        font-weight: 700;
+        margin-bottom: 8px;
+    }
+    .txn-bank-box {
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+        border: 1px solid #dbe3ee;
+        border-radius: 10px;
+        padding: 14px 16px;
+    }
 </style>
 @endsection
 @section('content')
@@ -76,6 +120,32 @@
                                                 </div>
                                                 <div class="card-content">
                                                     <div class="card-body">
+                                                        @php
+                                                            $isWalletToBank = strtolower((string) ($transaction->reason ?? '')) === 'wallet to bank transfer';
+                                                            $chargeBreakdown = collect(normalizeChargeBreakdown($transaction->charge_breakdown ?? []))->filter(fn ($charge) => is_array($charge));
+                                                            $baseTransferCharge = $chargeBreakdown->whereIn('type', ['provider_fee', 'our_charge'])->sum(fn ($charge) => (float) ($charge['amount'] ?? 0));
+                                                            $bandExtraCharges = $chargeBreakdown->where('type', 'band_extra_charge')->values();
+                                                            $additionalCharges = $chargeBreakdown->where('type', 'global_extra_charge')->values();
+                                                            $extraChargesTotal = $bandExtraCharges->sum(fn ($charge) => (float) ($charge['amount'] ?? 0)) + $additionalCharges->sum(fn ($charge) => (float) ($charge['amount'] ?? 0));
+                                                            $totalFee = $baseTransferCharge + $extraChargesTotal;
+                                                            $requestData = [];
+                                                            if (!empty($transaction->request_data)) {
+                                                                $decodedRequestData = json_decode($transaction->request_data, true);
+                                                                if (is_array($decodedRequestData)) {
+                                                                    $requestData = $decodedRequestData;
+                                                                }
+                                                            }
+                                                            $legacyBankCode = $transaction->bank_code ?? data_get($requestData, 'bank_code') ?? data_get($requestData, 'bank') ?? null;
+                                                            $bankName = $transaction->bank?->bank_name
+                                                                ?: $transaction->bank_name
+                                                                ?: ($legacyBankCode ? \App\Models\Bank::where('cbn_code', $legacyBankCode)->value('bank_name') : null)
+                                                                ?: 'N/A';
+
+                                                            if ($baseTransferCharge <= 0 && (float) $transaction->provider_charge > 0) {
+                                                                $baseTransferCharge = (float) $transaction->provider_charge;
+                                                                $totalFee = $baseTransferCharge + $extraChargesTotal;
+                                                            }
+                                                        @endphp
                                                         <div class="row">
                                                             <div class="col-md-1">
                                                                 @if(in_array($transaction->reason, ['LEVEL-UPGRADE','WALLET-FUNDING','ADMIN-DEBIT','ADMIN-CREDIT']))
@@ -187,7 +257,7 @@
                                                                     <strong class="heads">Request Payload</strong> <br>
                                                                     <div>
                                                                         <code style="margin:10px 0">
-                                                                        
+
                                                                             {!! $transaction->request_data !!}
                                                                         </code>
 
@@ -213,10 +283,17 @@
                                                                         <thead>
                                                                             <tr>
                                                                                 <th style="color:black">Item</th>
-                                                                                <th style="color:black">Unit Cost</th>
-                                                                                <th style="color:black">Quantity</th>
-                                                                                <th style="color:black">Amount</th>
-                                                                                <th style="color:black">Biller</th>
+                                                                                @if($isWalletToBank)
+                                                                                    <th style="color:black">Quantity</th>
+                                                                                    <th style="color:black">Amount Details</th>
+                                                                                    <th style="color:black">Biller</th>
+                                                                                    <th style="color:black">Bank Details</th>
+                                                                                @else
+                                                                                    <th style="color:black">Unit Cost</th>
+                                                                                    <th style="color:black">Quantity</th>
+                                                                                    <th style="color:black">Amount</th>
+                                                                                    <th style="color:black">Biller</th>
+                                                                                @endif
                                                                             </tr>
                                                                         </thead>
                                                                         <tbody>
@@ -228,36 +305,120 @@
                                                                                 {{ $transaction->product->name }}@if(!empty($transaction->variation->system_name)) <strong> | {{$transaction->variation->system_name}} </strong> @endif
                                                                                 @endif
                                                                             </td>
-                                                                            <td>
-                                                                                {!! getSettings()->currency. number_format($transaction->amount, 2) !!}
-                                                                            </td>
+                                                                            @if($isWalletToBank)
                                                                                 <td>
-                                                                                {{ $transaction->quantity  }}
-                                                                            </td>
-
-                                                                            <td>
-                                                                                <span style="color:black">Convenience Fee:</span> {!! getSettings()->currency. number_format($transaction->provider_charge, 2) !!} <br>
-                                                                                <span style="color:black">Discount: </span>{!! getSettings()->currency. number_format($transaction->discount, 2) !!} <br>
-                                                                                <span style="color:black">Provider Charge:</span>{!! getSettings()->currency. number_format($transaction->provider_charge, 2) !!} <br>
-                                                                                <span style="color:black">Total Amount:</span> {!! getSettings()->currency. number_format($transaction->total_amount, 2) !!}
-                                                                            </td>
-                                                                            <td>{{ $transaction->unique_element }}
-                                                                                <?php
-                                                                                    // dd(verifiableUniqueElements(), $transaction->category->unique_element);
-                                                                                    if (isset($transaction->variation) &&  in_array($transaction->category->unique_element, verifiableUniqueElements())
-                                                                                    ) {
-                                                                                        $element = $transaction->category->unique_element;
-                                                                                    } else if (isset($transaction->variation) &&  in_array($transaction->variation->slug, verifiableUniqueElements())
-                                                                                    )  {
-                                                                                        $element = specialVerifiableVariations()[$transaction->variation->slug];
-                                                                                    }  else{
-                                                                                        $element = null;
-                                                                                    }
-                                                                                ?>
-                                                                                {{-- @if(isset($element)) <br>
-                                                                                <button id="validate-biller" onclick="validateBiller('{{$transaction->variation_id}}','{{$element}}','{{$transaction->unique_element}}')" class="btn btn-info btn-sm">Validate Biller</button>
-                                                                                @endif --}}
-                                                                            </td>
+                                                                                    {{ $transaction->quantity  }}
+                                                                                </td>
+                                                                                <td>
+                                                                                    <div class="txn-breakdown-box">
+                                                                                        <div class="txn-breakdown-title">Price Breakdown</div>
+                                                                                        <div class="txn-breakdown-row">
+                                                                                            <span>Transfer Amount</span>
+                                                                                            <strong>{!! getSettings()->currency !!}{{ number_format((float) $transaction->amount, 2) }}</strong>
+                                                                                        </div>
+                                                                                        <div class="txn-breakdown-row">
+                                                                                            <span>Base Transfer Charge</span>
+                                                                                            <strong>{!! getSettings()->currency !!}{{ number_format((float) $baseTransferCharge, 2) }}</strong>
+                                                                                        </div>
+                                                                                        @if($bandExtraCharges->count())
+                                                                                            <div class="txn-breakdown-section">
+                                                                                                <div class="txn-breakdown-section-label">Band Extra Charges</div>
+                                                                                                @foreach($bandExtraCharges as $charge)
+                                                                                                    <div class="txn-breakdown-row">
+                                                                                                        <span>{{ $charge['label'] ?? 'Band charge' }}</span>
+                                                                                                        <strong>{!! getSettings()->currency !!}{{ number_format((float) ($charge['amount'] ?? 0), 2) }}</strong>
+                                                                                                    </div>
+                                                                                                @endforeach
+                                                                                            </div>
+                                                                                        @endif
+                                                                                        @if($additionalCharges->count())
+                                                                                            <div class="txn-breakdown-section">
+                                                                                                <div class="txn-breakdown-section-label">Additional Charges</div>
+                                                                                                @foreach($additionalCharges as $charge)
+                                                                                                    <div class="txn-breakdown-row">
+                                                                                                        <span>{{ $charge['label'] ?? 'Additional charge' }}</span>
+                                                                                                        <strong>{!! getSettings()->currency !!}{{ number_format((float) ($charge['amount'] ?? 0), 2) }}</strong>
+                                                                                                    </div>
+                                                                                                @endforeach
+                                                                                            </div>
+                                                                                        @endif
+                                                                                        @if(!empty($transaction->pricing_band_name))
+                                                                                            <div class="txn-breakdown-section">
+                                                                                                <div class="txn-breakdown-row mb-0">
+                                                                                                    <span>Matched Band</span>
+                                                                                                    <strong>{{ $transaction->pricing_band_name }}</strong>
+                                                                                                </div>
+                                                                                            </div>
+                                                                                        @endif
+                                                                                        <div class="txn-breakdown-section">
+                                                                                            <div class="txn-breakdown-row">
+                                                                                                <span>Total Fee</span>
+                                                                                                <strong>{!! getSettings()->currency !!}{{ number_format((float) $totalFee, 2) }}</strong>
+                                                                                            </div>
+                                                                                            <div class="txn-breakdown-row">
+                                                                                                <span>Total Debit</span>
+                                                                                                <strong>{!! getSettings()->currency !!}{{ number_format((float) $transaction->total_amount, 2) }}</strong>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </td>
+                                                                                <td>{{ $transaction->unique_element }}
+                                                                                    <?php
+                                                                                        if (isset($transaction->variation) && in_array($transaction->category->unique_element, verifiableUniqueElements()))
+                                                                                        {
+                                                                                            $element = $transaction->category->unique_element;
+                                                                                        } elseif (isset($transaction->variation) && in_array($transaction->variation->slug, verifiableUniqueElements()))
+                                                                                        {
+                                                                                            $element = specialVerifiableVariations()[$transaction->variation->slug];
+                                                                                        } else {
+                                                                                            $element = null;
+                                                                                        }
+                                                                                    ?>
+                                                                                </td>
+                                                                                <td>
+                                                                                    <div class="txn-bank-box">
+                                                                                        <div class="txn-breakdown-title">Bank Details</div>
+                                                                                        <div class="txn-breakdown-row">
+                                                                                            <span>Bank Name</span>
+                                                                                            <strong>{{ $bankName }}</strong>
+                                                                                        </div>
+                                                                                        <div class="txn-breakdown-row">
+                                                                                            <span>Account Name</span>
+                                                                                            <strong>{{ $transaction->account_name ?: 'N/A' }}</strong>
+                                                                                        </div>
+                                                                                        <div class="txn-breakdown-row mb-0">
+                                                                                            <span>Account Number</span>
+                                                                                            <strong>{{ $transaction->account_number ?: 'N/A' }}</strong>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </td>
+                                                                            @else
+                                                                                <td>
+                                                                                    {!! getSettings()->currency. number_format($transaction->amount, 2) !!}
+                                                                                </td>
+                                                                                <td>
+                                                                                    {{ $transaction->quantity  }}
+                                                                                </td>
+                                                                                <td>
+                                                                                    <span style="color:black">Convenience Fee:</span> {!! getSettings()->currency. number_format($transaction->provider_charge, 2) !!} <br>
+                                                                                    <span style="color:black">Discount: </span>{!! getSettings()->currency. number_format($transaction->discount, 2) !!} <br>
+                                                                                    <span style="color:black">Provider Charge:</span>{!! getSettings()->currency. number_format($transaction->provider_charge, 2) !!} <br>
+                                                                                    <span style="color:black">Total Amount:</span> {!! getSettings()->currency. number_format($transaction->total_amount, 2) !!}
+                                                                                </td>
+                                                                                <td>{{ $transaction->unique_element }}
+                                                                                    <?php
+                                                                                        if (isset($transaction->variation) && in_array($transaction->category->unique_element, verifiableUniqueElements()))
+                                                                                        {
+                                                                                            $element = $transaction->category->unique_element;
+                                                                                        } elseif (isset($transaction->variation) && in_array($transaction->variation->slug, verifiableUniqueElements()))
+                                                                                        {
+                                                                                            $element = specialVerifiableVariations()[$transaction->variation->slug];
+                                                                                        } else {
+                                                                                            $element = null;
+                                                                                        }
+                                                                                    ?>
+                                                                                </td>
+                                                                            @endif
                                                                         </tr>
                                                                         </tbody>
                                                                     </table>
@@ -279,7 +440,7 @@
                                                                     <a id="qw_debit" onclick="queryCredit('{{$transaction->id}}', 'credit')" class="btn btn-success btn-sm" style="color:#fff;"><svg fill="white" xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24"><path d="M480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q65 0 123 19t107 53l-58 59q-38-24-81-37.5T480-800q-133 0-226.5 93.5T160-480q0 133 93.5 226.5T480-160q32 0 62-6t58-17l60 61q-41 20-86 31t-94 11Zm280-80v-120H640v-80h120v-120h80v120h120v80H840v120h-80ZM424-296 254-466l56-56 114 114 400-401 56 56-456 457Z"/></svg> Query Credit</a>
 
                                                                     <a id="qw_credit" onclick="queryCredit('{{$transaction->id}}', 'debit')" class="btn btn-danger btn-sm" style="color:#fff;"><svg fill="white" xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24"><path d="M200-440v-80h560v80H200Z"/></svg> Query Debit</a>
-                                                                    
+
                                                                     <a id="qw-transaction" onclick="queryStatus('{{$transaction->id}}')" data-id="{{$transaction->id}}" class="btn btn-info btn-sm" style="color:#fff;"><svg fill="white" xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24"><path d="m105-233-65-47 200-320 120 140 160-260 109 163q-23 1-43.5 5.5T545-539l-22-33-152 247-121-141-145 233ZM863-40 738-165q-20 14-44.5 21t-50.5 7q-75 0-127.5-52.5T463-317q0-75 52.5-127.5T643-497q75 0 127.5 52.5T823-317q0 26-7 50.5T795-221L920-97l-57 57ZM643-217q42 0 71-29t29-71q0-42-29-71t-71-29q-42 0-71 29t-29 71q0 42 29 71t71 29Zm89-320q-19-8-39.5-13t-42.5-6l205-324 65 47-188 296Z"/></svg></i> Re Query Transaction</a>
                                                                 </div>
                                                                 <div class="col-md-6">

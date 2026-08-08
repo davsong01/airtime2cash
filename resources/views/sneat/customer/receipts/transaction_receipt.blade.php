@@ -18,6 +18,8 @@
         : ($product['display_name'] ?? $product['name'] ?? $transaction['product_name'] ?? 'Transaction');
     $variationName = $variation['system_name'] ?? $transaction['variation_name'] ?? null;
     $extraInfo = [];
+    $isWalletToBank = strtolower((string) ($transaction['reason'] ?? '')) === 'wallet to bank transfer';
+    $chargeBreakdown = collect(normalizeChargeBreakdown($transaction['charge_breakdown'] ?? []))->filter(fn ($charge) => is_array($charge));
 
     if (filled($transaction['extra_info'] ?? null)) {
         $decodedExtraInfo = json_decode($transaction['extra_info'], true);
@@ -463,11 +465,11 @@
                                 <span class="detail-value">{{ $transaction['unique_element'] ?? 'Not provided' }}</span>
                             </td>
                         </tr>
-                        <tr class="detail-row-last">
-                            <td class="detail-cell detail-cell-left">
-                                <span class="detail-label">Customer phone</span>
-                                <span class="detail-value">{{ $transaction['customer_phone'] ?? 'Not provided' }}</span>
-                            </td>
+                    <tr class="detail-row-last">
+                        <td class="detail-cell detail-cell-left">
+                            <span class="detail-label">Customer phone</span>
+                            <span class="detail-value">{{ $transaction['customer_phone'] ?? 'Not provided' }}</span>
+                        </td>
                             <td class="detail-cell">
                                 <span class="detail-label">Customer email</span>
                                 <span class="detail-value">{{ $transaction['customer_email'] ?? 'Not provided' }}</span>
@@ -511,7 +513,46 @@
                         <td>Quantity</td>
                         <td>{{ number_format($transaction['quantity'] ?? 1) }}</td>
                     </tr>
-                    @if((float) ($transaction['provider_charge'] ?? 0) > 0)
+                    @if($isWalletToBank)
+                        @php
+                            $baseTransferCharge = $chargeBreakdown->whereIn('type', ['provider_fee', 'our_charge'])->sum(fn ($charge) => (float) ($charge['amount'] ?? 0));
+                            $bandExtraCharges = $chargeBreakdown->where('type', 'band_extra_charge')->values();
+                            $additionalCharges = $chargeBreakdown->where('type', 'global_extra_charge')->values();
+                            $extraChargesTotal = $bandExtraCharges->sum(fn ($charge) => (float) ($charge['amount'] ?? 0)) + $additionalCharges->sum(fn ($charge) => (float) ($charge['amount'] ?? 0));
+                            $totalFee = $baseTransferCharge + $extraChargesTotal;
+
+                            if ($baseTransferCharge <= 0 && (float) ($transaction['provider_charge'] ?? 0) > 0) {
+                                $baseTransferCharge = (float) $transaction['provider_charge'];
+                                $totalFee = $baseTransferCharge + $extraChargesTotal;
+                            }
+                        @endphp
+                        <tr>
+                            <td>Base Transfer Charge</td>
+                            <td>{!! $currency !!}{{ number_format($baseTransferCharge, 2) }}</td>
+                        </tr>
+                        @foreach($bandExtraCharges as $charge)
+                            <tr>
+                                <td>{{ $charge['label'] ?? 'Band charge' }}</td>
+                                <td>{!! $currency !!}{{ number_format((float) ($charge['amount'] ?? 0), 2) }}</td>
+                            </tr>
+                        @endforeach
+                        @foreach($additionalCharges as $charge)
+                            <tr>
+                                <td>{{ $charge['label'] ?? 'Additional charge' }}</td>
+                                <td>{!! $currency !!}{{ number_format((float) ($charge['amount'] ?? 0), 2) }}</td>
+                            </tr>
+                        @endforeach
+                        @if(!empty($transaction['pricing_band_name']))
+                            <tr>
+                                <td>Matched Band</td>
+                                <td>{{ $transaction['pricing_band_name'] }}</td>
+                            </tr>
+                        @endif
+                        <tr>
+                            <td>Total Fee</td>
+                            <td>{!! $currency !!}{{ number_format($totalFee, 2) }}</td>
+                        </tr>
+                    @elseif((float) ($transaction['provider_charge'] ?? 0) > 0)
                         <tr>
                             <td>Convenience fee</td>
                             <td>{!! $currency !!}{{ number_format($transaction['provider_charge'], 2) }}</td>

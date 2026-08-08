@@ -6,6 +6,7 @@ use App\Models\Customer;
 use App\Models\EmailLog;
 use App\Models\Product;
 use App\Models\Settings;
+use App\Models\API;
 use App\Mail\EmailMessages;
 use Illuminate\Support\Arr;
 use App\Models\Announcement;
@@ -51,6 +52,37 @@ if (!function_exists("calculatePaymentGatewayReservedAccountCharge")) {
     }
 }
 
+if (!function_exists("normalizeChargeBreakdown")) {
+    function normalizeChargeBreakdown($value): array
+    {
+        if (is_array($value)) {
+            return $value;
+        }
+
+        if ($value instanceof \JsonSerializable) {
+            $value = $value->jsonSerialize();
+
+            if (is_array($value)) {
+                return $value;
+            }
+        }
+
+        if (is_string($value) && $value !== '') {
+            $decoded = json_decode($value, true);
+
+            if (is_string($decoded) && $decoded !== '') {
+                $decoded = json_decode($decoded, true);
+            }
+
+            if (is_array($decoded)) {
+                return $decoded;
+            }
+        }
+
+        return [];
+    }
+}
+
 if (!function_exists("getPaymentGatewayReservedAccountCharge")) {
     function getPaymentGatewayReservedAccountCharge($provider = null)
     {
@@ -71,6 +103,168 @@ if (!function_exists("getPaymentGatewayReservedAccountCharge")) {
             'value' => $charge,
             'display_value' => $display_value
         ];
+    }
+}
+
+if (!function_exists("getBankTransferChargeDetails")) {
+    function getBankTransferChargeDetails($amount, $providerId = null): array
+    {
+        $amount = max(0, (float) $amount);
+        $settings = getSettings();
+        $provider = API::query()
+            ->when($providerId, fn ($query) => $query->whereKey($providerId), fn ($query) => $query->whereKey($settings?->bank_transfer_provider_id))
+            ->where('status', 'active')
+            ->first();
+
+        $result = [
+            'provider_id' => $provider?->id,
+            'provider_name' => $provider?->name,
+            'provider_slug' => $provider?->slug,
+            'pricing_enabled' => (bool) ($provider?->pricing_data_status ?? false),
+            'pricing_available' => false,
+            'extra_charges' => [],
+            'extra_charges_total' => 0.0,
+            'band_name' => null,
+            'min_amount' => null,
+            'max_amount' => null,
+            'provider_fee' => 0.0,
+            'extra_charge' => 0.0,
+            'transfer_fee' => 0.0,
+            'total_debit' => $amount,
+            'matched' => false,
+            'pricing_data' => [],
+            'charge_breakdown' => [],
+        ];
+
+        if (! $provider) {
+            return $result;
+        }
+
+        if (! $result['pricing_enabled']) {
+            return $result;
+        }
+
+        $pricingData = is_array($provider->pricing_data ?? null)
+            ? $provider->pricing_data
+            : (json_decode($provider->pricing_data ?? '[]', true) ?: []);
+        $globalExtraCharges = is_array($provider->extra_charges ?? null)
+            ? $provider->extra_charges
+            : (json_decode($provider->extra_charges ?? '[]', true) ?: []);
+
+        $result['pricing_data'] = $pricingData;
+        $result['pricing_available'] = ! empty($pricingData);
+        $result['extra_charges'] = collect($globalExtraCharges)
+            ->filter(fn ($charge) => is_array($charge))
+            ->map(function ($charge) {
+                return [
+                    'charge_name' => trim((string) ($charge['charge_name'] ?? $charge['name'] ?? '')),
+                    'value' => (float) ($charge['value'] ?? 0),
+                ];
+            })
+            ->filter(fn ($charge) => filled($charge['charge_name']) || (float) $charge['value'] > 0)
+            ->values()
+            ->all();
+        $result['extra_charges_total'] = collect($result['extra_charges'])->sum(fn ($charge) => (float) ($charge['value'] ?? 0));
+
+        if (empty($pricingData)) {
+            return $result;
+        }
+
+        $matchedBand = collect($pricingData)->first(function ($band) use ($amount) {
+            if (!is_array($band)) {
+                return false;
+            }
+
+            $minAmount = isset($band['min_amount']) && $band['min_amount'] !== ''
+                ? (float) $band['min_amount']
+                : null;
+            $maxAmount = isset($band['max_amount']) && $band['max_amount'] !== ''
+                ? (float) $band['max_amount']
+                : null;
+
+            if ($minAmount !== null && $amount < $minAmount) {
+                return false;
+            }
+
+            if ($maxAmount !== null && $amount > $maxAmount) {
+                return false;
+            }
+
+            return true;
+        });
+
+        if (! $matchedBand) {
+            return $result;
+        }
+
+        $providerFee = (float) ($matchedBand['provider_fee'] ?? 0);
+        $extraCharge = (float) ($matchedBand['extra_charge'] ?? 0);
+        $bandGlobalExtraCharges = $result['extra_charges'];
+        $bandExtraCharges = collect($matchedBand['extra_charges'] ?? [])
+            ->filter(fn ($charge) => is_array($charge))
+            ->map(function ($charge) {
+                return [
+                    'charge_name' => trim((string) ($charge['charge_name'] ?? $charge['name'] ?? '')),
+                    'value' => (float) ($charge['value'] ?? 0),
+                ];
+            })
+            ->filter(fn ($charge) => filled($charge['charge_name']) || (float) $charge['value'] > 0)
+            ->values()
+            ->all();
+        $extraChargesTotal = collect($bandGlobalExtraCharges)->sum(fn ($charge) => (float) ($charge['value'] ?? 0))
+            + collect($bandExtraCharges)->sum(fn ($charge) => (float) ($charge['value'] ?? 0));
+        $chargeBreakdown = [
+            [
+                'label' => 'Provider Fee',
+                'amount' => $providerFee,
+                'type' => 'provider_fee',
+            ],
+        ];
+
+        if ($extraCharge > 0) {
+            $chargeBreakdown[] = [
+                'label' => 'Our Charge',
+                'amount' => $extraCharge,
+                'type' => 'our_charge',
+            ];
+        }
+
+        foreach ($bandGlobalExtraCharges as $charge) {
+            $chargeBreakdown[] = [
+                'label' => $charge['charge_name'] ?: 'Additional Charge',
+                'amount' => (float) ($charge['value'] ?? 0),
+                'type' => 'global_extra_charge',
+            ];
+        }
+
+        foreach ($bandExtraCharges as $charge) {
+            $chargeBreakdown[] = [
+                'label' => $charge['charge_name'] ?: 'Extra Charge',
+                'amount' => (float) ($charge['value'] ?? 0),
+                'type' => 'band_extra_charge',
+            ];
+        }
+
+        $transferFee = $providerFee + $extraCharge + $extraChargesTotal;
+
+        return array_merge($result, [
+            'band_name' => $matchedBand['band_name'] ?? $matchedBand['name'] ?? null,
+            'min_amount' => isset($matchedBand['min_amount']) && $matchedBand['min_amount'] !== ''
+                ? (float) $matchedBand['min_amount']
+                : null,
+            'max_amount' => isset($matchedBand['max_amount']) && $matchedBand['max_amount'] !== ''
+                ? (float) $matchedBand['max_amount']
+                : null,
+            'provider_fee' => $providerFee,
+            'extra_charge' => $extraCharge,
+            'extra_charges' => $bandExtraCharges,
+            'extra_charges_total' => $extraChargesTotal,
+            'charge_breakdown' => $chargeBreakdown,
+            'transfer_fee' => $transferFee,
+            'total_debit' => $amount + $transferFee,
+            'matched' => true,
+            'pricing_available' => true,
+        ]);
     }
 }
 

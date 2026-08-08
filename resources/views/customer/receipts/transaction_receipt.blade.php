@@ -182,6 +182,10 @@
 					</tr>
 					@endforeach
 				@endif
+				@php
+					$isWalletToBank = strtolower((string) ($transaction['reason'] ?? '')) === 'wallet to bank transfer';
+					$chargeBreakdown = collect(normalizeChargeBreakdown($transaction['charge_breakdown'] ?? []))->filter(fn ($charge) => is_array($charge));
+				@endphp
 				<tr class="item">
 					<td>Payment Method</td>
 					<td>{{ ucfirst($transaction['payment_method']) }}</td>
@@ -225,11 +229,50 @@
 					<td>Discount Applied</td>
 					<td>#{{ number_format($transaction['discount'], 2) }}</td>
 				</tr>
-				@if(!empty($transaction->provider_charge))
+				@if($isWalletToBank)
+					@php
+						$baseTransferCharge = $chargeBreakdown->whereIn('type', ['provider_fee', 'our_charge'])->sum(fn ($charge) => (float) ($charge['amount'] ?? 0));
+						$bandExtraCharges = $chargeBreakdown->where('type', 'band_extra_charge')->values();
+						$additionalCharges = $chargeBreakdown->where('type', 'global_extra_charge')->values();
+						$extraChargesTotal = $bandExtraCharges->sum(fn ($charge) => (float) ($charge['amount'] ?? 0)) + $additionalCharges->sum(fn ($charge) => (float) ($charge['amount'] ?? 0));
+						$totalFee = $baseTransferCharge + $extraChargesTotal;
+
+						if ($baseTransferCharge <= 0 && (float) ($transaction['provider_charge'] ?? 0) > 0) {
+							$baseTransferCharge = (float) $transaction['provider_charge'];
+							$totalFee = $baseTransferCharge + $extraChargesTotal;
+						}
+					@endphp
+					<tr class="item">
+						<td>Base Transfer Charge</td>
+						<td>#{{ number_format($baseTransferCharge, 2) }}</td>
+					</tr>
+					@foreach ($bandExtraCharges as $charge)
+					<tr class="item">
+						<td>{{ $charge['label'] ?? 'Band charge' }}</td>
+						<td>#{{ number_format((float) ($charge['amount'] ?? 0), 2) }}</td>
+					</tr>
+					@endforeach
+					@foreach ($additionalCharges as $charge)
+					<tr class="item">
+						<td>{{ $charge['label'] ?? 'Additional charge' }}</td>
+						<td>#{{ number_format((float) ($charge['amount'] ?? 0), 2) }}</td>
+					</tr>
+					@endforeach
+					@if(!empty($transaction['pricing_band_name']))
+					<tr class="item">
+						<td>Matched Band</td>
+						<td>{{ $transaction['pricing_band_name'] }}</td>
+					</tr>
+					@endif
+					<tr class="item">
+						<td>Total Fee</td>
+						<td>#{{ number_format($totalFee, 2) }}</td>
+					</tr>
+				@elseif((float) ($transaction['provider_charge'] ?? 0) > 0)
                 <tr class="item">
 					<td>Convenience Fee</td>
 					<td>#{{ number_format($transaction['provider_charge'], 2) }}</td>
-				</tr>                                                           
+				</tr>
                 @endif
 				<tr class="item">
 					<td>Total Amount Paid</td>

@@ -7,6 +7,8 @@
     }else {
         $color = 'green';
     }
+    $isWalletToBank = strtolower((string) ($transaction->reason ?? '')) === 'wallet to bank transfer';
+    $chargeBreakdown = collect(normalizeChargeBreakdown($transaction->charge_breakdown ?? []))->filter(fn ($charge) => is_array($charge));
 ?>
 @extends('layouts.app')
 @section('title', 'Transaction Completed')
@@ -25,6 +27,92 @@
     }
     .trans-details{
         padding: 1.7rem 2px;
+    }
+
+    .wallet-bank-breakdown-card {
+        margin-top: 1rem;
+        padding: 1rem;
+        border: 1px solid #dbeafe;
+        border-radius: 0.9rem;
+        background: linear-gradient(180deg, #f8fbff 0%, #eef5ff 100%);
+        box-shadow: 0 10px 24px rgba(37, 99, 235, 0.08);
+    }
+
+    .wallet-bank-breakdown-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .wallet-bank-breakdown-title {
+        margin: 0;
+        color: #0f172a;
+        font-size: 1rem;
+        font-weight: 700;
+    }
+
+    .wallet-bank-breakdown-subtitle {
+        color: #64748b;
+        font-size: 0.78rem;
+    }
+
+    .wallet-bank-breakdown-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.3rem 0.6rem;
+        border-radius: 999px;
+        background: rgba(59, 130, 246, 0.12);
+        color: #2563eb;
+        font-size: 0.72rem;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
+    .wallet-bank-breakdown-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 0.45rem 0;
+    }
+
+    .wallet-bank-breakdown-row + .wallet-bank-breakdown-row {
+        border-top: 1px dashed rgba(148, 163, 184, 0.35);
+    }
+
+    .wallet-bank-breakdown-row span {
+        color: #475569;
+        font-size: 0.88rem;
+    }
+
+    .wallet-bank-breakdown-row strong {
+        color: #0f172a;
+        font-size: 0.9rem;
+    }
+
+    .wallet-bank-breakdown-section {
+        margin-top: 0.8rem;
+        padding-top: 0.8rem;
+        border-top: 1px solid rgba(148, 163, 184, 0.2);
+    }
+
+    .wallet-bank-breakdown-section-label {
+        margin-bottom: 0.45rem;
+        color: #64748b;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+    }
+
+    .wallet-bank-breakdown-total {
+        margin-top: 0.7rem;
+        padding-top: 0.7rem;
+        border-top: 1px solid rgba(148, 163, 184, 0.3);
+        font-weight: 700;
     }
 </style>
 @endsection
@@ -195,6 +283,35 @@
                                                                                 <div class="item-progress value">{{$transaction->customer_email }}</div>
                                                                                 </div>
                                                                             </li>
+                                                                            @if($isWalletToBank)
+                                                                                <li class="d-flex mb-1">
+                                                                                    <div class="d-flex w-100 flex-wrap align-items-center justify-content-between gap-2">
+                                                                                        <div class="me-2">
+                                                                                            <p class="mb-0 lh-1 key">Bank Name: </p>
+                                                                                        </div>
+
+                                                                                        <div class="item-progress value">{{ $transaction->bank?->bank_name ?: $transaction->bank_name ?: 'Not provided' }}</div>
+                                                                                    </div>
+                                                                                </li>
+                                                                                <li class="d-flex mb-1">
+                                                                                    <div class="d-flex w-100 flex-wrap align-items-center justify-content-between gap-2">
+                                                                                        <div class="me-2">
+                                                                                            <p class="mb-0 lh-1 key">Account Name: </p>
+                                                                                        </div>
+
+                                                                                        <div class="item-progress value">{{ $transaction->account_name ?: 'Not provided' }}</div>
+                                                                                    </div>
+                                                                                </li>
+                                                                                <li class="d-flex mb-1">
+                                                                                    <div class="d-flex w-100 flex-wrap align-items-center justify-content-between gap-2">
+                                                                                        <div class="me-2">
+                                                                                            <p class="mb-0 lh-1 key">Account Number: </p>
+                                                                                        </div>
+
+                                                                                        <div class="item-progress value">{{ $transaction->account_number ?: 'Not provided' }}</div>
+                                                                                    </div>
+                                                                                </li>
+                                                                            @endif
 
                                                                             <li class="d-flex mb-1">
                                                                                  <div class="d-flex w-100 flex-wrap align-items-center justify-content-between gap-2">
@@ -205,7 +322,75 @@
                                                                                 <div class="item-progress value">{!! getSettings()->currency !!}{{ number_format($transaction->unit_price) }}</div>
                                                                                 </div>
                                                                             </li>
-                                                                            @if(!empty($transaction->provider_charge))
+                                                                            @if($isWalletToBank)
+                                                                                @php
+                                                                                    $baseTransferCharge = $chargeBreakdown->whereIn('type', ['provider_fee', 'our_charge'])->sum(fn ($charge) => (float) ($charge['amount'] ?? 0));
+                                                                                    $bandExtraCharges = $chargeBreakdown->where('type', 'band_extra_charge')->values();
+                                                                                    $additionalCharges = $chargeBreakdown->where('type', 'global_extra_charge')->values();
+                                                                                    $extraChargesTotal = $bandExtraCharges->sum(fn ($charge) => (float) ($charge['amount'] ?? 0)) + $additionalCharges->sum(fn ($charge) => (float) ($charge['amount'] ?? 0));
+                                                                                    $totalFee = $baseTransferCharge + $extraChargesTotal;
+
+                                                                                    if ($baseTransferCharge <= 0 && (float) $transaction->provider_charge > 0) {
+                                                                                        $baseTransferCharge = (float) $transaction->provider_charge;
+                                                                                        $totalFee = $baseTransferCharge + $extraChargesTotal;
+                                                                                    }
+                                                                                @endphp
+                                                                                <div class="wallet-bank-breakdown-card">
+                                                                                    <div class="wallet-bank-breakdown-header">
+                                                                                        <div>
+                                                                                            <h5 class="wallet-bank-breakdown-title mb-1">Charge Breakdown</h5>
+                                                                                            <div class="wallet-bank-breakdown-subtitle">Wallet to bank transfer charges</div>
+                                                                                        </div>
+                                                                                        <span class="wallet-bank-breakdown-pill"><i class="bx bx-receipt"></i> Wallet to bank</span>
+                                                                                    </div>
+                                                                                    <div class="wallet-bank-breakdown-row">
+                                                                                        <span>Transfer Amount</span>
+                                                                                        <strong>{!! getSettings()->currency !!}{{ number_format((float) $transaction->amount, 2) }}</strong>
+                                                                                    </div>
+                                                                                    <div class="wallet-bank-breakdown-row">
+                                                                                        <span>Base Transfer Charge</span>
+                                                                                        <strong>{!! getSettings()->currency !!}{{ number_format($baseTransferCharge, 2) }}</strong>
+                                                                                    </div>
+                                                                                    @if($bandExtraCharges->count())
+                                                                                        <div class="wallet-bank-breakdown-section">
+                                                                                            <div class="wallet-bank-breakdown-section-label">Band Extra Charges</div>
+                                                                                            @foreach ($bandExtraCharges as $charge)
+                                                                                                <div class="wallet-bank-breakdown-row">
+                                                                                                    <span>{{ $charge['label'] ?? 'Band charge' }}</span>
+                                                                                                    <strong>{!! getSettings()->currency !!}{{ number_format((float) ($charge['amount'] ?? 0), 2) }}</strong>
+                                                                                                </div>
+                                                                                            @endforeach
+                                                                                        </div>
+                                                                                    @endif
+                                                                                    @if($additionalCharges->count())
+                                                                                        <div class="wallet-bank-breakdown-section">
+                                                                                            <div class="wallet-bank-breakdown-section-label">Additional Charges</div>
+                                                                                            @foreach ($additionalCharges as $charge)
+                                                                                                <div class="wallet-bank-breakdown-row">
+                                                                                                    <span>{{ $charge['label'] ?? 'Additional charge' }}</span>
+                                                                                                    <strong>{!! getSettings()->currency !!}{{ number_format((float) ($charge['amount'] ?? 0), 2) }}</strong>
+                                                                                                </div>
+                                                                                            @endforeach
+                                                                                        </div>
+                                                                                    @endif
+                                                                                    @if(!empty($transaction->pricing_band_name))
+                                                                                        <div class="wallet-bank-breakdown-section">
+                                                                                            <div class="wallet-bank-breakdown-row mb-0">
+                                                                                                <span>Matched Band</span>
+                                                                                                <strong>{{ $transaction->pricing_band_name }}</strong>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    @endif
+                                                                                    <div class="wallet-bank-breakdown-row wallet-bank-breakdown-total">
+                                                                                        <span>Total Fee</span>
+                                                                                        <strong>{!! getSettings()->currency !!}{{ number_format($totalFee, 2) }}</strong>
+                                                                                    </div>
+                                                                                    <div class="wallet-bank-breakdown-row wallet-bank-breakdown-total">
+                                                                                        <span>Total Debit</span>
+                                                                                        <strong>{!! getSettings()->currency !!}{{ number_format((float) $transaction->total_amount, 2) }}</strong>
+                                                                                    </div>
+                                                                                </div>
+                                                                            @elseif($isWalletToBank && !empty($transaction->provider_charge))
                                                                                 <li class="d-flex mb-1">
                                                                                     <div class="d-flex w-100 flex-wrap align-items-center justify-content-between gap-2">
                                                                                     <div class="me-2">

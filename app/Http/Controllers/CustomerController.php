@@ -107,7 +107,16 @@ class CustomerController extends Controller
             'to' => ['nullable', 'date', 'after_or_equal:from'],
         ]);
 
-        $customers = User::where('type', '!=', 'admin')->whereNull('email_verified_at');
+        $customers = User::where('type', '!=', 'admin')
+            ->where(function ($query) {
+                $query->whereNull('email_verified_at')
+                    ->orWhere('email_verified_at', '')
+                    ->orWhere('email_verified_at', '0000-00-00 00:00:00');
+            })
+            ->where(function ($query) {
+                $query->whereNull('status')
+                    ->orWhere('status', '!=', 'verified');
+            });
 
         if ($request->filled('search')) {
             $search = '%' . trim($request->search) . '%';

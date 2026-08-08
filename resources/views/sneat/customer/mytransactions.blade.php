@@ -239,6 +239,7 @@
                             <th>Transaction</th>
                             <th>Recipient</th>
                             <th>Amount</th>
+                            <th>Charges</th>
                             <th>Status</th>
                             <th>Date</th>
                             <th class="text-end">Actions</th>
@@ -246,23 +247,24 @@
                     </thead>
                     <tbody>
                         @foreach ($transactions as $transaction)
-                            @php
-                                $serviceName = in_array($transaction->reason, ['LEVEL-UPGRADE', 'WALLET-FUNDING', 'ADMIN-DEBIT', 'ADMIN-CREDIT'], true)
-                                    ? str($transaction->reason)->replace('-', ' ')->title()
-                                    : ($transaction->product->display_name ?? $transaction->product->name ?? 'Transaction');
-                                $variationName = $transaction?->variation?->system_name;
-                                $status = strtolower($transaction->status ?? 'pending');
-                                $statusColor = match ($status) {
-                                    'failed' => 'danger',
-                                    'delivered', 'successful', 'success', 'completed' => 'success',
-                                    'pending', 'initiated', 'processing' => 'warning',
-                                    'refunded', 'reversed' => 'info',
-                                    default => 'secondary',
-                                };
-                                $statusLabel = filled($transaction->descr) ? $transaction->descr : $status;
-                                $isDebit = $transaction->type === 'debit';
-                            @endphp
-                            <tr>
+                                @php
+                                    $serviceName = in_array($transaction->reason, ['LEVEL-UPGRADE', 'WALLET-FUNDING', 'ADMIN-DEBIT', 'ADMIN-CREDIT'], true)
+                                        ? str($transaction->reason)->replace('-', ' ')->title()
+                                        : ($transaction->product->display_name ?? $transaction->product->name ?? 'Transaction');
+                                    $variationName = $transaction?->variation?->system_name;
+                                    $status = strtolower($transaction->status ?? 'pending');
+                                    $statusColor = match ($status) {
+                                        'failed' => 'danger',
+                                        'delivered', 'successful', 'success', 'completed' => 'success',
+                                        'pending', 'initiated', 'processing' => 'warning',
+                                        'refunded', 'reversed' => 'info',
+                                        default => 'secondary',
+                                    };
+                                    $statusLabel = filled($transaction->descr) ? $transaction->descr : $status;
+                                    $isDebit = $transaction->type === 'debit';
+                                    $chargeBreakdown = collect(normalizeChargeBreakdown($transaction->charge_breakdown ?? []))->filter(fn ($charge) => is_array($charge));
+                                @endphp
+                                <tr>
                                 <td>
                                     <div class="d-flex align-items-center gap-3">
                                         <span class="transaction-service-mark"><i class="bx bx-transfer fs-5"></i></span>
@@ -287,6 +289,21 @@
                                     </span>
                                     <small class="d-block text-muted">{{ $isDebit ? 'Debit' : 'Credit' }}</small>
                                 </td>
+                                <td>
+                                    @if($chargeBreakdown->count())
+                                        @foreach ($chargeBreakdown as $charge)
+                                            <small class="d-block text-muted">
+                                                {{ $charge['label'] ?? 'Charge' }}: {!! $currency !!}{{ number_format((float) ($charge['amount'] ?? 0), 2) }}
+                                            </small>
+                                        @endforeach
+                                    @elseif((float) $transaction->provider_charge > 0)
+                                        <small class="d-block text-muted">
+                                            Transfer Fee: {!! $currency !!}{{ number_format($transaction->provider_charge, 2) }}
+                                        </small>
+                                    @else
+                                        <small class="text-muted">-</small>
+                                    @endif
+                                </td>
                                 <td><span class="transaction-status bg-label-{{ $statusColor }}">{{ str($statusLabel)->title() }}</span></td>
                                 <td>
                                     <span class="d-block fw-medium">{{ $transaction->created_at->format('M j, Y') }}</span>
@@ -310,22 +327,23 @@
 
             <div class="d-lg-none">
                 @foreach ($transactions as $transaction)
-                    @php
-                        $serviceName = in_array($transaction->reason, ['LEVEL-UPGRADE', 'WALLET-FUNDING', 'ADMIN-DEBIT', 'ADMIN-CREDIT'], true)
-                            ? str($transaction->reason)->replace('-', ' ')->title()
-                            : ($transaction->product->display_name ?? $transaction->product->name ?? 'Transaction');
-                        $status = strtolower($transaction->status ?? 'pending');
-                        $statusColor = match ($status) {
-                            'failed' => 'danger',
-                            'delivered', 'successful', 'success', 'completed' => 'success',
-                            'pending', 'initiated', 'processing' => 'warning',
-                            'refunded', 'reversed' => 'info',
-                            default => 'secondary',
-                        };
-                        $statusLabel = filled($transaction->descr) ? $transaction->descr : $status;
-                        $isDebit = $transaction->type === 'debit';
-                    @endphp
-                    <article class="transaction-mobile-item">
+                        @php
+                            $serviceName = in_array($transaction->reason, ['LEVEL-UPGRADE', 'WALLET-FUNDING', 'ADMIN-DEBIT', 'ADMIN-CREDIT'], true)
+                                ? str($transaction->reason)->replace('-', ' ')->title()
+                                : ($transaction->product->display_name ?? $transaction->product->name ?? 'Transaction');
+                            $status = strtolower($transaction->status ?? 'pending');
+                            $statusColor = match ($status) {
+                                'failed' => 'danger',
+                                'delivered', 'successful', 'success', 'completed' => 'success',
+                                'pending', 'initiated', 'processing' => 'warning',
+                                'refunded', 'reversed' => 'info',
+                                default => 'secondary',
+                            };
+                            $statusLabel = filled($transaction->descr) ? $transaction->descr : $status;
+                            $isDebit = $transaction->type === 'debit';
+                            $chargeBreakdown = collect(normalizeChargeBreakdown($transaction->charge_breakdown ?? []))->filter(fn ($charge) => is_array($charge));
+                        @endphp
+                        <article class="transaction-mobile-item">
                         <div class="d-flex align-items-start gap-3 mb-3">
                             <span class="transaction-service-mark"><i class="bx bx-transfer fs-5"></i></span>
                             <div class="flex-grow-1 min-w-0">
@@ -343,6 +361,22 @@
                         <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
                             <span class="transaction-status bg-label-{{ $statusColor }}">{{ str($statusLabel)->title() }}</span>
                             <small class="text-muted">{{ $transaction->created_at->format('M j, Y') }} at {{ $transaction->created_at->format('g:i A') }}</small>
+                        </div>
+                        <div class="mb-3">
+                            <small class="d-block text-muted mb-1">Charges</small>
+                            @if($chargeBreakdown->count())
+                                @foreach ($chargeBreakdown as $charge)
+                                    <small class="d-block">
+                                        {{ $charge['label'] ?? 'Charge' }}: {!! $currency !!}{{ number_format((float) ($charge['amount'] ?? 0), 2) }}
+                                    </small>
+                                @endforeach
+                            @elseif((float) $transaction->provider_charge > 0)
+                                <small class="d-block">
+                                    Transfer Fee: {!! $currency !!}{{ number_format($transaction->provider_charge, 2) }}
+                                </small>
+                            @else
+                                <small class="d-block text-muted">-</small>
+                            @endif
                         </div>
                         @if($transaction->unique_element)
                             <div class="d-flex align-items-center gap-2 text-muted small mb-3">

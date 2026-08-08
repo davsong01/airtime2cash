@@ -15,6 +15,11 @@ class API extends Model
     use HasFactory;
     protected $guarded = [];
     protected $table = 'a_p_is';
+    protected $casts = [
+        'pricing_data' => 'array',
+        'extra_charges' => 'array',
+        'pricing_data_status' => 'boolean',
+    ];
 
     protected function createdAt(): Attribute
     {
