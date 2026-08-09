@@ -231,7 +231,11 @@ class SageController extends BankTransferProviderController
             'GET'
         );
 
-        $banks = collect(data_get($response, 'data', []))
+        $rawBanks = data_get($response, 'banks')
+            ?? data_get($response, 'data.banks')
+            ?? data_get($response, 'data', []);
+
+        $banks = collect($rawBanks)
             ->filter(fn ($bank) => is_array($bank))
             ->map(fn ($bank) => [
                 'bank_name' => $bank['bank_name'] ?? $bank['name'] ?? null,
