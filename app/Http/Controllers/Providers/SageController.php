@@ -246,7 +246,12 @@ class SageController extends BankTransferProviderController
             ->values()
             ->all();
 
-        return ['status' => 'success', 'data' => $banks, 'api_response' => $response];
+        return [
+            'status' => 'success',
+            'data' => $banks,
+            'banks' => $banks,
+            'api_response' => $response,
+        ];
     }
 
     public function verifyWebhookSignature(Request $request): array
