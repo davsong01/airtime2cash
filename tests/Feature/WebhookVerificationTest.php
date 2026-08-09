@@ -7,8 +7,10 @@ use App\Http\Controllers\Providers\KoraController;
 use App\Http\Controllers\Providers\MonnifyController;
 use App\Http\Controllers\Providers\PaystackController;
 use App\Http\Controllers\Providers\SageController;
+use App\Http\Controllers\APIController;
 use App\Models\Admin;
 use App\Models\API;
+use App\Models\Bank;
 use App\Models\Customer;
 use App\Models\TransactionLog;
 use App\Models\Webhook;
@@ -360,6 +362,138 @@ class WebhookVerificationTest extends TestCase
         $this->assertDatabaseHas('webhooks', [
             'transaction_id' => $finalTransaction->transaction_id,
             'processing_status' => 'processed',
+        ]);
+    }
+
+    public function test_sage_pull_banks_returns_a_normalized_banks_list_without_a_data_wrapper(): void
+    {
+        $controller = new class extends SageController {
+            public function __construct()
+            {
+                $this->base_url = 'https://sage.test';
+                $this->secret_key = 'sage-secret';
+                $this->public_key = 'sage-public';
+                $this->control = $this;
+            }
+
+            public function login()
+            {
+                return [
+                    'success' => true,
+                    'status' => 'success',
+                    'data' => [
+                        'token' => [
+                            'access_token' => 'sage-access-token',
+                        ],
+                    ],
+                ];
+            }
+
+            public function basicApiCall($url, $payload, $headers, $method = 'POST')
+            {
+                if (str_contains((string) $url, '/merchant/authorization')) {
+                    return $this->login();
+                }
+
+                return [
+                    'success' => true,
+                    'status' => 'success',
+                    'message' => 'Banks fetched successfully',
+                    'banks' => [
+                        [
+                            'cbn_code' => '110005',
+                            'bank_name' => '3line Card Management Limited',
+                        ],
+                        [
+                            'cbn_code' => '120001',
+                            'bank_name' => '9Payment Service Bank',
+                        ],
+                    ],
+                ];
+            }
+        };
+
+        $response = $controller->pullBanks();
+
+        $this->assertSame('success', $response['status']);
+        $this->assertArrayHasKey('banks', $response);
+        $this->assertArrayNotHasKey('data', $response);
+        $this->assertCount(2, $response['banks']);
+        $this->assertSame('110005', $response['banks'][0]['cbn_code']);
+        $this->assertSame('3line Card Management Limited', $response['banks'][0]['bank_name']);
+    }
+
+    public function test_admin_bank_sync_merges_sage_provider_codes_into_existing_banks(): void
+    {
+        $provider = API::create([
+            'name' => 'SageCloud',
+            'slug' => 'sagecloud',
+            'status' => 'active',
+            'is_bank_transfer' => true,
+            'is_bank_verification' => true,
+        ]);
+
+        Bank::create([
+            'bank_name' => '3line Card Management Limited',
+            'cbn_code' => '110005',
+            'status' => 'active',
+            'provider_codes' => [
+                'paystack' => '110005',
+            ],
+            'provider_meta' => [],
+        ]);
+
+        $fakeController = new class extends SageController {
+            public function __construct()
+            {
+                // Intentionally empty for the test.
+            }
+
+            public function pullBanks(): array
+            {
+                return [
+                    'status' => 'success',
+                    'banks' => [
+                        [
+                            'cbn_code' => '110005',
+                            'bank_name' => '3line Card Management Limited',
+                            'provider_codes' => [
+                                'sagecloud' => '110005',
+                            ],
+                        ],
+                        [
+                            'cbn_code' => '120001',
+                            'bank_name' => '9Payment Service Bank',
+                            'provider_codes' => [
+                                'sagecloud' => '120001',
+                            ],
+                        ],
+                    ],
+                ];
+            }
+        };
+
+        $this->app->instance(SageController::class, $fakeController);
+
+        $response = app(APIController::class)->pullBanks($provider);
+        $payload = $response->getData(true);
+
+        $this->assertTrue($payload['status']);
+        $this->assertSame(2, $payload['count']);
+        $this->assertSame(2, $payload['synced_count']);
+
+        $this->assertDatabaseHas('banks', [
+            'cbn_code' => '110005',
+        ]);
+
+        $bank = Bank::where('cbn_code', '110005')->first();
+        $codes = $bank?->provider_codes ?? [];
+
+        $this->assertSame('110005', $codes['sagecloud'] ?? null);
+        $this->assertSame('110005', $codes['paystack'] ?? null);
+
+        $this->assertDatabaseHas('banks', [
+            'cbn_code' => '120001',
         ]);
     }
 

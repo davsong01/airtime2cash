@@ -239,8 +239,8 @@ class SageController extends BankTransferProviderController
             ->filter(fn ($bank) => is_array($bank))
             ->map(fn ($bank) => [
                 'bank_name' => $bank['bank_name'] ?? $bank['name'] ?? null,
-                'cbn_code' => $bank['bank_code'] ?? $bank['code'] ?? null,
-                'provider_codes' => ['sagecloud' => $bank['cbn_code'] ?? $bank['code'] ?? null],
+                'cbn_code' => $bank['cbn_code'] ?? $bank['bank_code'] ?? $bank['code'] ?? null,
+                'provider_codes' => ['sagecloud' => $bank['cbn_code'] ?? $bank['bank_code'] ?? $bank['code'] ?? null],
                 'provider_meta' => $bank,
             ])
             ->values()

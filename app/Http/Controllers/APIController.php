@@ -201,6 +201,7 @@ class APIController extends Controller
             ], 422);
         }
 
+        $fetchedCount = count($banks);
         $syncedCount = 0;
 
         foreach ($banks as $bankData) {
@@ -218,7 +219,8 @@ class APIController extends Controller
                 continue;
             }
 
-            $providerCode = $bankData['provider_code'] ?? $cbnCode;
+            $providerCodes = is_array($bankData['provider_codes'] ?? null) ? $bankData['provider_codes'] : [];
+            $providerCode = $providerCodes[$api->slug] ?? $bankData['provider_code'] ?? $cbnCode;
             $bank = Bank::query()->where('cbn_code', $cbnCode)->first();
 
             if (! $bank) {
@@ -226,9 +228,9 @@ class APIController extends Controller
                     'bank_name' => $bankData['bank_name'] ?? $bankData['name'] ?? null,
                     'cbn_code' => $cbnCode,
                     'status' => 'active',
-                    'provider_codes' => [
+                    'provider_codes' => array_filter(array_merge($providerCodes, [
                         $api->slug => $providerCode,
-                    ],
+                    ]), fn ($value) => filled($value)),
                     'provider_meta' => $bankData['provider_meta'] ?? [],
                 ]);
                 $syncedCount++;
@@ -236,11 +238,13 @@ class APIController extends Controller
             }
 
             $codes = is_array($bank->provider_codes ?? null) ? $bank->provider_codes : [];
+            $mergedCodes = array_filter(array_merge($codes, $providerCodes, [
+                $api->slug => $providerCode,
+            ]), fn ($value) => filled($value));
 
-            if (blank($codes[$api->slug] ?? null)) {
-                $codes[$api->slug] = $providerCode;
+            if ($mergedCodes !== $codes) {
                 $bank->update([
-                    'provider_codes' => $codes,
+                    'provider_codes' => $mergedCodes,
                 ]);
                 $syncedCount++;
             }
@@ -248,8 +252,9 @@ class APIController extends Controller
 
         return response()->json([
             'status' => true,
-            'message' => $syncedCount . ' bank' . ($syncedCount === 1 ? '' : 's') . ' pulled',
-            'count' => $syncedCount,
+            'message' => $fetchedCount . ' bank' . ($fetchedCount === 1 ? '' : 's') . ' pulled',
+            'count' => $fetchedCount,
+            'synced_count' => $syncedCount,
         ]);
     }
 
