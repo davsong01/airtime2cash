@@ -197,10 +197,33 @@ class SageController extends BankTransferProviderController
 
     public function pullBanks(): array
     {
+        $login = $this->login();
+
+        if (empty($login) || ($login['success'] ?? false) !== true) {
+            return [
+                'status' => 'failed',
+                'message' => 'Could not authenticate with SageCloud.',
+                'api_response' => $login ?? null,
+            ];
+        }
+
+        $token = data_get($login, 'data.token.access_token');
+
+        if (blank($token)) {
+            return [
+                'status' => 'failed',
+                'message' => 'SageCloud did not return a valid access token.',
+                'api_response' => $login,
+            ];
+        }
+
         $response = $this->basicApiCall(
-            rtrim($this->base_url, '/') . '/banks',
+            rtrim($this->base_url, '/') . '/transfer/get-transfer-data',
             [],
-            ['Content-Type: application/json'],
+            [
+                'Content-Type: application/json',
+                'Authorization: Bearer ' . $token,
+            ],
             'GET'
         );
 
