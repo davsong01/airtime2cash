@@ -131,7 +131,7 @@
                                 @if(!$canWithdraw)
                                     <div class="alert alert-warning">
                                         @if(!$pricingEnabled)
-                                            Wallet to bank transfer pricing has been turned off by admin.
+                                            Wallet to bank transfer pricing is not configured yet.
                                         @elseif(!$pricingAvailable)
                                             Wallet to bank transfer pricing is not configured for the active provider.
                                         @else
@@ -203,6 +203,13 @@
                                 <label for="account_name" class="form-label">Account name</label>
                                 <input class="form-control" id="account_name" name="account_name" type="text" required>
                             </div>
+                            <div class="col-12">
+                                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mt-2">
+                                    <small class="text-danger">Please ensure the bank details are correct before you proceed.</small>
+                                    <button type="button" class="btn btn-outline-info btn-sm" id="verify-bank-details-btn">Verify Bank Details</button>
+                                </div>
+                                <div class="mt-3 d-none" id="bank-verify-result"></div>
+                            </div>
                         </div>
                         <div class="mt-4">
                             <button class="btn btn-primary customer-form-submit" id="transfer-submit" type="submit" @disabled(!$canWithdraw)><i class="bx bx-right-arrow-alt me-1"></i> Proceed</button>
@@ -234,6 +241,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const previewBandSection = document.getElementById('preview-band-section');
     const previewAdditionalSection = document.getElementById('preview-additional-section');
     const submitButton = document.getElementById('transfer-submit');
+    const verifyBankButton = document.getElementById('verify-bank-details-btn');
+    const verifyBankResult = document.getElementById('bank-verify-result');
     if (!amountInput || !previewAmount || !previewFee || !previewTotal || !submitButton) return;
     const walletBalance = parseFloat(amountInput.dataset.walletBalance) || 0;
     const minimumTransfer = parseFloat(amountInput.dataset.minTransfer) || 0;
@@ -263,6 +272,42 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     const formatMoney = (value) => `${currency}${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+    const escapeHtml = (value) => String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+
+    const renderVerificationCard = (payload, title) => {
+        const response = payload?.raw_response ?? payload?.data ?? payload ?? {};
+        const status = String(payload?.status ?? response?.status ?? 'success').toLowerCase();
+        const refined = payload?.data?.refined_data ?? response?.refined_data ?? {};
+        const bankName = refined['Bank Name'] ?? response?.data?.bank_name ?? response?.bank_name ?? '';
+        const accountName = refined['Account Name'] ?? response?.data?.account_name ?? response?.account_name ?? '';
+        const accountNumber = refined['Account Number'] ?? response?.data?.account_number ?? response?.account_number ?? '';
+
+        return `
+            <div class="card border-0 shadow-sm mb-0" style="background:linear-gradient(180deg,#ffffff 0%,#f8fafc 100%);">
+                <div class="card-body py-3">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <div class="fw-bold text-dark">${escapeHtml(title || 'Bank verification')}</div>
+
+                    </div>
+                    ${bankName || accountName || accountNumber ? `
+                        <div class="d-flex flex-column gap-1 text-dark">
+                            ${bankName ? `<div><span class="fw-bold">${escapeHtml(bankName)}</span></div>` : ''}
+                            ${accountName ? `<div>${escapeHtml(accountName)}</div>` : ''}
+                            ${accountNumber ? `<div>${escapeHtml(accountNumber)}</div>` : ''}
+                        </div>
+                    ` : `
+                        <div class="text-muted">Unavailable at the moment.</div>
+                    `}
+                </div>
+            </div>
+        `;
+    };
 
     const renderBreakdown = (band, bandExtraCharges, additionalCharges) => {
         if (!previewBandCharges || !previewAdditionalCharges || !previewBandSection || !previewAdditionalSection) {
@@ -337,6 +382,61 @@ document.addEventListener('DOMContentLoaded', function () {
 
         submitButton.disabled = !isValid;
     });
+
+    if (verifyBankButton && verifyBankResult) {
+        verifyBankButton.addEventListener('click', async function () {
+            const bank = document.getElementById('bank');
+            const accountNumber = document.getElementById('account_number');
+            const accountName = document.getElementById('account_name');
+            const csrfToken = document.querySelector('input[name="_token"]')?.value || document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+            if (!bank || !accountNumber || !accountName) {
+                return;
+            }
+
+            verifyBankButton.disabled = true;
+            verifyBankButton.textContent = 'Verifying...';
+            verifyBankResult.classList.remove('d-none');
+            verifyBankResult.innerHTML = renderVerificationCard({
+                status: 'pending',
+                message: 'Verifying bank details...'
+            }, 'Bank verification');
+
+            try {
+                const response = await fetch('{{ route('customer.verify.bank.details') }}', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        bank_code: bank.value,
+                        account_number: accountNumber.value,
+                        account_name: accountName.value,
+                    }),
+                });
+
+                const payload = await response.json();
+
+                if (!response.ok || payload.status === false) {
+                    verifyBankResult.innerHTML = renderVerificationCard({
+                        status: 'failed',
+                    }, 'Bank details');
+                    return;
+                }
+
+                verifyBankResult.innerHTML = renderVerificationCard(payload, 'Bank details verified successfully');
+            } catch (error) {
+                verifyBankResult.innerHTML = renderVerificationCard({
+                    status: 'failed',
+                }, 'Bank details verification failed');
+            } finally {
+                verifyBankButton.disabled = false;
+                verifyBankButton.textContent = 'Verify Bank Details';
+            }
+        });
+    }
 
     submitButton.disabled = true;
     amountInput.dispatchEvent(new Event('input'));

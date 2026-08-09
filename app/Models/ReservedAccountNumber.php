@@ -28,13 +28,18 @@ class ReservedAccountNumber extends Model
         return $this->hasMany(TransactionLog::class, 'account_number', 'account_number');
     }
 
+    public function api()
+    {
+        return $this->belongsTo(API::class, 'api_id');
+    }
+
     public function payment_gateway()
     {
-        return $this->belongsTo(PaymentGateway::class, 'paymentgateway_id');
+        return $this->api();
     }
 
     public function gateway()
     {
-        return $this->belongsTo(PaymentGateway::class, 'paymentgateway_id');
+        return $this->api();
     }
 }

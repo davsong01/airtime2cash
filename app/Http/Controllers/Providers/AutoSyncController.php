@@ -38,16 +38,29 @@ class AutoSyncController extends Controller
 
     public function verifyWebhookSignature(Request $request)
     {
-        $reference = $request->input('transaction.reference');
+        $payload = normalizeWebhookPayload($request);
+        $reference = data_get($payload, 'transaction.reference')
+            ?? data_get($payload, 'data.transaction.reference')
+            ?? data_get($payload, 'reference');
 
-        if (!$reference || !$request->has('hash')) {
-            return ['status' => false, 'message' => 'Missing reference or hash'];
+        if (! $reference || ! data_get($payload, 'hash')) {
+            return [
+                'status' => false,
+                'reference' => $reference,
+                'message' => 'Missing reference or hash',
+            ];
         }
 
-        $hash = hash('sha256', sprintf('%s:%s', '1234', $reference));
+        $provider = $this->credentials();
+        $webhookSecret = $provider->public_key ?? $provider->secret_key ?? null;
+        $hash = hash('sha256', sprintf('%s:%s', $webhookSecret, $reference));
 
-        if (!hash_equals($request->input('hash'), $hash)) {
-            return ['status' => false, 'message' => 'Invalid signature'];
+        if (! hash_equals((string) data_get($payload, 'hash'), $hash)) {
+            return [
+                'status' => false,
+                'reference' => $reference,
+                'message' => 'Invalid signature',
+            ];
         }
 
         return [

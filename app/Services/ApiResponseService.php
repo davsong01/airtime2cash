@@ -152,7 +152,6 @@ class ApiResponseService
 
         $product = $variation->product;
         $api = $variation->api;
-        $file_name = $variation->api->file_name;
 
         $request['product_name'] = $product->name ?? null;
         $request['variation_name'] = $variation->slug ?? null;

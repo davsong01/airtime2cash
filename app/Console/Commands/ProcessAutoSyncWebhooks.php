@@ -7,9 +7,9 @@ use App\Services\WebhookProcessor;
 use Illuminate\Console\Command;
 use Throwable;
 
-class ProcessWebhooks extends Command
+class ProcessAutoSyncWebhooks extends Command
 {
-    protected $signature = ':process-webhooks {--limit=25}';
+    protected $signature = 'process:webhooks {--limit=25}';
     protected $description = 'Process pending webhooks sequentially';
 
     public function handle(WebhookProcessor $processor): int

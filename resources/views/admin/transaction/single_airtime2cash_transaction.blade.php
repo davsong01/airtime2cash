@@ -12,6 +12,12 @@
 
 @section('page-css')
 <style>
+    .txn-details-page {
+        font-size: smaller;
+        font-weight: 398;
+        color: black;
+    }
+
     .reset-pin {
         font-size: 10px;
         float: right;
@@ -20,17 +26,12 @@
     .heads {
         color: black
     }
-    body {
-        font-size: 1rem;
-        font-weight: 398;
-        color: black;
-        font-size: smaller;
-    }
-    .table {
+
+    .txn-details-page .table {
         color: black;
     }
 
-    code{
+    .txn-details-page code {
         max-height: 250px;
         display: block;
         overflow:scroll;
@@ -53,7 +54,7 @@
 @endsection
 @section('content')
 <!-- Content wrapper -->
-<div class="app-content content">
+<div class="app-content content txn-details-page">
     <div class="content-overlay"></div>
     <div class="content-wrapper">
         <div class="content-body">
@@ -239,27 +240,40 @@
             <form action="{{route('admin.changetransactionmethod', $transaction->id)}}" method="POST">
                 @csrf
                 <div class="modal-body">
+                    @php
+                        $bankTransferCharge = getBankTransferChargeDetails($transaction->total_amount, getSettings()->bank_transfer_provider_id);
+                        $bankTransferProviderName = $bankTransferCharge['provider_name'] ?? 'active bank transfer provider';
+                        $bankTransferFee = (float) ($bankTransferCharge['transfer_fee'] ?? 0);
+                    @endphp
                     <div class="row">
                         <div class="col-md-12">
                             {{-- {{dd($transaction->payment_method)}} --}}
                             <fieldset class="form-group col-sm-12 col-12">
                                 <label for="category">Select Payment method</label>
+                                <small class="d-block text-muted mb-2">
+                                    Wallet to bank transfers are routed through <strong>{{ $bankTransferProviderName }}</strong>
+                                    and this transaction currently attracts a base transfer charge of
+                                    <strong>{!! getSettings()['currency'] !!}{{ number_format($bankTransferFee, 2) }}</strong>.
+                                </small>
                                     <select class="form-control" name="payment_method" id="payment_method" required>
                                         <option value="Transfer to Wallet" {{ $transaction->payment_method == 'Transfer to Wallet' ? 'selected' : ''}}>Transfer to Wallet ({!! getSettings()['currency'] !!}0 charges)</option>
-                                        <option value="Transfer to Bank Account" {{ $transaction->payment_method == 'Transfer to Bank Account' ? 'selected' : ''}}>Transfer to Bank Account ({!! getSettings()['currency'] !!}{{env('BANK_TRANSFER_CHARGES')}} transfer charge applies)</option>
+                                        <option value="Transfer to Bank Account" {{ $transaction->payment_method == 'Transfer to Bank Account' ? 'selected' : ''}}>Transfer to Bank Account ({!! getSettings()['currency'] !!}{{ number_format($bankTransferFee, 2) }} base charge via {{ $bankTransferProviderName }})</option>
                                     </select>
                                 </select>
                             </fieldset>
                         </div>
                         <div class="col-md-12" id="bank-details-div" style="display:{{ $transaction->payment_method == 'Transfer to Bank Account' ? 'block' : 'none'}}">
                             <fieldset class="form-group col-sm-12 col-12">
-                                <label for="payment_method">Select Bank </label>
+                                <label for="payment_method">Select Bank for {{ $bankTransferProviderName }}</label>
                                 <select class="form-control" name="bank" id="bank">
                                     <option value="">Select</option>
                                     @foreach($banks as $bank)
                                     <option value="{{ $bank->cbn_code }}" {{ ($transaction->bank_code == $bank->cbn_code ||  old('bank') == $bank->cbn_code) ? 'selected' : ''}}>{{ $bank->bank_name }}</option>
                                     @endforeach
                                 </select>
+                                <small class="d-block text-muted mt-1">
+                                    Bank details here will be validated against the same provider used for wallet-to-bank transfers.
+                                </small>
                             </fieldset>
                             <fieldset class="form-group col-sm-12 col-12">
                                 <label for="receive" class="">Account Number</label>
@@ -290,6 +304,29 @@
 @section('page-script')
 <script src="{{ asset('app-assets/js/scripts/pages/dashboard-analytics.js') }}"></script>
 <script>
+    function escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function renderVerificationCard(payload, title) {
+        const response = payload?.raw_response ?? payload?.data ?? payload ?? {};
+        const rawResponse = typeof response === 'string'
+            ? response
+            : JSON.stringify(response, null, 2);
+
+        return `
+            <div class="validate-div mb-0">
+                <div class="small text-uppercase text-muted font-weight-bold mb-2">${escapeHtml(title || 'Bank verification')}</div>
+                <pre class="mb-0 bg-transparent border-0 p-0" style="white-space:pre-wrap;max-height:260px;overflow:auto;">${escapeHtml(rawResponse)}</pre>
+            </div>
+        `;
+    }
+
     function queryBankDetails(){
         url = '{{route("admin.verify.bank.details")}}';
         var formData =  {
@@ -311,7 +348,7 @@
 				$('#qw_debit').html('Query Debit <i class="fa fa-check"></i>');
 				$('#img_loading').hide();
 				$('#q_res').show();
-				$('#q_res').html(JSON.stringify(data.message, null, 3));
+				$('#q_res').html(renderVerificationCard(data, 'Account verification completed'));
 			}
 		});
 		e.preventDefault();

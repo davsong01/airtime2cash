@@ -4,8 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Providers\KingsVtuController;
 use App\Models\API;
+use App\Models\Bank;
 use App\Services\AutoSyncService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class APIController extends Controller
 {
@@ -32,9 +35,13 @@ class APIController extends Controller
             "live_base_url" => "nullable",
             "secret_key" => "nullable",
             "public_key" => "nullable",
+            "account_number" => "nullable|string|max:255",
             "slug" => "required|string|max:100",
-            "file_name" => "nullable|string|max:255",
             "pricing_data_status" => "nullable|boolean",
+            "is_bank_transfer" => "nullable|boolean",
+            "is_bank_verification" => "nullable|boolean",
+            "is_auto_share" => "nullable|boolean",
+            "is_payment_gateway" => "nullable|boolean",
             "pricing_data" => "nullable|string",
             "extra_charges" => "nullable|string",
         ]);
@@ -47,11 +54,15 @@ class APIController extends Controller
             "api_key" => $request->api_key,
             "secret_key" => $request->secret_key,
             "public_key" => $request->public_key,
+            "account_number" => $request->account_number,
             "sandbox_base_url" => $request->sandbox_base_url,
             "live_base_url" => $request->live_base_url,
             "slug" => $request->slug,
-            "file_name" => $request->file_name,
             "pricing_data_status" => $request->boolean('pricing_data_status'),
+            "is_bank_transfer" => $request->boolean('is_bank_transfer'),
+            "is_bank_verification" => $request->boolean('is_bank_verification'),
+            "is_auto_share" => $request->boolean('is_auto_share'),
+            "is_payment_gateway" => $request->boolean('is_payment_gateway'),
             "pricing_data" => $this->decodePricingBands($request->input('pricing_data')),
             "extra_charges" => $this->decodeExtraCharges($request->input('extra_charges')),
         ]);
@@ -74,11 +85,15 @@ class APIController extends Controller
             "api_key" => "nullable",
             "secret_key" => "nullable",
             "public_key" => "nullable",
+            "account_number" => "nullable|string|max:255",
             "sandbox_base_url" => "nullable",
             "live_base_url" => "nullable",
             "slug" => "required|string|max:100",
-            "file_name" => "nullable|string|max:255",
             "pricing_data_status" => "nullable|boolean",
+            "is_bank_transfer" => "nullable|boolean",
+            "is_bank_verification" => "nullable|boolean",
+            "is_auto_share" => "nullable|boolean",
+            "is_payment_gateway" => "nullable|boolean",
             "pricing_data" => "nullable|string",
             "extra_charges" => "nullable|string",
         ]);
@@ -91,11 +106,15 @@ class APIController extends Controller
             "api_key" => $request->api_key,
             "secret_key" => $request->secret_key,
             "public_key" => $request->public_key,
+            "account_number" => $request->account_number,
             "sandbox_base_url" => $request->sandbox_base_url,
             "live_base_url" => $request->live_base_url,
             "slug" => $request->slug,
-            "file_name" => $request->file_name,
             "pricing_data_status" => $request->boolean('pricing_data_status'),
+            "is_bank_transfer" => $request->boolean('is_bank_transfer'),
+            "is_bank_verification" => $request->boolean('is_bank_verification'),
+            "is_auto_share" => $request->boolean('is_auto_share'),
+            "is_payment_gateway" => $request->boolean('is_payment_gateway'),
             "pricing_data" => $this->decodePricingBands($request->input('pricing_data')),
             "extra_charges" => $this->decodeExtraCharges($request->input('extra_charges')),
         ]);
@@ -105,13 +124,125 @@ class APIController extends Controller
 
     public function getBalance(API $api)
     {
-        if($api->slug == 'autosync'){
-            $res = app(AutoSyncService::class)->balance($api);
-        }else{
-            $res = app(KingsVtuController::class)->balance();
+        try {
+            $controller = resolveProviderController($api);
+
+            if ($controller && method_exists($controller, 'balance')) {
+                $res = $controller->balance();
+            } elseif ($api->slug === 'autosync') {
+                $res = app(AutoSyncService::class)->balance($api);
+            } else {
+                $res = app(KingsVtuController::class)->balance(null, $api);
+            }
+
+            if (($res['status'] ?? null) === 'success' && array_key_exists('balance', $res)) {
+                $api->update(['balance' => $res['balance']]);
+            } else {
+                Log::warning('Provider balance check failed.', [
+                    'api_id' => $api->id,
+                    'slug' => $api->slug,
+                    'name' => $api->name,
+                    'response' => $res,
+                ]);
+            }
+
+            return response()->json($res);
+        } catch (Throwable $e) {
+            Log::error('Provider balance check threw an exception.', [
+                'api_id' => $api->id,
+                'slug' => $api->slug,
+                'name' => $api->name,
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+
+            return response()->json([
+                'status' => 'failed',
+                'message' => 'Unable to fetch provider balance at the moment.',
+            ], 422);
+        }
+    }
+
+    public function pullBanks(API $api)
+    {
+        if (! $api->is_bank_transfer && ! $api->is_bank_verification) {
+            return response()->json([
+                'status' => false,
+                'message' => 'This provider is not configured for bank syncing.',
+            ], 422);
         }
 
-        return response()->json($res);
+        $controller = resolveProviderController($api);
+
+        if (! $controller || ! method_exists($controller, 'pullBanks')) {
+            return response()->json([
+                'status' => false,
+                'message' => 'This provider does not support bank syncing.',
+            ], 422);
+        }
+
+        $response = $controller->pullBanks();
+        $banks = data_get($response, 'data', []);
+
+        if (! is_array($banks)) {
+            return response()->json([
+                'status' => false,
+                'message' => 'The provider did not return a valid bank list.',
+                'response' => $response,
+            ], 422);
+        }
+
+        $syncedCount = 0;
+
+        foreach ($banks as $bankData) {
+            if (! is_array($bankData)) {
+                continue;
+            }
+
+            if ($this->bankSupportsTransfer($bankData) === false) {
+                continue;
+            }
+
+            $cbnCode = $bankData['cbn_code'] ?? $bankData['code'] ?? null;
+
+            if (blank($cbnCode)) {
+                continue;
+            }
+
+            $providerCode = $bankData['provider_code'] ?? $cbnCode;
+            $bank = Bank::query()->where('cbn_code', $cbnCode)->first();
+
+            if (! $bank) {
+                Bank::create([
+                    'bank_name' => $bankData['bank_name'] ?? $bankData['name'] ?? null,
+                    'cbn_code' => $cbnCode,
+                    'status' => 'active',
+                    'provider_codes' => [
+                        $api->slug => $providerCode,
+                    ],
+                    'provider_meta' => $bankData['provider_meta'] ?? [],
+                ]);
+                $syncedCount++;
+                continue;
+            }
+
+            $codes = is_array($bank->provider_codes ?? null) ? $bank->provider_codes : [];
+
+            if (blank($codes[$api->slug] ?? null)) {
+                $codes[$api->slug] = $providerCode;
+                $bank->update([
+                    'provider_codes' => $codes,
+                ]);
+                $syncedCount++;
+            }
+        }
+
+        return response()->json([
+            'status' => true,
+            'message' => $syncedCount . ' bank' . ($syncedCount === 1 ? '' : 's') . ' pulled',
+            'count' => $syncedCount,
+        ]);
     }
 
     private function decodePricingBands(?string $pricingData): array
@@ -169,6 +300,26 @@ class APIController extends Controller
         }
 
         return array_values($normalized);
+    }
+
+    private function bankSupportsTransfer(array $bankData): ?bool
+    {
+        $flags = [
+            $bankData['supports_transfer'] ?? null,
+            $bankData['supportsTransfer'] ?? null,
+            $bankData['transfer_enabled'] ?? null,
+            $bankData['transferEnabled'] ?? null,
+        ];
+
+        foreach ($flags as $flag) {
+            if ($flag === null) {
+                continue;
+            }
+
+            return filter_var($flag, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+        }
+
+        return null;
     }
 
     private function decodeExtraCharges(?string $extraCharges): array

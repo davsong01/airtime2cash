@@ -85,7 +85,7 @@ class TransactionController extends Controller
             $product->auto_share_discounted_rate = $product->auto_share_rate ?? $product->rate;
         }
 
-        $banks = Bank::all();
+        $banks = Bank::active()->orderBy('bank_name')->get();
 
         if (!empty($category) && $category->status == 'active') {
             return view(themeView('customer', 'airtime2cash_page'), compact('category', 'banks'));
@@ -103,7 +103,12 @@ class TransactionController extends Controller
         }
 
         $product = Product::where('slug', $slug)->first();
-        $banks = Bank::all();
+        $verificationProviderId = getSettings()->bank_verification_provider_id ?: getSettings()->bank_transfer_provider_id;
+        $verificationProvider = API::query()
+            ->whereKey($verificationProviderId)
+            ->where('status', 'active')
+            ->first();
+        $banks = getWalletToBankBanks($verificationProvider);
         $pricingProvider = API::query()
             ->whereKey(getSettings()->bank_transfer_provider_id)
             ->where('status', 'active')
@@ -305,7 +310,7 @@ class TransactionController extends Controller
         }
 
         $transaction_id = 'A2C-' . $this->generateRequestId();
-        $bank = Bank::where('cbn_code', $request->bank)->first();
+        $bank = Bank::active()->where('cbn_code', $request->bank)->first();
         if (!empty($bank)) {
             $bank_name = $bank->bank_name;
             $request['bank_id'] = $bank->id;
@@ -542,7 +547,7 @@ class TransactionController extends Controller
         $amount = (float) $this->removeCharsInAmount($request->amount);
         $chargeDetails = getBankTransferChargeDetails($amount);
         if (!($chargeDetails['pricing_enabled'] ?? false)) {
-            return back()->with('error', 'Wallet to bank transfer pricing has been turned off by admin.');
+            return back()->with('error', 'Wallet to bank transfer pricing is configured yet.');
         }
 
         if (!($chargeDetails['pricing_available'] ?? false)) {
@@ -572,11 +577,12 @@ class TransactionController extends Controller
             return back()->with('error', 'Insufficient wallet balance. This transfer will debit ₦' . number_format($totalDebit, 2));
         }
 
-        $bank = Bank::where('cbn_code', $request->bank)->first();
+        $bank = Bank::active()->where('cbn_code', $request->bank)->first();
 
         if (!empty($bank)) {
             $bank_name = $bank->bank_name;
             $request['bank_id'] = $bank->id;
+            $request['bank_code'] = $bank->cbn_code;
         } else {
             return back()->with('error', 'Invalid bank selected');
         }
@@ -1827,7 +1833,12 @@ class TransactionController extends Controller
 
     public function singleAirtimeTransactionView(Airtime2CashTransactions $transaction)
     {
-        $banks = Bank::all();
+        $verificationProviderId = getSettings()->bank_verification_provider_id ?: getSettings()->bank_transfer_provider_id;
+        $verificationProvider = API::query()
+            ->whereKey($verificationProviderId)
+            ->where('status', 'active')
+            ->first();
+        $banks = getWalletToBankBanks($verificationProvider);
         return view('admin.transaction.single_airtime2cash_transaction', compact('transaction', 'banks'));
     }
 
@@ -1917,6 +1928,216 @@ class TransactionController extends Controller
         }
     }
 
+    public function resolvePendingTransactionAction(Request $request, TransactionLog $transaction)
+    {
+        $validated = $request->validate([
+            'action' => ['required', 'in:credit_customer,failed,successful,process'],
+            'amount' => ['nullable', 'numeric', 'min:0'],
+            'reason' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $status = strtolower((string) ($transaction->status ?? ''));
+
+        if (! in_array($status, ['pending', 'initiated', 'processing'], true)) {
+            return back()->with('error', 'Only pending transactions can be resolved from this modal.');
+        }
+
+        try {
+            return match ($validated['action']) {
+                'credit_customer' => $this->resolvePendingTransactionByCredit(
+                    $transaction,
+                    (float) ($validated['amount'] ?? $transaction->total_amount ?? $transaction->amount ?? 0),
+                    $validated['reason'] ?? 'Pending transaction refunded by ADMIN'
+                ),
+                'failed' => $this->resolvePendingTransactionByStatus(
+                    $transaction,
+                    'failed',
+                    $validated['reason'] ?? 'Manually marked as failed by ADMIN'
+                ),
+                'successful' => $this->resolvePendingTransactionByStatus(
+                    $transaction,
+                    'success',
+                    $validated['reason'] ?? 'Manually marked as successful by ADMIN'
+                ),
+                'process' => $this->resolvePendingTransactionByProvider($transaction),
+                default => back()->with('error', 'Unsupported resolution action.'),
+            };
+        } catch (Throwable $exception) {
+            return back()->with('error', 'Unable to resolve transaction: ' . $exception->getMessage());
+        }
+    }
+
+    private function resolvePendingTransactionByCredit(TransactionLog $transaction, float $amount, string $reason)
+    {
+        $user = $transaction->customer?->user;
+
+        if (! $user || ! $user->customer) {
+            return back()->with('error', 'Unable to locate the customer wallet for this transaction.');
+        }
+
+        if ($amount <= 0) {
+            return back()->with('error', 'Refund amount must be greater than zero.');
+        }
+
+        $wallet = new WalletController();
+        $balanceBefore = $wallet->getWalletBalance($user);
+
+        $refundRequest = [
+            'customer_id' => $user->customer->id,
+            'type' => 'credit',
+            'total_amount' => $amount,
+            'transaction_id' => $transaction->transaction_id,
+            'reason' => $reason,
+            'payment_method' => 'ADMIN-REFUND',
+        ];
+
+        $wallet->logWallet($refundRequest);
+        $wallet->updateCustomerWallet($user, $amount, 'credit');
+
+        $this->markTransactionResolved(
+            $transaction,
+            'failed',
+            $reason,
+            $reason,
+            $balanceBefore + $amount,
+        );
+
+        return back()->with('message', 'Customer has been credited and the transaction was closed.');
+    }
+
+    private function resolvePendingTransactionByStatus(TransactionLog $transaction, string $status, string $reason)
+    {
+        $this->markTransactionResolved(
+            $transaction,
+            $status,
+            $reason,
+            $status === 'failed' ? $reason : null,
+            $transaction->balance_after,
+        );
+
+        return back()->with('message', 'Transaction updated successfully.');
+    }
+
+    private function resolvePendingTransactionByProvider(TransactionLog $transaction)
+    {
+        $provider = $transaction->api ?: API::query()
+            ->whereKey(getSettings()->bank_transfer_provider_id)
+            ->where('status', 'active')
+            ->first();
+
+        if (! $provider) {
+            return back()->with('error', 'No active provider is attached to this transaction.');
+        }
+
+        $controller = resolveProviderController($provider);
+
+        if (! $controller) {
+            return back()->with('error', 'Unable to resolve the transaction provider controller.');
+        }
+
+        $response = null;
+        $transactionType = strtolower((string) ($transaction->product?->type ?? $transaction->unique_element ?? $transaction->reason ?? ''));
+
+        if ($transactionType === 'wallet2bank' || str_contains($transactionType, 'wallet to bank')) {
+            if (! method_exists($controller, 'requery')) {
+                return back()->with('error', 'This provider does not support transaction requery.');
+            }
+
+            $response = $controller->requery($transaction);
+        } elseif (method_exists($controller, 'verifyTransaction')) {
+            $reference = $transaction->reference_id
+                ?: $transaction->transaction_reference
+                ?: $transaction->request_id
+                ?: $transaction->transaction_id;
+
+            $response = $controller->verifyTransaction((string) $reference);
+        } else {
+            return back()->with('error', 'This provider does not support transaction processing.');
+        }
+
+        $providerStatus = strtolower((string) data_get($response, 'provider_status', data_get($response, 'status', 'pending')));
+        $isSuccessful = in_array($providerStatus, ['successful', 'success', 'completed'], true)
+            || (bool) data_get($response, 'status', false) === true;
+        $isFailed = in_array($providerStatus, ['failed', 'rejected', 'declined', 'error'], true);
+
+        if ($isSuccessful) {
+            $this->markTransactionResolved(
+                $transaction,
+                'success',
+                'Transaction processed successfully after provider verification.',
+                null,
+                $transaction->balance_after,
+            );
+
+            return back()->with('message', 'Transaction processed successfully.');
+        }
+
+        if ($isFailed) {
+            $this->refundResolvedTransactionIfNeeded($transaction, 'Transaction failed after provider verification.');
+            $this->markTransactionResolved(
+                $transaction,
+                'failed',
+                'Transaction failed after provider verification.',
+                data_get($response, 'message', 'Transaction failed after provider verification.'),
+                $transaction->balance_before,
+            );
+
+            return back()->with('message', 'Transaction failed after provider verification.');
+        }
+
+        $this->markTransactionResolved(
+            $transaction,
+            'pending',
+            'Provider still returned a pending response after requery.',
+            data_get($response, 'message', 'Provider still returned a pending response after requery.'),
+            $transaction->balance_after,
+        );
+
+        return back()->with('warning', 'Provider still returned a pending response. The transaction remains pending.');
+    }
+
+    private function refundResolvedTransactionIfNeeded(TransactionLog $transaction, string $reason): void
+    {
+        if (strtolower((string) ($transaction->type ?? '')) !== 'debit') {
+            return;
+        }
+
+        $user = $transaction->customer?->user;
+
+        if (! $user || ! $user->customer) {
+            return;
+        }
+
+        $amount = (float) ($transaction->total_amount ?? $transaction->amount ?? 0);
+
+        if ($amount <= 0) {
+            return;
+        }
+
+        $wallet = new WalletController();
+        $wallet->logWallet([
+            'customer_id' => $user->customer->id,
+            'type' => 'credit',
+            'total_amount' => $amount,
+            'transaction_id' => $transaction->transaction_id,
+            'reason' => $reason,
+            'payment_method' => 'ADMIN-REFUND',
+        ]);
+        $wallet->updateCustomerWallet($user, $amount, 'credit');
+    }
+
+    private function markTransactionResolved(TransactionLog $transaction, string $status, string $descr, ?string $failureReason = null, ?float $balanceAfter = null): void
+    {
+        $transaction->update([
+            'status' => $status,
+            'user_status' => $status,
+            'descr' => $descr,
+            'failure_reason' => $failureReason,
+            'admin_id' => auth()->user()->admin->id ?? null,
+            'balance_after' => $balanceAfter ?? $transaction->balance_after,
+        ]);
+    }
+
     public function queryWallet(Request $request, TransactionLog $transactionlog)
     {
         $type = $request->type;
@@ -1967,7 +2188,15 @@ class TransactionController extends Controller
         if (!$trans) return ['status' => 'failed', 'message' => 'Transaction not found!'];
 
         if ($trans->product->type == 'wallet2bank') {
-            $query = app("App\Http\Controllers\Providers\SageController")->requery($trans);
+            $provider = $trans->api ?: API::query()
+                ->whereKey(getSettings()->bank_transfer_provider_id)
+                ->where('status', 'active')
+                ->first();
+
+            $controller = resolveProviderController($provider);
+            $query = $controller && method_exists($controller, 'requery')
+                ? $controller->requery($trans)
+                : ['status' => 'failed', 'message' => 'No supported bank transfer provider found.'];
         } else {
             if ($trans->reason == 'WALLET-FUNDING') {
                 if ($trans->wallet_funding_provider == 1) {
@@ -1988,19 +2217,57 @@ class TransactionController extends Controller
     }
 
 
-    public function requeryCallback($reference)
+    public function requeryCallback(Request $request, $reference)
     {
+        if (! $request->ajax() && ! $request->expectsJson()) {
+            return back()->with('message', 'Use the Query button on the callback analysis page to view the response.');
+        }
+
         $transaction = ReservedAccountCallback::where('transaction_reference', $reference)->first();
+
+        if (! $transaction) {
+            return response()->json([
+                'status' => 'failed',
+                'message' => 'Callback record not found.',
+                'reference' => $reference,
+            ], 404);
+        }
 
         if ($transaction->provider_id == 1) {
             $monnify = new MonnifyController($transaction->gateway);
-            return $monnify->verifyTransaction($reference);
+            $result = $monnify->verifyTransaction($reference);
+
+            return response()->json([
+                'status' => $result['status'] ?? 'failed',
+                'message' => ($result['status'] ?? 'failed') === 'success'
+                    ? 'Monnify query completed successfully.'
+                    : 'Monnify query did not return a successful payment state.',
+                'reference' => $reference,
+                'provider' => $transaction->gateway?->name,
+                'response' => $result,
+            ]);
         }
 
         if ($transaction->wallet_funding_provider == 2) {
             $squad = new SquadController($transaction->gateway);
-            return $squad->verifyTransaction($reference);
+            $result = $squad->verifyTransaction($reference);
+
+            return response()->json([
+                'status' => $result['status'] ?? 'failed',
+                'message' => ($result['status'] ?? 'failed') === 'success'
+                    ? 'Squad query completed successfully.'
+                    : 'Squad query did not return a successful payment state.',
+                'reference' => $reference,
+                'provider' => $transaction->gateway?->name,
+                'response' => $result,
+            ]);
         }
+
+        return response()->json([
+            'status' => 'failed',
+            'message' => 'Unsupported provider for callback requery.',
+            'reference' => $reference,
+        ], 422);
 
     }
 
@@ -2113,19 +2380,36 @@ class TransactionController extends Controller
             ];
         }
 
-        $controller = match ($provider->slug) {
-            'sagecloud' => app(SageController::class),
-            default => throw new RuntimeException(
-                "Unsupported bank transfer provider: {$provider->slug}"
-            ),
-        };
+        $controller = resolveProviderController($provider);
+
+        if (! $controller || ! method_exists($controller, 'transfer')) {
+            return [
+                'status' => 'failed',
+                'error' => "Unsupported bank transfer provider: {$provider->slug}",
+            ];
+        }
+
+        $bank = Bank::active()->where('cbn_code', $bankCode)->first();
+
+        if (! $bank) {
+            return [
+                'status' => 'failed',
+                'error' => 'Selected bank is unavailable or inactive.',
+            ];
+        }
+
+        $resolvedBankCode = resolveProviderBankCode($bank, $provider) ?: $bankCode;
 
         $data = [
-            'bank_code' => $bankCode,
+            'bank_code' => $resolvedBankCode,
+            'provider_bank_code' => $resolvedBankCode,
+            'cbn_code' => $bank->cbn_code,
             'account_number' => $accountNumber,
             'account_name' => $accountName,
             'amount' => (float) $amount,
             'transaction_id' => $transaction?->transaction_id,
+            'provider_id' => $provider->id,
+            'provider_slug' => $provider->slug,
         ];
 
         $response = $controller->transfer($data);
@@ -2133,6 +2417,8 @@ class TransactionController extends Controller
         if ($transaction) {
             $transaction->update([
                 'api_id' => $provider->id,
+                'bank_id' => $bank?->id,
+                'bank_code' => $bank->cbn_code,
                 'api_response' => $response['api_response'] ?? $response,
                 'request_data' => json_encode(
                     $response['request_data'] ?? $data
@@ -2173,9 +2459,91 @@ class TransactionController extends Controller
 
     public function verifyBankDetails(Request $request)
     {
-        $provider = API::where('id', getSettings()->bank_transfer_provider_id)->where('status', 'active')->first();
-        if($provider->slug == 'sagecloud'){
-            return app(SageController::class)->verifyBankDetails($request->all());
+        $providerId = getSettings()->bank_verification_provider_id ?: getSettings()->bank_transfer_provider_id;
+        $provider = API::where('id', $providerId)->where('status', 'active')->first();
+
+        if (! $provider) {
+            return response()->json([
+                'status' => false,
+                'message' => 'No active bank verification provider configured.',
+            ], 422);
         }
+
+        $controller = resolveProviderController($provider);
+
+        if (! $controller || ! method_exists($controller, 'verifyBankDetails')) {
+            return response()->json([
+                'status' => false,
+                'message' => "Bank verification is not supported for {$provider->slug}.",
+            ], 422);
+        }
+
+        $accountNumber = trim((string) $request->input('account_number', ''));
+
+        if ($accountNumber !== '') {
+            $cached = BillerLog::query()
+                ->where('service_id', $provider->slug)
+                ->where('billers_code', $accountNumber)
+                ->latest('id')
+                ->first();
+
+            if ($cached) {
+                $refinedData = json_decode((string) $cached->refined_data, true);
+                $rawData = json_decode((string) $cached->raw_data, true);
+
+                return response()->json([
+                    'status' => true,
+                    'message' => 'Account details loaded from cache.',
+                    'data' => [
+                        'provider' => $cached->provider,
+                        'account_number' => $accountNumber,
+                        'refined_data' => is_array($refinedData) ? $refinedData : [],
+                        'raw_response' => is_array($rawData) ? $rawData : [],
+                        'cached' => true,
+                    ],
+                    'raw_response' => is_array($rawData) ? $rawData : [],
+                ]);
+            }
+        }
+
+        $response = $controller->verifyBankDetails($request->all());
+        $payload = $response instanceof JsonResponse
+            ? $response->getData(true)
+            : (is_array($response) ? $response : []);
+
+        if (! (bool) data_get($payload, 'status', false)) {
+            return $response;
+        }
+
+        $providerResponse = data_get($payload, 'raw_response')
+            ?? data_get($payload, 'data')
+            ?? $payload;
+
+        if (is_array($providerResponse)) {
+            $refinedData = array_filter([
+                'Bank Name' => data_get($providerResponse, 'data.bank_name')
+                    ?? data_get($providerResponse, 'bank_name')
+                    ?? data_get($providerResponse, 'bank'),
+                'Account Name' => data_get($providerResponse, 'data.account_name')
+                    ?? data_get($providerResponse, 'account_name')
+                    ?? data_get($providerResponse, 'accountName'),
+                'Account Number' => data_get($providerResponse, 'data.account_number')
+                    ?? data_get($providerResponse, 'account_number')
+                    ?? $accountNumber,
+            ], fn ($value) => filled($value));
+
+            BillerLog::updateOrCreate([
+                'service_id' => $provider->slug,
+                'billers_code' => $accountNumber,
+            ], [
+                'service_id' => $provider->slug,
+                'billers_code' => $accountNumber,
+                'provider' => $provider->slug,
+                'refined_data' => json_encode($refinedData),
+                'raw_data' => json_encode($providerResponse),
+            ]);
+        }
+
+        return $response;
     }
 }

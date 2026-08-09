@@ -19,7 +19,7 @@ class WebhookProcessor
 
         return match ($providerSlug) {
             'autosync' => app(AutoSyncService::class)->process($webhook, $resolvedBy, $force),
-            'sagecloud' => $this->processGenericWebhook($webhook, $resolvedBy, $force),
+            'sagecloud', 'paystack', 'monnify', 'kora' => $this->processGenericWebhook($webhook, $resolvedBy, $force),
             default => $this->processGenericWebhook($webhook, $resolvedBy, $force),
         };
     }
@@ -36,7 +36,6 @@ class WebhookProcessor
 
         $webhook->update([
             'processing_status' => 'processing',
-            'attempts' => (int) $webhook->attempts + 1,
             'last_error' => null,
         ]);
 
@@ -161,7 +160,7 @@ class WebhookProcessor
             'failure_reason' => $isFailed ? ($message ?? 'Transaction failed.') : null,
             'descr' => $message ?? ($isSuccessful
                 ? 'Transaction completed successfully.'
-                : ($isPending ? 'Transaction is pending provider confirmation.' : 'Transaction failed.')),
+                : ($providerStatus === 'pending' ? 'Transaction is pending provider confirmation.' : 'Transaction failed.')),
             'completed_at' => $isSuccessful ? ($transaction->completed_at ?? now()) : $transaction->completed_at,
             'admin_id' => $isWalletToBank ? auth()->user()?->admin?->id ?? ($transaction->admin_id ?? null) : ($transaction->admin_id ?? null),
         ];

@@ -14,11 +14,15 @@ class API extends Model
 
     use HasFactory;
     protected $guarded = [];
-    protected $table = 'a_p_is';
+    protected $table = 'apis';
     protected $casts = [
         'pricing_data' => 'array',
         'extra_charges' => 'array',
         'pricing_data_status' => 'boolean',
+        'is_bank_transfer' => 'boolean',
+        'is_bank_verification' => 'boolean',
+        'is_auto_share' => 'boolean',
+        'is_payment_gateway' => 'boolean',
     ];
 
     protected function createdAt(): Attribute

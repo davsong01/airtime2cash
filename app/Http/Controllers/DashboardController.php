@@ -170,8 +170,9 @@ class DashboardController extends Controller
 
     public function showLoadWalletPge()
     {
-        $gateway = PaymentGateway::where('id', getSettings()->payment_gateway)->first();
-        return view(themeView('customer', 'load_wallet'), compact('gateway'));
+        $provider = resolvePaymentGatewayProvider();
+        $gateway = $provider ? resolvePaymentGatewaySetting($provider->slug) : resolvePaymentGatewaySetting();
+        return view(themeView('customer', 'load_wallet'), compact('gateway', 'provider'));
     }
 
     public function upgradeAccount(Request $request)

@@ -1,0 +1,425 @@
+<?php
+
+namespace App\Http\Controllers\Providers;
+
+use App\Models\ReservedAccountNumber;
+use Illuminate\Http\Request;
+
+class MonnifyController extends BankTransferProviderController
+{
+    protected function providerSlug(): string
+    {
+        return 'monnify';
+    }
+
+    public function login()
+    {
+        $provider = $this->api();
+
+        if (! $provider) {
+            return null;
+        }
+
+        $headers = [
+            'Authorization: Basic ' . base64_encode(($provider->api_key ?? '') . ':' . ($provider->secret_key ?? '')),
+            'Content-Type: application/json',
+        ];
+
+        $url = rtrim((string) $this->baseUrl(), '/') . '/api/v1/auth/login';
+        $response = $this->basicApiCall($url, [], $headers, 'POST');
+
+        return $response['responseBody']['accessToken'] ?? null;
+    }
+
+    protected function headers(): array
+    {
+        $token = $this->login();
+
+        return [
+            'Content-Type: application/json',
+            'Authorization: Bearer ' . ($token ?: ''),
+        ];
+    }
+
+    public function verifyWebhookSignature(Request $request): array
+    {
+        $payload = normalizeWebhookPayload($request);
+        $rawBody = trim((string) $request->getContent());
+        $signature = (string) $request->header('monnify-signature');
+        $expectedSignature = blank($rawBody)
+            ? null
+            : hash_hmac('sha512', $rawBody, (string) ($this->api()?->secret_key ?? ''));
+
+        if (blank($signature) || blank($expectedSignature) || ! hash_equals($expectedSignature, $signature)) {
+            return [
+                'status' => false,
+                'reference' => data_get($payload, 'eventData.paymentReference')
+                    ?? data_get($payload, 'eventData.transactionReference')
+                    ?? data_get($payload, 'transaction.reference')
+                    ?? data_get($payload, 'reference')
+                    ?? data_get($payload, 'data.reference'),
+                'message' => 'Invalid Monnify webhook signature.',
+            ];
+        }
+
+        $reference = data_get($payload, 'eventData.paymentReference')
+            ?? data_get($payload, 'eventData.transactionReference')
+            ?? data_get($payload, 'transaction.reference')
+            ?? data_get($payload, 'reference')
+            ?? data_get($payload, 'data.reference');
+
+        return [
+            'status' => filled($reference),
+            'reference' => $reference,
+            'message' => filled($reference)
+                ? 'Webhook signature verified.'
+                : 'Webhook reference could not be resolved.',
+        ];
+    }
+
+    public function balance(): array
+    {
+        $token = $this->login();
+        if (empty($token)) {
+            return ['status' => 'failed', 'message' => 'Could not authenticate with Monnify.'];
+        }
+
+        $accountNumber = data_get($this->api(), 'account_number') ?: data_get($this->api(), 'contract_id');
+
+        if (blank($accountNumber)) {
+            return ['status' => 'failed', 'message' => 'Monnify wallet account number is not configured on this provider.'];
+        }
+
+        $response = $this->basicApiCall(
+            rtrim((string) $this->baseUrl(), '/') . '/api/v2/disbursements/wallet-balance?accountNumber=' . urlencode((string) $accountNumber),
+            [],
+            [
+                'Content-Type: application/json',
+                'Authorization: Bearer ' . $token,
+            ],
+            'GET'
+        );
+  
+        return [
+            'status' => (($response['requestSuccessful'] ?? false) === true && ($response['responseCode'] ?? null) === '0') ? 'success' : 'failed',
+            'balance' => data_get($response, 'responseBody.availableBalance', data_get($response, 'responseBody.ledgerBalance')),
+            'currency' => data_get($response, 'responseBody.currency', 'NGN'),
+            'api_response' => $response,
+        ];
+    }
+
+    public function verifyBankDetails(array $data)
+    {
+        $token = $this->login();
+        if (empty($token)) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Could not verify account details at the moment, please try again later',
+            ], 422);
+        }
+
+        $response = $this->basicApiCall(
+            rtrim((string) $this->baseUrl(), '/') . '/api/v2/disbursements/account/validate?accountNumber=' . urlencode((string) ($data['account_number'] ?? '')) . '&bankCode=' . urlencode((string) ($data['provider_bank_code'] ?? $data['bank_code'] ?? '')),
+            [],
+            [
+                'Content-Type: application/json',
+                'Authorization: Bearer ' . $token,
+            ],
+            'GET'
+        );
+
+        $success = (($response['requestSuccessful'] ?? false) === true && (string) ($response['responseCode'] ?? '') === '0');
+
+        return response()->json([
+            'status' => $success,
+            'message' => $success ? 'Bank details verified successfully.' : ($response['responseMessage'] ?? 'Unable to verify account details at the moment, please try again later'),
+            'data' => $response['responseBody'] ?? $response,
+        ], $success ? 200 : 422);
+    }
+
+    public function transfer(array $data): array
+    {
+        $token = $this->login();
+
+        if (empty($token)) {
+            return [
+                'status' => 'failed',
+                'error' => 'Could not authenticate with Monnify.',
+                'request_data' => $data,
+            ];
+        }
+
+        $payload = [
+            'amount' => (float) $data['amount'],
+            'reference' => $data['transaction_id'] ?? $this->generateRequestId(),
+            'narration' => $data['narration'] ?? ('Transfer from ' . config('app.name')),
+            'destinationBankCode' => $data['provider_bank_code'] ?? $data['bank_code'] ?? null,
+            'destinationAccountNumber' => $data['account_number'] ?? null,
+            'destinationAccountName' => $data['account_name'] ?? null,
+            'currency' => 'NGN',
+            'async' => true,
+        ];
+
+        $response = $this->basicApiCall(
+            rtrim((string) $this->baseUrl(), '/') . '/api/v2/disbursements/single',
+            json_encode($payload),
+            [
+                'Content-Type: application/json',
+                'Authorization: Bearer ' . $token,
+            ],
+            'POST'
+        );
+
+        $providerStatus = strtolower((string) data_get($response, 'responseBody.status', data_get($response, 'data.status', data_get($response, 'status', 'failed'))));
+        $success = in_array($providerStatus, ['success', 'successful', 'completed'], true)
+            || (($response['requestSuccessful'] ?? false) === true && (string) ($response['responseCode'] ?? '') === '0' && in_array($providerStatus, ['success', 'completed'], true));
+        $pending = in_array($providerStatus, ['pending', 'processing', 'initiated', 'awaiting_processing', 'in_progress', 'pending_authorization'], true);
+
+        return [
+            'status' => $success ? 'success' : ($pending ? 'pending' : 'failed'),
+            'provider_status' => $providerStatus ?: ($success ? 'success' : 'failed'),
+            'error' => $success ? null : ($pending ? null : (data_get($response, 'responseMessage') ?? 'Monnify transfer failed.')),
+            'request_data' => $payload,
+            'api_response' => $response,
+        ];
+    }
+
+    public function requery($transaction)
+    {
+        $token = $this->login();
+        if (empty($token)) {
+            return null;
+        }
+
+        $response = $this->basicApiCall(
+            rtrim((string) $this->baseUrl(), '/') . '/api/v2/disbursements/search-transactions?reference=' . urlencode($transaction->transaction_id),
+            [],
+            [
+                'Content-Type: application/json',
+                'Authorization: Bearer ' . $token,
+            ],
+            'GET'
+        );
+
+        $providerStatus = strtolower((string) data_get($response, 'responseBody.status', data_get($response, 'responseBody.paymentStatus', data_get($response, 'status', 'pending'))));
+
+        return [
+            'status' => in_array($providerStatus, ['success', 'successful', 'completed'], true),
+            'api_status' => (bool) data_get($response, 'requestSuccessful', false),
+            'provider_status' => $providerStatus,
+            'api_response' => $response,
+            'payload' => ['reference' => $transaction->transaction_id],
+            'message' => data_get($response, 'responseMessage', data_get($response, 'message')),
+        ];
+    }
+
+    public function verifyTransaction(string $reference): array
+    {
+        $token = $this->login();
+
+        if (empty($token)) {
+            return [
+                'status' => 'failed',
+                'message' => 'Could not authenticate with Monnify.',
+            ];
+        }
+
+        $response = $this->basicApiCall(
+            rtrim((string) $this->baseUrl(), '/') . '/api/v2/merchant/transactions/query?paymentReference=' . urlencode($reference),
+            [],
+            [
+                'Content-Type: application/json',
+                'Authorization: Bearer ' . $token,
+            ],
+            'GET'
+        );
+
+        $paymentStatus = strtoupper((string) data_get($response, 'responseBody.paymentStatus', 'FAILED'));
+        $amountPaid = (float) data_get($response, 'responseBody.amountPaid', 0);
+        $success = in_array($paymentStatus, ['PAID', 'OVERPAID'], true);
+
+        return [
+            'status' => $success ? 'success' : (in_array($paymentStatus, ['PENDING'], true) ? 'pending' : 'failed'),
+            'provider_status' => $paymentStatus,
+            'amount' => $amountPaid,
+            'api_status' => (bool) data_get($response, 'requestSuccessful', false),
+            'api_response' => $response,
+            'message' => data_get($response, 'responseMessage', $success ? 'Transaction verified successfully.' : 'Transaction verification failed.'),
+        ];
+    }
+
+    public function pullBanks(): array
+    {
+        $token = $this->login();
+        if (empty($token)) {
+            return ['status' => 'failed', 'message' => 'Could not authenticate with Monnify.'];
+        }
+
+        $response = $this->basicApiCall(
+            rtrim((string) $this->baseUrl(), '/') . '/api/v1/banks',
+            [],
+            [
+                'Content-Type: application/json',
+                'Authorization: Bearer ' . $token,
+            ],
+            'GET'
+        );
+
+        $banks = collect(data_get($response, 'responseBody', []))
+            ->filter(fn ($bank) => is_array($bank))
+            ->map(fn ($bank) => [
+                'bank_name' => $bank['name'] ?? $bank['bankName'] ?? null,
+                'cbn_code' => $bank['code'] ?? $bank['bankCode'] ?? null,
+                'provider_codes' => ['monnify' => $bank['code'] ?? $bank['bankCode'] ?? null],
+                'provider_meta' => $bank,
+            ])
+            ->values()
+            ->all();
+
+        return [
+            'status' => 'success',
+            'data' => $banks,
+            'api_response' => $response,
+        ];
+    }
+
+    public function createReservedAccount(array $data, int $admin_id = null)
+    {
+        $token = $this->login();
+
+        if (empty($token)) {
+            return [
+                'status' => 'failed',
+                'status_code' => 0,
+            ];
+        }
+
+        $provider = $this->api();
+        $response = $this->basicApiCall(
+            rtrim((string) $this->baseUrl(), '/') . '/api/v2/bank-transfer/reserved-accounts',
+            json_encode([
+                'customer_id' => $data['customer_id'] ?? null,
+                'bvn' => $data['BVN'] ?? null,
+                'customerEmail' => $data['customerEmail'] ?? null,
+                'accountName' => $data['accountName'] ?? $data['customerName'] ?? null,
+                'currencyCode' => 'NGN',
+                'contractCode' => $provider?->contract_id,
+                'getAllAvailableBanks' => ! empty($data['preferredBanks']),
+                'accountReference' => $this->generateRequestId(),
+                'preferredBanks' => $data['preferredBanks'] ?? null,
+            ]),
+            [
+                'Content-Type: application/json',
+                'Authorization: Bearer ' . $token,
+            ],
+            'POST'
+        );
+
+        if (
+            ($response['responseCode'] ?? null) === 0 &&
+            ($response['responseMessage'] ?? null) === 'success'
+        ) {
+            foreach (($response['responseBody']['accounts'] ?? []) as $account) {
+                ReservedAccountNumber::updateOrCreate([
+                    'customer_id' => $data['customer_id'] ?? null,
+                    'account_number' => $account['accountNumber'] ?? null,
+                    'account_name' => $account['accountName'] ?? null,
+                    'bank_name' => $account['bankName'] ?? null,
+                    'bank_code' => $account['bankCode'] ?? null,
+                ], [
+                    'customer_id' => $data['customer_id'] ?? null,
+                    'admin_id' => $admin_id ?? null,
+                    'account_reference' => $response['responseBody']['accountReference'] ?? null,
+                    'account_number' => $account['accountNumber'] ?? null,
+                    'account_name' => $account['accountName'] ?? null,
+                    'bank_name' => $account['bankName'] ?? null,
+                    'bank_code' => $account['bankCode'] ?? null,
+                    'api_id' => $provider?->id,
+                    'status' => $response['responseBody']['status'] ?? null,
+                    'purpose' => 'WALLET-FUNDING',
+                    'bvn' => $response['responseBody']['bvn'] ?? null,
+                    'response' => json_encode($response),
+                ]);
+            }
+
+            return ['status' => 'success', 'data' => ''];
+        }
+
+        return [
+            'status' => 'failed',
+            'data' => $response['responseMessage'] ?? 'no-response',
+        ];
+    }
+
+    public function deleteReservedAccount(string $account_reference)
+    {
+        $token = $this->login();
+
+        if (empty($token)) {
+            return [
+                'status' => 'failed',
+                'status_code' => 0,
+            ];
+        }
+
+        $response = $this->basicApiCall(
+            rtrim((string) $this->baseUrl(), '/') . '/api/v1/bank-transfer/reserved-accounts/reference/' . $account_reference,
+            [],
+            [
+                'Content-Type: application/json',
+                'Authorization: Bearer ' . $token,
+            ],
+            'DELETE'
+        );
+
+        if (($response['responseCode'] ?? null) === 0 && ($response['responseMessage'] ?? null) === 'success') {
+            ReservedAccountNumber::where('account_reference', $account_reference)->delete();
+            return ['status' => 'success', 'data' => ''];
+        }
+
+        return [
+            'status' => 'failed',
+            'data' => $response['responseBody'] ?? $response['responseMessage'] ?? $response,
+        ];
+    }
+
+    public function redirectToGateway(Request $request, $transaction)
+    {
+        $token = $this->login();
+
+        if (empty($token)) {
+            return [
+                'status' => 'failed',
+                'status_code' => 0,
+            ];
+        }
+
+        $payload = json_encode([
+            'amount' => $request->amount,
+            'customerName' => auth()->user()->firstname . ' ' . auth()->user()->lastname,
+            'customerEmail' => auth()->user()->email,
+            'paymentReference' => $request['reference'],
+            'paymentDescription' => 'WALLET-FUNDING',
+            'currencyCode' => 'NGN',
+            'contractCode' => $this->api()?->contract_id,
+            'redirectUrl' => route('payment-callback', $this->api()?->id),
+            'paymentMethods' => ['CARD', 'ACCOUNT_TRANSFER'],
+        ]);
+
+        $response = $this->basicApiCall(
+            rtrim((string) $this->baseUrl(), '/') . '/api/v1/merchant/transactions/init-transaction',
+            $payload,
+            [
+                'Content-Type: application/json',
+                'Authorization: Bearer ' . $token,
+            ],
+            'POST'
+        );
+
+        return [
+            'status' => (($response['responseCode'] ?? null) === 0 && ($response['responseMessage'] ?? null) === 'success') ? 'success' : 'failed',
+            'url' => $response['responseBody']['checkoutUrl'] ?? null,
+            'api_response' => $response,
+        ];
+    }
+}

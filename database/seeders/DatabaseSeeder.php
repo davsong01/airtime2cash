@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
             // RoleSeeder::class,
             // AirtimeToCashCategorySeeder::class,
             BankSeeder::class,
+            ApiIntegrationSeeder::class,
         ]);
     }
 }

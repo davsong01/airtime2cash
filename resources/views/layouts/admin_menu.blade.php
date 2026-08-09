@@ -294,14 +294,8 @@
                         </svg><span class="menu-title">&nbsp;KYC Management</span></a>
                 </li>
             @endif
-            @if (in_array('Payment Gateway Settings', $allowedMenu) || in_array(1, auth()->user()->admin->roleIds()))
-                <li class="svg {{ Route::is('paymentgateway.*') ? 'active' : '' }}"><a
-                        href="{{ route('paymentgateway.index') }}"><svg xmlns="http://www.w3.org/2000/svg"
-                            height="24" viewBox="0 -960 960 960" width="24">
-                            <path
-                                d="m480-560-56-56 63-64H320v-80h167l-64-64 57-56 160 160-160 160ZM280-80q-33 0-56.5-23.5T200-160q0-33 23.5-56.5T280-240q33 0 56.5 23.5T360-160q0 33-23.5 56.5T280-80Zm400 0q-33 0-56.5-23.5T600-160q0-33 23.5-56.5T680-240q33 0 56.5 23.5T760-160q0 33-23.5 56.5T680-80ZM40-800v-80h131l170 360h280l156-280h91L692-482q-11 20-29.5 31T622-440H324l-44 80h480v80H280q-45 0-68.5-39t-1.5-79l54-98-144-304H40Z"
-                                 />
-                        </svg><span class="menu-title">&nbsp;Payment Gateway Settings</span></a></li>
+            @if (in_array('Banks', $allowedMenu) || in_array(1, auth()->user()->admin->roleIds()))
+                <li class="svg {{ Route::is('banks.*') ? 'active' : '' }}"><a href="{{ route('banks.index') }}"><svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24"><path d="M120-120v-80h80v-320h-80v-80h720v80h-80v320h80v80H120Zm160-80h80v-320h-80v320Zm160 0h80v-320h-80v320Zm160 0h80v-320h-80v320ZM80-720v-80l400-160 400 160v80H80Zm120-80h560L480-836 200-800Z"/></svg><span class="menu-title">&nbsp;Banks</span></a></li>
             @endif
             @if (in_array('General Settings', $allowedMenu) || in_array(1, auth()->user()->admin->roleIds()))
                 <li class="svg {{  Route::is('settings.edit') ? 'active' : '' }}"><a href="{{ route('settings.edit') }}"><svg  xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24"><path d="m370-80-16-128q-13-5-24.5-12T307-235l-119 50L78-375l103-78q-1-7-1-13.5v-27q0-6.5 1-13.5L78-585l110-190 119 50q11-8 23-15t24-12l16-128h220l16 128q13 5 24.5 12t22.5 15l119-50 110 190-103 78q1 7 1 13.5v27q0 6.5-2 13.5l103 78-110 190-118-50q-11 8-23 15t-24 12L590-80H370Zm70-80h79l14-106q31-8 57.5-23.5T639-327l99 41 39-68-86-65q5-14 7-29.5t2-31.5q0-16-2-31.5t-7-29.5l86-65-39-68-99 42q-22-23-48.5-38.5T533-694l-13-106h-79l-14 106q-31 8-57.5 23.5T321-633l-99-41-39 68 86 64q-5 15-7 30t-2 32q0 16 2 31t7 30l-86 65 39 68 99-42q22 23 48.5 38.5T427-266l13 106Zm42-180q58 0 99-41t41-99q0-58-41-99t-99-41q-59 0-99.5 41T342-480q0 58 40.5 99t99.5 41Zm-2-140Z" />

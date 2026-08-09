@@ -436,7 +436,6 @@ class AutoSyncService
 
         $webhook->update([
             'processing_status' => 'processing',
-            'attempts' => $webhook->attempts + 1,
             'last_error' => null,
         ]);
 

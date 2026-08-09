@@ -17,6 +17,22 @@
         .webhook-status.info { color: #168aad; background: rgba(0,207,232,.1); }
         .webhook-json { max-height: 340px; overflow: auto; font-size: .78rem; background: #f8f9fa; border: 1px solid #ececec; border-radius: .4rem; padding: 1rem; white-space: pre-wrap; word-break: break-word; }
         .webhook-table td, .webhook-table th { vertical-align: middle; }
+        .webhook-bulk-bar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: .75rem;
+            padding: .9rem 1rem;
+            background: #f8fafc;
+            border-bottom: 1px solid #ececec;
+        }
+        .webhook-bulk-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .5rem;
+            align-items: center;
+        }
     </style>
 @endsection
 
@@ -48,7 +64,7 @@
                         <div>
                             <span class="text-primary text-uppercase font-small-3 font-weight-bold">Settlement Operations</span>
                             <h2 class="mb-50">Webhook Monitor</h2>
-                            <p class="text-muted mb-0">Review provider callbacks, signature verification, processing attempts and settlement state.</p>
+                            <p class="text-muted mb-0">Review provider callbacks, signature verification, processing status and settlement state.</p>
                         </div>
 
                         <a href="{{ route('admin.api-request.clear') }}" onsubmit="confirm('This will truncate all webhook data, are you sure?')" class="btn btn-danger mt-1 mt-md-0"><i class="bx bx-cog mr-50"></i>Clear Webhooks</a>
@@ -197,10 +213,55 @@
                     </form>
                 </div>
 
+                <div class="webhook-bulk-bar">
+                    <div>
+                        <strong>Bulk actions</strong>
+                        <small class="d-block text-muted" id="webhookSelectionLabel">Select one or more webhooks to apply actions.</small>
+                    </div>
+
+                    <div class="webhook-bulk-actions">
+                        <button
+                            type="submit"
+                            class="btn btn-sm btn-outline-warning"
+                            form="webhookBulkForm"
+                            formaction="{{ route('admin.webhooks.bulk-revert') }}"
+                            onclick="return confirm('Revert the selected webhooks to pending?')"
+                            id="bulkRevertButton"
+                            disabled
+                        >
+                            <i class="bx bx-reset mr-25"></i>
+                            Revert Selected
+                        </button>
+
+                        <button
+                            type="submit"
+                            class="btn btn-sm btn-outline-danger"
+                            form="webhookBulkForm"
+                            formaction="{{ route('admin.webhooks.bulk-delete') }}"
+                            onclick="return confirm('Delete the selected webhooks permanently? This cannot be undone.')"
+                            id="bulkDeleteButton"
+                            disabled
+                        >
+                            <i class="bx bx-trash mr-25"></i>
+                            Delete Selected
+                        </button>
+                    </div>
+                </div>
+
                 <div class="table-responsive">
+                    <form id="webhookBulkForm" method="POST">
+                        @csrf
+                    </form>
+
                     <table class="table table-hover webhook-table mb-0">
                         <thead>
                             <tr>
+                                <th style="width: 44px;">
+                                    <div class="custom-control custom-checkbox">
+                                        <input type="checkbox" class="custom-control-input" id="selectAllWebhooks">
+                                        <label class="custom-control-label" for="selectAllWebhooks"></label>
+                                    </div>
+                                </th>
                                 <th>#</th>
                                 <th>Provider</th>
                                 <th>Transaction</th>
@@ -229,10 +290,24 @@
                                     };
 
                                     $linkedTransaction = $webhook->linkedTransaction();
-                                    $canResolve = $webhook->isWalletToBankTransaction() && $webhook->hasUnresolvedTransaction();
+                                    $canResolve = $webhook->linkedTransaction() && $webhook->hasUnresolvedTransaction();
                                 @endphp
 
                                 <tr>
+                                    <td>
+                                        <div class="custom-control custom-checkbox">
+                                            <input
+                                                type="checkbox"
+                                                class="custom-control-input webhook-row-checkbox"
+                                                id="webhookSelect{{ $webhook->id }}"
+                                                name="webhook_ids[]"
+                                                value="{{ $webhook->id }}"
+                                                form="webhookBulkForm"
+                                            >
+                                            <label class="custom-control-label" for="webhookSelect{{ $webhook->id }}"></label>
+                                        </div>
+                                    </td>
+
                                     <td>{{ $webhooks->firstItem() + $loop->index }}</td>
 
                                     <td>
@@ -245,7 +320,18 @@
                                     </td>
 
                                     <td>
-                                        <strong>{{ $webhook->transaction_id ?: 'Not matched' }}</strong>
+                                        @if($linkedTransaction)
+                                            <a
+                                                href="{{ route('admin.single.transaction.view', $linkedTransaction->id) }}"
+                                                class="font-weight-bold text-primary"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                            >
+                                                {{ $webhook->transaction_id ?: 'View transaction' }}
+                                            </a>
+                                        @else
+                                            <strong>{{ $webhook->transaction_id ?: 'Not matched' }}</strong>
+                                        @endif
                                         <small class="d-block text-muted">
                                             {{ $webhook->customer?->user?->email ?: 'No customer match' }}
                                         </small>
@@ -270,10 +356,6 @@
                                             <i class="bx {{ $icon }}"></i>
                                             {{ ucfirst($webhook->processing_status) }}
                                         </span>
-
-                                        <small class="d-block mt-25 text-muted">
-                                            {{ $webhook->attempts }} attempt(s)
-                                        </small>
                                     </td>
 
                                     <td class="text-right">
@@ -294,10 +376,10 @@
                                                 <button
                                                     type="submit"
                                                     class="btn btn-sm btn-primary"
-                                                    onclick="return confirm('Resolve this transaction from the attached webhook now?')"
+                                                    onclick="return confirm('Analyze this transaction from the attached webhook now?')"
                                                 >
                                                     <i class="bx bx-refresh mr-25"></i>
-                                                    Resolve
+                                                    Analyze
                                                 </button>
                                             </form>
                                         @endif
@@ -355,8 +437,45 @@
 
                                                 <div class="row mb-2">
                                                     <div class="col-md-4">
+                                                        <small class="text-muted d-block">Processed At</small>
+                                                        <strong>{{ $webhook->processed_at ? $webhook->processed_at->format('M j, Y g:i:s A') : 'Not processed yet' }}</strong>
+                                                    </div>
+
+                                                    <div class="col-md-4">
+                                                        <small class="text-muted d-block">Resolved By</small>
+                                                        <strong>{{ $webhook->resolver?->user?->name ?? $webhook->resolver?->user?->email ?? 'Unresolved' }}</strong>
+                                                    </div>
+
+                                                    <div class="col-md-4">
+                                                        <small class="text-muted d-block">Last Error</small>
+                                                        <div class="border rounded p-2 bg-light text-break">
+                                                            {{ $webhook->last_error ?: 'No error recorded.' }}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div class="row mb-2">
+                                                    <div class="col-md-4">
+                                                        <small class="text-muted d-block">Resolved At</small>
+                                                        <strong>{{ $webhook->resolved_at ? $webhook->resolved_at->format('M j, Y g:i:s A') : 'Not resolved yet' }}</strong>
+                                                    </div>
+                                                </div>
+
+                                                <div class="row mb-2">
+                                                    <div class="col-md-4">
                                                         <small class="text-muted d-block">Attached Transaction</small>
-                                                        <strong>{{ $webhook->transaction_id ?: 'Not matched' }}</strong>
+                                                        @if($linkedTransaction)
+                                                            <a
+                                                                href="{{ route('admin.single.transaction.view', $linkedTransaction->id) }}"
+                                                                class="font-weight-bold"
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                            >
+                                                                {{ $webhook->transaction_id ?: 'View transaction' }}
+                                                            </a>
+                                                        @else
+                                                            <strong>{{ $webhook->transaction_id ?: 'Not matched' }}</strong>
+                                                        @endif
                                                     </div>
 
                                                     <div class="col-md-4">
@@ -371,13 +490,6 @@
                                                         <strong>{{ $linkedTransaction?->bank?->bank_name ?? $linkedTransaction?->bank_name ?? '-' }}</strong>
                                                     </div>
                                                 </div>
-
-                                                @if($webhook->last_error)
-                                                    <div class="alert alert-danger">
-                                                        <strong>Last Error:</strong>
-                                                        {{ $webhook->last_error }}
-                                                    </div>
-                                                @endif
 
                                                 <h6>Headers</h6>
                                                 <pre class="webhook-json">{{ json_encode($webhook->headers, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
@@ -396,7 +508,7 @@
                                 </div>
                             @empty
                                 <tr>
-                                    <td colspan="7" class="text-center text-muted py-3">
+                                    <td colspan="8" class="text-center text-muted py-3">
                                         No webhooks have been received.
                                     </td>
                                 </tr>
@@ -414,4 +526,54 @@
         </div>
     </div>
 </div>
+
+@push('scripts')
+    <script>
+        (function () {
+            const selectAll = document.getElementById('selectAllWebhooks');
+            const rowCheckboxes = Array.from(document.querySelectorAll('.webhook-row-checkbox'));
+            const bulkDeleteButton = document.getElementById('bulkDeleteButton');
+            const bulkRevertButton = document.getElementById('bulkRevertButton');
+            const selectionLabel = document.getElementById('webhookSelectionLabel');
+
+            if (!selectAll || !rowCheckboxes.length) {
+                return;
+            }
+
+            const syncBulkControls = () => {
+                const selectedCount = rowCheckboxes.filter((checkbox) => checkbox.checked).length;
+                const hasSelection = selectedCount > 0;
+
+                selectAll.checked = selectedCount === rowCheckboxes.length;
+                selectAll.indeterminate = selectedCount > 0 && selectedCount < rowCheckboxes.length;
+
+                [bulkDeleteButton, bulkRevertButton].forEach((button) => {
+                    if (button) {
+                        button.disabled = !hasSelection;
+                    }
+                });
+
+                if (selectionLabel) {
+                    selectionLabel.textContent = hasSelection
+                        ? `${selectedCount} webhook${selectedCount === 1 ? '' : 's'} selected.`
+                        : 'Select one or more webhooks to apply actions.';
+                }
+            };
+
+            selectAll.addEventListener('change', function () {
+                rowCheckboxes.forEach((checkbox) => {
+                    checkbox.checked = selectAll.checked;
+                });
+
+                syncBulkControls();
+            });
+
+            rowCheckboxes.forEach((checkbox) => {
+                checkbox.addEventListener('change', syncBulkControls);
+            });
+
+            syncBulkControls();
+        })();
+    </script>
+@endpush
 @endsection

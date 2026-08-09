@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\API;
 use Illuminate\Http\Request;
 use App\Models\PaymentGateway;
 use App\Models\TransactionLog;
@@ -15,18 +16,20 @@ class PaymentController extends Controller
 {
     public function redirectToUrl(Request $request)
     {
-        $provider = PaymentGateway::where('id', 1)->first();
+        $provider = resolvePaymentGatewayProvider();
 
         if (empty($provider)) {
             return false;
         }
+
+        $providerSettings = resolvePaymentGatewaySetting($provider->slug);
 
         // Log Wallet
         $wallet = new WalletController();
         $balance = $wallet->getWalletBalance(auth()->user());
         $reference = $this->generateRequestId();
         $extra_charge = getSettings()->card_funding_extra_charge > 0 ? getSettings()->card_funding_extra_charge : 0;
-        $provider_charge = ($provider->charge / 100) * $request->amount;
+        $provider_charge = $providerSettings ? (($providerSettings->charge / 100) * $request->amount) : 0;
         $provider_charge = $provider_charge + $extra_charge;
 
         $amount = $request->amount - $provider_charge;
@@ -51,13 +54,19 @@ class PaymentController extends Controller
         $request['quantity'] = 1;
         $request['unique_element'] = 'WALLET-FUNDING';
         $request['provider_charge'] = $provider_charge;
-        $request['wallet_funding_provider'] = $provider->id;
+        $request['wallet_funding_provider'] = $providerSettings?->id;
 
         $transaction =  app('App\Http\Controllers\TransactionController')->logTransaction($request->all());
 
         $request['reference'] = $reference;
         $request['amount'] = $original_amount;
-        $redirect_url = app('App\Http\Controllers\PaymentProcessors\MonnifyController')->redirectToGateway($request, $transaction);
+        $gatewayController = resolveProviderController($provider);
+
+        if (! $gatewayController || ! method_exists($gatewayController, 'redirectToGateway')) {
+            return back()->with('error', 'The selected payment gateway is not supported for wallet funding yet.');
+        }
+
+        $redirect_url = $gatewayController->redirectToGateway($request, $transaction);
 
         if (isset($redirect_url) && $redirect_url['status'] == 'success') {
             return redirect()->away($redirect_url['url']);
@@ -232,17 +241,19 @@ class PaymentController extends Controller
         $wallet = new WalletController();
         $balance = $wallet->getWalletBalance(auth()->user());
 
-        $reference_id = $request->paymentReference;
+        $reference_id = $request->paymentReference ?? $request->reference ?? $request->trxref ?? $request->transactionReference ?? null;
         $transaction = TransactionLog::where('reference_id', $reference_id)->first();
         if (!$transaction || !$reference_id) {
             return abort(404);
         }
-        $providerDetails = PaymentGateway::where('id', $provider_id)->first();
+        $providerDetails = API::where('id', $provider_id)->first();
 
         // Verify Transaction
-        $verify = $this->verifyPayment($transaction->transaction_id, 1);
+        $verify = $this->verifyPayment($reference_id, $provider_id);
+        $verifiedAmount = (float) data_get($verify, 'amount', 0);
+        $expectedAmount = (float) $transaction->amount;
 
-        if (isset($verify) && $verify['status'] == 'success') {
+        if (isset($verify) && ($verify['status'] ?? null) == 'success' && ($verifiedAmount <= 0 || abs($verifiedAmount - $expectedAmount) < 0.01)) {
             $paid = $transaction->total_amount;
 
             try {
@@ -293,13 +304,19 @@ class PaymentController extends Controller
 
     public function verifyPayment($reference, $provider_id = null)
     {
-        $provider = PaymentGateway::where('id', $provider_id)->first();
+        $provider = API::where('id', $provider_id)->first();
 
         if (empty($provider)) {
             return false;
         }
 
-        $verify = app('App\Http\Controllers\PaymentProcessors\MonnifyController')->verifyTransaction($reference);
+        $controller = resolveProviderController($provider);
+
+        if (! $controller || ! method_exists($controller, 'verifyTransaction')) {
+            return false;
+        }
+
+        $verify = $controller->verifyTransaction($reference);
 
         return $verify;
     }

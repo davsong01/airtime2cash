@@ -76,7 +76,7 @@
                                                 </thead>
                                                 <tbody>
                                                     @foreach(auth()->user()->customer->reserved_accounts as $account)
-                                                        @if($account->paymentgateway_id == $gateway->id)
+                                                        @if($account->api_id == ($provider->id ?? $gateway->id))
                                                             <tr>
                                                                 <td>{{ $account->account_name }}</td>
                                                                 <td>{{ $account->bank_name }}</td>

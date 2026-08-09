@@ -16,6 +16,7 @@
     $extraChargesArray = is_array($extraChargesArray) ? $extraChargesArray : [];
     $pricingDataEnabled = filter_var(old('pricing_data_status', $isEdit ? ($api->pricing_data_status ? '1' : '0') : '0'), FILTER_VALIDATE_BOOL);
     $currencySymbol = getSettings()->currency ?? '&#8358;';
+    $canPullBanks = $isEdit && (bool) ($api->is_bank_transfer || $api->is_bank_verification);
 @endphp
 @section('page-css')
 <style>
@@ -301,10 +302,6 @@
                                                                 </select>
                                                             </fieldset>
                                                             <fieldset class="form-group mb-3">
-                                                                <label for="file_name">File Name</label>
-                                                                <input type="text" class="form-control" name="file_name" value="{{ old('file_name', optional($api)->file_name) }}" placeholder="Enter file name" id="file_name">
-                                                            </fieldset>
-                                                            <fieldset class="form-group mb-3">
                                                                 <label for="api_key">API Key</label>
                                                                 <input type="text" class="form-control" name="api_key" value="{{ old('api_key', optional($api)->api_key) }}" placeholder="Enter api key" id="api_key">
                                                             </fieldset>
@@ -316,10 +313,53 @@
                                                                 <label for="public_key">Public Key</label>
                                                                 <input type="text" class="form-control" name="public_key" value="{{ old('public_key', optional($api)->public_key) }}" placeholder="Enter public key" id="public_key">
                                                             </fieldset>
+                                                            <fieldset class="form-group mb-3">
+                                                                <label for="account_number">Account Number</label>
+                                                                <input type="text" class="form-control" name="account_number" value="{{ old('account_number', optional($api)->account_number) }}" placeholder="Enter account number" id="account_number">
+                                                                <small class="text-muted d-block mt-50">Used by providers that need an internal settlement or wallet account number.</small>
+                                                            </fieldset>
                                                             <div class="form-group mb-0">
                                                                 <label for="live_base_url">Live Base URL</label>
                                                                 <input type="text" class="form-control" name="live_base_url" value="{{ old('live_base_url', optional($api)->live_base_url) }}" placeholder="Enter live base url" id="live_base_url">
                                                             </div>
+                                                            <div class="pricing-section-block">
+                                                                <h6 class="font-weight-bold mb-3">Capabilities</h6>
+                                                                <div class="row">
+                                                                    <div class="col-sm-6 mb-2">
+                                                                        <div class="custom-control custom-checkbox">
+                                                                            <input type="checkbox" class="custom-control-input" id="is_bank_transfer" name="is_bank_transfer" value="1" @checked(old('is_bank_transfer', optional($api)->is_bank_transfer))>
+                                                                            <label class="custom-control-label" for="is_bank_transfer">Use for bank transfer</label>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div class="col-sm-6 mb-2">
+                                                                        <div class="custom-control custom-checkbox">
+                                                                            <input type="checkbox" class="custom-control-input" id="is_bank_verification" name="is_bank_verification" value="1" @checked(old('is_bank_verification', optional($api)->is_bank_verification))>
+                                                                            <label class="custom-control-label" for="is_bank_verification">Use for bank verification</label>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div class="col-sm-6 mb-2">
+                                                                        <div class="custom-control custom-checkbox">
+                                                                            <input type="checkbox" class="custom-control-input" id="is_auto_share" name="is_auto_share" value="1" @checked(old('is_auto_share', optional($api)->is_auto_share))>
+                                                                            <label class="custom-control-label" for="is_auto_share">Use for auto share</label>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div class="col-sm-6 mb-2">
+                                                                        <div class="custom-control custom-checkbox">
+                                                                            <input type="checkbox" class="custom-control-input" id="is_payment_gateway" name="is_payment_gateway" value="1" @checked(old('is_payment_gateway', optional($api)->is_payment_gateway))>
+                                                                            <label class="custom-control-label" for="is_payment_gateway">Use for payment gateway</label>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                <small class="text-muted d-block mt-1">These flags control where the provider appears in settings and operations.</small>
+                                                            </div>
+                                                            @if($canPullBanks)
+                                                                <div class="form-group mt-3 mb-0">
+                                                                    <button type="button" class="btn btn-outline-info btn-block" id="pull-banks-btn" data-url="{{ route('api.pull.banks', $api) }}">
+                                                                        <i class="bx bx-cloud-download mr-1"></i> Pull Bank Details
+                                                                    </button>
+                                                                    <small class="text-muted d-block mt-50">Refresh the shared bank table from this provider.</small>
+                                                                </div>
+                                                            @endif
                                                         </div>
                                                     </div>
                                                 </div>
@@ -419,6 +459,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const pricingShell = document.getElementById('pricing-band-shell');
     const pricingFields = document.getElementById('pricing-fields');
     const pricingStateBadge = document.getElementById('pricing-state-badge');
+    const pullBanksButton = document.getElementById('pull-banks-btn');
     const initialBands = @json($pricingDataArray);
     const initialExtraCharges = @json($extraChargesArray);
     const currencySymbol = {!! json_encode($currencySymbol) !!};
@@ -787,6 +828,39 @@ document.addEventListener('DOMContentLoaded', function () {
     syncPricingState();
     renderBands();
     renderExtraCharges();
+
+    if (pullBanksButton) {
+        pullBanksButton.addEventListener('click', async function () {
+            const originalHtml = pullBanksButton.innerHTML;
+            pullBanksButton.disabled = true;
+            pullBanksButton.innerHTML = '<span class="spinner-border spinner-border-sm mr-1" role="status" aria-hidden="true"></span> Syncing...';
+
+            try {
+                const response = await fetch(pullBanksButton.dataset.url, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({}),
+                });
+
+                const payload = await response.json();
+
+                if (!response.ok || !payload.status) {
+                    throw new Error(payload.message || 'Unable to sync banks.');
+                }
+
+                alert(payload.message || 'Banks synced successfully.');
+            } catch (error) {
+                alert(error.message || 'Unable to sync banks.');
+            } finally {
+                pullBanksButton.disabled = false;
+                pullBanksButton.innerHTML = originalHtml;
+            }
+        });
+    }
 });
 </script>
 @endsection
