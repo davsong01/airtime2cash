@@ -164,7 +164,7 @@
                                                                         @if(!$canWithdraw)
                                                                             <div class="alert alert-warning">
                                                                                 @if(!$pricingEnabled)
-                                                                                    Wallet to bank transfer pricing has been turned off by admin.
+                                                                                    Wallet to bank transfer pricing is not configured yet.
                                                                                 @elseif(!$pricingAvailable)
                                                                                     Wallet to bank transfer pricing is not configured for the active provider.
                                                                                 @else
@@ -253,6 +253,8 @@
                                                                         const previewBandSection = document.getElementById('preview-band-section');
                                                                         const previewAdditionalSection = document.getElementById('preview-additional-section');
                                                                         const submitButton = document.getElementById('transfer-submit');
+                                                                        const verifyBankButton = document.getElementById('verify-bank-details-btn');
+                                                                        const verifyBankResult = document.getElementById('bank-verify-result');
 
                                                                         if (!amountInput || !previewAmount || !previewFee || !previewTotal || !submitButton) return;
 
@@ -367,6 +369,61 @@
                                                                             submitButton.disabled = !isValid;
                                                                         });
 
+                                                                        if (verifyBankButton && verifyBankResult) {
+                                                                            verifyBankButton.addEventListener('click', async function () {
+                                                                                const bank = document.getElementById('bank');
+                                                                                const accountNumber = document.getElementById('account_number');
+                                                                                const accountName = document.getElementById('account_name');
+
+                                                                                if (!bank || !accountNumber || !accountName) {
+                                                                                    return;
+                                                                                }
+
+                                                                                verifyBankButton.disabled = true;
+                                                                                verifyBankButton.textContent = 'Verifying...';
+                                                                                verifyBankResult.className = 'alert alert-light border';
+                                                                                verifyBankResult.textContent = 'Verifying bank details...';
+                                                                                verifyBankResult.classList.remove('d-none');
+
+                                                                                try {
+                                                                                    const response = await fetch('{{ route('customer.verify.bank.details') }}', {
+                                                                                        method: 'POST',
+                                                                                        headers: {
+                                                                                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                                                                                            'Accept': 'application/json',
+                                                                                            'Content-Type': 'application/json',
+                                                                                        },
+                                                                                        body: JSON.stringify({
+                                                                                            bank_code: bank.value,
+                                                                                            account_number: accountNumber.value,
+                                                                                            account_name: accountName.value,
+                                                                                        }),
+                                                                                    });
+
+                                                                                    const payload = await response.json();
+
+                                                                                    if (!response.ok || payload.status === false) {
+                                                                                        throw new Error(payload.message || 'Unable to verify bank details right now.');
+                                                                                    }
+
+                                                                                    verifyBankResult.className = '';
+                                                                                    verifyBankResult.innerHTML = renderVerificationCard(payload, 'Bank details verified successfully');
+                                                                                } catch (error) {
+                                                                                    verifyBankResult.className = '';
+                                                                                    verifyBankResult.innerHTML = renderVerificationCard({
+                                                                                        status: 'failed',
+                                                                                        message: error.message || 'Unable to verify bank details right now.',
+                                                                                        raw_response: {
+                                                                                            message: error.message || 'Unable to verify bank details right now.',
+                                                                                        },
+                                                                                    }, 'Bank details verification failed');
+                                                                                } finally {
+                                                                                    verifyBankButton.disabled = false;
+                                                                                    verifyBankButton.textContent = 'Verify Bank Details';
+                                                                                }
+                                                                            });
+                                                                        }
+
                                                                         submitButton.disabled = true;
                                                                         amountInput.dispatchEvent(new Event('input'));
                                                                     });
@@ -390,12 +447,16 @@
                                                                         <label for="receive" class="">Account Name</label>
                                                                         <input class="form-control" id="account_name" name="account_name" type="text" required>
                                                                     </fieldset>
-                                                                    <small class="footnote" style="color:red">Please ensure that bank details entered are correct to enable us complete the transaction</small>
+                                                                    <div class="d-flex align-items-center justify-content-between flex-wrap mb-2">
+                                                                        <small class="footnote" style="color:red">Please ensure that bank details entered are correct to enable us complete the transaction</small>
+                                                                        <button type="button" class="btn btn-outline-info btn-sm mt-2 mt-md-0" id="verify-bank-details-btn">Verify Bank Details</button>
+                                                                    </div>
+                                                                    <div class="alert alert-light border d-none" id="bank-verify-result"></div>
                                                                 </div>
                                                                 <div class="col-md-12">
                                                                             <button style="margin-top:4px" class="btn btn-primary" id="transfer-submit" type="submit" @disabled(!$canWithdraw)>PROCEED </button>
                                                                 </div>
-                                                                
+
                                                             </div>
                                                         </form>
                                                     </div>
@@ -436,6 +497,86 @@
 <script src="http://ajax.aspnetcdn.com/ajax/jquery.validate/1.11.1/jquery.validate.min.js"></script>
 
 <script>
+    function escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function renderVerificationCard(payload, title) {
+        const response = payload?.raw_response ?? payload?.data ?? payload ?? {};
+        const status = String(payload?.status ?? response?.status ?? 'success').toLowerCase();
+        const message = payload?.message ?? response?.message ?? title ?? 'Verification completed';
+        const rawResponse = JSON.stringify(response, null, 2);
+        const cardId = `wallet2bank-verify-raw-${Date.now()}`;
+        const bankName = response?.data?.bank_name ?? response?.bank_name ?? '';
+        const accountName = response?.data?.account_name ?? response?.account_name ?? '';
+        const accountNumber = response?.data?.account_number ?? response?.account_number ?? '';
+
+        return `
+            <div class="card border-0 shadow-sm mb-0" style="background:linear-gradient(180deg,#ffffff 0%,#f8fafc 100%);">
+                <div class="card-body py-3">
+                    <div class="d-flex align-items-start justify-content-between mb-3">
+                        <div>
+                            <div class="small text-uppercase text-muted font-weight-bold">Verification result</div>
+                            <h6 class="mb-0">${escapeHtml(title || 'Bank verification')}</h6>
+                        </div>
+                        <span class="badge badge-${status === 'success' ? 'success' : (status === 'failed' ? 'danger' : 'warning')} text-uppercase px-3 py-2">${escapeHtml(status)}</span>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-7 mb-2">
+                            <div class="rounded border bg-white px-3 py-2 h-100">
+                                <small class="text-muted d-block text-uppercase mb-1">Message</small>
+                                <div class="font-weight-bold text-dark">${escapeHtml(message)}</div>
+                            </div>
+                        </div>
+                        <div class="col-md-5 mb-2">
+                            <div class="rounded border bg-white px-3 py-2 h-100">
+                                <small class="text-muted d-block text-uppercase mb-1">Status</small>
+                                <div class="font-weight-bold text-dark">${escapeHtml(response?.status ?? status)}</div>
+                            </div>
+                        </div>
+                        ${bankName ? `
+                            <div class="col-md-4 mb-2">
+                                <div class="rounded border bg-white px-3 py-2 h-100">
+                                    <small class="text-muted d-block text-uppercase mb-1">Bank</small>
+                                    <div class="font-weight-bold text-dark">${escapeHtml(bankName)}</div>
+                                </div>
+                            </div>
+                        ` : ''}
+                        ${accountName ? `
+                            <div class="col-md-4 mb-2">
+                                <div class="rounded border bg-white px-3 py-2 h-100">
+                                    <small class="text-muted d-block text-uppercase mb-1">Account name</small>
+                                    <div class="font-weight-bold text-dark">${escapeHtml(accountName)}</div>
+                                </div>
+                            </div>
+                        ` : ''}
+                        ${accountNumber ? `
+                            <div class="col-md-4 mb-2">
+                                <div class="rounded border bg-white px-3 py-2 h-100">
+                                    <small class="text-muted d-block text-uppercase mb-1">Account number</small>
+                                    <div class="font-weight-bold text-dark">${escapeHtml(accountNumber)}</div>
+                                </div>
+                            </div>
+                        ` : ''}
+                    </div>
+                    <div class="mt-2">
+                        <a class="small font-weight-bold text-primary" data-toggle="collapse" href="#${cardId}" role="button" aria-expanded="false" aria-controls="${cardId}">
+                            View raw response
+                        </a>
+                        <div class="collapse mt-2" id="${cardId}">
+                            <pre class="bg-light border rounded p-2 mb-0" style="white-space:pre-wrap;max-height:220px;overflow:auto;">${escapeHtml(rawResponse)}</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
     function submitForm(){
         var inputs = document.getElementById("initialize").getElementsByTagName("input");
         // Loop through each input and perform validation
@@ -471,7 +612,7 @@
             $("#amount").val('');
             $('#receive-div').hide()
             $('#payment-div').hide()
-            
+
 
             if (product == '') {
                 $("#amount").val('');
@@ -487,7 +628,7 @@
                 var image = $('#product').find(':selected').data('image');
                 var title = $('#product').find(':selected').data('name');
                 var description = $('#product').find(':selected').data('description');
-                
+
                 $('#product-image-div').show();
                 $("#product-image").attr("src", image);
                 $("#product-title").html(title);
@@ -496,14 +637,14 @@
                 $("#rate-div").show();
                 $("#rate").val(discounted_rate);
                 $("#instruction").html(instruction);
-                
+
                 if(min != '' && max != ''){
                     $("#airtime-range").html('The Minimum and Maximum amount for '+title + ' is '+min + ' and ' +max + ' respectively');
                     $("#airtime-range").show();
                 }else{
                     $("#airtime-range").hide();
                 }
-                
+
                 $("#amount").attr({
                     "max": max,
                     "min": min,
@@ -533,13 +674,13 @@
             }
             var fixed_price = $('#product').find(':selected').data('fixed_price');
         });
-        
-        $("#amount").keyup(function(){        
+
+        $("#amount").keyup(function(){
             var rate = parseInt($('#rate').val());
             var amount = parseInt($('#amount').val());
             var min = parseInt($('#amount').attr('min')) ?? 50;
             var max = parseInt($('#amount').attr('max'));
-            
+
             var receive = 0;
             if(amount > 0 && amount >= min && amount <= max){
                 receive = amount - ((rate/100) * amount);

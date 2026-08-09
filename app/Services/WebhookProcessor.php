@@ -7,6 +7,8 @@ use App\Models\TransactionLog;
 use App\Models\Webhook;
 use App\Http\Controllers\WalletController;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use RuntimeException;
 
 class WebhookProcessor
@@ -19,7 +21,7 @@ class WebhookProcessor
 
         return match ($providerSlug) {
             'autosync' => app(AutoSyncService::class)->process($webhook, $resolvedBy, $force),
-            'sagecloud' => $this->processGenericWebhook($webhook, $resolvedBy, $force),
+            'sagecloud', 'paystack', 'monnify', 'kora' => $this->processGenericWebhook($webhook, $resolvedBy, $force),
             default => $this->processGenericWebhook($webhook, $resolvedBy, $force),
         };
     }
@@ -34,73 +36,97 @@ class WebhookProcessor
             return $webhook;
         }
 
-        $webhook->update([
-            'processing_status' => 'processing',
-            'attempts' => (int) $webhook->attempts + 1,
-            'last_error' => null,
-        ]);
-
-        try {
-            $payload = is_array($webhook->payload) ? $webhook->payload : [];
-            $transaction = $this->resolveLinkedTransaction($webhook);
-
-            if (! $transaction) {
-                throw new RuntimeException('No local transaction matches this webhook.');
-            }
-
+        return DB::transaction(function () use ($webhook, $resolvedBy) {
             $webhook->update([
-                'customer_id' => $transaction->customer_id ?? $webhook->customer_id,
-                'transaction_id' => $transaction->transaction_id ?? $webhook->transaction_id,
-                'provider_reference' => $webhook->provider_reference ?? $this->extractReference($payload),
-                'request_ref' => $webhook->request_ref ?? $this->extractRequestRef($payload),
-                'provider_status' => $this->extractProviderStatus($payload, $transaction),
-            ]);
-
-            $providerStatus = strtolower((string) $webhook->provider_status);
-            $isSuccessful = in_array($providerStatus, ['successful', 'success', 'completed', 'approved'], true);
-            $isFailed = in_array($providerStatus, ['failed', 'declined', 'cancelled', 'canceled', 'reversed'], true);
-            $isPending = in_array($providerStatus, ['pending', 'processing', 'initiated'], true);
-
-            if (! $isSuccessful && ! $isFailed && ! $isPending) {
-                throw new RuntimeException('Webhook does not contain a final transaction status.');
-            }
-
-            if ($transaction instanceof Airtime2CashTransactions) {
-                $transaction->update([
-                    'status' => $isSuccessful ? 'successful' : 'failed',
-                    'provider_status' => $providerStatus ?: ($isSuccessful ? 'successful' : 'failed'),
-                    'provider_response' => json_encode($payload, JSON_THROW_ON_ERROR),
-                    'description' => $isSuccessful
-                        ? ($this->extractMessage($payload) ?? 'Transaction completed successfully.')
-                        : ($this->extractMessage($payload) ?? 'Transaction failed.'),
-                    'decline_reason' => $isFailed ? ($this->extractMessage($payload) ?? 'Transaction failed.') : null,
-                    'completed_at' => $isSuccessful ? ($transaction->completed_at ?? now()) : $transaction->completed_at,
-                ]);
-            } elseif ($transaction instanceof TransactionLog) {
-                $transaction->update($this->resolveTransactionLogUpdates($transaction, $payload, $providerStatus, $isSuccessful, $isFailed));
-            } else {
-                throw new RuntimeException('Unsupported transaction model attached to this webhook.');
-            }
-
-            $webhook->update([
-                'processing_status' => 'processed',
-                'processed_at' => now(),
-                'resolved_by' => $resolvedBy,
-                'resolved_at' => now(),
+                'processing_status' => 'processing',
                 'last_error' => null,
             ]);
-        } catch (\Throwable $exception) {
-            $webhook->update([
-                'processing_status' => 'failed',
-                'last_error' => $exception->getMessage(),
-                'resolved_by' => $resolvedBy,
-                'resolved_at' => now(),
-            ]);
 
-            throw $exception;
+            try {
+                $payload = is_array($webhook->payload) ? $webhook->payload : [];
+                $transaction = $this->resolveLinkedTransaction($webhook);
+
+                if (! $transaction) {
+                    throw new RuntimeException('No local transaction matches this webhook.');
+                }
+
+                $webhook->update([
+                    'customer_id' => $transaction->customer_id ?? $webhook->customer_id,
+                    'transaction_id' => $transaction->transaction_id ?? $webhook->transaction_id,
+                    'provider_reference' => $webhook->provider_reference ?? $this->extractReference($payload),
+                    'request_ref' => $webhook->request_ref ?? $this->extractRequestRef($payload),
+                    'provider_status' => $this->extractProviderStatus($payload, $transaction),
+                ]);
+
+                if (! $this->transactionIsPending($transaction)) {
+                    $webhook->update([
+                        'processing_status' => 'processed',
+                        'processed_at' => now(),
+                        'resolved_by' => $resolvedBy,
+                        'resolved_at' => now(),
+                        'last_error' => null,
+                    ]);
+
+                    return $webhook->fresh();
+                }
+
+                $providerStatus = strtolower((string) $webhook->provider_status);
+                $isSuccessful = in_array($providerStatus, ['successful', 'success', 'completed', 'approved'], true);
+                $isFailed = in_array($providerStatus, ['failed', 'declined', 'cancelled', 'canceled', 'reversed'], true);
+                $isPending = in_array($providerStatus, ['pending', 'processing', 'initiated'], true);
+
+                if (! $isSuccessful && ! $isFailed && ! $isPending) {
+                    throw new RuntimeException('Webhook does not contain a final transaction status.');
+                }
+
+                if ($transaction instanceof Airtime2CashTransactions) {
+                    $transaction->update([
+                        'status' => $isSuccessful ? 'successful' : 'failed',
+                        'provider_status' => $providerStatus ?: ($isSuccessful ? 'successful' : 'failed'),
+                        'provider_response' => json_encode($payload, JSON_THROW_ON_ERROR),
+                        'description' => $isSuccessful
+                            ? ($this->extractMessage($payload) ?? 'Transaction completed successfully.')
+                            : ($this->extractMessage($payload) ?? 'Transaction failed.'),
+                        'decline_reason' => $isFailed ? ($this->extractMessage($payload) ?? 'Transaction failed.') : null,
+                        'completed_at' => $isSuccessful ? ($transaction->completed_at ?? now()) : $transaction->completed_at,
+                    ]);
+                } elseif ($transaction instanceof TransactionLog) {
+                    $transaction->update($this->resolveTransactionLogUpdates($transaction, $payload, $providerStatus, $isSuccessful, $isFailed));
+                } else {
+                    throw new RuntimeException('Unsupported transaction model attached to this webhook.');
+                }
+
+                $webhook->update([
+                    'processing_status' => 'processed',
+                    'processed_at' => now(),
+                    'resolved_by' => $resolvedBy,
+                    'resolved_at' => now(),
+                    'last_error' => null,
+                ]);
+            } catch (\Throwable $exception) {
+                $webhook->update([
+                    'processing_status' => 'failed',
+                    'last_error' => $exception->getMessage(),
+                    'resolved_by' => $resolvedBy,
+                    'resolved_at' => now(),
+                ]);
+
+                throw $exception;
+            }
+
+            return $webhook->fresh();
+        });
+    }
+
+    private function transactionIsPending(Airtime2CashTransactions|TransactionLog|null $transaction): bool
+    {
+        if (! $transaction) {
+            return false;
         }
 
-        return $webhook->fresh();
+        $status = strtolower((string) ($transaction->status ?? 'pending'));
+
+        return in_array($status, ['pending', 'processing', 'initiated'], true);
     }
 
     private function resolveLinkedTransaction(Webhook $webhook): Airtime2CashTransactions|TransactionLog|null
@@ -156,15 +182,17 @@ class WebhookProcessor
             'user_status' => $isWalletToBank
                 ? ($isSuccessful ? 'success' : ($isFailed ? 'failed' : 'pending'))
                 : ($isSuccessful ? 'success' : ($isFailed ? 'failed' : 'pending')),
-            'provider_status' => $providerStatus ?: ($isSuccessful ? 'successful' : 'failed'),
             'api_response' => json_encode($payload, JSON_THROW_ON_ERROR),
             'failure_reason' => $isFailed ? ($message ?? 'Transaction failed.') : null,
             'descr' => $message ?? ($isSuccessful
                 ? 'Transaction completed successfully.'
-                : ($isPending ? 'Transaction is pending provider confirmation.' : 'Transaction failed.')),
-            'completed_at' => $isSuccessful ? ($transaction->completed_at ?? now()) : $transaction->completed_at,
+                : ($providerStatus === 'pending' ? 'Transaction is pending provider confirmation.' : 'Transaction failed.')),
             'admin_id' => $isWalletToBank ? auth()->user()?->admin?->id ?? ($transaction->admin_id ?? null) : ($transaction->admin_id ?? null),
-        ];
+        ] + (Schema::hasColumn('transaction_logs', 'provider_status')
+            ? ['provider_status' => $providerStatus ?: ($isSuccessful ? 'successful' : 'failed')]
+            : []) + (Schema::hasColumn('transaction_logs', 'completed_at')
+            ? ['completed_at' => $isSuccessful ? ($transaction->completed_at ?? now()) : $transaction->completed_at]
+            : []);
     }
 
     private function refundWalletToBankTransaction(TransactionLog $transaction): void

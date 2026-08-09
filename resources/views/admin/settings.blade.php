@@ -1,6 +1,3 @@
-<?php
-use App\Models\PaymentGateway;
-?>
 @extends('layouts.app')
 @section('page-css')
     <style>
@@ -64,6 +61,47 @@ use App\Models\PaymentGateway;
             min-width: 68px;
         }
 
+        .settings-section-stack > .card {
+            margin-bottom: .85rem;
+        }
+
+        .settings-section-stack > .card:last-child {
+            margin-bottom: 0;
+        }
+
+        .settings-section-stack .card-header {
+            padding: .95rem 1.25rem .7rem;
+        }
+
+        .settings-section-stack .card-body {
+            padding: 1rem 1.25rem 1.15rem;
+        }
+
+        .settings-section-stack .card-header .card-title {
+            margin-bottom: .1rem;
+            font-size: 1rem;
+            line-height: 1.2;
+        }
+
+        .settings-section-stack .card-header small {
+            font-size: .8rem;
+            line-height: 1.35;
+        }
+
+        .settings-save-card .card-body {
+            padding: .85rem 1.25rem;
+        }
+
+        .settings-save-card .btn {
+            padding: .6rem 1.2rem;
+            font-size: .92rem;
+            border-radius: .45rem;
+        }
+
+        .settings-save-card .btn i {
+            margin-right: .35rem;
+        }
+
         @media (max-width: 767.98px) {
             .settings-image-preview {
                 margin-bottom: 1rem;
@@ -96,6 +134,7 @@ use App\Models\PaymentGateway;
                                                     <div class="card-body">
                                                        <form action="{{ route('settings.update') }}" method="POST" enctype="multipart/form-data">
                                                             @csrf
+                                                            <div class="settings-section-stack">
 
                                                             <div class="card">
                                                                 <div class="card-header">
@@ -119,20 +158,6 @@ use App\Models\PaymentGateway;
                                                                                     <option value="">Select</option>
                                                                                     @foreach($currencies as $currency)
                                                                                         <option value="{{ $currency }}" @selected($currency == old('currency', $settings->currency))>{!! $currency !!}</option>
-                                                                                    @endforeach
-                                                                                </select>
-                                                                            </fieldset>
-                                                                        </div>
-
-                                                                        <div class="col-md-6">
-                                                                            <fieldset class="form-group">
-                                                                                <label for="payment_gateway">Payment Gateway</label>
-                                                                                <select name="payment_gateway" class="form-control" id="payment_gateway" required>
-                                                                                    <option value="">Select</option>
-                                                                                    @foreach($payment_gateways as $gateway)
-                                                                                        <option value="{{ $gateway->id }}" @selected((string) $gateway->id === (string) old('payment_gateway', $settings->payment_gateway))>
-                                                                                            {{ $gateway->name }}
-                                                                                        </option>
                                                                                     @endforeach
                                                                                 </select>
                                                                             </fieldset>
@@ -200,7 +225,7 @@ use App\Models\PaymentGateway;
                                                                                 <label for="bank_transfer_provider_id">Bank Transfer Provider</label>
                                                                                 <select name="bank_transfer_provider_id" class="form-control @error('bank_transfer_provider_id') is-invalid @enderror" id="bank_transfer_provider_id">
                                                                                     <option value="">Select provider</option>
-                                                                                    @foreach($autoShareProviders as $provider)
+                                                                                    @foreach($bankTransferProviders as $provider)
                                                                                         <option value="{{ $provider->id }}" @selected((string) old('bank_transfer_provider_id', $settings->bank_transfer_provider_id) === (string) $provider->id)>
                                                                                             {{ $provider->name }}{{ $provider->status !== 'active' ? ' (Inactive)' : '' }}
                                                                                         </option>
@@ -209,7 +234,41 @@ use App\Models\PaymentGateway;
                                                                                 @error('bank_transfer_provider_id')
                                                                                     <div class="invalid-feedback">{{ $message }}</div>
                                                                                 @enderror
-                                                                                <small class="text-muted d-block mt-50">Provider used for admin bank transfers.</small>
+                                                                                <small class="text-muted d-block mt-50">Provider used for admin bank transfers and customer wallet-to-bank transfers.</small>
+                                                                            </fieldset>
+                                                                        </div>
+
+                                                                        <div class="col-md-6">
+                                                                            <fieldset class="form-group">
+                                                                                <label for="bank_verification_provider_id">Bank Verification Provider</label>
+                                                                                <select name="bank_verification_provider_id" class="form-control @error('bank_verification_provider_id') is-invalid @enderror" id="bank_verification_provider_id">
+                                                                                    <option value="">Use bank transfer provider</option>
+                                                                                    @foreach($bankVerificationProviders as $provider)
+                                                                                        <option value="{{ $provider->id }}" @selected((string) old('bank_verification_provider_id', $settings->bank_verification_provider_id) === (string) $provider->id)>
+                                                                                            {{ $provider->name }}{{ $provider->status !== 'active' ? ' (Inactive)' : '' }}
+                                                                                        </option>
+                                                                                    @endforeach
+                                                                                </select>
+                                                                                @error('bank_verification_provider_id')
+                                                                                    <div class="invalid-feedback">{{ $message }}</div>
+                                                                                @enderror
+                                                                                <small class="text-muted d-block mt-50">Provider used to verify customer bank details before transfer.</small>
+                                                                            </fieldset>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    <div class="row mt-1">
+                                                                        <div class="col-md-6">
+                                                                            <fieldset class="form-group">
+                                                                                <label for="payment_gateway">Payment Gateway Provider</label>
+                                                                                <select name="payment_gateway" class="form-control" id="payment_gateway" required>
+                                                                                    <option value="">Select</option>
+                                                                                    @foreach($paymentGatewayProviders as $gateway)
+                                                                                        <option value="{{ $gateway->slug }}" @selected((string) $gateway->slug === (string) old('payment_gateway', $settings->payment_gateway))>
+                                                                                           {{ $gateway->name }}
+                                                                                        </option>
+                                                                                    @endforeach
+                                                                                </select>
                                                                             </fieldset>
                                                                         </div>
                                                                     </div>
@@ -543,13 +602,14 @@ use App\Models\PaymentGateway;
                                                                 </div>
                                                             </div>
 
-                                                            <div class="card">
+                                                            <div class="card settings-save-card">
                                                                 <div class="card-body d-flex justify-content-end">
                                                                     <button class="btn btn-primary" type="submit">
                                                                         <i class="bx bx-save mr-50"></i>
                                                                         Update Settings
                                                                     </button>
                                                                 </div>
+                                                            </div>
                                                             </div>
                                                         </form>
                                                     </div>

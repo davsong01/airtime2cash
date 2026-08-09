@@ -16,8 +16,27 @@ class KingsVtuController extends Controller
         $this->api = API::first();
     }
 
-    public function getCategories(){
-        $url = $this->api->live_base_url;
+    protected function resolveApi(?API $provider = null): ?API
+    {
+        return $provider ?? $this->api ?? API::first();
+    }
+
+    protected function baseUrl(?API $provider = null): ?string
+    {
+        $api = $this->resolveApi($provider);
+
+        if (! $api) {
+            return null;
+        }
+
+        return env('ENT') === 'local'
+            ? ($api->sandbox_base_url ?: $api->live_base_url)
+            : ($api->live_base_url ?: $api->sandbox_base_url);
+    }
+
+    public function getCategories(?API $provider = null){
+        $api = $this->resolveApi($provider);
+        $url = $this->baseUrl($api);
         $url = $url . "category";
 
         $headers = [
@@ -29,9 +48,9 @@ class KingsVtuController extends Controller
 
     }
 
-    public function getProducts($category_slug)
+    public function getProducts($category_slug, ?API $provider = null)
     {
-        $url = $this->api->live_base_url;
+        $url = $this->baseUrl($provider);
         $url = $url . "products/".$category_slug;
 
         $headers = [
@@ -42,9 +61,9 @@ class KingsVtuController extends Controller
         return $this->basicApiCall($url, [], $headers, 'GET');
     }
 
-    public function getVariations($product_slug)
+    public function getVariations($product_slug, ?API $provider = null)
     {
-        $url = $this->api->live_base_url;
+        $url = $this->baseUrl($provider);
         $url = $url . "variations/" . $product_slug;
 
         $headers = [
@@ -59,7 +78,8 @@ class KingsVtuController extends Controller
     {
         // Post data
         try {
-            $url = env('ENV') == 'local' ? $this->api->sandbox_base_url : $this->api->live_base_url;
+            $this->api = $this->resolveApi($api);
+            $url = $this->baseUrl($this->api);
             $url = $url . "query";
 
             $headers = [
@@ -145,7 +165,7 @@ class KingsVtuController extends Controller
 
         try {
             //code...
-            $this->balance($this->api);
+            $this->balance(null, $this->api);
             app(ProviderUtilityService::class)->sendWarningEmail($this->api);
         } catch (\Throwable $th) {
             //throw $th;
@@ -155,11 +175,11 @@ class KingsVtuController extends Controller
 
     public function requery($transaction)
     {
-        $this->api = $transaction->api;
+        $this->api = $this->resolveApi($transaction->api);
         $request_id = $transaction->reference_id;
 
         try {
-            $url = env('ENV') == 'local' ? $this->api->sandbox_base_url : $this->api->live_base_url;
+            $url = $this->baseUrl($this->api);
             $url = $url . "re-query";
 
             $headers = [
@@ -227,9 +247,19 @@ class KingsVtuController extends Controller
         return $format;
     }
 
-    public function balance($no_format = null)
+    public function balance($no_format = null, ?API $provider = null)
     {
-        $url = $this->api->live_base_url;
+        $this->api = $provider ?? $this->api ?? API::first();
+
+        if (! $this->api) {
+            return [
+                'status' => 'failed',
+                'status_code' => 0,
+                'balance' => null,
+            ];
+        }
+
+        $url = $this->baseUrl($this->api);
         $url = $url . "category";
 
         $headers = [
@@ -238,7 +268,7 @@ class KingsVtuController extends Controller
         ];
 
         try {
-            $url = env('ENV') == 'local' ? $this->api->sandbox_base_url : $this->api->live_base_url;
+            $url = $this->baseUrl($this->api);
             $url = $url . "get-balance";
 
             $headers = [
@@ -251,12 +281,13 @@ class KingsVtuController extends Controller
 
             if (isset($response['status']) && $response['status'] == 'success' && !empty($response['data'])) {
                 $result = $response;
-                $balance = '#' . number_format($response['data']['wallet_balance'], 2);
+                $rawBalance = (float) ($response['data']['wallet_balance'] ?? 0);
+                $balance = $rawBalance;
                 $status = 'success';
                 $status_code = 1;
 
                 $this->api->update([
-                    'balance' => $response['data']['wallet_balance'],
+                    'balance' => $rawBalance,
                 ]);
             } else {
                 $status = 'failed';
@@ -280,7 +311,7 @@ class KingsVtuController extends Controller
         if (isset($no_format)) {
             $format = [
                 'status' => $status,
-                'balance' => $response['contents']['balance'] ?? null,
+                'balance' => $response['contents']['balance'] ?? ($response['data']['wallet_balance'] ?? null),
                 'status_code' => $status_code,
             ];
         }
@@ -292,7 +323,7 @@ class KingsVtuController extends Controller
     {
         // Post data
         try {
-            $url = env('ENV') == 'local' ? $data['api']->sandbox_base_url : $data['api']->live_base_url;
+            $url = $this->baseUrl($data['api']);
 
             $url = $url . "verify-biller";
 

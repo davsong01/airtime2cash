@@ -2,9 +2,10 @@
 
 namespace App\Services;
 
+use App\Http\Controllers\Providers\SageController;
 use App\Http\Controllers\TransactionController;
-use App\Models\API;
 use App\Models\Airtime2CashTransactions;
+use App\Models\API;
 use App\Models\TransactionLog;
 use App\Models\Webhook;
 use Illuminate\Http\Request;
@@ -45,12 +46,38 @@ class WebhookService
             }
 
             $payload = $request->all();
+            if (empty($payload)) {
+                $rawContent = trim((string) $request->getContent());
+                if ($rawContent !== '') {
+                    $decodedContent = json_decode($rawContent, true);
+                    if (json_last_error() === JSON_ERROR_NONE && is_array($decodedContent)) {
+                        $payload = $decodedContent;
+                    }
+                }
+            }
+
+            foreach (['transaction', 'data'] as $key) {
+                if (isset($payload[$key]) && is_string($payload[$key])) {
+                    $decoded = json_decode($payload[$key], true);
+                    if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                        $payload[$key] = $decoded;
+                    }
+                }
+            }
+
             $headers = $this->normalizeHeaders($request->headers->all());
-            $controller = $this->resolveProviderController($provider);
+            $controller = resolveProviderController($provider);
             $verification = ['status' => true, 'reference' => null];
 
             if ($controller && method_exists($controller, 'verifyWebhookSignature')) {
                 $verification = (array) $controller->verifyWebhookSignature($request);
+            }
+
+            if (! (bool) ($verification['status'] ?? false)) {
+                return response()->json([
+                    'status' => false,
+                    'message' => $verification['message'] ?? 'Invalid webhook signature.',
+                ], 403);
             }
 
             $providerReference = $this->extractProviderReference($payload, $verification['reference'] ?? null);
@@ -59,25 +86,7 @@ class WebhookService
             $providerStatus = $this->extractProviderStatus($payload);
             $customerId = $this->resolveCustomerId($transactionId);
 
-            $query = Webhook::query()->where('api_id', $provider->id);
-
-            if (filled($providerReference)) {
-                $query->where('provider_reference', $providerReference);
-            } elseif (filled($requestRef)) {
-                $query->where('request_ref', $requestRef);
-            } elseif (filled($transactionId)) {
-                $query->where('transaction_id', $transactionId);
-            } else {
-                $query = null;
-            }
-
-            if ($query) {
-                $webhook = $query->latest('id')->first() ?? new Webhook();
-                $attempts = (int) ($webhook->attempts ?? 0);
-            } else {
-                $webhook = new Webhook();
-                $attempts = 0;
-            }
+            $webhook = new Webhook();
 
             $webhook->fill([
                 'api_id' => $provider->id,
@@ -87,20 +96,70 @@ class WebhookService
                 'request_ref' => $requestRef,
                 'provider_status' => $providerStatus,
                 'processing_status' => 'pending',
-                'signature_valid' => (bool) ($verification['status'] ?? false),
+                'signature_valid' => true,
                 'headers' => $headers,
                 'payload' => $payload,
-                'attempts' => $attempts + 1,
-                'last_error' => ! ($verification['status'] ?? false)
-                    ? ($verification['message'] ?? 'Signature verification failed.')
-                    : null,
+                'last_error' => null,
             ]);
+
+            $existingWebhook = Webhook::query()
+                ->where('api_id', $provider->id)
+                ->where(function ($query) use ($providerReference, $requestRef, $transactionId) {
+                    if (filled($providerReference)) {
+                        $query->orWhere('provider_reference', $providerReference);
+                    }
+
+                    if (filled($requestRef)) {
+                        $query->orWhere('request_ref', $requestRef);
+                    }
+
+                    if (filled($transactionId)) {
+                        $query->orWhere('transaction_id', $transactionId);
+                    }
+                })
+                ->first();
+
+            if ($existingWebhook) {
+                $existingPayload = is_array($existingWebhook->payload) ? $existingWebhook->payload : json_decode((string) ($existingWebhook->payload ?? '{}'), true);
+                $samePayload = json_encode($existingPayload, JSON_UNESCAPED_SLASHES) === json_encode($payload, JSON_UNESCAPED_SLASHES);
+                $sameStatus = strtolower((string) $existingWebhook->provider_status) === strtolower((string) $providerStatus);
+
+                if ($this->transactionIsFinal($transactionId) || ($samePayload && $sameStatus)) {
+                    return response()->json([
+                        'status' => true,
+                        'message' => 'Duplicate webhook ignored.',
+                    ], 200);
+                }
+
+                DB::transaction(function () use ($existingWebhook, $customerId, $transactionId, $providerReference, $requestRef, $providerStatus, $headers, $payload) {
+                    $existingWebhook->update([
+                        'customer_id' => $customerId,
+                        'transaction_id' => $transactionId,
+                        'provider_reference' => $providerReference,
+                        'request_ref' => $requestRef,
+                        'provider_status' => $providerStatus,
+                        'processing_status' => 'pending',
+                        'signature_valid' => true,
+                        'headers' => $headers,
+                        'payload' => $payload,
+                        'last_error' => null,
+                    ]);
+                });
+
+                return response()->json([
+                    'status' => true,
+                    'message' => 'Webhook updated successfully.',
+                ], 200);
+            }
 
             DB::transaction(function () use ($webhook) {
                 $webhook->save();
             });
 
-            return true;
+            return response()->json([
+                'status' => true,
+                'message' => 'Webhook logged successfully.',
+            ], 200);
         } catch (\Throwable $exception) {
             Log::error('Webhook processing failed', [
                 'provider_id' => $providerId,
@@ -108,19 +167,11 @@ class WebhookService
                 'payload' => $request->all(),
             ]);
 
-            return false;
+            return response()->json([
+                'status' => false,
+                'message' => 'Webhook could not be logged.',
+            ], 200);
         }
-    }
-
-    private function resolveProviderController(API $provider): mixed
-    {
-        $class = 'App\\Http\\Controllers\\Providers\\'.$provider->file_name;
-
-        if (! class_exists($class)) {
-            return null;
-        }
-
-        return app($class);
     }
 
     private function resolveCustomerId(?string $transactionId): ?int
@@ -218,5 +269,24 @@ class WebhookService
         }
 
         return null;
+    }
+
+    private function transactionIsFinal(?string $transactionId): bool
+    {
+        if (blank($transactionId)) {
+            return false;
+        }
+
+        $airtimeTransaction = Airtime2CashTransactions::where('transaction_id', $transactionId)->first();
+        if ($airtimeTransaction && in_array(strtolower((string) $airtimeTransaction->status), ['pending', 'processing', 'initiated'], true)) {
+            return false;
+        }
+
+        $transactionLog = TransactionLog::where('transaction_id', $transactionId)->first();
+        if ($transactionLog && in_array(strtolower((string) $transactionLog->status), ['pending', 'processing', 'initiated'], true)) {
+            return false;
+        }
+
+        return (bool) ($airtimeTransaction || $transactionLog);
     }
 }

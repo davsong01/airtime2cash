@@ -9,6 +9,7 @@ use App\Http\Controllers\APIController;
 use App\Http\Controllers\AutoSyncAirtimeController;
 use App\Http\Controllers\WebhookController;
 use App\Http\Controllers\BillerLogController;
+use App\Http\Controllers\BankController;
 use App\Http\Controllers\BlackListController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\Controller;
@@ -20,7 +21,6 @@ use App\Http\Controllers\EmailApiController;
 use App\Http\Controllers\EmailLogController;
 use App\Http\Controllers\KycDataController;
 use App\Http\Controllers\PaymentController;
-use App\Http\Controllers\PaymentGatewayController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
@@ -104,6 +104,7 @@ Route::middleware(['auth', 'verified', 'tpin', 'ipcheck'])->group(function () {
         Route::post('customer-verify', [TransactionController::class, 'verify'])->name('verify.unique.element');
         Route::get('customer-transaction_status/{transaction_id}', [TransactionController::class, 'transactionStatus'])->name('transaction.status');
         Route::get('customer-airtime-to-cash-transaction_status/{transaction_id}', [TransactionController::class, 'Airtime2CashTransactionStatus'])->name('airtime2cash.transaction.status');
+        Route::post('verify-bank-details', [TransactionController::class, 'verifyBankDetails'])->name('customer.verify.bank.details');
 
         Route::get('customer-transaction-report', [TransactionController::class, 'showTransactionReportPage'])->name('customer.transaction.report');
         Route::get('customer-load-wallet', [DashboardController::class, 'showLoadWalletPge'])->name('customer.load.wallet');
@@ -151,6 +152,8 @@ Route::middleware(['auth', 'verified', 'admin', 'ipcheck', 'adminRoute'])->prefi
     Route::get('duplicate-product/{product}', [ProductController::class, 'duplicateProduct'])->name('duplicate.product');
     Route::resource('api', APIController::class);
     Route::get('api-balance/{api}', [APIController::class, 'getBalance'])->name('api.balance');
+    Route::post('api/{api}/pull-banks', [APIController::class, 'pullBanks'])->name('api.pull.banks');
+    Route::resource('banks', BankController::class);
 
     Route::resource('category', CategoryController::class);
     Route::get('pull-categories', [CategoryController::class, 'pullCategories'])->name('category.pull');
@@ -183,6 +186,8 @@ Route::middleware(['auth', 'verified', 'admin', 'ipcheck', 'adminRoute'])->prefi
     Route::get('admin.webhook-log', [CallbackOperationsController::class, 'clearWebhookLogs'])->name('admin.api-request.clear');
 
     Route::post('webhooks/{webhook}/resolve', [CallbackOperationsController::class, 'resolve'])->name('admin.autosync.webhooks.resolve');
+    Route::post('operations/webhooks/bulk-delete', [CallbackOperationsController::class, 'bulkDeleteWebhooks'])->name('admin.webhooks.bulk-delete');
+    Route::post('operations/webhooks/bulk-revert', [CallbackOperationsController::class, 'bulkRevertWebhooks'])->name('admin.webhooks.bulk-revert');
 
     Route::get('admin-earninglog', [TransactionController::class, 'walletEarningView'])->name('admin.earninglog');
     Route::get('credit-customer', [TransactionController::class, 'creditCustomerPage'])->name('admin.credit.customer');
@@ -193,6 +198,7 @@ Route::middleware(['auth', 'verified', 'admin', 'ipcheck', 'adminRoute'])->prefi
         ->middleware('throttle:120,1')
         ->name('admin.kyc.customer-suggestions');
     Route::get('admin-reserved-account', [ReservedAccountNumberController::class, 'index'])->name('admin.reserved.accounts');
+    Route::post('admin-reserved-account/sync-provider-ids', [ReservedAccountNumberController::class, 'syncProviderIds'])->name('admin.reserved.accounts.sync-provider-ids');
     Route::get('account-transactions/{account}', [ReservedAccountNumberController::class, 'show'])->name('account.transactions');
     Route::get('admin-callback-analysis', [PaymentController::class, 'callBackAnalysis'])->name('callback.analysis');
     Route::get('admin-callback-analysis-reset/{callback}', [PaymentController::class, 'resetCallBackResponse'])->name('callback.reset');
@@ -201,6 +207,7 @@ Route::middleware(['auth', 'verified', 'admin', 'ipcheck', 'adminRoute'])->prefi
     Route::get('reserved-account-delete/{account}', [ReservedAccountNumberController::class, 'delete'])->name('reserved_account.delete');
 
     Route::get('single-transaction-view/{transaction}', [TransactionController::class, 'singleTransactionView'])->name('admin.single.transaction.view');
+    Route::post('single-transaction-view/{transaction}/resolve', [TransactionController::class, 'resolvePendingTransactionAction'])->name('admin.single.transaction.resolve');
     Route::get('single-airtime2cash-transaction-view/{transaction}', [TransactionController::class, 'singleAirtimeTransactionView'])->name('admin.single.airtime2cash.transaction.view');
     Route::get('query-wallet/{transactionlog?}', [TransactionController::class, 'queryWallet'])->name('admin.query.wallet');
     Route::get('requery-transaction/{transactionlog?}', [TransactionController::class, 'requery'])->name('admin.requery.transaction');
@@ -249,8 +256,6 @@ Route::middleware(['auth', 'verified', 'admin', 'ipcheck', 'adminRoute'])->prefi
     Route::post('settings-update', [SettingsController::class, 'update'])->name('settings.update');
 
     Route::get('verify-transaction/{reference}/{provider_id?}', [PaymentController::class, 'verifyPayment'])->name('transaction.verify');
-
-    Route::resource('paymentgateway', PaymentGatewayController::class);
 
     Route::post('transaction-pin-reset/{user}', [CustomerController::class, 'resetTransactionPin'])->name('admin.transaction.pin.reset');
     Route::post('password-reset/{user}', [CustomerController::class, 'resetPassword'])->name('admin.password.reset');

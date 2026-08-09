@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Settings;
 use Illuminate\Http\Request;
-use App\Models\PaymentGateway;
 use App\Models\API;
 
 class SettingsController extends Controller
@@ -71,10 +70,24 @@ class SettingsController extends Controller
             '$'
         ];
 
-        $payment_gateways = PaymentGateway::all();
-        $autoShareProviders = API::orderBy('name')->get(['id', 'name', 'status', 'slug']);
+        $paymentGatewayProviders = API::query()
+            ->where('is_payment_gateway', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'status', 'slug']);
+        $autoShareProviders = API::query()
+            ->where('is_auto_share', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'status', 'slug']);
+        $bankTransferProviders = API::query()
+            ->where('is_bank_transfer', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'status', 'slug']);
+        $bankVerificationProviders = API::query()
+            ->where('is_bank_verification', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'status', 'slug']);
 
-        return view('admin.settings', compact('settings', 'currencies', 'payment_gateways', 'autoShareProviders'));
+        return view('admin.settings', compact('settings', 'currencies', 'paymentGatewayProviders', 'autoShareProviders', 'bankTransferProviders', 'bankVerificationProviders'));
     }
 
     /**
@@ -94,8 +107,9 @@ class SettingsController extends Controller
         $request->validate(collect($colorFields)
             ->mapWithKeys(fn (string $field) => [$field => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/']])
             ->all() + [
-                'auto_share_provider_id' => ['nullable', 'integer', 'exists:a_p_is,id'],
-                'bank_transfer_provider_id' => ['required', 'integer', 'exists:a_p_is,id'],
+                'auto_share_provider_id' => ['nullable', 'integer', 'exists:apis,id'],
+                'bank_transfer_provider_id' => ['required', 'integer', 'exists:apis,id'],
+                'bank_verification_provider_id' => ['nullable', 'integer', 'exists:apis,id'],
 
             ]);
 

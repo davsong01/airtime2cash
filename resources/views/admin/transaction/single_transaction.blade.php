@@ -12,6 +12,12 @@
 
 @section('page-css')
 <style>
+    .txn-details-page {
+        font-size: smaller;
+        font-weight: 398;
+        color: black;
+    }
+
     .reset-pin {
         font-size: 10px;
         float: right;
@@ -20,17 +26,12 @@
     .heads {
         color: black
     }
-    body {
-        font-size: 1rem;
-        font-weight: 398;
-        color: black;
-        font-size: smaller;
-    }
-    .table {
+
+    .txn-details-page .table {
         color: black;
     }
 
-    code{
+    .txn-details-page code {
         max-height: 250px;
         display: block;
         overflow:scroll;
@@ -93,11 +94,46 @@
         border-radius: 10px;
         padding: 14px 16px;
     }
+    .txn-json-card {
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+        border: 1px solid #dbe3ee;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 6px 16px rgba(15, 23, 42, 0.05);
+    }
+    .txn-json-card__head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 12px 14px;
+        background: #eef4fb;
+        border-bottom: 1px solid #dbe3ee;
+    }
+    .txn-json-card__title {
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: .05em;
+        text-transform: uppercase;
+        color: #334155;
+    }
+    .txn-json-card__body {
+        margin: 0;
+        padding: 14px;
+        background: transparent;
+        color: #0f172a;
+        font-size: 12px;
+        line-height: 1.5;
+        max-height: 320px;
+        overflow: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
 </style>
 @endsection
 @section('content')
 <!-- Content wrapper -->
-<div class="app-content content">
+<div class="app-content content txn-details-page">
     <div class="content-overlay"></div>
     <div class="content-wrapper">
         <div class="content-body">
@@ -140,6 +176,16 @@
                                                                 ?: $transaction->bank_name
                                                                 ?: ($legacyBankCode ? \App\Models\Bank::where('cbn_code', $legacyBankCode)->value('bank_name') : null)
                                                                 ?: 'N/A';
+                                                            $verificationProviderId = getSettings()->bank_verification_provider_id ?: getSettings()->bank_transfer_provider_id;
+                                                            $bankCode = $transaction->bank
+                                                                ? resolveProviderBankCode($transaction->bank, $verificationProviderId)
+                                                                : null;
+                                                            $bankCode = $bankCode
+                                                                ?: data_get($requestData, 'provider_bank_code')
+                                                                ?: $transaction->bank_code
+                                                                ?: data_get($requestData, 'bank_code')
+                                                                ?: data_get($requestData, 'bank')
+                                                                ?: $legacyBankCode;
 
                                                             if ($baseTransferCharge <= 0 && (float) $transaction->provider_charge > 0) {
                                                                 $baseTransferCharge = (float) $transaction->provider_charge;
@@ -197,8 +243,8 @@
                                                                     <span style="color:{{ $color }}"><strong>{{ ucfirst($transaction->descr) }}</strong></span><br><br>
                                                                     <strong>Real Status</strong> <br>
                                                                     <span style="color:{{ $color }}"><strong>{{ ucfirst($transaction->status) }}</strong></span><br><br>
-                                                                    @if(!in_array($transaction->status, ['completed','success']))
-                                                                    <a id="qw_resolve" class="btn btn-success btn-sm" style="color:#fff;"><svg fill="white" xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24"><path d="M754-81q-8 0-15-2.5T726-92L522-296q-6-6-8.5-13t-2.5-15q0-8 2.5-15t8.5-13l85-85q6-6 13-8.5t15-2.5q8 0 15 2.5t13 8.5l204 204q6 6 8.5 13t2.5 15q0 8-2.5 15t-8.5 13l-85 85q-6 6-13 8.5T754-81Zm0-95 29-29-147-147-29 29 147 147ZM205-80q-8 0-15.5-3T176-92l-84-84q-6-6-9-13.5T80-205q0-8 3-15t9-13l212-212h85l34-34-165-165h-57L80-765l113-113 121 121v57l165 165 116-116-43-43 56-56H495l-28-28 142-142 28 28v113l56-56 142 142q17 17 26 38.5t9 45.5q0 24-9 46t-26 39l-85-85-56 56-42-42-207 207v84L233-92q-6 6-13 9t-15 3Zm0-96 170-170v-29h-29L176-205l29 29Zm0 0-29-29 15 14 14 15Zm549 0 29-29-29 29Z"/></svg> Resolve</a>
+                                                                    @if($transaction->status === 'pending')
+                                                                    <a href="#" id="qw_resolve" data-toggle="modal" data-target="#pendingTransactionActionModal" class="btn btn-success btn-sm" style="color:#fff;"><svg fill="white" xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24"><path d="M754-81q-8 0-15-2.5T726-92L522-296q-6-6-8.5-13t-2.5-15q0-8 2.5-15t8.5-13l85-85q6-6 13-8.5t15-2.5q8 0 15 2.5t13 8.5l204 204q6 6 8.5 13t2.5 15q0 8-2.5 15t-8.5 13l-85 85q-6 6-13 8.5T754-81Zm0-95 29-29-147-147-29 29 147 147ZM205-80q-8 0-15.5-3T176-92l-84-84q-6-6-9-13.5T80-205q0-8 3-15t9-13l212-212h85l34-34-165-165h-57L80-765l113-113 121 121v57l165 165 116-116-43-43 56-56H495l-28-28 142-142 28 28v113l56-56 142 142q17 17 26 38.5t9 45.5q0 24-9 46t-26 39l-85-85-56 56-42-42-207 207v84L233-92q-6 6-13 9t-15 3Zm0-96 170-170v-29h-29L176-205l29 29Zm0 0-29-29 15 14 14 15Zm549 0 29-29-29 29Z"/></svg> Resolve</a>
                                                                     @endif
                                                                     {{-- Description <br> --}}
                                                                     {{-- <span style="color:{{ $color }}"><strong>{{ ucfirst($transaction->descr) }}</strong></span><br><br> --}}
@@ -376,22 +422,38 @@
                                                                                     ?>
                                                                                 </td>
                                                                                 <td>
-                                                                                    <div class="txn-bank-box">
-                                                                                        <div class="txn-breakdown-title">Bank Details</div>
-                                                                                        <div class="txn-breakdown-row">
-                                                                                            <span>Bank Name</span>
-                                                                                            <strong>{{ $bankName }}</strong>
+                                                                    <div class="txn-bank-box">
+                                                                        <div class="txn-breakdown-title">Bank Details</div>
+                                                                        <div class="txn-breakdown-row">
+                                                                            <span>Bank Name</span>
+                                                                            <strong>{{ $bankName }}</strong>
                                                                                         </div>
                                                                                         <div class="txn-breakdown-row">
                                                                                             <span>Account Name</span>
                                                                                             <strong>{{ $transaction->account_name ?: 'N/A' }}</strong>
                                                                                         </div>
-                                                                                        <div class="txn-breakdown-row mb-0">
-                                                                                            <span>Account Number</span>
-                                                                                            <strong>{{ $transaction->account_number ?: 'N/A' }}</strong>
-                                                                                        </div>
-                                                                                    </div>
-                                                                                </td>
+                                                                        <div class="txn-breakdown-row mb-0">
+                                                                            <span>Account Number</span>
+                                                                            <strong>{{ $transaction->account_number ?: 'N/A' }}</strong>
+                                                                        </div>
+                                                                    </div>
+                                                                    @if($isWalletToBank && filled($transaction->account_number))
+                                                                        <div class="mt-2">
+                                                                            <button
+                                                                                type="button"
+                                                                                class="btn btn-sm btn-outline-success"
+                                                                                id="admin-verify-bank-btn"
+                                                                                onclick="verifyAdminBankDetails()"
+                                                                            >
+                                                                                Verify Account Details
+                                                                            </button>
+                                                                            <div class="validate-div mt-2 mb-0" style="display:none;">
+                                                                                <img src="{{url('/')}}/site/loading.gif" height="70" style="display:none; margin-left:auto; margin-right:auto;height:initial" id="admin_verify_loading">
+                                                                                <div id="admin_verify_result" style="max-height:300px;overflow:auto;word-wrap:break-word"></div>
+                                                                            </div>
+                                                                        </div>
+                                                                    @endif
+                                                                </td>
                                                                             @else
                                                                                 <td>
                                                                                     {!! getSettings()->currency. number_format($transaction->amount, 2) !!}
@@ -458,6 +520,82 @@
                                                     </div>
                                                 </div>
                                             </div>
+                                            @if($transaction->status === 'pending')
+                                                <div class="modal fade" id="pendingTransactionActionModal" tabindex="-1" role="dialog" aria-hidden="true">
+                                                    <div class="modal-dialog modal-lg modal-dialog-scrollable" role="document">
+                                                        <div class="modal-content">
+                                                            <div class="modal-header">
+                                                                <div>
+                                                                    <h5 class="modal-title mb-25">Resolve Pending Transaction</h5>
+                                                                    <small class="text-muted">Choose the action that best matches what happened with this transaction.</small>
+                                                                </div>
+                                                                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                                                    <span aria-hidden="true">&times;</span>
+                                                                </button>
+                                                            </div>
+                                                            <div class="modal-body">
+                                                                <div class="alert alert-info">
+                                                                    This transaction is currently <strong>{{ ucfirst($transaction->status) }}</strong>. Please choose a resolution below so it does not remain open.
+                                                                </div>
+
+                                                                <div class="row">
+                                                                    <div class="col-lg-6 mb-3">
+                                                                        <div class="border rounded p-3 h-100">
+                                                                            <h6 class="mb-1">Credit Customer</h6>
+                                                                            <p class="text-muted mb-3">Use this to refund the customer wallet and close the transaction.</p>
+                                                                            <form method="POST" action="{{ route('admin.single.transaction.resolve', $transaction->id) }}">
+                                                                                @csrf
+                                                                                <input type="hidden" name="action" value="credit_customer">
+                                                                                <div class="form-group">
+                                                                                    <label for="credit_email">Customer Email</label>
+                                                                                    <input type="email" id="credit_email" class="form-control" value="{{ $transaction->customer_email }}" readonly>
+                                                                                </div>
+                                                                                <div class="form-group">
+                                                                                    <label for="credit_amount">Amount</label>
+                                                                                    <input type="number" step="0.01" min="0" id="credit_amount" name="amount" class="form-control" value="{{ old('amount', $transaction->total_amount ?? $transaction->amount ?? 0) }}" required>
+                                                                                </div>
+                                                                                <div class="form-group mb-3">
+                                                                                    <label for="credit_reason">Reason</label>
+                                                                                    <textarea id="credit_reason" name="reason" class="form-control" rows="3" placeholder="Explain why this wallet credit is being done">{{ old('reason', 'Refund for pending transaction ' . $transaction->transaction_id) }}</textarea>
+                                                                                </div>
+                                                                                <button type="submit" class="btn btn-primary btn-block" onclick="return confirm('Credit this customer and close the transaction?')">Credit Customer</button>
+                                                                            </form>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    <div class="col-lg-6 mb-3">
+                                                                        <div class="border rounded p-3 h-100">
+                                                                            <h6 class="mb-1">Quick Status Actions</h6>
+                                                                            <p class="text-muted mb-3">Mark the transaction closed without wallet movement, or ask the provider to be checked again.</p>
+
+                                                                            <form method="POST" action="{{ route('admin.single.transaction.resolve', $transaction->id) }}" class="mb-2">
+                                                                                @csrf
+                                                                                <input type="hidden" name="action" value="successful">
+                                                                                <input type="hidden" name="reason" value="Manually marked as successful by ADMIN">
+                                                                                <button type="submit" class="btn btn-success btn-block" onclick="return confirm('Mark this transaction as successful?')">Mark as Successful</button>
+                                                                            </form>
+
+                                                                            <form method="POST" action="{{ route('admin.single.transaction.resolve', $transaction->id) }}" class="mb-2">
+                                                                                @csrf
+                                                                                <input type="hidden" name="action" value="failed">
+                                                                                <input type="hidden" name="reason" value="Manually marked as failed by ADMIN">
+                                                                                <button type="submit" class="btn btn-danger btn-block" onclick="return confirm('Mark this transaction as failed?')">Mark as Failed</button>
+                                                                            </form>
+
+                                                                            <form method="POST" action="{{ route('admin.single.transaction.resolve', $transaction->id) }}">
+                                                                                @csrf
+                                                                                <input type="hidden" name="action" value="process">
+                                                                                <input type="hidden" name="reason" value="Reprocess pending transaction after provider verification">
+                                                                                <button type="submit" class="btn btn-info btn-block" onclick="return confirm('Requery and process this transaction based on provider response?')">Process</button>
+                                                                            </form>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            @endif
                                         </div>
                                     </div>
                                 </section>
@@ -473,6 +611,69 @@
 @section('page-script')
 <script src="{{ asset('app-assets/js/scripts/pages/dashboard-analytics.js') }}"></script>
 <script>
+    function escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function renderPrettyJsonPanel(payload, title, subtitle) {
+        const raw = payload?.raw_response ?? payload?.data ?? payload ?? {};
+        return `
+            <div class="txn-json-card">
+                <div class="txn-json-card__head">
+                    <div>
+                        <div class="txn-json-card__title">${escapeHtml(title || 'Query Result')}</div>
+                        ${subtitle ? `<div class="text-muted small">${escapeHtml(subtitle)}</div>` : ''}
+                    </div>
+                </div>
+                <pre class="txn-json-card__body mb-0">${escapeHtml(JSON.stringify(raw, null, 2))}</pre>
+            </div>
+        `;
+    }
+
+    function verifyAdminBankDetails() {
+        const button = $('#admin-verify-bank-btn');
+        const resultBox = $('#admin_verify_result');
+        const loader = $('#admin_verify_loading');
+        const wrapper = button.closest('.mt-2').find('.validate-div');
+
+        $.ajax({
+            url: '{{ route("admin.verify.bank.details") }}',
+            type: 'POST',
+            data: {
+                _token: '{{ csrf_token() }}',
+                transaction_id: '{{ $transaction->id }}',
+                bank_code: '{{ $bankCode ?? '' }}',
+                account_number: '{{ $transaction->account_number ?? '' }}',
+            },
+            beforeSend: function () {
+                wrapper.show();
+                resultBox.empty();
+                loader.show();
+                button.prop('disabled', true);
+            },
+            success: function (data) {
+                wrapper.show();
+                resultBox.show();
+                resultBox.html(renderPrettyJsonPanel(data, 'Account verification response', 'Pretty JSON view'));
+            },
+            error: function (xhr) {
+                wrapper.show();
+                resultBox.show();
+                const raw = xhr.responseJSON ?? { message: 'Unable to verify bank details right now.' };
+                resultBox.html(renderPrettyJsonPanel(raw, 'Account verification response', 'Pretty JSON view'));
+            },
+            complete: function () {
+                loader.hide();
+                button.prop('disabled', false);
+            }
+        });
+    }
+
     function queryCredit(id, type){
 		var tid = id;
         if(type == 'credit'){
@@ -488,11 +689,11 @@
 				$('#img_loading').show();
 				$('#validate-biller').html('Processing....');
 			},
-			success:function (data) {
+            success:function (data) {
 				$('#qw_debit').html('Query '+type+' <i class="fa fa-check"></i>');
 				$('#img_loading').hide();
 				$('#q_res').show();
-				$('#q_res').html(data.message);
+				$('#q_res').html(renderPrettyJsonPanel(data, 'Query ' + type + ' response', 'Wallet query result'));
 			}
 		});
 		e.preventDefault();
@@ -512,18 +713,18 @@
 				$('#img_loading2').show();
 				$('#qw_status').html('Processing....');
 			},
-			success:function (data) {
+            success:function (data) {
 				$('#qw_status').html('Requery Complete <i class="fa fa-check"></i>');
 				$('#img_loading').hide();
 				$('#q_res').show();
-				$('#q_res').html(data.message);
+				$('#q_res').html(renderPrettyJsonPanel(data, 'Requery response', 'Transaction query result'));
 
                 // $('#validate-div').show();
                 // $('#validate-biller').html('Validate Biller <i class="fa fa-check"></i>');
 				$('#img_loading2').hide();
 				$('#validate-div').show();
 				$('#q_res2').show();
-				$('#q_res2').html(JSON.stringify(data.api_response, null, 5));
+				$('#q_res2').html(renderPrettyJsonPanel(data?.api_response ?? data, 'Provider response', 'Raw provider payload'));
 
 			}
 		});
@@ -551,16 +752,16 @@
 				$('#img_loading2').show();
 				$('#validate-biller').html('Processing....');
 			},
-			success:function (data) {
+				success:function (data) {
                 console.log(data);
-				$('#validate-biller').html('Validate Biller <i class="fa fa-check"></i>');
-				$('#img_loading2').hide();
-				$('#validate-div').show();
-				$('#q_res2').show();
-				$('#q_res2').html(data.message);
-			}
-		});
-		e.preventDefault();
+					$('#validate-biller').html('Validate Biller <i class="fa fa-check"></i>');
+					$('#img_loading2').hide();
+					$('#validate-div').show();
+					$('#q_res2').show();
+					$('#q_res2').html(renderPrettyJsonPanel(data, 'Validation response', 'Pretty JSON view'));
+				}
+			});
+			e.preventDefault();
     }
 
     // $('#qw-transaction').click(function () {

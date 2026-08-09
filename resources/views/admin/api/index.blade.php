@@ -17,7 +17,8 @@
         .provider-webhook-label { font-size:.72rem; font-weight:700; color:#6c757d; text-transform:uppercase; margin-bottom:.45rem; }
         .provider-webhook .form-control { background:#f8f9fa; font-size:.8rem; }
         .provider-actions { display:flex; flex-wrap:wrap; gap:.5rem; margin-top:1rem; padding-top:1rem; border-top:1px solid #eee; }
-        .provider-balance { display:none; padding:.4rem .65rem; border-radius:.4rem; background:#f4f5f7; font-weight:700; }
+        .provider-balance { display:inline-flex; align-items:center; gap:.4rem; padding:.4rem .65rem; border-radius:.4rem; background:#f4f5f7; font-weight:700; }
+        .provider-balance.muted { color:#6c757d; font-weight:600; }
         @media (max-width: 991.98px) { .provider-grid { grid-template-columns:1fr; } }
     </style>
 @endsection
@@ -119,10 +120,26 @@
                                             <span id="icon-{{ $api->id }}">
                                                 <i class="bx bx-refresh"></i>
                                             </span>
-                                            Check Balance
+                                            Refresh Balance
                                         </button>
+                                        <span
+                                            id="balance-{{ $api->id }}"
+                                            class="provider-balance muted"
+                                            data-provider-slug="{{ $api->slug }}"
+                                        >
+                                            {{ $api->balance !== null ? (($api->slug === 'paystack' ? 'NGN' : getSettings()->currency) . ' ' . number_format((float) $api->balance, 2)) : 'No cached balance yet' }}
+                                        </span>
+                                    @endif
 
-                                        <span id="balance-{{ $api->id }}" class="provider-balance"></span>
+                                    @if(($api->is_bank_transfer || $api->is_bank_verification) && hasAccess('api.edit'))
+                                        <button
+                                            type="button"
+                                            class="btn btn-sm btn-outline-secondary"
+                                            onclick="syncBanks('{{ $api->id }}', this)"
+                                        >
+                                            <i class="bx bx-network-chart"></i>
+                                            Sync Banks
+                                        </button>
                                     @endif
                                 </div>
                             @endif
@@ -165,6 +182,15 @@ function getBalance(id) {
     const button = $('#api-' + id);
     const icon = $('#icon-' + id);
     const balance = $('#balance-' + id);
+    const providerSlug = balance.data('providerSlug');
+
+    function setBalanceFailure(message) {
+        balance
+            .removeClass('muted')
+            .addClass('text-danger')
+            .text(message)
+            .show();
+    }
 
     button.prop('disabled', true);
     icon.html("<i class='bx bx-loader-alt bx-spin'></i>");
@@ -175,19 +201,47 @@ function getBalance(id) {
         dataType: 'json',
         success: function (data) {
             if (data.status === 'success') {
-                button.hide();
-                balance.text(data.balance).show();
+                const currency = data.currency || (providerSlug === 'paystack' ? 'NGN' : '{{ getSettings()->currency }}');
+                balance
+                    .removeClass('muted text-danger')
+                    .text(currency + ' ' + Number(data.balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
+                    .show();
                 return;
             }
 
-            button.prop('disabled', false);
-            icon.html("<i class='bx bx-refresh'></i>");
-            balance.text(data.message || 'Unable to fetch balance').show();
+            setBalanceFailure(data.message || 'Balance check failed.');
         },
-        error: function () {
+        error: function (xhr) {
+            setBalanceFailure(xhr.responseJSON?.message || 'Balance check failed.');
+        },
+        complete: function () {
             button.prop('disabled', false);
             icon.html("<i class='bx bx-refresh'></i>");
-            balance.text('Unable to fetch balance').show();
+        }
+    });
+}
+
+function syncBanks(id, button) {
+    const original = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = "<i class='bx bx-loader-alt bx-spin'></i> Syncing";
+
+    $.ajax({
+        url: "{{ url('admin/api') }}/" + id + "/pull-banks",
+        method: 'POST',
+        headers: {
+            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+        },
+        dataType: 'json',
+        success: function (data) {
+            alert(data.message || 'Banks synced successfully.');
+        },
+        error: function (xhr) {
+            alert(xhr.responseJSON?.message || 'Unable to sync banks.');
+        },
+        complete: function () {
+            button.disabled = false;
+            button.innerHTML = original;
         }
     });
 }

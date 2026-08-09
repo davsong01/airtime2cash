@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\View;
 use App\Http\Controllers\WalletController;
+use App\Models\Bank;
 use App\Http\Controllers\PaymentProcessors\SquadController;
 use App\Http\Controllers\PaymentProcessors\MonnifyController;
 
@@ -80,6 +81,37 @@ if (!function_exists("normalizeChargeBreakdown")) {
         }
 
         return [];
+    }
+}
+
+if (!function_exists("normalizeWebhookPayload")) {
+    function normalizeWebhookPayload(\Illuminate\Http\Request $request): array
+    {
+        $payload = $request->all();
+
+        if (empty($payload)) {
+            $rawContent = trim((string) $request->getContent());
+
+            if ($rawContent !== '') {
+                $decodedContent = json_decode($rawContent, true);
+
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decodedContent)) {
+                    $payload = $decodedContent;
+                }
+            }
+        }
+
+        foreach (['transaction', 'data', 'eventData', 'destination'] as $key) {
+            if (isset($payload[$key]) && is_string($payload[$key])) {
+                $decoded = json_decode($payload[$key], true);
+
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    $payload[$key] = $decoded;
+                }
+            }
+        }
+
+        return $payload;
     }
 }
 
@@ -354,22 +386,197 @@ if (!function_exists("extractKeyValuesFromMultiDimensionalArray")) {
 if (!function_exists("createReservedAccount")) {
     function createReservedAccount($data = null, $admin_id = null)
     {
-        $provider = PaymentGateway::where('id', getSettings()->payment_gateway)->first();
-        $paymentGateway = $provider->slug;
+        $provider = resolvePaymentGatewayProvider();
         $reserved = null;
-        if (!empty($paymentGateway)) {
-            if ($paymentGateway == 'monnify') {
-                $monnify = new MonnifyController($provider);
-                $reserved = $monnify->createReservedAccount($data, $admin_id);
-            }
+        if (empty($provider)) {
+            return null;
+        }
 
-            if ($paymentGateway == 'squad') {
-                $squad = new SquadController($provider);
-                $reserved = $squad->createReservedAccount($data, $admin_id);
-            }
+        $controller = resolveProviderController($provider);
+
+        if ($controller && method_exists($controller, 'createReservedAccount')) {
+            $reserved = $controller->createReservedAccount($data, $admin_id);
         }
 
         return $reserved;
+    }
+}
+
+if (!function_exists("resolvePaymentGatewaySetting")) {
+    function resolvePaymentGatewaySetting($gateway = null): ?PaymentGateway
+    {
+        $gateway = $gateway ?? getSettings()?->payment_gateway;
+
+        if (blank($gateway)) {
+            return null;
+        }
+
+        return PaymentGateway::query()
+            ->when(is_numeric($gateway), fn ($query) => $query->whereKey((int) $gateway), fn ($query) => $query->where('slug', $gateway))
+            ->first();
+    }
+}
+
+if (!function_exists("resolvePaymentGatewayProvider")) {
+    function resolvePaymentGatewayProvider($gateway = null): ?API
+    {
+        $gateway = $gateway ?? getSettings()?->payment_gateway;
+
+        if (blank($gateway)) {
+            return null;
+        }
+
+        $provider = API::query()
+            ->when(is_numeric($gateway), fn ($query) => $query->whereKey((int) $gateway), fn ($query) => $query->where('slug', $gateway))
+            ->first();
+
+        if ($provider) {
+            return $provider;
+        }
+
+        $legacyGateway = PaymentGateway::query()
+            ->when(is_numeric($gateway), fn ($query) => $query->whereKey((int) $gateway), fn ($query) => $query->where('slug', $gateway))
+            ->first();
+
+        if (! $legacyGateway) {
+            return null;
+        }
+
+        return API::query()->where('slug', $legacyGateway->slug)->first();
+    }
+}
+
+if (!function_exists("providerBaseUrl")) {
+    function providerBaseUrl($provider = null): ?string
+    {
+        if (blank($provider)) {
+            return null;
+        }
+
+        if (! $provider instanceof API) {
+            $provider = $provider instanceof \Illuminate\Database\Eloquent\Model
+                ? $provider
+                : (is_numeric($provider)
+                    ? API::query()->find((int) $provider)
+                    : API::query()->where('slug', $provider)->first());
+        }
+
+        if (! $provider) {
+            return null;
+        }
+
+        return env('ENT') === 'local'
+            ? ($provider->sandbox_base_url ?: $provider->live_base_url)
+            : ($provider->live_base_url ?: $provider->sandbox_base_url);
+    }
+}
+
+if (!function_exists("resolveProviderBankCode")) {
+    function resolveProviderBankCode(Bank $bank, $provider = null): ?string
+    {
+        if (blank($bank)) {
+            return null;
+        }
+
+        if (! $provider instanceof API) {
+            $provider = $provider instanceof \Illuminate\Database\Eloquent\Model
+                ? $provider
+                : (is_numeric($provider)
+                    ? API::query()->find((int) $provider)
+                    : API::query()->where('slug', $provider)->first());
+        }
+
+        $providerSlug = strtolower((string) ($provider?->slug ?? ''));
+        $providerCodes = is_array($bank->provider_codes ?? null)
+            ? $bank->provider_codes
+            : (json_decode((string) ($bank->provider_codes ?? '[]'), true) ?: []);
+
+        if (filled($providerSlug) && filled($providerCodes[$providerSlug] ?? null)) {
+            return (string) $providerCodes[$providerSlug];
+        }
+
+        return $bank->cbn_code ?: $bank->bank_code ?: null;
+    }
+}
+
+if (!function_exists("getWalletToBankBanks")) {
+    function getWalletToBankBanks($provider = null)
+    {
+        if (! $provider instanceof API) {
+            $provider = $provider instanceof \Illuminate\Database\Eloquent\Model
+                ? $provider
+                : (is_numeric($provider)
+                    ? API::query()->find((int) $provider)
+                    : API::query()->where('slug', $provider)->first());
+        }
+
+        if (! $provider) {
+            $settings = getSettings();
+            $providerId = $settings?->bank_verification_provider_id ?: $settings?->bank_transfer_provider_id;
+            $provider = API::query()->whereKey($providerId)->first();
+        }
+
+        $providerSlug = strtolower((string) ($provider?->slug ?? ''));
+
+        return Bank::query()
+            ->where('status', 'active')
+            ->orderBy('bank_name')
+            ->get()
+            ->filter(function (Bank $bank) use ($providerSlug) {
+                $providerCodes = is_array($bank->provider_codes ?? null)
+                    ? $bank->provider_codes
+                    : (json_decode((string) ($bank->provider_codes ?? '[]'), true) ?: []);
+
+                return filled($providerSlug) && filled($providerCodes[$providerSlug] ?? null);
+            })
+            ->values();
+    }
+}
+
+if (!function_exists("resolveProviderController")) {
+    function resolveProviderController($provider = null)
+    {
+        if (blank($provider)) {
+            return null;
+        }
+
+        if ($provider instanceof API) {
+            $model = $provider;
+        } elseif (is_numeric($provider)) {
+            $model = API::query()->find((int) $provider);
+        } elseif (is_string($provider)) {
+            $model = API::query()
+                ->where('slug', $provider)
+                ->first();
+        } else {
+            $model = $provider;
+        }
+
+        if (! $model || blank($model->slug)) {
+            return null;
+        }
+
+        $slug = strtolower((string) $model->slug);
+        $controllerMap = [
+            'monnify' => 'App\\Http\\Controllers\\Providers\\MonnifyController',
+            'paystack' => 'App\\Http\\Controllers\\Providers\\PaystackController',
+            'kora' => 'App\\Http\\Controllers\\Providers\\KoraController',
+            'sagecloud' => 'App\\Http\\Controllers\\Providers\\SageController',
+            'autosync' => 'App\\Http\\Controllers\\Providers\\AutoSyncController',
+            'squad' => 'App\\Http\\Controllers\\PaymentProcessors\\SquadController',
+        ];
+
+        if (isset($controllerMap[$slug]) && class_exists($controllerMap[$slug])) {
+            return app($controllerMap[$slug]);
+        }
+
+        $fallback = 'App\\Http\\Controllers\\Providers\\' . \Illuminate\Support\Str::studly($slug) . 'Controller';
+
+        if (class_exists($fallback)) {
+            return app($fallback);
+        }
+
+        return null;
     }
 }
 

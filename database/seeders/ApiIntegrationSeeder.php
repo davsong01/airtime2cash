@@ -1,0 +1,83 @@
+<?php
+
+namespace Database\Seeders;
+
+use App\Models\API;
+use Illuminate\Database\Seeder;
+
+class ApiIntegrationSeeder extends Seeder
+{
+    public function run(): void
+    {
+        $providers = [
+            [
+                'name' => 'Monnify',
+                'slug' => 'monnify',
+                'sandbox_base_url' => 'https://sandbox.monnify.com',
+                'live_base_url' => 'https://api.monnify.com',
+                'is_bank_transfer' => true,
+                'is_bank_verification' => true,
+                'is_payment_gateway' => true,
+            ],
+            [
+                'name' => 'Paystack',
+                'slug' => 'paystack',
+                'sandbox_base_url' => 'https://api.paystack.co',
+                'live_base_url' => 'https://api.paystack.co',
+                'is_bank_transfer' => true,
+                'is_bank_verification' => true,
+                'is_payment_gateway' => true,
+            ],
+            [
+                'name' => 'Kora',
+                'slug' => 'kora',
+                'sandbox_base_url' => 'https://api.korapay.com/merchant/api/v1',
+                'live_base_url' => 'https://api.korapay.com/merchant/api/v1',
+                'is_bank_transfer' => true,
+                'is_bank_verification' => true,
+            ],
+            [
+                'name' => 'SageCloud',
+                'slug' => 'sagecloud',
+                'sandbox_base_url' => env('SAGE_BASE_URL'),
+                'live_base_url' => env('SAGE_BASE_URL'),
+                'is_bank_transfer' => true,
+                'is_bank_verification' => true,
+            ],
+            [
+                'name' => 'AutoSync',
+                'slug' => 'autosync',
+                'sandbox_base_url' => null,
+                'live_base_url' => null,
+                'is_auto_share' => true,
+            ],
+        ];
+
+        foreach ($providers as $provider) {
+            $api = API::firstOrNew(['slug' => $provider['slug']]);
+
+            $api->fill(array_merge($provider, [
+                'status' => $api->exists ? ($api->status ?? 'active') : 'active',
+                'warning_threshold_status' => $api->exists ? ($api->warning_threshold_status ?? 'inactive') : 'inactive',
+                'balance' => $api->exists ? ($api->balance ?? 0) : 0,
+            ]));
+
+            foreach ([
+                'is_bank_transfer',
+                'is_bank_verification',
+                'is_auto_share',
+                'is_payment_gateway',
+            ] as $flag) {
+                if (! array_key_exists($flag, $provider)) {
+                    continue;
+                }
+
+                if (! $api->exists || is_null($api->getRawOriginal($flag))) {
+                    $api->{$flag} = $provider[$flag];
+                }
+            }
+
+            $api->save();
+        }
+    }
+}

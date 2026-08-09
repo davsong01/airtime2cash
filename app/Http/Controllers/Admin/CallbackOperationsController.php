@@ -9,6 +9,7 @@ use App\Models\Webhook;
 use App\Services\WebhookProcessor;
 use App\Services\WebhookService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Throwable;
 
@@ -159,8 +160,12 @@ class CallbackOperationsController extends Controller
 
     public function resolve(Webhook $webhook)
     {
-        if (! $webhook->isWalletToBankTransaction()) {
-            return back()->with('error', 'This resolve action is only available for wallet-to-bank transactions.');
+        if (! $webhook->linkedTransaction()) {
+            return back()->with('error', 'This webhook does not have an attached transaction to resolve.');
+        }
+
+        if (! $webhook->hasUnresolvedTransaction()) {
+            return back()->with('error', 'This transaction has already been resolved.');
         }
 
         try {
@@ -170,5 +175,43 @@ class CallbackOperationsController extends Controller
         }
 
         return back()->with('message', 'Webhook processed successfully. Settlement remained idempotent.');
+    }
+
+    public function bulkDeleteWebhooks(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'webhook_ids' => ['required', 'array', 'min:1'],
+            'webhook_ids.*' => ['integer', 'distinct', 'exists:webhooks,id'],
+        ]);
+
+        $deleted = Webhook::whereIn('id', $data['webhook_ids'])->count();
+
+        Webhook::whereIn('id', $data['webhook_ids'])->delete();
+
+        return back()->with(
+            'message',
+            "{$deleted} webhook" . ($deleted === 1 ? '' : 's') . ' deleted successfully.'
+        );
+    }
+
+    public function bulkRevertWebhooks(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'webhook_ids' => ['required', 'array', 'min:1'],
+            'webhook_ids.*' => ['integer', 'distinct', 'exists:webhooks,id'],
+        ]);
+
+        $updated = Webhook::whereIn('id', $data['webhook_ids'])->update([
+            'processing_status' => 'pending',
+            'processed_at' => null,
+            'resolved_at' => null,
+            'resolved_by' => null,
+            'last_error' => null,
+        ]);
+
+        return back()->with(
+            'message',
+            "{$updated} webhook" . ($updated === 1 ? '' : 's') . ' reverted to pending.'
+        );
     }
 }

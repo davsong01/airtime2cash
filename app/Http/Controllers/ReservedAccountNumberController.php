@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\API;
 use Illuminate\Http\Request;
 use App\Models\TransactionLog;
 use App\Models\ReservedAccount;
@@ -22,7 +23,7 @@ class ReservedAccountNumberController extends Controller
         $numbers = ReservedAccountNumber::with([
             'customer.user:id,firstname,middlename,lastname,email,phone',
             'admin.user:id,firstname,lastname',
-            'payment_gateway:id,name',
+            'api:id,name',
         ])->withCount('transactions')
             ->withSum('transactions as transaction_total', 'total_amount');
 
@@ -42,7 +43,7 @@ class ReservedAccountNumberController extends Controller
         }
 
         if ($request->filled('gateway')) {
-            $numbers->where('paymentgateway_id', $request->gateway);
+            $numbers->where('api_id', $request->gateway);
         }
 
         if ($request->filled('status')) {
@@ -53,7 +54,7 @@ class ReservedAccountNumberController extends Controller
             ->selectRaw("SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) AS active")
             ->selectRaw('COUNT(DISTINCT customer_id) AS customers')
             ->first();
-        $gateways = \App\Models\PaymentGateway::orderBy('name')->get(['id', 'name']);
+        $gateways = API::orderBy('name')->get(['id', 'name']);
         $numbers = $numbers->latest('id')->paginate(25)->withQueryString();
 
         return view('admin.customers.reserved_account_numbers', compact('numbers', 'summary', 'gateways'));
@@ -61,9 +62,14 @@ class ReservedAccountNumberController extends Controller
 
     public function delete(ReservedAccountNumber $account)
     {
-        if ($account->paymentgateway_id == 1) {
-            $delete = app('App\Http\Controllers\PaymentProcessors\MonnifyController')->deleteReservedAccount($account->account_reference);
+        $provider = $account->api;
+        $controller = resolveProviderController($provider);
+
+        if (! $controller || ! method_exists($controller, 'deleteReservedAccount')) {
+            return back()->with('error', 'This reserved account provider cannot be managed here.');
         }
+
+        $delete = $controller->deleteReservedAccount($account->account_reference);
 
         if ($delete['status'] == 'success') {
             return back()->with('message', 'Reserved Account Deleted successfully');
@@ -124,5 +130,18 @@ class ReservedAccountNumberController extends Controller
     public function destroy(ReservedAccount $reservedAccount)
     {
         //
+    }
+
+    public function syncProviderIds()
+    {
+        $monnify = API::where('slug', 'monnify')->first();
+
+        if (! $monnify) {
+            return back()->with('error', 'Monnify provider record was not found.');
+        }
+
+        ReservedAccountNumber::query()->update(['api_id' => $monnify->id]);
+
+        return back()->with('message', 'Reserved account provider ids refreshed successfully.');
     }
 }

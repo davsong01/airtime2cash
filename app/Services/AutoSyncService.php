@@ -11,6 +11,7 @@ use GuzzleHttp\Psr7\Response as GuzzleResponse;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -434,71 +435,83 @@ class AutoSyncService
             return $webhook;
         }
 
-        $webhook->update([
-            'processing_status' => 'processing',
-            'attempts' => $webhook->attempts + 1,
-            'last_error' => null,
-        ]);
-
-        try {
-            $payload = $webhook->payload;
-            $providerTransaction = data_get($payload, 'transaction', []);
-            $transaction = Airtime2CashTransactions::where(function ($query) use ($webhook) {
-                if ($webhook->provider_reference) {
-                    $query->where('provider_reference', $webhook->provider_reference);
-                }
-                if ($webhook->request_ref) {
-                    $method = $webhook->provider_reference ? 'orWhere' : 'where';
-                    $query->{$method}('provider_request_ref', $webhook->request_ref)
-                        ->orWhere('transaction_id', $webhook->request_ref);
-                }
-            })->first();
-
-            if (!$transaction) {
-                throw new RuntimeException('No local Airtime2Cash transaction matches this webhook.');
-            }
-
+        return DB::transaction(function () use ($webhook, $resolvedBy) {
             $webhook->update([
-                'customer_id' => $transaction->customer_id,
-                'transaction_id' => $transaction->transaction_id,
+                'processing_status' => 'processing',
+                'last_error' => null,
             ]);
 
-            $providerStatus = strtolower((string) ($providerTransaction['status'] ?? ''));
-            if (in_array($providerStatus, ['successful', 'success', 'completed'], true)) {
-                $completedAmount = (float) ($providerTransaction['actual_amount'] ?? $providerTransaction['amount'] ?? 0);
-                $this->settlement->settle($transaction, $completedAmount, $payload, $resolvedBy);
-            } elseif (in_array($providerStatus, ['failed', 'declined', 'cancelled'], true)) {
-                if ($transaction->status !== 'approved') {
-                    $transaction->update([
-                        'status' => 'declined',
-                        'provider_status' => $providerStatus,
-                        'provider_response' => json_encode($payload),
-                        'description' => $providerTransaction['details'] ?? 'Auto Transfer failed at AutoSync.',
-                        'approved_by' => $resolvedBy ?? $transaction->approved_by,
+            try {
+                $payload = $webhook->payload;
+                $providerTransaction = data_get($payload, 'transaction', []);
+                $transaction = Airtime2CashTransactions::where(function ($query) use ($webhook) {
+                    if ($webhook->provider_reference) {
+                        $query->where('provider_reference', $webhook->provider_reference);
+                    }
+                    if ($webhook->request_ref) {
+                        $method = $webhook->provider_reference ? 'orWhere' : 'where';
+                        $query->{$method}('provider_request_ref', $webhook->request_ref)
+                            ->orWhere('transaction_id', $webhook->request_ref);
+                    }
+                })->first();
+
+                if (!$transaction) {
+                    throw new RuntimeException('No local Airtime2Cash transaction matches this webhook.');
+                }
+
+                $webhook->update([
+                    'customer_id' => $transaction->customer_id,
+                    'transaction_id' => $transaction->transaction_id,
+                ]);
+
+                if (! in_array(strtolower((string) $transaction->status), ['pending', 'processing', 'initiated'], true)) {
+                    $webhook->update([
+                        'processing_status' => 'processed',
+                        'processed_at' => now(),
+                        'resolved_by' => $resolvedBy,
+                        'resolved_at' => $resolvedBy ? now() : null,
                     ]);
+
+                    return $webhook->fresh();
                 }
-            } else {
-                throw new RuntimeException('Webhook does not contain a final AutoSync transaction status.');
+
+                $providerStatus = strtolower((string) ($providerTransaction['status'] ?? ''));
+                if (in_array($providerStatus, ['successful', 'success', 'completed'], true)) {
+                    $completedAmount = (float) ($providerTransaction['actual_amount'] ?? $providerTransaction['amount'] ?? 0);
+                    $this->settlement->settle($transaction, $completedAmount, $payload, $resolvedBy);
+                } elseif (in_array($providerStatus, ['failed', 'declined', 'cancelled'], true)) {
+                    if ($transaction->status !== 'approved') {
+                        $transaction->update([
+                            'status' => 'declined',
+                            'provider_status' => $providerStatus,
+                            'provider_response' => json_encode($payload),
+                            'description' => $providerTransaction['details'] ?? 'Auto Transfer failed at AutoSync.',
+                            'approved_by' => $resolvedBy ?? $transaction->approved_by,
+                        ]);
+                    }
+                } else {
+                    throw new RuntimeException('Webhook does not contain a final AutoSync transaction status.');
+                }
+
+                $webhook->update([
+                    'processing_status' => 'processed',
+                    'processed_at' => now(),
+                    'resolved_by' => $resolvedBy,
+                    'resolved_at' => $resolvedBy ? now() : null,
+                ]);
+            } catch (Throwable $exception) {
+                $webhook->update([
+                    'processing_status' => 'failed',
+                    'last_error' => $exception->getMessage(),
+                    'resolved_by' => $resolvedBy,
+                    'resolved_at' => $resolvedBy ? now() : null,
+                ]);
+
+                throw $exception;
             }
 
-            $webhook->update([
-                'processing_status' => 'processed',
-                'processed_at' => now(),
-                'resolved_by' => $resolvedBy,
-                'resolved_at' => $resolvedBy ? now() : null,
-            ]);
-        } catch (Throwable $exception) {
-            $webhook->update([
-                'processing_status' => 'failed',
-                'last_error' => $exception->getMessage(),
-                'resolved_by' => $resolvedBy,
-                'resolved_at' => $resolvedBy ? now() : null,
-            ]);
-
-            throw $exception;
-        }
-
-        return $webhook->fresh();
+            return $webhook->fresh();
+        });
     }
 
     public function balance(API $provider, $no_format = null)
