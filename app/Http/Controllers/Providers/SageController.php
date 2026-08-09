@@ -240,7 +240,7 @@ class SageController extends BankTransferProviderController
             ->map(fn ($bank) => [
                 'bank_name' => $bank['bank_name'] ?? $bank['name'] ?? null,
                 'cbn_code' => $bank['bank_code'] ?? $bank['code'] ?? null,
-                'provider_codes' => ['sagecloud' => $bank['bank_code'] ?? $bank['code'] ?? null],
+                'provider_codes' => ['sagecloud' => $bank['cbn_code'] ?? $bank['code'] ?? null],
                 'provider_meta' => $bank,
             ])
             ->values()
