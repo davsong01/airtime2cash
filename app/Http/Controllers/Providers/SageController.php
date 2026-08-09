@@ -39,8 +39,30 @@ class SageController extends BankTransferProviderController
     }
 
 
-    public function walletBalance($token)
+    private function fetchWalletBalance(?string $token = null)
     {
+        if (blank($token)) {
+            $login = $this->login();
+
+            if (empty($login) || ($login['success'] ?? false) !== true) {
+                return [
+                    'status' => 'failed',
+                    'message' => 'Could not authenticate with SageCloud.',
+                    'api_response' => $login ?? null,
+                ];
+            }
+
+            $token = data_get($login, 'data.token.access_token');
+
+            if (blank($token)) {
+                return [
+                    'status' => 'failed',
+                    'message' => 'SageCloud did not return a valid access token.',
+                    'api_response' => $login,
+                ];
+            }
+        }
+
         $url = rtrim($this->base_url, '/') . '/wallet/balance';
         $headers = [
             "Content-Type: application/json",
@@ -167,25 +189,7 @@ class SageController extends BankTransferProviderController
 
     public function balance(): array
     {
-        $login = $this->login();
-
-        if (empty($login) || ($login['success'] ?? false) !== true) {
-            return [
-                'status' => 'failed',
-                'message' => 'Could not authenticate with SageCloud.',
-            ];
-        }
-
-        $token = data_get($login, 'data.token.access_token');
-
-        if (blank($token)) {
-            return [
-                'status' => 'failed',
-                'message' => 'SageCloud did not return a valid access token.',
-            ];
-        }
-
-        $response = $this->walletBalance($token);
+        $response = $this->fetchWalletBalance();
 
         return [
             'status' => ((bool) data_get($response, 'success', false)) ? 'success' : 'failed',
