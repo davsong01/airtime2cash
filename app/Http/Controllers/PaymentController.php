@@ -11,6 +11,7 @@ use App\Models\ReservedAccountNumber;
 use App\Models\ReservedAccountCallback;
 use App\Http\Controllers\PaymentProcessors\SquadController;
 use App\Http\Controllers\PaymentProcessors\MonnifyController;
+use App\Services\WebhookService;
 
 class PaymentController extends Controller
 {
@@ -99,17 +100,23 @@ class PaymentController extends Controller
         }
     }
 
-    public function analyzeCallbackResponse()
+    public function analyzeCallbackResponse(Request $request)
     {
         try {
+            $pick = max(1, (int) $request->integer('pick', 5));
 
             $calls = ReservedAccountCallback::where(['status' => 'pending'])->orderBy('id', 'ASC')
-                ->take(5)
+                ->take($pick)
                 ->get()
                 ->toArray();
 
             if (count($calls) < 1) {
-                return;
+                app(WebhookService::class)->analyzeWebhookResponse($pick);
+
+                return response()->json([
+                    'status' => true,
+                    'message' => 'Webhook queue processed successfully.',
+                ]);
             }
 
             $tlk = 'PICKED-' . time();
@@ -231,9 +238,16 @@ class PaymentController extends Controller
                 ReservedAccountCallback::where('id', $call->id)->update(['status' => 'analyzed']);
                 // DB::commit();
             }
+
+            app(WebhookService::class)->analyzeWebhookResponse($pick);
         } catch (\Throwable $th) {
             DB::rollBack();
         }
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Callback and webhook queues processed successfully.',
+        ]);
     }
 
     public function analyzePaymentResponse(Request $request, $provider_id)

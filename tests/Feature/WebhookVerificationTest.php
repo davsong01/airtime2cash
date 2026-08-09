@@ -9,6 +9,8 @@ use App\Http\Controllers\Providers\PaystackController;
 use App\Http\Controllers\Providers\SageController;
 use App\Models\Admin;
 use App\Models\API;
+use App\Models\Customer;
+use App\Models\TransactionLog;
 use App\Models\Webhook;
 use App\Models\User;
 use App\Services\WebhookService;
@@ -226,6 +228,138 @@ class WebhookVerificationTest extends TestCase
 
         $this->assertDatabaseMissing('webhooks', [
             'id' => $webhookIds[1],
+        ]);
+    }
+
+    public function test_analyze_callback_cron_processes_pending_webhooks_and_skips_final_transactions(): void
+    {
+        $this->ensureWebhookTableExists();
+
+        $provider = $this->seedProvider(PaystackController::class);
+        $user = User::factory()->create([
+            'firstname' => 'Cron',
+            'lastname' => 'Tester',
+            'email' => 'cron.tester@example.com',
+            'phone' => '08030000000',
+            'email_verified_at' => now(),
+        ]);
+
+        $customer = Customer::create([
+            'user_id' => $user->id,
+        ]);
+
+        $pendingTransaction = TransactionLog::create([
+            'status' => 'pending',
+            'reference_id' => 'REF-PENDING-001',
+            'transaction_id' => 'W2B-PENDING-001',
+            'payment_method' => 'wallet',
+            'customer_id' => $customer->id,
+            'customer_email' => $user->email,
+            'customer_name' => $user->name,
+            'customer_phone' => $user->phone,
+            'unique_element' => 'wallet2bank',
+            'discount' => 0,
+            'unit_price' => 500,
+            'amount' => 500,
+            'total_amount' => 605,
+            'balance_before' => 5000,
+            'balance_after' => 4395,
+            'quantity' => 1,
+            'request_data' => json_encode([]),
+            'api_response' => null,
+            'ip_address' => '127.0.0.1',
+            'domain_name' => 'localhost',
+            'api_id' => $provider->id,
+            'descr' => 'Wallet to bank transfer initiated.',
+            'provider_charge' => 105,
+        ]);
+
+        $finalTransaction = TransactionLog::create([
+            'status' => 'declined',
+            'reference_id' => 'REF-FINAL-001',
+            'transaction_id' => 'W2B-FINAL-001',
+            'payment_method' => 'wallet',
+            'customer_id' => $customer->id,
+            'customer_email' => $user->email,
+            'customer_name' => $user->name,
+            'customer_phone' => $user->phone,
+            'unique_element' => 'wallet2bank',
+            'discount' => 0,
+            'unit_price' => 400,
+            'amount' => 400,
+            'total_amount' => 505,
+            'balance_before' => 4395,
+            'balance_after' => 3890,
+            'quantity' => 1,
+            'request_data' => json_encode([]),
+            'api_response' => null,
+            'ip_address' => '127.0.0.1',
+            'domain_name' => 'localhost',
+            'api_id' => $provider->id,
+            'descr' => 'Already declined transaction.',
+            'provider_charge' => 105,
+        ]);
+
+        Webhook::create([
+            'api_id' => $provider->id,
+            'customer_id' => $customer->id,
+            'transaction_id' => $pendingTransaction->transaction_id,
+            'provider_reference' => 'PROVIDER-PENDING-001',
+            'request_ref' => $pendingTransaction->transaction_id,
+            'provider_status' => 'successful',
+            'processing_status' => 'pending',
+            'signature_valid' => true,
+            'headers' => ['x-test' => 'pending'],
+            'payload' => [
+                'transaction' => [
+                    'reference' => $pendingTransaction->transaction_id,
+                    'request_ref' => $pendingTransaction->transaction_id,
+                    'status' => 'successful',
+                    'details' => 'Completed by provider.',
+                ],
+            ],
+        ]);
+
+        Webhook::create([
+            'api_id' => $provider->id,
+            'customer_id' => $customer->id,
+            'transaction_id' => $finalTransaction->transaction_id,
+            'provider_reference' => 'PROVIDER-FINAL-001',
+            'request_ref' => $finalTransaction->transaction_id,
+            'provider_status' => 'successful',
+            'processing_status' => 'pending',
+            'signature_valid' => true,
+            'headers' => ['x-test' => 'final'],
+            'payload' => [
+                'transaction' => [
+                    'reference' => $finalTransaction->transaction_id,
+                    'request_ref' => $finalTransaction->transaction_id,
+                    'status' => 'successful',
+                    'details' => 'Should be ignored because transaction is already final.',
+                ],
+            ],
+        ]);
+
+        app(WebhookService::class)->analyzeWebhookResponse(10);
+
+        $this->assertDatabaseHas('transaction_logs', [
+            'transaction_id' => $pendingTransaction->transaction_id,
+            'status' => 'success',
+        ]);
+
+        $this->assertDatabaseHas('transaction_logs', [
+            'transaction_id' => $finalTransaction->transaction_id,
+            'status' => 'declined',
+        ]);
+
+        $this->assertDatabaseHas('webhooks', [
+            'transaction_id' => $pendingTransaction->transaction_id,
+            'processing_status' => 'processed',
+        ]);
+
+        $this->assertDatabaseHas('webhooks', [
+            'transaction_id' => $finalTransaction->transaction_id,
+            'processing_status' => 'processed',
         ]);
     }
 

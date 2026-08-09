@@ -86,30 +86,6 @@ class WebhookService
             $providerStatus = $this->extractProviderStatus($payload);
             $customerId = $this->resolveCustomerId($transactionId);
 
-            $duplicate = Webhook::query()
-                ->where('api_id', $provider->id)
-                ->where(function ($query) use ($providerReference, $requestRef, $transactionId) {
-                    if (filled($providerReference)) {
-                        $query->orWhere('provider_reference', $providerReference);
-                    }
-
-                    if (filled($requestRef)) {
-                        $query->orWhere('request_ref', $requestRef);
-                    }
-
-                    if (filled($transactionId)) {
-                        $query->orWhere('transaction_id', $transactionId);
-                    }
-                })
-                ->exists();
-
-            if ($duplicate) {
-                return response()->json([
-                    'status' => true,
-                    'message' => 'Duplicate webhook ignored.',
-                ], 200);
-            }
-
             $webhook = new Webhook();
 
             $webhook->fill([
@@ -125,6 +101,56 @@ class WebhookService
                 'payload' => $payload,
                 'last_error' => null,
             ]);
+
+            $existingWebhook = Webhook::query()
+                ->where('api_id', $provider->id)
+                ->where(function ($query) use ($providerReference, $requestRef, $transactionId) {
+                    if (filled($providerReference)) {
+                        $query->orWhere('provider_reference', $providerReference);
+                    }
+
+                    if (filled($requestRef)) {
+                        $query->orWhere('request_ref', $requestRef);
+                    }
+
+                    if (filled($transactionId)) {
+                        $query->orWhere('transaction_id', $transactionId);
+                    }
+                })
+                ->first();
+
+            if ($existingWebhook) {
+                $existingPayload = is_array($existingWebhook->payload) ? $existingWebhook->payload : json_decode((string) ($existingWebhook->payload ?? '{}'), true);
+                $samePayload = json_encode($existingPayload, JSON_UNESCAPED_SLASHES) === json_encode($payload, JSON_UNESCAPED_SLASHES);
+                $sameStatus = strtolower((string) $existingWebhook->provider_status) === strtolower((string) $providerStatus);
+
+                if ($this->transactionIsFinal($transactionId) || ($samePayload && $sameStatus)) {
+                    return response()->json([
+                        'status' => true,
+                        'message' => 'Duplicate webhook ignored.',
+                    ], 200);
+                }
+
+                DB::transaction(function () use ($existingWebhook, $customerId, $transactionId, $providerReference, $requestRef, $providerStatus, $headers, $payload) {
+                    $existingWebhook->update([
+                        'customer_id' => $customerId,
+                        'transaction_id' => $transactionId,
+                        'provider_reference' => $providerReference,
+                        'request_ref' => $requestRef,
+                        'provider_status' => $providerStatus,
+                        'processing_status' => 'pending',
+                        'signature_valid' => true,
+                        'headers' => $headers,
+                        'payload' => $payload,
+                        'last_error' => null,
+                    ]);
+                });
+
+                return response()->json([
+                    'status' => true,
+                    'message' => 'Webhook updated successfully.',
+                ], 200);
+            }
 
             DB::transaction(function () use ($webhook) {
                 $webhook->save();
@@ -243,5 +269,24 @@ class WebhookService
         }
 
         return null;
+    }
+
+    private function transactionIsFinal(?string $transactionId): bool
+    {
+        if (blank($transactionId)) {
+            return false;
+        }
+
+        $airtimeTransaction = Airtime2CashTransactions::where('transaction_id', $transactionId)->first();
+        if ($airtimeTransaction && in_array(strtolower((string) $airtimeTransaction->status), ['pending', 'processing', 'initiated'], true)) {
+            return false;
+        }
+
+        $transactionLog = TransactionLog::where('transaction_id', $transactionId)->first();
+        if ($transactionLog && in_array(strtolower((string) $transactionLog->status), ['pending', 'processing', 'initiated'], true)) {
+            return false;
+        }
+
+        return (bool) ($airtimeTransaction || $transactionLog);
     }
 }

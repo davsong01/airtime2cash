@@ -12,7 +12,7 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
-        $schedule->command('autosync:process-webhooks --limit=25')->everyMinute()->withoutOverlapping();
+        $schedule->command('process:webhooks --limit=25')->everyMinute()->withoutOverlapping();
     }
 
     /**
