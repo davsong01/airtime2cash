@@ -183,7 +183,7 @@ class APIController extends Controller
         }
 
         $response = $controller->pullBanks();
-        $banks = data_get($response, 'data', data_get($response, 'banks', []));
+        $banks = data_get($response, 'banks', data_get($response, 'data', []));
 
         if (! is_array($banks) && is_array($response) && array_is_list($response)) {
             $banks = $response;

@@ -248,7 +248,6 @@ class SageController extends BankTransferProviderController
 
         return [
             'status' => 'success',
-            'data' => $banks,
             'banks' => $banks,
             'api_response' => $response,
         ];
