@@ -734,6 +734,285 @@ class WebhookVerificationTest extends TestCase
         ]);
     }
 
+    public function test_monnify_pending_authorization_does_not_mark_success_when_transfer_status_is_still_pending(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+        ]);
+
+        Admin::create([
+            'user_id' => $user->id,
+            'permissions' => '',
+        ]);
+
+        $provider = API::create([
+            'name' => 'Monnify',
+            'slug' => 'monnify',
+            'status' => 'active',
+            'live_base_url' => 'https://api.monnify.com',
+            'sandbox_base_url' => 'https://sandbox.monnify.com',
+            'account_number' => '1234567890',
+            'secret_key' => 'monnify-secret',
+            'api_key' => 'monnify-api-key',
+            'is_bank_transfer' => true,
+        ]);
+
+        $customerUser = User::factory()->create([
+            'firstname' => 'Wrong',
+            'lastname' => 'OTP',
+            'email' => 'wrong.otp@example.com',
+            'phone' => '08050000000',
+            'email_verified_at' => now(),
+        ]);
+
+        $customer = Customer::create([
+            'user_id' => $customerUser->id,
+        ]);
+
+        $transaction = TransactionLog::create([
+            'status' => 'pending',
+            'reference_id' => 'REF-MONNIFY-OTP-PENDING',
+            'transaction_id' => 'W2B-MONNIFY-OTP-PENDING',
+            'payment_method' => 'wallet',
+            'customer_id' => $customer->id,
+            'customer_email' => $customerUser->email,
+            'customer_name' => $customerUser->name,
+            'customer_phone' => $customerUser->phone,
+            'unique_element' => 'wallet2bank',
+            'discount' => 0,
+            'unit_price' => 500,
+            'amount' => 500,
+            'total_amount' => 605,
+            'balance_before' => 5000,
+            'balance_after' => 4395,
+            'quantity' => 1,
+            'request_data' => json_encode([
+                'reference' => 'W2B-MONNIFY-OTP-PENDING',
+            ]),
+            'api_response' => json_encode([
+                'requestSuccessful' => false,
+                'responseCode' => '99',
+                'responseMessage' => 'PENDING_AUTHORIZATION',
+                'responseBody' => [
+                    'reference' => 'W2B-MONNIFY-OTP-PENDING',
+                    'status' => 'PENDING_AUTHORIZATION',
+                ],
+            ]),
+            'ip_address' => '127.0.0.1',
+            'domain_name' => 'localhost',
+            'api_id' => $provider->id,
+            'descr' => 'Wallet to Bank Transfer initiated.',
+            'provider_charge' => 105,
+        ]);
+
+        $fakeController = new class extends MonnifyController {
+            public function login()
+            {
+                return 'monnify-token';
+            }
+
+            public function authorizeTransfer(string $reference, string $authorizationCode): array
+            {
+                return [
+                    'status' => 'failed',
+                    'provider_status' => 'pending_authorization',
+                    'error' => 'Transaction not awaiting authorization',
+                    'api_response' => [
+                        'requestSuccessful' => false,
+                        'responseMessage' => 'Transaction not awaiting authorization',
+                        'responseCode' => 'D01',
+                    ],
+                    'request_data' => [
+                        'reference' => $reference,
+                        'authorizationCode' => $authorizationCode,
+                    ],
+                ];
+            }
+
+            public function singleTransferStatus(string $reference): array
+            {
+                return [
+                    'status' => 'pending',
+                    'provider_status' => 'PENDING_AUTHORIZATION',
+                    'api_response' => [
+                        'requestSuccessful' => true,
+                        'responseCode' => '0',
+                        'responseMessage' => 'success',
+                        'responseBody' => [
+                            'reference' => $reference,
+                            'status' => 'PENDING_AUTHORIZATION',
+                        ],
+                    ],
+                    'request_data' => [
+                        'reference' => $reference,
+                    ],
+                ];
+            }
+        };
+
+        $this->app->instance(MonnifyController::class, $fakeController);
+        $this->actingAs($user);
+
+        $request = Request::create('/', 'POST', [
+            'action' => 'authorize_monnify',
+            'authorization_code' => '096043',
+        ]);
+
+        $response = app(TransactionController::class)->resolvePendingTransactionAction($request, $transaction);
+
+        $this->assertTrue(method_exists($response, 'getSession'));
+        $this->assertDatabaseHas('transaction_logs', [
+            'id' => $transaction->id,
+            'status' => 'pending',
+        ]);
+        $this->assertDatabaseMissing('transaction_logs', [
+            'id' => $transaction->id,
+            'status' => 'success',
+        ]);
+
+        $storedTransaction = TransactionLog::find($transaction->id);
+        $apiResponse = json_decode((string) $storedTransaction?->api_response, true) ?: [];
+        $this->assertSame('PENDING_AUTHORIZATION', data_get($apiResponse, 'responseBody.status'));
+    }
+
+    public function test_monnify_authorization_error_is_shown_to_admin_even_when_status_remains_pending(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+        ]);
+
+        Admin::create([
+            'user_id' => $user->id,
+            'permissions' => '',
+        ]);
+
+        $provider = API::create([
+            'name' => 'Monnify',
+            'slug' => 'monnify',
+            'status' => 'active',
+            'live_base_url' => 'https://api.monnify.com',
+            'sandbox_base_url' => 'https://sandbox.monnify.com',
+            'account_number' => '1234567890',
+            'secret_key' => 'monnify-secret',
+            'api_key' => 'monnify-api-key',
+            'is_bank_transfer' => true,
+        ]);
+
+        $customerUser = User::factory()->create([
+            'firstname' => 'Error',
+            'lastname' => 'Shown',
+            'email' => 'error.shown@example.com',
+            'phone' => '08060000000',
+            'email_verified_at' => now(),
+        ]);
+
+        $customer = Customer::create([
+            'user_id' => $customerUser->id,
+        ]);
+
+        $transaction = TransactionLog::create([
+            'status' => 'pending',
+            'reference_id' => 'REF-MONNIFY-OTP-ERROR',
+            'transaction_id' => 'W2B-MONNIFY-OTP-ERROR',
+            'payment_method' => 'wallet',
+            'customer_id' => $customer->id,
+            'customer_email' => $customerUser->email,
+            'customer_name' => $customerUser->name,
+            'customer_phone' => $customerUser->phone,
+            'unique_element' => 'wallet2bank',
+            'discount' => 0,
+            'unit_price' => 500,
+            'amount' => 500,
+            'total_amount' => 605,
+            'balance_before' => 5000,
+            'balance_after' => 4395,
+            'quantity' => 1,
+            'request_data' => json_encode([
+                'reference' => 'W2B-MONNIFY-OTP-ERROR',
+            ]),
+            'api_response' => json_encode([
+                'requestSuccessful' => false,
+                'responseCode' => '99',
+                'responseMessage' => 'PENDING_AUTHORIZATION',
+                'responseBody' => [
+                    'reference' => 'W2B-MONNIFY-OTP-ERROR',
+                    'status' => 'PENDING_AUTHORIZATION',
+                ],
+            ]),
+            'ip_address' => '127.0.0.1',
+            'domain_name' => 'localhost',
+            'api_id' => $provider->id,
+            'descr' => 'Wallet to Bank Transfer initiated.',
+            'provider_charge' => 105,
+        ]);
+
+        $fakeController = new class extends MonnifyController {
+            public function login()
+            {
+                return 'monnify-token';
+            }
+
+            public function authorizeTransfer(string $reference, string $authorizationCode): array
+            {
+                return [
+                    'status' => 'failed',
+                    'provider_status' => 'failed',
+                    'error' => 'authorizationCode must be 6 digits',
+                    'api_response' => [
+                        'requestSuccessful' => false,
+                        'responseMessage' => 'authorizationCode must be 6 digits',
+                        'responseCode' => '99',
+                    ],
+                    'request_data' => [
+                        'reference' => $reference,
+                        'authorizationCode' => $authorizationCode,
+                    ],
+                ];
+            }
+
+            public function singleTransferStatus(string $reference): array
+            {
+                return [
+                    'status' => 'pending',
+                    'provider_status' => 'PENDING_AUTHORIZATION',
+                    'api_response' => [
+                        'requestSuccessful' => true,
+                        'responseCode' => '0',
+                        'responseMessage' => 'success',
+                        'responseBody' => [
+                            'reference' => $reference,
+                            'status' => 'PENDING_AUTHORIZATION',
+                        ],
+                    ],
+                    'request_data' => [
+                        'reference' => $reference,
+                    ],
+                ];
+            }
+        };
+
+        $this->app->instance(MonnifyController::class, $fakeController);
+        $this->actingAs($user);
+
+        $request = Request::create('/', 'POST', [
+            'action' => 'authorize_monnify',
+            'authorization_code' => '5555555555',
+        ]);
+
+        $response = app(TransactionController::class)->resolvePendingTransactionAction($request, $transaction);
+
+        $this->assertTrue(method_exists($response, 'getSession'));
+        $this->assertSame('authorizationCode must be 6 digits', $response->getSession()->get('error'));
+        $this->assertDatabaseHas('transaction_logs', [
+            'id' => $transaction->id,
+            'status' => 'pending',
+        ]);
+        $this->assertDatabaseMissing('transaction_logs', [
+            'id' => $transaction->id,
+            'status' => 'success',
+        ]);
+    }
+
     public function test_monnify_wallet_to_bank_requery_uses_single_transfer_status_endpoint(): void
     {
         $provider = API::create([

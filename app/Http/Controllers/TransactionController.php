@@ -2149,21 +2149,25 @@ class TransactionController extends Controller
         $reference = $this->monnifyTransferReference($transaction);
         $authorizationResponse = $controller->authorizeTransfer($reference, $authorizationCode);
         $statusResponse = $controller->singleTransferStatus($reference);
-        $response = data_get($statusResponse, 'api_response')
-            ? $statusResponse
-            : $authorizationResponse;
+        $response = $statusResponse;
 
-        $providerStatus = strtolower((string) data_get($response, 'provider_status', data_get($response, 'status', 'failed')));
-        $isSuccessful = in_array($providerStatus, ['successful', 'success', 'completed', 'authorized'], true)
-            || (bool) data_get($response, 'status', false) === true;
+        $providerStatus = strtolower((string) data_get($statusResponse, 'provider_status', data_get($statusResponse, 'status', 'failed')));
+        $responseStatus = strtolower((string) data_get($statusResponse, 'status', 'failed'));
+        $authorizationError = data_get($authorizationResponse, 'error', data_get($authorizationResponse, 'message'));
+        $statusError = data_get($statusResponse, 'error', data_get($statusResponse, 'message'));
+        $flashError = filled($authorizationError)
+            ? $authorizationError
+            : (filled($statusError) ? $statusError : 'Monnify OTP authorization failed.');
+        $isSuccessful = $responseStatus === 'success'
+            && in_array($providerStatus, ['successful', 'success', 'completed', 'authorized'], true);
         $isFailed = in_array($providerStatus, ['failed', 'rejected', 'declined', 'error', 'expired'], true)
-            || data_get($response, 'status') === 'failed';
+            || $responseStatus === 'failed';
 
         if ($isSuccessful) {
             $this->markTransactionResolved(
                 $transaction,
                 'success',
-                'Monnify transfer authorized successfully.',
+                'Transfer completed successfully.',
                 null,
                 $transaction->balance_after,
                 $providerStatus,
@@ -2178,27 +2182,19 @@ class TransactionController extends Controller
             $this->markTransactionResolved(
                 $transaction,
                 'failed',
-                'Monnify transfer failed after OTP authorization.',
-                data_get($response, 'error', data_get($response, 'message', data_get($authorizationResponse, 'error', data_get($authorizationResponse, 'message', 'Monnify OTP authorization failed.')))),
+                'Transfer could not be completed.',
+                $flashError,
                 $transaction->balance_before,
                 $providerStatus,
                 $response,
             );
 
-            return back()->with('error', data_get($response, 'error', data_get($response, 'message', data_get($authorizationResponse, 'error', data_get($authorizationResponse, 'message', 'Monnify OTP authorization failed.')))));
+            return back()->with('error', $flashError);
         }
 
-        $transaction->update([
-            'provider_status' => $providerStatus ?: 'pending_authorization',
-            'api_response' => json_encode([
-                'authorization_response' => $authorizationResponse,
-                'status_response' => $statusResponse,
-            ]),
-            'failure_reason' => data_get($response, 'error', data_get($response, 'message', data_get($authorizationResponse, 'error', data_get($authorizationResponse, 'message', null)))),
-            'descr' => 'Monnify transfer is still awaiting authorization.',
-        ]);
-
-        return back()->with('warning', 'Monnify transfer is still awaiting authorization.');
+        return filled($authorizationError)
+            ? back()->with('error', $authorizationError)
+            : back()->with('warning', 'Transfer is still awaiting authorization.');
     }
 
     private function resendPendingMonnifyOtp(TransactionLog $transaction)
