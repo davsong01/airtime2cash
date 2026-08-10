@@ -64,6 +64,7 @@ class SageController extends BankTransferProviderController
         }
 
         $url = rtrim($this->base_url, '/') . '/wallet/balance';
+
         $headers = [
             "Content-Type: application/json",
             "Authorization: Bearer " . $token,
@@ -193,7 +194,7 @@ class SageController extends BankTransferProviderController
 
         return [
             'status' => ((bool) data_get($response, 'success', false)) ? 'success' : 'failed',
-            'balance' => data_get($response, 'data.balance', 0),
+            'balance' => data_get($response, 'data.api_response.general_wallet.balance', 0),
             'currency' => data_get($response, 'data.currency', 'NGN'),
             'api_response' => $response,
         ];
