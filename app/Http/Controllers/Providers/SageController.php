@@ -191,11 +191,16 @@ class SageController extends BankTransferProviderController
     public function balance(): array
     {
         $response = $this->fetchWalletBalance();
+        $walletBalance = data_get($response, 'api_response.general_wallet.balance')
+            ?? data_get($response, 'data.api_response.general_wallet.balance')
+            ?? data_get($response, 'data.general_wallet.balance')
+            ?? data_get($response, 'general_wallet.balance')
+            ?? 0;
 
         return [
             'status' => ((bool) data_get($response, 'success', false)) ? 'success' : 'failed',
-            'balance' => data_get($response, 'data.api_response.general_wallet.balance', 0),
-            'currency' => data_get($response, 'data.currency', 'NGN'),
+            'balance' => (float) $walletBalance,
+            'currency' => data_get($response, 'currency', data_get($response, 'data.currency', 'NGN')),
             'api_response' => $response,
         ];
     }
