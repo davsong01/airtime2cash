@@ -165,10 +165,17 @@
                                                             $extraChargesTotal = $bandExtraCharges->sum(fn ($charge) => (float) ($charge['amount'] ?? 0)) + $additionalCharges->sum(fn ($charge) => (float) ($charge['amount'] ?? 0));
                                                             $totalFee = $baseTransferCharge + $extraChargesTotal;
                                                             $requestData = [];
+                                                            $apiResponseData = [];
                                                             if (!empty($transaction->request_data)) {
                                                                 $decodedRequestData = json_decode($transaction->request_data, true);
                                                                 if (is_array($decodedRequestData)) {
                                                                     $requestData = $decodedRequestData;
+                                                                }
+                                                            }
+                                                            if (!empty($transaction->api_response)) {
+                                                                $decodedApiResponse = json_decode($transaction->api_response, true);
+                                                                if (is_array($decodedApiResponse)) {
+                                                                    $apiResponseData = $decodedApiResponse;
                                                                 }
                                                             }
                                                             $legacyBankCode = $transaction->bank_code ?? data_get($requestData, 'bank_code') ?? data_get($requestData, 'bank') ?? null;
@@ -186,6 +193,22 @@
                                                                 ?: data_get($requestData, 'bank_code')
                                                                 ?: data_get($requestData, 'bank')
                                                                 ?: $legacyBankCode;
+                                                            $transactionProviderSlug = strtolower((string) ($transaction->api?->slug ?? ''));
+                                                            $transactionProviderStatus = strtolower((string) (
+                                                                data_get($apiResponseData, 'responseBody.status')
+                                                                ?: data_get($apiResponseData, 'provider_status')
+                                                                ?: data_get($apiResponseData, 'status')
+                                                                ?: $transaction->provider_status
+                                                                ?: ''
+                                                            ));
+                                                            $isMonnifyPendingAuthorization = $transactionProviderSlug === 'monnify'
+                                                                && $transactionProviderStatus === 'pending_authorization'
+                                                                && strtolower((string) ($transaction->status ?? '')) === 'pending';
+                                                            $monnifyTransferReference = data_get($requestData, 'reference')
+                                                                ?: data_get($requestData, 'transaction_id')
+                                                                ?: data_get($apiResponseData, 'responseBody.reference')
+                                                                ?: data_get($apiResponseData, 'responseBody.paymentReference')
+                                                                ?: $transaction->transaction_id;
 
                                                             if ($baseTransferCharge <= 0 && (float) $transaction->provider_charge > 0) {
                                                                 $baseTransferCharge = (float) $transaction->provider_charge;
@@ -537,6 +560,37 @@
                                                                 <div class="alert alert-info">
                                                                     This transaction is currently <strong>{{ ucfirst($transaction->status) }}</strong>. Please choose a resolution below so it does not remain open.
                                                                 </div>
+
+                                                                @if($isMonnifyPendingAuthorization)
+                                                                    <div class="border rounded-lg bg-light p-3 mb-3" style="border-left: 4px solid #f0ad4e !important;">
+                                                                        <div class="d-flex align-items-center justify-content-between flex-wrap mb-2">
+                                                                            <div class="mr-2">
+                                                                                <strong class="d-block text-dark">Monnify authorization</strong>
+                                                                                <small class="text-muted">Enter the OTP sent to the registered Monnify email to complete this transfer.</small>
+                                                                            </div>
+                                                                            <span class="badge badge-light-warning">OTP required</span>
+                                                                        </div>
+                                                                        <form method="POST" action="{{ route('admin.single.transaction.resolve', $transaction->id) }}" class="mt-2">
+                                                                            @csrf
+                                                                            <input type="hidden" name="action" value="authorize_monnify">
+                                                                            <div class="form-row">
+                                                                                <div class="form-group col-md-8 mb-2">
+                                                                                    <label for="authorization_code">Authorization OTP</label>
+                                                                                    <input type="text" name="authorization_code" id="authorization_code" class="form-control" inputmode="numeric" autocomplete="one-time-code" maxlength="20" placeholder="Enter OTP sent to the Monnify email" required>
+                                                                                </div>
+                                                                                <div class="form-group col-md-4 mb-2 d-flex align-items-end">
+                                                                                    <button type="submit" class="btn btn-dark btn-block" onclick="return confirm('Authorize this Monnify transfer with the entered OTP?')">Authorize</button>
+                                                                                </div>
+                                                                            </div>
+                                                                        </form>
+                                                                        <form method="POST" action="{{ route('admin.single.transaction.resolve', $transaction->id) }}">
+                                                                            @csrf
+                                                                            <input type="hidden" name="action" value="resend_monnify_otp">
+                                                                            <button type="submit" class="btn btn-link p-0 text-warning" onclick="return confirm('Request a new OTP from Monnify for this transfer?')">Resend OTP</button>
+                                                                        </form>
+                                                                        <small class="text-muted d-block mt-2">After submission, we verify Monnify's transfer status before we close this transaction.</small>
+                                                                    </div>
+                                                                @endif
 
                                                                 <div class="row">
                                                                     <div class="col-lg-6 mb-3">

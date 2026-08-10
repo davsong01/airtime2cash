@@ -32,6 +32,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use RuntimeException;
 use Throwable;
@@ -1826,7 +1827,7 @@ class TransactionController extends Controller
 
     public function singleTransactionView(TransactionLog $transaction)
     {
-        $transaction->loadMissing(['bank']);
+        $transaction->loadMissing(['bank', 'api']);
 
         return view('admin.transaction.single_transaction', compact('transaction'));
     }
@@ -1931,14 +1932,19 @@ class TransactionController extends Controller
     public function resolvePendingTransactionAction(Request $request, TransactionLog $transaction)
     {
         $validated = $request->validate([
-            'action' => ['required', 'in:credit_customer,failed,successful,process'],
+            'action' => ['required', 'in:credit_customer,failed,successful,process,authorize_monnify,resend_monnify_otp'],
             'amount' => ['nullable', 'numeric', 'min:0'],
             'reason' => ['nullable', 'string', 'max:500'],
+            'authorization_code' => ['nullable', 'string', 'max:20'],
         ]);
 
+        $transaction->loadMissing(['api', 'customer.user', 'bank', 'product']);
         $status = strtolower((string) ($transaction->status ?? ''));
+        $providerStatus = $this->transactionProviderStatus($transaction);
+        $providerSlug = strtolower((string) ($transaction->api?->slug ?? ''));
+        $isMonnifyPendingAuthorization = $providerSlug === 'monnify' && $providerStatus === 'pending_authorization';
 
-        if (! in_array($status, ['pending', 'initiated', 'processing'], true)) {
+        if (! in_array($status, ['pending', 'initiated', 'processing'], true) && ! ($isMonnifyPendingAuthorization && in_array($validated['action'], ['authorize_monnify', 'resend_monnify_otp'], true))) {
             return back()->with('error', 'Only pending transactions can be resolved from this modal.');
         }
 
@@ -1960,6 +1966,11 @@ class TransactionController extends Controller
                     $validated['reason'] ?? 'Manually marked as successful by ADMIN'
                 ),
                 'process' => $this->resolvePendingTransactionByProvider($transaction),
+                'authorize_monnify' => $this->authorizePendingMonnifyTransaction(
+                    $transaction,
+                    (string) ($validated['authorization_code'] ?? '')
+                ),
+                'resend_monnify_otp' => $this->resendPendingMonnifyOtp($transaction),
                 default => back()->with('error', 'Unsupported resolution action.'),
             };
         } catch (Throwable $exception) {
@@ -2035,6 +2046,10 @@ class TransactionController extends Controller
             return back()->with('error', 'Unable to resolve the transaction provider controller.');
         }
 
+        if (strtolower((string) ($provider->slug ?? '')) === 'monnify' && $this->transactionProviderStatus($transaction) === 'pending_authorization') {
+            return back()->with('warning', 'This Monnify transfer is waiting for OTP authorization. Use the Monnify OTP actions in the modal.');
+        }
+
         $response = null;
         $transactionType = strtolower((string) ($transaction->product?->type ?? $transaction->unique_element ?? $transaction->reason ?? ''));
 
@@ -2067,6 +2082,8 @@ class TransactionController extends Controller
                 'Transaction processed successfully after provider verification.',
                 null,
                 $transaction->balance_after,
+                $providerStatus,
+                $response,
             );
 
             return back()->with('message', 'Transaction processed successfully.');
@@ -2080,6 +2097,8 @@ class TransactionController extends Controller
                 'Transaction failed after provider verification.',
                 data_get($response, 'message', 'Transaction failed after provider verification.'),
                 $transaction->balance_before,
+                $providerStatus,
+                $response,
             );
 
             return back()->with('message', 'Transaction failed after provider verification.');
@@ -2091,9 +2110,129 @@ class TransactionController extends Controller
             'Provider still returned a pending response after requery.',
             data_get($response, 'message', 'Provider still returned a pending response after requery.'),
             $transaction->balance_after,
+            $providerStatus,
+            $response,
         );
 
         return back()->with('warning', 'Provider still returned a pending response. The transaction remains pending.');
+    }
+
+    private function authorizePendingMonnifyTransaction(TransactionLog $transaction, string $authorizationCode)
+    {
+        $provider = $transaction->api ?: API::query()
+            ->whereKey(getSettings()->bank_transfer_provider_id)
+            ->where('status', 'active')
+            ->first();
+
+        if (! $provider || strtolower((string) ($provider->slug ?? '')) !== 'monnify') {
+            return back()->with('error', 'This transaction is not attached to Monnify.');
+        }
+
+        if ($this->transactionProviderStatus($transaction) !== 'pending_authorization') {
+            return back()->with('error', 'This Monnify transaction is not waiting for OTP authorization.');
+        }
+
+        if (blank($authorizationCode)) {
+            return back()->with('error', 'Please enter the OTP sent to the Monnify registered email address.');
+        }
+
+        $controller = resolveProviderController($provider);
+
+        if (! $controller || ! method_exists($controller, 'authorizeTransfer')) {
+            return back()->with('error', 'Monnify OTP authorization is not available on this provider controller.');
+        }
+
+        if (! method_exists($controller, 'singleTransferStatus')) {
+            return back()->with('error', 'Monnify transfer status lookup is not available on this provider controller.');
+        }
+
+        $reference = $this->monnifyTransferReference($transaction);
+        $authorizationResponse = $controller->authorizeTransfer($reference, $authorizationCode);
+        $statusResponse = $controller->singleTransferStatus($reference);
+        $response = data_get($statusResponse, 'api_response')
+            ? $statusResponse
+            : $authorizationResponse;
+
+        $providerStatus = strtolower((string) data_get($response, 'provider_status', data_get($response, 'status', 'failed')));
+        $isSuccessful = in_array($providerStatus, ['successful', 'success', 'completed', 'authorized'], true)
+            || (bool) data_get($response, 'status', false) === true;
+        $isFailed = in_array($providerStatus, ['failed', 'rejected', 'declined', 'error', 'expired'], true)
+            || data_get($response, 'status') === 'failed';
+
+        if ($isSuccessful) {
+            $this->markTransactionResolved(
+                $transaction,
+                'success',
+                'Monnify transfer authorized successfully.',
+                null,
+                $transaction->balance_after,
+                $providerStatus,
+                $response,
+            );
+
+            return back()->with('message', 'Monnify transfer authorized successfully.');
+        }
+
+        if ($isFailed) {
+            $this->refundResolvedTransactionIfNeeded($transaction, 'Monnify transfer failed after OTP authorization.');
+            $this->markTransactionResolved(
+                $transaction,
+                'failed',
+                'Monnify transfer failed after OTP authorization.',
+                data_get($response, 'error', data_get($response, 'message', data_get($authorizationResponse, 'error', data_get($authorizationResponse, 'message', 'Monnify OTP authorization failed.')))),
+                $transaction->balance_before,
+                $providerStatus,
+                $response,
+            );
+
+            return back()->with('error', data_get($response, 'error', data_get($response, 'message', data_get($authorizationResponse, 'error', data_get($authorizationResponse, 'message', 'Monnify OTP authorization failed.')))));
+        }
+
+        $transaction->update([
+            'provider_status' => $providerStatus ?: 'pending_authorization',
+            'api_response' => json_encode([
+                'authorization_response' => $authorizationResponse,
+                'status_response' => $statusResponse,
+            ]),
+            'failure_reason' => data_get($response, 'error', data_get($response, 'message', data_get($authorizationResponse, 'error', data_get($authorizationResponse, 'message', null)))),
+            'descr' => 'Monnify transfer is still awaiting authorization.',
+        ]);
+
+        return back()->with('warning', 'Monnify transfer is still awaiting authorization.');
+    }
+
+    private function resendPendingMonnifyOtp(TransactionLog $transaction)
+    {
+        $provider = $transaction->api ?: API::query()
+            ->whereKey(getSettings()->bank_transfer_provider_id)
+            ->where('status', 'active')
+            ->first();
+
+        if (! $provider || strtolower((string) ($provider->slug ?? '')) !== 'monnify') {
+            return back()->with('error', 'This transaction is not attached to Monnify.');
+        }
+
+        if ($this->transactionProviderStatus($transaction) !== 'pending_authorization') {
+            return back()->with('error', 'Only Monnify transfers awaiting authorization can request a new OTP.');
+        }
+
+        $controller = resolveProviderController($provider);
+
+        if (! $controller || ! method_exists($controller, 'resendOtp')) {
+            return back()->with('error', 'Monnify OTP resend is not available on this provider controller.');
+        }
+
+        $reference = $this->monnifyTransferReference($transaction);
+        $response = $controller->resendOtp($reference);
+        $providerStatus = strtolower((string) data_get($response, 'provider_status', data_get($response, 'status', 'failed')));
+        $isSuccessful = in_array($providerStatus, ['successful', 'success', 'resent'], true)
+            || (bool) data_get($response, 'status', false) === true;
+
+        if ($isSuccessful) {
+            return back()->with('message', 'Monnify OTP has been resent to the registered email address.');
+        }
+
+        return back()->with('error', data_get($response, 'error', data_get($response, 'message', 'Unable to resend the Monnify OTP at the moment.')));
     }
 
     private function refundResolvedTransactionIfNeeded(TransactionLog $transaction, string $reason): void
@@ -2126,16 +2265,79 @@ class TransactionController extends Controller
         $wallet->updateCustomerWallet($user, $amount, 'credit');
     }
 
-    private function markTransactionResolved(TransactionLog $transaction, string $status, string $descr, ?string $failureReason = null, ?float $balanceAfter = null): void
+    private function markTransactionResolved(TransactionLog $transaction, string $status, string $descr, ?string $failureReason = null, ?float $balanceAfter = null, ?string $providerStatus = null, mixed $apiResponse = null): void
     {
-        $transaction->update([
+        $updates = [
             'status' => $status,
             'user_status' => $status,
             'descr' => $descr,
             'failure_reason' => $failureReason,
-            'admin_id' => auth()->user()->admin->id ?? null,
+            'admin_id' => data_get(auth()->user(), 'admin.id'),
             'balance_after' => $balanceAfter ?? $transaction->balance_after,
-        ]);
+        ];
+
+        if ($providerStatus !== null && Schema::hasColumn('transaction_logs', 'provider_status')) {
+            $updates['provider_status'] = $providerStatus;
+        }
+
+        if ($apiResponse !== null) {
+            $updates['api_response'] = is_array($apiResponse) ? json_encode($apiResponse) : $apiResponse;
+        }
+
+        $transaction->update($updates);
+    }
+
+    private function monnifyTransferReference(TransactionLog $transaction): string
+    {
+        $requestData = $this->decodedTransactionRequestData($transaction);
+        $responseData = $this->decodedTransactionApiResponse($transaction);
+
+        return (string) (
+            data_get($responseData, 'responseBody.reference')
+            ?: data_get($responseData, 'responseBody.paymentReference')
+            ?: data_get($responseData, 'reference')
+            ?: data_get($requestData, 'reference')
+            ?: data_get($requestData, 'transaction_id')
+            ?: data_get($transaction, 'transaction_id')
+        );
+    }
+
+    private function decodedTransactionRequestData(TransactionLog $transaction): array
+    {
+        $requestData = $transaction->request_data ?? [];
+
+        if (is_array($requestData)) {
+            return $requestData;
+        }
+
+        $decoded = json_decode((string) $requestData, true);
+
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    private function decodedTransactionApiResponse(TransactionLog $transaction): array
+    {
+        $apiResponse = $transaction->api_response ?? [];
+
+        if (is_array($apiResponse)) {
+            return $apiResponse;
+        }
+
+        $decoded = json_decode((string) $apiResponse, true);
+
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    private function transactionProviderStatus(TransactionLog $transaction): string
+    {
+        $apiResponse = $this->decodedTransactionApiResponse($transaction);
+        $providerStatus = data_get($apiResponse, 'responseBody.status')
+            ?: data_get($apiResponse, 'provider_status')
+            ?: data_get($apiResponse, 'status')
+            ?: data_get($transaction, 'provider_status')
+            ?: '';
+
+        return strtolower((string) $providerStatus);
     }
 
     public function queryWallet(Request $request, TransactionLog $transactionlog)

@@ -41,6 +41,12 @@ class MonnifyController extends BankTransferProviderController
         ];
     }
 
+    private function sourceAccountNumber(): ?string
+    {
+        return data_get($this->api(), 'account_number')
+            ?: data_get($this->api(), 'contract_id');
+    }
+
     public function verifyWebhookSignature(Request $request): array
     {
         $payload = normalizeWebhookPayload($request);
@@ -84,7 +90,7 @@ class MonnifyController extends BankTransferProviderController
             return ['status' => 'failed', 'message' => 'Could not authenticate with Monnify.'];
         }
 
-        $accountNumber = data_get($this->api(), 'account_number') ?: data_get($this->api(), 'contract_id');
+        $accountNumber = $this->sourceAccountNumber();
 
         if (blank($accountNumber)) {
             return ['status' => 'failed', 'message' => 'Monnify wallet account number is not configured on this provider.'];
@@ -149,10 +155,21 @@ class MonnifyController extends BankTransferProviderController
             ];
         }
 
+        $sourceAccountNumber = $this->sourceAccountNumber();
+
+        if (blank($sourceAccountNumber)) {
+            return [
+                'status' => 'failed',
+                'error' => 'Monnify sourceAccountNumber is not configured on this provider.',
+                'request_data' => $data,
+            ];
+        }
+
         $payload = [
             'amount' => (float) $data['amount'],
             'reference' => $data['transaction_id'] ?? $this->generateRequestId(),
             'narration' => $data['narration'] ?? ('Transfer from ' . config('app.name')),
+            'sourceAccountNumber' => $sourceAccountNumber,
             'destinationBankCode' => $data['provider_bank_code'] ?? $data['bank_code'] ?? null,
             'destinationAccountNumber' => $data['account_number'] ?? null,
             'destinationAccountName' => $data['account_name'] ?? null,
@@ -174,25 +191,97 @@ class MonnifyController extends BankTransferProviderController
         $success = in_array($providerStatus, ['success', 'successful', 'completed'], true)
             || (($response['requestSuccessful'] ?? false) === true && (string) ($response['responseCode'] ?? '') === '0' && in_array($providerStatus, ['success', 'completed'], true));
         $pending = in_array($providerStatus, ['pending', 'processing', 'initiated', 'awaiting_processing', 'in_progress', 'pending_authorization'], true);
+        $requiresAuthorization = $providerStatus === 'pending_authorization';
 
         return [
             'status' => $success ? 'success' : ($pending ? 'pending' : 'failed'),
             'provider_status' => $providerStatus ?: ($success ? 'success' : 'failed'),
+            'requires_authorization' => $requiresAuthorization,
             'error' => $success ? null : ($pending ? null : (data_get($response, 'responseMessage') ?? 'Monnify transfer failed.')),
             'request_data' => $payload,
             'api_response' => $response,
         ];
     }
 
-    public function requery($transaction)
+    public function authorizeTransfer(string $reference, string $authorizationCode): array
     {
         $token = $this->login();
+
         if (empty($token)) {
-            return null;
+            return [
+                'status' => 'failed',
+                'error' => 'Could not authenticate with Monnify.',
+                'request_data' => [
+                    'reference' => $reference,
+                ],
+            ];
+        }
+
+        if (blank($reference) || blank($authorizationCode)) {
+            return [
+                'status' => 'failed',
+                'error' => 'Reference and authorization code are required.',
+                'request_data' => [
+                    'reference' => $reference,
+                ],
+            ];
+        }
+
+        $payload = [
+            'reference' => $reference,
+            'authorizationCode' => $authorizationCode,
+        ];
+
+        $response = $this->basicApiCall(
+            rtrim((string) $this->baseUrl(), '/') . '/api/v2/disbursements/single/validate-otp',
+            json_encode($payload),
+            [
+                'Content-Type: application/json',
+                'Authorization: Bearer ' . $token,
+            ],
+            'POST'
+        );
+
+        $providerStatus = strtolower((string) data_get($response, 'responseBody.status', data_get($response, 'status', 'failed')));
+        $success = (($response['requestSuccessful'] ?? false) === true && (string) ($response['responseCode'] ?? '') === '0')
+            || in_array($providerStatus, ['success', 'successful', 'completed', 'authorized'], true);
+        $pending = in_array($providerStatus, ['pending', 'pending_authorization', 'awaiting_processing', 'in_progress'], true);
+
+        return [
+            'status' => $success ? 'success' : ($pending ? 'pending' : 'failed'),
+            'provider_status' => $providerStatus ?: ($success ? 'success' : 'failed'),
+            'error' => $success ? null : ($pending ? null : (data_get($response, 'responseMessage') ?? 'Monnify OTP authorization failed.')),
+            'request_data' => $payload,
+            'api_response' => $response,
+        ];
+    }
+
+    public function singleTransferStatus(string $reference): array
+    {
+        $token = $this->login();
+
+        if (empty($token)) {
+            return [
+                'status' => 'failed',
+                'error' => 'Could not authenticate with Monnify.',
+                'request_data' => [
+                    'reference' => $reference,
+                ],
+            ];
+        }
+
+        if (blank($reference)) {
+            return [
+                'status' => 'failed',
+                'error' => 'Reference is required.',
+                'request_data' => [
+                    'reference' => $reference,
+                ],
+            ];
         }
 
         $response = $this->basicApiCall(
-            rtrim((string) $this->baseUrl(), '/') . '/api/v2/disbursements/search-transactions?reference=' . urlencode($transaction->transaction_id),
+            rtrim((string) $this->baseUrl(), '/') . '/api/v2/disbursements/single/summary?reference=' . urlencode($reference),
             [],
             [
                 'Content-Type: application/json',
@@ -201,15 +290,90 @@ class MonnifyController extends BankTransferProviderController
             'GET'
         );
 
-        $providerStatus = strtolower((string) data_get($response, 'responseBody.status', data_get($response, 'responseBody.paymentStatus', data_get($response, 'status', 'pending'))));
+        $providerStatus = strtolower((string) data_get($response, 'responseBody.status', data_get($response, 'status', 'failed')));
+        $success = (($response['requestSuccessful'] ?? false) === true && (string) ($response['responseCode'] ?? '') === '0')
+            || in_array($providerStatus, ['success', 'successful', 'completed'], true);
+        $pending = in_array($providerStatus, ['pending', 'pending_authorization', 'awaiting_processing', 'in_progress', 'processing'], true);
+
+        return [
+            'status' => $success ? 'success' : ($pending ? 'pending' : 'failed'),
+            'provider_status' => $providerStatus ?: ($success ? 'success' : 'failed'),
+            'error' => $success ? null : ($pending ? null : (data_get($response, 'responseMessage') ?? 'Monnify transfer status check failed.')),
+            'request_data' => [
+                'reference' => $reference,
+            ],
+            'api_response' => $response,
+        ];
+    }
+
+    public function resendOtp(string $reference): array
+    {
+        $token = $this->login();
+
+        if (empty($token)) {
+            return [
+                'status' => 'failed',
+                'error' => 'Could not authenticate with Monnify.',
+                'request_data' => [
+                    'reference' => $reference,
+                ],
+            ];
+        }
+
+        if (blank($reference)) {
+            return [
+                'status' => 'failed',
+                'error' => 'Reference is required.',
+                'request_data' => [
+                    'reference' => $reference,
+                ],
+            ];
+        }
+
+        $payload = [
+            'reference' => $reference,
+        ];
+
+        $response = $this->basicApiCall(
+            rtrim((string) $this->baseUrl(), '/') . '/api/v2/disbursements/single/resend-otp',
+            json_encode($payload),
+            [
+                'Content-Type: application/json',
+                'Authorization: Bearer ' . $token,
+            ],
+            'POST'
+        );
+
+        $providerStatus = strtolower((string) data_get($response, 'responseBody.status', data_get($response, 'status', 'failed')));
+        $success = (($response['requestSuccessful'] ?? false) === true && (string) ($response['responseCode'] ?? '') === '0')
+            || in_array($providerStatus, ['success', 'successful', 'resent'], true);
+
+        return [
+            'status' => $success ? 'success' : 'failed',
+            'provider_status' => $providerStatus ?: ($success ? 'success' : 'failed'),
+            'error' => $success ? null : (data_get($response, 'responseMessage') ?? 'Monnify OTP resend failed.'),
+            'request_data' => $payload,
+            'api_response' => $response,
+        ];
+    }
+
+    public function requery($transaction)
+    {
+        $reference = $transaction->transaction_id
+            ?: data_get($transaction, 'request_data.reference')
+            ?: data_get($transaction, 'api_response.responseBody.reference')
+            ?: data_get($transaction, 'reference_id');
+
+        $response = $this->singleTransferStatus((string) $reference);
+        $providerStatus = strtolower((string) data_get($response, 'provider_status', data_get($response, 'status', 'pending')));
 
         return [
             'status' => in_array($providerStatus, ['success', 'successful', 'completed'], true),
-            'api_status' => (bool) data_get($response, 'requestSuccessful', false),
+            'api_status' => (bool) data_get($response, 'api_response.requestSuccessful', false),
             'provider_status' => $providerStatus,
             'api_response' => $response,
-            'payload' => ['reference' => $transaction->transaction_id],
-            'message' => data_get($response, 'responseMessage', data_get($response, 'message')),
+            'payload' => ['reference' => $reference],
+            'message' => data_get($response, 'api_response.responseMessage', data_get($response, 'error', data_get($response, 'message'))),
         ];
     }
 
