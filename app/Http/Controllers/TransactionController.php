@@ -544,6 +544,10 @@ class TransactionController extends Controller
             return back()->with('error', 'The selected product/service does not seem to exist, kindly try again');
         }
 
+        $request->validate([
+            'transfer_mode' => ['nullable', 'in:manual,auto_share'],
+        ]);
+
         $providerMin = 60;
         $amount = (float) $this->removeCharsInAmount($request->amount);
         $chargeDetails = getBankTransferChargeDetails($amount);
@@ -625,6 +629,7 @@ class TransactionController extends Controller
         $request['unique_element'] = 'Wallet2Bank';
         $request['discount'] = 0;
         $request['api_id'] = $chargeDetails['provider_id'] ?? getSettings()->bank_transfer_provider_id ?? null;
+        $request['transfer_mode'] = $request->input('transfer_mode', 'auto_share');
 
         $wallet = new WalletController();
 
@@ -634,7 +639,9 @@ class TransactionController extends Controller
             $request['balance_after'] = $request['balance_before'] - $request['total_amount'];
             $request['status'] = 'pending';
             $request['user_status'] = 'pending';
-            $request['descr'] = 'Wallet to Bank Transfer initiated.';
+            $request['descr'] = $request['transfer_mode'] === 'manual'
+                ? 'Wallet to Bank Transfer initiated for manual processing.'
+                : 'Wallet to Bank Transfer initiated.';
 
             $transaction = $this->logTransaction($request->all());
 
@@ -650,6 +657,69 @@ class TransactionController extends Controller
             Log::error(['Transaction Error' => 'Message: ' . $th->getMessage() . ' File: ' . $th->getFile() . ' Line: ' . $th->getLine()]);
 
             return back()->with('error', 'An error occured, please try again later');
+        }
+
+        if ($request['transfer_mode'] === 'manual') {
+            try {
+                $message = "Hello Admin, I want to request a wallet to bank transfer on " . config('app.name') . ". Please find below details of the transaction:\n\n" .
+                    "*Name:* " . auth()->user()->name . "\n" .
+                    "*Amount to Transfer:* " . getSettings()->currency . number_format($transaction->amount, 2) . "\n" .
+                    "*Transfer Fee:* " . getSettings()->currency . number_format((float) $transaction->provider_charge, 2) . "\n" .
+                    "*Total Debit:* " . getSettings()->currency . number_format($transaction->total_amount, 2) . "\n" .
+                    "*Transfer Mode:* Manual Transfer\n" .
+                    "*Transaction ID:* " . $transaction->transaction_id . "\n" .
+                    "*Bank Name:* " . $bank->bank_name . "\n" .
+                    "*Account Name:* " . $request->account_name . "\n" .
+                    "*Account Number:* " . $request->account_number . "\n" .
+                    "*Transaction Date:* " . date("M jS, Y g:iA", strtotime($transaction->created_at)) . "\n\n" .
+                    "I am aware that manual resolution is subject to an admin being online and may take longer during busy periods.";
+
+                $subject = "Wallet to Bank Manual Transfer Alert";
+                $body = '<p>Hello ' . e(auth()->user()->name) . ',</p>';
+                $body .= '<p style="line-height: 2;">Your wallet to bank transfer request has been received and queued for manual processing on ' . e(config('app.name')) . '.<br>
+                    Please find below the details of the transaction:</p>';
+                $body .= '
+                    <p style="line-height: 1.8;">
+                    <strong>Amount to Transfer:</strong> ' . e(getSettings()->currency) . number_format($transaction->amount, 2) . '<br>
+                    <strong>Transfer Fee:</strong> ' . e(getSettings()->currency) . number_format((float) $transaction->provider_charge, 2) . '<br>
+                    <strong>Total Debit:</strong> ' . e(getSettings()->currency) . number_format($transaction->total_amount, 2) . '<br>
+                    <strong>Transfer Method:</strong> Manual Transfer<br>
+                    <strong>Transaction ID:</strong> ' . e($transaction->transaction_id) . '<br>
+                    <strong>Bank Name:</strong> ' . e($bank->bank_name) . '<br>
+                    <strong>Account Name:</strong> ' . e($request->account_name) . '<br>
+                    <strong>Account Number:</strong> ' . e($request->account_number) . '<br>
+                    <strong>Transaction Date:</strong> ' . date("M jS, Y g:iA", strtotime($transaction->created_at)) . '<br>';
+                $body .= '<br>Warm Regards,<br>' . e(config('app.name')) . '.</p>';
+
+                try {
+                    logEmails(auth()->user()->email, $subject, $body);
+                } catch (\Throwable $emailException) {
+                    Log::warning('Wallet-to-bank manual email log failed.', [
+                        'message' => $emailException->getMessage(),
+                        'transaction_id' => $transaction->transaction_id,
+                        'user_id' => auth()->id(),
+                    ]);
+                }
+
+                if (getSettings()->a2cash_chat_engine == 'telegram') {
+                    $chatLink = "https://t.me/" . ltrim(getSettings()->telegram_username, '@') . "?text=" . urlencode($message);
+                } else {
+                    $chatLink = "https://api.whatsapp.com/send?phone=" . getSettings()->whatsapp_number . "&text=" . urlencode($message);
+                }
+
+                return redirect()->away($chatLink);
+            } catch (\Throwable $th) {
+                Log::error('Wallet-to-bank manual handoff failed.', [
+                    'message' => $th->getMessage(),
+                    'file' => $th->getFile(),
+                    'line' => $th->getLine(),
+                    'transaction_id' => $transaction->transaction_id,
+                    'user_id' => auth()->id(),
+                ]);
+
+                return redirect(route('transaction.status', $transaction->transaction_id))
+                    ->with('warning', 'Your manual transfer request was created, but the WhatsApp handoff could not be opened. Please contact support with your transaction ID.');
+            }
         }
 
         try {

@@ -1,4 +1,5 @@
 @php $verifiable = verifiableUniqueElements(); @endphp
+@php $defaultTransferMode = old('transfer_mode', 'auto_share'); @endphp
 @extends('sneat.layouts.app')
 @section('title', $category->seo_title ?? 'Wallet to Bank Transfer')
 
@@ -89,6 +90,86 @@
             border-top: 1px solid rgba(148, 163, 184, .22);
             font-weight: 700;
         }
+
+        .transfer-mode-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: .85rem;
+        }
+
+        .transfer-mode-input {
+            position: absolute;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .transfer-mode-option {
+            display: flex;
+            min-height: 94px;
+            padding: 1rem;
+            align-items: center;
+            gap: .85rem;
+            border: 1px solid rgba(148, 163, 184, .18);
+            border-radius: 1rem;
+            background: rgba(255, 255, 255, .82);
+            cursor: pointer;
+            transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+        }
+
+        .transfer-mode-option:hover {
+            transform: translateY(-2px);
+            border-color: rgba(37, 99, 235, .34);
+            box-shadow: 0 .9rem 1.5rem rgba(37, 99, 235, .08);
+        }
+
+        .transfer-mode-input:checked + .transfer-mode-option {
+            border-color: rgba(var(--bs-primary-rgb), .8);
+            background: linear-gradient(135deg, rgba(var(--bs-primary-rgb), .1), rgba(14, 165, 233, .04));
+            box-shadow: 0 0 0 .2rem rgba(var(--bs-primary-rgb), .08);
+        }
+
+        .transfer-mode-badge {
+            display: inline-flex;
+            width: 42px;
+            height: 42px;
+            flex: 0 0 auto;
+            align-items: center;
+            justify-content: center;
+            border-radius: 14px;
+            color: #fff;
+            font-size: 1.1rem;
+            background: linear-gradient(145deg, #2563eb, #0ea5e9);
+        }
+
+        .transfer-mode-option strong,
+        .transfer-mode-option small {
+            display: block;
+        }
+
+        .transfer-mode-option small {
+            margin-top: .18rem;
+            color: var(--bs-secondary-color);
+            line-height: 1.45;
+        }
+
+        .manual-resolution-note {
+            padding: .9rem 1rem;
+            border: 1px solid rgba(245, 158, 11, .28);
+            border-radius: .9rem;
+            background: rgba(255, 251, 235, .95);
+            color: #92400e;
+        }
+
+        [data-bs-theme="dark"] .manual-resolution-note {
+            color: #fcd34d;
+            background: rgba(120, 53, 15, .34);
+        }
+
+        @media (max-width: 767.98px) {
+            .transfer-mode-grid {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 @endsection
 
@@ -127,6 +208,34 @@
                     <form action="{{ route('initialize.wallet2banktransaction', $product->id) }}" method="POST" onsubmit="return confirm('I have entered correct details');" class="customer-modern-form">
                         @csrf
                         <div class="row g-3">
+                            <div class="col-12">
+                                <label class="form-label d-block mb-2">Transfer method</label>
+                                <div class="transfer-mode-grid">
+                                    <div>
+                                        <input class="transfer-mode-input" type="radio" name="transfer_mode" id="transfer-mode-auto" value="auto_share" @checked($defaultTransferMode === 'auto_share')>
+                                        <label class="transfer-mode-option" for="transfer-mode-auto">
+                                            <span class="transfer-mode-badge"><i class="bx bx-bolt-circle"></i></span>
+                                            <span>
+                                                <strong>Auto Transfer</strong>
+                                                <small>Use the active provider for a faster settlement.</small>
+                                            </span>
+                                        </label>
+                                    </div>
+                                    <div>
+                                        <input class="transfer-mode-input" type="radio" name="transfer_mode" id="transfer-mode-manual" value="manual" @checked($defaultTransferMode === 'manual')>
+                                        <label class="transfer-mode-option" for="transfer-mode-manual">
+                                            <span class="transfer-mode-badge"><i class="bx bx-hand"></i></span>
+                                            <span>
+                                                <strong>Manual Transfer</strong>
+                                                <small>Queued for admin review and sent to WhatsApp for manual processing.</small>
+                                            </span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="manual-resolution-note mt-3" id="manual-resolution-note" style="display:none">
+                                    Manual transfers depend on an admin being online and can take longer when traffic is high.
+                                </div>
+                            </div>
                             <div class="col-12">
                                 @if(!$canWithdraw)
                                     <div class="alert alert-warning">
@@ -203,7 +312,7 @@
                                 <label for="account_name" class="form-label">Account name</label>
                                 <input class="form-control" id="account_name" name="account_name" type="text" required>
                             </div>
-                            <div class="col-12">
+                            <div class="col-12" id="verify-bank-section">
                                 <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mt-2">
                                     <small class="text-danger">Please ensure the bank details are correct before you proceed.</small>
                                     <button type="button" class="btn btn-outline-info btn-sm" id="verify-bank-details-btn">Verify Bank Details</button>
@@ -243,6 +352,23 @@ document.addEventListener('DOMContentLoaded', function () {
     const submitButton = document.getElementById('transfer-submit');
     const verifyBankButton = document.getElementById('verify-bank-details-btn');
     const verifyBankResult = document.getElementById('bank-verify-result');
+    const verifyBankSection = document.getElementById('verify-bank-section');
+    const manualResolutionNote = document.getElementById('manual-resolution-note');
+    const transferModes = document.querySelectorAll('input[name="transfer_mode"]');
+    const updateTransferModeUi = () => {
+        const selectedMode = document.querySelector('input[name="transfer_mode"]:checked')?.value || 'auto_share';
+        if (manualResolutionNote) {
+            manualResolutionNote.style.display = selectedMode === 'manual' ? 'block' : 'none';
+        }
+        if (verifyBankSection) {
+            verifyBankSection.style.display = selectedMode === 'manual' ? 'none' : 'block';
+        }
+        if (submitButton) {
+            submitButton.innerHTML = selectedMode === 'manual'
+                ? '<i class="bx bx-right-arrow-alt me-1"></i> Proceed to WhatsApp'
+                : '<i class="bx bx-right-arrow-alt me-1"></i> Proceed';
+        }
+    };
     if (!amountInput || !previewAmount || !previewFee || !previewTotal || !submitButton) return;
     const walletBalance = parseFloat(amountInput.dataset.walletBalance) || 0;
     const minimumTransfer = parseFloat(amountInput.dataset.minTransfer) || 0;
@@ -382,6 +508,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
         submitButton.disabled = !isValid;
     });
+
+    transferModes.forEach((radio) => {
+        radio.addEventListener('change', updateTransferModeUi);
+    });
+    updateTransferModeUi();
 
     if (verifyBankButton && verifyBankResult) {
         verifyBankButton.addEventListener('click', async function () {

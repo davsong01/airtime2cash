@@ -47,8 +47,8 @@ class ProviderSeeder extends Seeder
             [
                 'name' => 'AutoSync',
                 'slug' => 'autosync',
-                'sandbox_base_url' => null,
-                'live_base_url' => null,
+                'sandbox_base_url' => 'https://autosyncng.com/api/v1',
+                'live_base_url' => 'https://autosyncng.com/api/v1',
                 'is_auto_share' => true,
             ],
         ];
