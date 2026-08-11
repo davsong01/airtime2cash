@@ -141,10 +141,10 @@ class ApiAvailabilityMonitorService
     {
         return match (true) {
             $score <= 20 => 'critical',
-            $score <= 25 => 'unstable',
-            $score <= 50 => 'average',
-            $score <= 75 => 'stable',
-            default => 'healthy',
+            $score <= 40 => 'unstable',
+            $score <= 60 => 'average',
+            $score <= 80 => 'stable',
+            default      => 'healthy',
         };
     }
 
