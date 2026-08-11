@@ -1319,7 +1319,6 @@ class TransactionController extends Controller
             'app_version' => Session::get('app_version') ?? null,
             'api_id' => $data['api_id'] ?? null,
             'reason' => $data['reason'] ?? null,
-            'wallet_funding_provider' => $data['wallet_funding_provider'] ?? null,
             'provider_charge' => $data['provider_charge'] ?? null,
             'charge_breakdown' => $data['charge_breakdown'] ?? null,
             'bank_id' => $data['bank_id'] ?? null,
@@ -2478,7 +2477,7 @@ class TransactionController extends Controller
                 : ['status' => 'failed', 'message' => 'No supported bank transfer provider found.'];
         } else {
             if ($trans->reason == 'WALLET-FUNDING') {
-                $provider = $trans->provider ?: API::query()->find($trans->wallet_funding_provider);
+                $provider = $trans->provider ?: $trans->api;
                 $providerSlug = strtolower((string) ($provider?->slug ?? ''));
 
                 if ($providerSlug === 'monnify') {

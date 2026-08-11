@@ -55,7 +55,6 @@ class PaymentController extends Controller
         $request['quantity'] = 1;
         $request['unique_element'] = 'WALLET-FUNDING';
         $request['provider_charge'] = $provider_charge;
-        $request['wallet_funding_provider'] = $providerApi?->id;
         $request['api_id'] = $providerApi?->id;
 
         $transaction =  app('App\Http\Controllers\TransactionController')->logTransaction($request->all());
@@ -225,7 +224,6 @@ class PaymentController extends Controller
                 $request['quantity'] = 1;
                 $request['unique_element'] = 'WALLET-FUNDING';
                 $request['provider_charge'] = $provider_charge;
-                $request['wallet_funding_provider'] = $provider?->id;
                 $request['api_id'] = $provider?->id;
                 $request['account_number'] =  $call['account_number'];
 
