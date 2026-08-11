@@ -226,7 +226,7 @@ class CustomerController extends Controller
         ];
 
         $admin_id = auth()->user()->admin->id;
-        $reserved = app('App\Http\Controllers\PaymentProcessors\MonnifyController')->createReservedAccount($data, $admin_id);
+        $reserved = createReservedAccount($data, $admin_id);
 
         if ($reserved['status'] && $reserved['status'] == 'success') {
             return back()->with('message', 'Reserved Account(s) crearted successfully');
@@ -460,7 +460,7 @@ class CustomerController extends Controller
 
         logEmails($customer->user->email, $subject, $body);
 
-        $reserved = app('App\Http\Controllers\PaymentProcessors\MonnifyController')->createReservedAccount($data);
+        $reserved = createReservedAccount($data);
         if ($reserved['status'] && $reserved['status'] == 'success') {
             return back()->with('message', 'KYC Approved succesfully and reserved accounts created');
         } else {

@@ -481,7 +481,7 @@ class DashboardController extends Controller
         //     'getAllAvailableBanks' => true,
         // ];
 
-        // $reserved = app('App\Http\Controllers\PaymentProcessors\MonnifyController')->createReservedAccount($data);
+        // $reserved = createReservedAccount($data);
 
         // if ($reserved['status'] && $reserved['status'] == 'success') {
         //     return back()->with('message', 'KYC Update completed and reserved accounts created');

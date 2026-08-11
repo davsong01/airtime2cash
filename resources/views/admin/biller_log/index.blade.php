@@ -1,6 +1,7 @@
 @extends('layouts.app')
 @section('title', 'Biller Logs')
 @section('page-css')
+    <link rel="stylesheet" href="{{ asset('app-assets/css/admin-operations.css') }}">
     <link rel="stylesheet" type="text/css" href="{{ asset('app-assets/vendors/css/vendors.min.css') }}">
     <link rel="stylesheet" type="text/css" href="{{ asset('app-assets/vendors/css/tables/datatable/datatables.min.css') }}"> 
     
@@ -11,6 +12,9 @@
     
 @endsection
 @section('content')
+@php
+    $latestCreatedAt = ! empty($summary->latest_created_at) ? \Illuminate\Support\Carbon::parse($summary->latest_created_at) : null;
+@endphp
 <!-- Content wrapper -->
  <div class="app-content content">
         <div class="content-overlay"></div>
@@ -34,6 +38,55 @@
                 </div>
             </div>
             <div class="content-body">
+                @include('layouts.alerts')
+
+                <section class="ops-hero mb-2">
+                    <div class="row align-items-center">
+                        <div class="col-lg-8">
+                            <span class="ops-kicker"><i class="bx bx-list-ul"></i> Biller operations</span>
+                            <h2>Biller log directory</h2>
+                            <p>Review verified biller codes, inspect refined payloads, and keep the service map tidy from one view.</p>
+                        </div>
+                        <div class="col-lg-4 text-lg-right mt-2 mt-lg-0">
+                            <a href="{{ route('admin.verifybiller') }}" class="btn btn-light"><i class="bx bx-check-shield mr-50"></i> Verify biller</a>
+                            <a href="{{ route('admin.trans') }}" class="btn btn-outline-primary ml-50"><i class="bx bx-receipt mr-50"></i> Transaction log</a>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="row">
+                    <div class="col-sm-6 col-xl-4">
+                        <div class="card ops-metric-card">
+                            <div class="card-body">
+                                <span class="ops-metric-icon is-primary"><i class="bx bx-book-content"></i></span>
+                                <span class="ops-metric-label">Total logs</span>
+                                <strong>{{ number_format((int) ($summary->total ?? 0)) }}</strong>
+                                <small>Biller records stored</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-sm-6 col-xl-4">
+                        <div class="card ops-metric-card">
+                            <div class="card-body">
+                                <span class="ops-metric-icon is-success"><i class="bx bx-grid-alt"></i></span>
+                                <span class="ops-metric-label">Unique services</span>
+                                <strong>{{ number_format((int) ($summary->services ?? 0)) }}</strong>
+                                <small>Distinct service IDs captured</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-sm-12 col-xl-4">
+                        <div class="card ops-metric-card">
+                            <div class="card-body">
+                                <span class="ops-metric-icon is-info"><i class="bx bx-time-five"></i></span>
+                                <span class="ops-metric-label">Latest update</span>
+                                <strong>{{ $latestCreatedAt?->format('M j, Y') ?? 'N/A' }}</strong>
+                                <small>{{ $latestCreatedAt?->format('g:i A') ?? 'No records yet' }}</small>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
                 <!-- Column selectors with Export Options and print table -->
                 <section id="column-selectors">
                     <div class="row">
@@ -41,8 +94,9 @@
                             <div class="card">
                                 @include('layouts.alerts')
                                 <div class="card-header">
-                                    <h4 class="card-title">All Biller's code</h4> <br>
-                                    <p>List of all Biller's verified on {{config('app.name')}}</p>
+                                    <span class="ops-section-kicker">Biller directory</span>
+                                    <h4 class="card-title mb-1">All biller codes</h4>
+                                    <p class="mb-0">List of all billers verified on {{ config('app.name') }}</p>
                                 </div>
                                 <div class="card-content">
                                     <div class="card-body card-dashboard">

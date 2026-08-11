@@ -1,45 +1,73 @@
+@php $currency = getSettings()?->currency ?? 'NGN'; @endphp
+
 @extends('layouts.app')
+@section('title', 'Wallet Log')
+@section('page-css')
+    <link rel="stylesheet" href="{{ asset('app-assets/css/admin-operations.css') }}">
+@endsection
 @section('content')
     <!-- Content wrapper -->
     <div class="app-content content">
         <div class="content-overlay"></div>
         <div class="content-wrapper">
+            <div class="content-header row">
+                <div class="content-header-left col-12 mb-2 mt-1">
+                    <div class="breadcrumb-wrapper col-12">
+                        <ol class="breadcrumb p-0 mb-0">
+                            <li class="breadcrumb-item"><a href="/"><i class="bx bx-home-alt"></i></a></li>
+                            <li class="breadcrumb-item active">Wallet log</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+            <div class="content-body">
+                @include('layouts.alerts')
+
+                <section class="ops-hero mb-2">
+                    <div class="row align-items-center">
+                        <div class="col-lg-8">
+                            <span class="ops-kicker"><i class="bx bx-wallet"></i> Wallet operations</span>
+                            <h2>Wallet transaction log</h2>
+                            <p>Review wallet movements, trace linked transaction IDs, and keep credit and debit flows easy to audit.</p>
+                        </div>
+                        <div class="col-lg-4 text-lg-right mt-2 mt-lg-0">
+                            <a href="{{ route('admin.trans') }}" class="btn btn-light"><i class="bx bx-receipt mr-50"></i> Transaction log</a>
+                            <a href="{{ route('admin.earninglog') }}" class="btn btn-outline-primary ml-50"><i class="bx bx-trending-up mr-50"></i> Earning log</a>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="row">
+                    <div class="col-sm-6 col-xl-6">
+                        <div class="card ops-metric-card">
+                            <div class="card-body">
+                                <span class="ops-metric-icon is-success"><i class="bx bx-up-arrow-alt"></i></span>
+                                <span class="ops-metric-label">Total credit</span>
+                                <strong>{{ $currency }}{{ number_format((float) $credit, 2) }}</strong>
+                                <small>Wallet credits recorded</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-sm-6 col-xl-6">
+                        <div class="card ops-metric-card">
+                            <div class="card-body">
+                                <span class="ops-metric-icon is-danger"><i class="bx bx-down-arrow-alt"></i></span>
+                                <span class="ops-metric-label">Total debit</span>
+                                <strong>{{ $currency }}{{ number_format((float) $debit, 2) }}</strong>
+                                <small>Wallet debits recorded</small>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
             <section id="table-success">
                 <div class="card">
                     <div class="card-header">
-                        <!-- head -->
-                        <h5 class="card-title mb-2">Wallet Transactions</h5>
-                        <div class="d-inline-block">
-                            <!-- chart-1   -->
-                            <div class="d-flex market-statistics-1">
-                                <!-- chart-statistics-1 -->
-                                <div id="donut-success-chart"></div>
-                                <!-- data -->
-                                <div class="statistics-data my-auto">
-                                    <div class="statistics">
-                                        <span class="font-medium-2 mr-50 text-bold-600">{!! getSettings()->currency. number_format($credit) !!}</span>
-                                            <br><span class="text-success">Credit</span>
-                                    </div>
-                                    
-                                </div>
-                            </div>
+                        <div>
+                            <span class="ops-section-kicker">Wallet directory</span>
+                            <h5 class="card-title mb-0">{{ number_format($transactions->total()) }} matching entries</h5>
                         </div>
-                        <div class="d-inline-block mx-3">
-                            <!-- chart-2 -->
-                            <div class="d-flex mb-75 market-statistics-2">
-                                <!-- chart statistics-2 -->
-                                <div id="donut-danger-chart"></div>
-                                <!-- data-2 -->
-                                <div class="statistics-data my-auto">
-                                    <div class="statistics">
-                                        <span
-                                            class="font-medium-2 mr-50 text-bold-600">{!! getSettings()->currency. number_format($debit) !!}</span><br><span
-                                            class="text-danger">Debit</span>
-                                    </div>
-                                    
-                                </div>
-                            </div>
-                        </div>
+                        <span class="badge badge-light-primary px-1 py-50">Latest first</span>
                     </div>
                     <div class="card-body">
                         <div class="col-md-12">
@@ -138,6 +166,7 @@
                     </div>
                 </div>
             </section>
+            </div>
         </div>
     </div>
 @endsection

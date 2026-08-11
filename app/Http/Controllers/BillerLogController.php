@@ -13,7 +13,12 @@ class BillerLogController extends Controller
     public function index()
     {
         $billers = BillerLog::orderBy('created_at', 'DESC')->get();
-        return view('admin.biller_log.index', compact('billers'));
+        $summary = BillerLog::selectRaw('COUNT(*) AS total')
+            ->selectRaw('COUNT(DISTINCT service_id) AS services')
+            ->selectRaw('MAX(created_at) AS latest_created_at')
+            ->first();
+
+        return view('admin.biller_log.index', compact('billers', 'summary'));
     }
 
     /**

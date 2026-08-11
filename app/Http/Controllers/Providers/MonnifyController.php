@@ -11,7 +11,7 @@ class MonnifyController extends BankTransferProviderController
     {
         return 'monnify';
     }
-
+    
     public function login()
     {
         $provider = $this->api();
@@ -105,7 +105,7 @@ class MonnifyController extends BankTransferProviderController
             ],
             'GET'
         );
-  
+
         return [
             'status' => (($response['requestSuccessful'] ?? false) === true && ($response['responseCode'] ?? null) === '0') ? 'success' : 'failed',
             'balance' => data_get($response, 'responseBody.availableBalance', data_get($response, 'responseBody.ledgerBalance')),
@@ -141,6 +141,66 @@ class MonnifyController extends BankTransferProviderController
             'message' => $success ? 'Bank details verified successfully.' : ($response['responseMessage'] ?? 'Unable to verify account details at the moment, please try again later'),
             'data' => $response['responseBody'] ?? $response,
         ], $success ? 200 : 422);
+    }
+
+    public function verifyBvn(string $bvn): array
+    {
+        $token = $this->login();
+
+        if (empty($token)) {
+            return [
+                'status' => false,
+                'message' => 'Could not authenticate with Monnify.',
+            ];
+        }
+
+        $customer = auth()->user()?->customer;
+        $firstName = trim((string) data_get(kycStatus('FIRST_NAME', $customer?->id ?? 0), 'value', ''));
+        $middleName = trim((string) data_get(kycStatus('MIDDLE_NAME', $customer?->id ?? 0), 'value', ''));
+        $lastName = trim((string) data_get(kycStatus('LAST_NAME', $customer?->id ?? 0), 'value', ''));
+        $phoneNumber = trim((string) data_get(kycStatus('PHONE_NUMBER', $customer?->id ?? 0), 'value', ''));
+        $dateOfBirth = trim((string) (data_get(kycStatus('DOB', $customer?->id ?? 0), 'value') ?: data_get(kycStatus('DATE_OF_BIRTH', $customer?->id ?? 0), 'value') ?: ''));
+        $name = trim(collect([$firstName, $middleName, $lastName])->filter()->implode(' '));
+
+        if (blank($name) || blank($dateOfBirth) || blank($phoneNumber)) {
+            return [
+                'status' => false,
+                'message' => 'BVN verification requires the customer name, date of birth, and mobile number to be available.',
+                'missing_fields' => array_values(array_filter([
+                    blank($name) ? 'name' : null,
+                    blank($dateOfBirth) ? 'dateOfBirth' : null,
+                    blank($phoneNumber) ? 'mobileNo' : null,
+                ])),
+            ];
+        }
+
+        $payload = [
+            'bvn' => $bvn,
+            'name' => $name,
+            'dateOfBirth' => $dateOfBirth,
+            'mobileNo' => $phoneNumber,
+        ];
+
+        $response = $this->basicApiCall(
+            rtrim((string) $this->baseUrl(), '/') . '/api/v1/vas/bvn-details-match',
+            json_encode($payload),
+            [
+                'Content-Type: application/json',
+                'Authorization: Bearer ' . $token,
+            ],
+            'POST'
+        );
+
+        $success = (($response['requestSuccessful'] ?? false) === true && (string) ($response['responseCode'] ?? '') === '0')
+            || filter_var(data_get($response, 'responseBody.bvnInformationMatch', false), FILTER_VALIDATE_BOOL);
+
+        return [
+            'status' => $success ? 'success' : 'failed',
+            'provider_status' => $success ? 'success' : (data_get($response, 'responseMessage') ?? 'failed'),
+            'message' => $success ? 'BVN verified successfully.' : (data_get($response, 'responseMessage') ?? 'BVN verification failed.'),
+            'api_response' => $response,
+            'payload' => $payload,
+        ];
     }
 
     public function transfer(array $data): array

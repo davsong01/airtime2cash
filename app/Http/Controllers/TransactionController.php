@@ -2,10 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\PaymentProcessors\MonnifyController;
 use App\Http\Controllers\PaymentProcessors\SquadController;
+use App\Http\Controllers\Providers\MonnifyController;
 use App\Http\Controllers\Providers\AutoSyncController;
-use App\Http\Controllers\Providers\SageController;
 use App\Http\Controllers\WalletController;
 use App\Models\Airtime2CashTransactions;
 use App\Models\API;
@@ -1740,6 +1739,7 @@ class TransactionController extends Controller
             ->selectRaw("COALESCE(SUM(CASE WHEN status IN ('delivered', 'success') THEN amount ELSE 0 END), 0) AS successful")
             ->selectRaw("COALESCE(SUM(CASE WHEN status = 'failed' THEN amount ELSE 0 END), 0) AS failed")
             ->selectRaw("COALESCE(SUM(CASE WHEN status = 'attention-required' THEN amount ELSE 0 END), 0) AS attention_required")
+            ->selectRaw("COUNT(*) AS total")
             ->first();
         $transactions = $baseQuery->latest();
         $providers = API::query()->where('is_payment_gateway', true)->orderBy('name')->get(['id', 'name', 'slug']);
@@ -1776,6 +1776,7 @@ class TransactionController extends Controller
             'success' => $metrics->successful,
             'failed' => $metrics->failed,
             'attention_required' => $metrics->attention_required,
+            'total' => $metrics->total,
             'query' => $request->query(),
         ]);
     }
@@ -1863,6 +1864,7 @@ class TransactionController extends Controller
 
         $metrics = ReferralEarning::selectRaw("COALESCE(SUM(CASE WHEN type = 'credit' THEN amount ELSE 0 END), 0) AS credit")
             ->selectRaw("COALESCE(SUM(CASE WHEN type = 'debit' THEN amount ELSE 0 END), 0) AS debit")
+            ->selectRaw('COUNT(*) AS total')
             ->first();
         $transactions = ReferralEarning::with(['customer.user:id,firstname,middlename,lastname,email,phone', 'referredCustomer.user:id,firstname,middlename,lastname,email,phone', 'transaction:id,transaction_id'])->latest();
 
@@ -1899,6 +1901,7 @@ class TransactionController extends Controller
             'transactions' => $transactions,
             'success' => $metrics->credit,
             'failed' => $metrics->debit,
+            'total' => $metrics->total,
             'query' => $request->query(),
         ]);
     }

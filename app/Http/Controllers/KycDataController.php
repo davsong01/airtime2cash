@@ -115,9 +115,25 @@ class KycDataController extends Controller
 
     public function verifyBVN($bvn)
     {
-        $verify = app('App\Http\Controllers\PaymentProcessors\MonnifyController')->verifyBvn($bvn);
+        $provider = resolvePaymentGatewayProvider(getSettings()?->bank_verification_provider_id ?: getSettings()?->payment_gateway);
 
-        return $verify;
+        if (! $provider) {
+            return [
+                'status' => false,
+                'message' => 'No verification provider is configured.',
+            ];
+        }
+
+        $controller = resolveProviderController($provider);
+
+        if (! $controller || ! method_exists($controller, 'verifyBvn')) {
+            return [
+                'status' => false,
+                'message' => 'The selected verification provider does not support BVN verification.',
+            ];
+        }
+
+        return $controller->verifyBvn($bvn);
     }
 
     public function getLgaByStateName($state)

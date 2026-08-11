@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\DB;
 use App\Models\ReservedAccountNumber;
 use App\Models\ReservedAccountCallback;
 use App\Http\Controllers\PaymentProcessors\SquadController;
-use App\Http\Controllers\PaymentProcessors\MonnifyController;
+use App\Http\Controllers\Providers\MonnifyController;
 use App\Services\WebhookService;
 
 class PaymentController extends Controller

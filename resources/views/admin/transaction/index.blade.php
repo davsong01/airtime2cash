@@ -1,64 +1,83 @@
+@php $currency = getSettings()?->currency ?? 'NGN'; @endphp
+
 @extends('layouts.app')
+@section('title', 'Transaction Log')
+@section('page-css')
+    <link rel="stylesheet" href="{{ asset('app-assets/css/admin-operations.css') }}">
+@endsection
 @section('content')
     <!-- Content wrapper -->
     <div class="app-content content">
         <div class="content-overlay"></div>
         <div class="content-wrapper">
+            <div class="content-header row">
+                <div class="content-header-left col-12 mb-2 mt-1">
+                    <div class="breadcrumb-wrapper col-12">
+                        <ol class="breadcrumb p-0 mb-0">
+                            <li class="breadcrumb-item"><a href="/"><i class="bx bx-home-alt"></i></a></li>
+                            <li class="breadcrumb-item active">Transaction log</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+            <div class="content-body">
+                @include('layouts.alerts')
+
+                <section class="ops-hero mb-2">
+                    <div class="row align-items-center">
+                        <div class="col-lg-8">
+                            <span class="ops-kicker"><i class="bx bx-receipt"></i> Transaction operations</span>
+                            <h2>Transaction log</h2>
+                            <p>Monitor every transaction from request through completion, and quickly isolate anything that still needs attention.</p>
+                        </div>
+                        <div class="col-lg-4 text-lg-right mt-2 mt-lg-0">
+                            <a href="{{ route('admin.walletlog') }}" class="btn btn-light"><i class="bx bx-wallet mr-50"></i> Wallet log</a>
+                            <a href="{{ route('admin.airtime.2.cash.log') }}" class="btn btn-outline-primary ml-50"><i class="bx bx-transfer-alt mr-50"></i> Airtime to cash</a>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="row">
+                    <div class="col-sm-6 col-xl-4">
+                        <div class="card ops-metric-card">
+                            <div class="card-body">
+                                <span class="ops-metric-icon is-success"><i class="bx bx-check-circle"></i></span>
+                                <span class="ops-metric-label">Delivered</span>
+                                <strong>{{ $currency }}{{ number_format((float) $success, 2) }}</strong>
+                                <small>Successful transaction value</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-sm-6 col-xl-4">
+                        <div class="card ops-metric-card">
+                            <div class="card-body">
+                                <span class="ops-metric-icon is-warning"><i class="bx bx-time-five"></i></span>
+                                <span class="ops-metric-label">Attention required</span>
+                                <strong>{{ $currency }}{{ number_format((float) $attention_required, 2) }}</strong>
+                                <small>Pending follow-up value</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-sm-12 col-xl-4">
+                        <div class="card ops-metric-card">
+                            <div class="card-body">
+                                <span class="ops-metric-icon is-danger"><i class="bx bx-x-circle"></i></span>
+                                <span class="ops-metric-label">Failed</span>
+                                <strong>{{ $currency }}{{ number_format((float) $failed, 2) }}</strong>
+                                <small>Unsuccessful transaction value</small>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
             <section id="table-success">
                 <div class="card">
                     <div class="card-header">
-                        <!-- head -->
-                        <h5 class="card-title mb-2">Transactions</h5>
-                        <div class="d-inline-block">
-                            <!-- chart-1   -->
-                            <div class="d-flex market-statistics-1">
-                                <!-- chart-statistics-1 -->
-                                <div id="donut-success-chart"></div>
-                                <!-- data -->
-                                <div class="statistics-data my-auto">
-                                    <div class="statistics">
-                                        <span
-                                            class="font-medium-2 mr-50 text-bold-600">{!! getSettings()->currency. number_format($success) !!}</span>
-                                            <br>
-                                            <span
-                                            class="text-success">Delivered</span>
-                                    </div>
-                                   
-                                </div>
-                            </div>
+                        <div>
+                            <span class="ops-section-kicker">Transaction directory</span>
+                            <h5 class="card-title mb-0">{{ number_format($transactions->total()) }} matching entries</h5>
                         </div>
-                        <div class="d-inline-block mx-3">
-                            <!-- chart-2 -->
-                            <div class="d-flex mb-75 market-statistics-2">
-                                <!-- chart statistics-2 -->
-                                <div id="donut-danger-chart"></div>
-                                <!-- data-2 -->
-                                <div class="statistics-data my-auto">
-                                    <div class="statistics">
-                                        <span
-                                            class="font-medium-2 mr-50 text-bold-600">{!! getSettings()->currency. number_format($attention_required) !!}</span><br><span
-                                            class="text-warning">Attention Required</span>
-                                    </div>
-                                    
-                                </div>
-                            </div>
-                        </div>
-                        <div class="d-inline-block mx-3">
-                            <!-- chart-2 -->
-                            <div class="d-flex mb-75 market-statistics-2">
-                                <!-- chart statistics-2 -->
-                                <div id="donut-danger-chart"></div>
-                                <!-- data-2 -->
-                                <div class="statistics-data my-auto">
-                                    <div class="statistics">
-                                        <span
-                                            class="font-medium-2 mr-50 text-bold-600">{!! getSettings()->currency. number_format($failed) !!}</span><br><span
-                                            class="text-danger">Failed</span>
-                                    </div>
-                                    
-                                </div>
-                            </div>
-                        </div>
+                        <span class="badge badge-light-success px-1 py-50">Latest first</span>
                     </div>
                     <div class="card-body">
                         <div class="col-md-12">
@@ -214,6 +233,7 @@
                     </div>
                 </div>
             </section>
+            </div>
         </div>
     </div>
 @endsection

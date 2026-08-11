@@ -29,7 +29,7 @@ class ReservedAccountCreationMiddleware
                         'getAllAvailableBanks' => true,
                     ];
 
-                $reserved = app('App\Http\Controllers\PaymentProcessors\MonnifyController')->createReservedAccount($data);
+                $reserved = createReservedAccount($data);
             }
         }   
 

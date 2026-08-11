@@ -132,6 +132,12 @@
 </style>
 @endsection
 @section('content')
+@php
+    $transactionStatus = strtolower((string) ($transaction->status ?? 'pending'));
+    $transactionCompletedAt = $transaction->completed_at ?? $transaction->updated_at ?? $transaction->created_at;
+    $transactionCompletedLabel = $transactionCompletedAt ? date("M jS, Y g:iA", strtotime($transactionCompletedAt)) : 'Awaiting completion';
+    $transactionProvider = $transaction->api?->name ?? 'Unknown provider';
+@endphp
 <!-- Content wrapper -->
 <div class="app-content content txn-details-page">
     <div class="content-overlay"></div>
@@ -141,6 +147,63 @@
             <section id="basic-input">
                 <div class="row">
                     <div class="col-md-12">
+                        <section class="ops-hero mb-2">
+                            <div class="row align-items-center">
+                                <div class="col-lg-8">
+                                    <span class="ops-kicker"><i class="bx bx-detail"></i> Transaction review</span>
+                                    <h2>{{ $transaction->product_name }}</h2>
+                                    <p>Inspect the full transaction trail, provider response, and admin resolution actions from one place.</p>
+                                </div>
+                                <div class="col-lg-4 text-lg-right mt-2 mt-lg-0">
+                                    <a href="{{ route('admin.trans') }}" class="btn btn-light"><i class="bx bx-receipt mr-50"></i> Transaction log</a>
+                                    <a href="{{ route('admin.walletlog') }}" class="btn btn-outline-primary ml-50"><i class="bx bx-wallet mr-50"></i> Wallet log</a>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="row">
+                            <div class="col-sm-6 col-xl-3">
+                                <div class="card ops-metric-card">
+                                    <div class="card-body">
+                                        <span class="ops-metric-icon {{ in_array($transactionStatus, ['success', 'successful', 'delivered', 'completed', 'approved'], true) ? 'is-success' : 'is-danger' }}"><i class="bx bx-stats"></i></span>
+                                        <span class="ops-metric-label">Status</span>
+                                        <strong>{{ ucfirst(str_replace('-', ' ', $transaction->status ?? 'pending')) }}</strong>
+                                        <small>Current resolution state</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-sm-6 col-xl-3">
+                                <div class="card ops-metric-card">
+                                    <div class="card-body">
+                                        <span class="ops-metric-icon is-primary"><i class="bx bx-money"></i></span>
+                                        <span class="ops-metric-label">Total amount</span>
+                                        <strong>{!! getSettings()->currency !!}{{ number_format((float) $transaction->total_amount, 2) }}</strong>
+                                        <small>Amount tied to this request</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-sm-6 col-xl-3">
+                                <div class="card ops-metric-card">
+                                    <div class="card-body">
+                                        <span class="ops-metric-icon is-info"><i class="bx bx-cloud"></i></span>
+                                        <span class="ops-metric-label">Provider</span>
+                                        <strong>{{ $transactionProvider }}</strong>
+                                        <small>Active processing provider</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-sm-6 col-xl-3">
+                                <div class="card ops-metric-card">
+                                    <div class="card-body">
+                                        <span class="ops-metric-icon is-warning"><i class="bx bx-check-shield"></i></span>
+                                        <span class="ops-metric-label">Completed</span>
+                                        <strong>{{ $transactionCompletedLabel }}</strong>
+                                        <small>Completion trail marker</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
                         <div class="card">
                             <div class="content-body">
                                 <!-- Nav Filled Starts -->

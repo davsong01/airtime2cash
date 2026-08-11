@@ -1,72 +1,95 @@
+@php $currency = getSettings()?->currency ?? 'NGN'; @endphp
+
 @extends('layouts.app')
+@section('title', 'Wallet Funding Log')
+@section('page-css')
+    <link rel="stylesheet" href="{{ asset('app-assets/css/admin-operations.css') }}">
+@endsection
 @section('content')
     <!-- Content wrapper -->
     <div class="app-content content">
         <div class="content-overlay"></div>
         <div class="content-wrapper">
-            <section id="table-success">
-                <div class="card">
-                    <div class="card-header">
-                        <!-- head -->
-                        <h5 class="card-title mb-2">Wallet Funding</h5>
-                        <div class="d-inline-block">
-                            <!-- chart-1   -->
-                            <div class="d-flex market-statistics-1">
-                                <!-- chart-statistics-1 -->
-                                <div id="donut-success-chart"></div>
-                                <!-- data -->
-                                <div class="statistics-data my-auto">
-                                    <div class="statistics">
-                                        <span
-                                            class="font-medium-2 mr-50 text-bold-600">{!! getSettings()->currency. number_format($success) !!}</span>
-                                            <br>
-                                            <span
-                                            class="text-success">Sucessful</span>
-                                    </div>
-                                    {{-- <div class="statistics-date">
-                                        <i
-                                            class="bx bx-radio-circle font-small-1 text-success mr-25"></i>
-                                        <small class="text-muted">May 12, 2019</small>
-                                    </div> --}}
-                                </div>
+            <div class="content-header row">
+                <div class="content-header-left col-12 mb-2 mt-1">
+                    <div class="breadcrumb-wrapper col-12">
+                        <ol class="breadcrumb p-0 mb-0">
+                            <li class="breadcrumb-item"><a href="/"><i class="bx bx-home-alt"></i></a></li>
+                            <li class="breadcrumb-item active">Wallet funding log</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+
+            <div class="content-body">
+                @include('layouts.alerts')
+
+                <section class="ops-hero mb-2">
+                    <div class="row align-items-center">
+                        <div class="col-lg-8">
+                            <span class="ops-kicker"><i class="bx bx-wallet"></i> Funding operations</span>
+                            <h2>Wallet funding log</h2>
+                            <p>Track successful wallet top-ups, monitor failed attempts, and keep an eye on payments that need manual attention.</p>
+                        </div>
+                        <div class="col-lg-4 text-lg-right mt-2 mt-lg-0">
+                            <a href="{{ route('admin.reserved.accounts') }}" class="btn btn-light"><i class="bx bx-building-house mr-50"></i> Reserved accounts</a>
+                            <a href="{{ route('api.index') }}" class="btn btn-outline-primary ml-50"><i class="bx bx-cloud mr-50"></i> Provider monitor</a>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="row">
+                    <div class="col-sm-6 col-xl-3">
+                        <div class="card ops-metric-card">
+                            <div class="card-body">
+                                <span class="ops-metric-icon is-primary"><i class="bx bx-receipt"></i></span>
+                                <span class="ops-metric-label">All requests</span>
+                                <strong>{{ number_format((int) $total) }}</strong>
+                                <small>Wallet funding transactions</small>
                             </div>
                         </div>
-                        <div class="d-inline-block mx-3">
-                            <!-- chart-2 -->
-                            <div class="d-flex mb-75 market-statistics-2">
-                                <!-- chart statistics-2 -->
-                                <div id="donut-danger-chart"></div>
-                                <!-- data-2 -->
-                                <div class="statistics-data my-auto">
-                                    <div class="statistics">
-                                        <span
-                                            class="font-medium-2 mr-50 text-bold-600">{!! getSettings()->currency. number_format($attention_required) !!}</span><br><span
-                                            class="text-warning">Attention Required</span>
-                                    </div>
-                                    {{-- <div class="statistics-date">
-                                        <i
-                                            class="bx bx-radio-circle font-small-1 text-success mr-25"></i>
-                                        <small class="text-muted">Jul 26, 2019</small>
-                                    </div> --}}
-                                </div>
+                    </div>
+                    <div class="col-sm-6 col-xl-3">
+                        <div class="card ops-metric-card">
+                            <div class="card-body">
+                                <span class="ops-metric-icon is-success"><i class="bx bx-check-circle"></i></span>
+                                <span class="ops-metric-label">Successful value</span>
+                                <strong>{{ $currency }}{{ number_format((float) $success, 2) }}</strong>
+                                <small>Delivered wallet funding amount</small>
                             </div>
                         </div>
-                        <div class="d-inline-block mx-3">
-                            <!-- chart-2 -->
-                            <div class="d-flex mb-75 market-statistics-2">
-                                <!-- chart statistics-2 -->
-                                <div id="donut-danger-chart"></div>
-                                <!-- data-2 -->
-                                <div class="statistics-data my-auto">
-                                    <div class="statistics">
-                                        <span
-                                            class="font-medium-2 mr-50 text-bold-600">{!! getSettings()->currency. number_format($failed) !!}</span><br><span
-                                            class="text-danger">Failed</span>
-                                    </div>
-                                   
-                                </div>
+                    </div>
+                    <div class="col-sm-6 col-xl-3">
+                        <div class="card ops-metric-card">
+                            <div class="card-body">
+                                <span class="ops-metric-icon is-warning"><i class="bx bx-time-five"></i></span>
+                                <span class="ops-metric-label">Needs attention</span>
+                                <strong>{{ $currency }}{{ number_format((float) $attention_required, 2) }}</strong>
+                                <small>Transactions waiting for manual review</small>
                             </div>
                         </div>
+                    </div>
+                    <div class="col-sm-6 col-xl-3">
+                        <div class="card ops-metric-card">
+                            <div class="card-body">
+                                <span class="ops-metric-icon is-danger"><i class="bx bx-x-circle"></i></span>
+                                <span class="ops-metric-label">Failed value</span>
+                                <strong>{{ $currency }}{{ number_format((float) $failed, 2) }}</strong>
+                                <small>Wallet funding attempts that did not complete</small>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="card ops-panel ops-filter-panel mb-2">
+                    <div class="card-header d-flex align-items-center justify-content-between flex-wrap">
+                        <div class="d-flex align-items-center">
+                            <span class="ops-filter-icon"><i class="bx bx-filter-alt"></i></span>
+                            <div><h5 class="mb-25">Find wallet funding</h5><small class="text-muted">Search by customer, provider, status, or date range.</small></div>
+                        </div>
+                        @if(request()->query())
+                            <a href="{{ route('admin.walletfundinglog') }}" class="btn btn-sm btn-light-secondary mt-1 mt-sm-0"><i class="bx bx-reset mr-25"></i> Clear filters</a>
+                        @endif
                     </div>
                     <div class="card-body">
                         <div class="col-md-12">
@@ -123,8 +146,16 @@
                                     </div>
                                 </div>
                             </form>
-                            <hr>
                         </div>
+                    </div>
+                </section>
+
+                <section class="card ops-panel">
+                    <div class="card-header d-flex align-items-center justify-content-between">
+                        <div><span class="ops-section-kicker">Transaction directory</span><h5 class="mb-0">{{ number_format($transactions->total()) }} matching wallet funding logs</h5></div>
+                        <span class="badge badge-light-primary px-1 py-50">Latest first</span>
+                    </div>
+                    <div class="table-responsive">
                         <div class="table-responsive">
                             <form method="post">
                                 <table id="table-extended-success" class="table mb-0">
@@ -195,11 +226,11 @@
                             {{-- {{ $transactions->appends($query) }} --}}
                         </div>
                     </div>
-                     <div class="card-footer">
+                     <div class="card-footer d-flex justify-content-end">
                         {!! $transactions->appends($_GET)->links() !!}
                     </div>
-                </div>
-            </section>
+                </section>
+            </div>
         </div>
     </div>
 @endsection

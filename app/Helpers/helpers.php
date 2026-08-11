@@ -15,8 +15,6 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\View;
 use App\Http\Controllers\WalletController;
 use App\Models\Bank;
-use App\Http\Controllers\PaymentProcessors\SquadController;
-use App\Http\Controllers\PaymentProcessors\MonnifyController;
 
 if (!function_exists("mask")) {
     function mask($word, $a = 2, $b = 9, $c = 9, $d = 10)
@@ -35,7 +33,7 @@ if (!function_exists("logEmails")) {
                 'recipient' => $email_to,
                 'content' => $body,
             ]);
-           
+
         } catch (\Exception $e) {}
     }
 }
@@ -193,7 +191,7 @@ if (!function_exists("getPaymentGatewayReservedAccountCharge")) {
                 'display_value' => getSettings()->currency . number_format(0, 1),
             ];
         }
-        
+
         if (($gateway->reserved_account_payment_charge_type ?? 'flat') == 'flat') {
             $charge = (float) ($gateway->reserved_account_payment_charge ?? 0);
             $display_value = isset(getSettings()->currency) ? getSettings()->currency . number_format($charge, 1): number_format($charge, 1);
@@ -2153,7 +2151,7 @@ if (!function_exists("announcements")) {
         function hasAccess($route)
         {
             $routes = auth()->user()->admin->rolepermissions();
-            
+
             if (in_array($route, $routes)|| in_array(1, auth()->user()->admin->roleIds())) {
                 return true;
             }else{

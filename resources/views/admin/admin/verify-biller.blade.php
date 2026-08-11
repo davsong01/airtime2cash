@@ -49,8 +49,7 @@
                                 <div class="card-content">
                                     <div class="card-body">
                                         <div class="api-call mb-4">
-                                            <div class="loading d-none text-warning "><i>Please wait while perform our
-                                                    magic...</i></div>
+                                            <div class="loading d-none text-warning "><i>Please wait...</i></div>
                                             <div class="row">
                                                 <div class="col-sm-6">
                                                     <code style="margin:10px 0" class="d-none format w-100">

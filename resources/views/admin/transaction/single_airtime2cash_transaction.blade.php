@@ -8,6 +8,9 @@
     }
     $completedAt = $transaction->completed_at ?? $transaction->updated_at ?? $transaction->created_at;
     $completedAtText = $completedAt ? date("M jS, Y g:iA", strtotime($completedAt)) : 'Awaiting completion';
+    $statusClass = in_array(strtolower((string) ($transaction->status ?? 'pending')), ['approved', 'success', 'successful', 'completed', 'delivered'], true)
+        ? 'is-success'
+        : (strtolower((string) ($transaction->status ?? 'pending')) === 'pending' ? 'is-warning' : 'is-danger');
 ?>
 @extends('layouts.app')
 @section('title', 'Transction Details')
@@ -64,6 +67,63 @@
             <section id="basic-input">
                 <div class="row">
                     <div class="col-md-12">
+                        <section class="ops-hero mb-2">
+                            <div class="row align-items-center">
+                                <div class="col-lg-8">
+                                    <span class="ops-kicker"><i class="bx bx-transfer-alt"></i> Airtime to cash review</span>
+                                    <h2>{{ $transaction->product->name }}</h2>
+                                    <p>Track the conversion request, confirm payout status, and review the completion trail in one dashboard view.</p>
+                                </div>
+                                <div class="col-lg-4 text-lg-right mt-2 mt-lg-0">
+                                    <a href="{{ route('admin.airtime.2.cash.log') }}" class="btn btn-light"><i class="bx bx-list-ul mr-50"></i> Conversion log</a>
+                                    <a href="{{ route('admin.walletfundinglog') }}" class="btn btn-outline-primary ml-50"><i class="bx bx-wallet mr-50"></i> Wallet funding</a>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="row">
+                            <div class="col-sm-6 col-xl-3">
+                                <div class="card ops-metric-card">
+                                    <div class="card-body">
+                                        <span class="ops-metric-icon {{ $statusClass }}"><i class="bx bx-stats"></i></span>
+                                        <span class="ops-metric-label">Status</span>
+                                        <strong>{{ ucfirst($transaction->status) }}</strong>
+                                        <small>Current conversion state</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-sm-6 col-xl-3">
+                                <div class="card ops-metric-card">
+                                    <div class="card-body">
+                                        <span class="ops-metric-icon is-primary"><i class="bx bx-money"></i></span>
+                                        <span class="ops-metric-label">Amount paid</span>
+                                        <strong>{!! getSettings()->currency !!}{{ number_format((float) $transaction->amount_paid, 2) }}</strong>
+                                        <small>Customer cash-out value</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-sm-6 col-xl-3">
+                                <div class="card ops-metric-card">
+                                    <div class="card-body">
+                                        <span class="ops-metric-icon is-success"><i class="bx bx-trending-up"></i></span>
+                                        <span class="ops-metric-label">Income</span>
+                                        <strong>{!! getSettings()->currency !!}{{ number_format((float) $transaction->amount_charged, 2) }}</strong>
+                                        <small>Conversion revenue recorded</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-sm-6 col-xl-3">
+                                <div class="card ops-metric-card">
+                                    <div class="card-body">
+                                        <span class="ops-metric-icon is-warning"><i class="bx bx-check-shield"></i></span>
+                                        <span class="ops-metric-label">Completed</span>
+                                        <strong>{{ $completedAtText }}</strong>
+                                        <small>Final completion trail</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
                         <div class="card">
                             <div class="content-body">
                                 <!-- Nav Filled Starts -->
