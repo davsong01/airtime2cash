@@ -254,7 +254,7 @@ class CustomerController extends Controller
         $ref = $curr . number_format(referralBalance($user), 2) ?? 0;
         $transactionSummary = $user->customer->transactions()
             ->selectRaw('COALESCE(SUM(amount), 0) as total')
-            ->selectRaw('COALESCE(SUM(CASE WHEN wallet_funding_provider IS NOT NULL THEN amount ELSE 0 END), 0) as funded_total')
+            ->selectRaw('COALESCE(SUM(CASE WHEN api_id IS NOT NULL AND unique_element = \'WALLET-FUNDING\' THEN amount ELSE 0 END), 0) as funded_total')
             ->first();
         $transTotal = $curr . number_format((float) $transactionSummary->total, 2);
         $fundTotal = $curr . number_format((float) $transactionSummary->funded_total, 2);

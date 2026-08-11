@@ -318,6 +318,10 @@
                                                                 <input type="text" class="form-control" name="account_number" value="{{ old('account_number', optional($api)->account_number) }}" placeholder="Enter account number" id="account_number">
                                                                 <small class="text-muted d-block mt-50">Used by providers that need an internal settlement or wallet account number.</small>
                                                             </fieldset>
+                                                            <fieldset class="form-group mb-3">
+                                                                <label for="contract_id">Contract ID</label>
+                                                                <input type="text" class="form-control" name="contract_id" value="{{ old('contract_id', optional($api)->contract_id) }}" placeholder="Enter contract id" id="contract_id">
+                                                            </fieldset>
                                                             <div class="form-group mb-0">
                                                                 <label for="live_base_url">Live Base URL</label>
                                                                 <input type="text" class="form-control" name="live_base_url" value="{{ old('live_base_url', optional($api)->live_base_url) }}" placeholder="Enter live base url" id="live_base_url">

@@ -135,6 +135,7 @@
                                 <table id="table-extended-success" class="table mb-0">
                                     <thead>
                                         <tr>
+                                            <th>S/N</th>
                                             <th>Customer</th>
                                             <th>Payment Details</th>
                                             <th>Transaction Details</th>
@@ -147,6 +148,7 @@
                                     <tbody>
                                         @foreach ($transactions as $transaction)
                                             <tr>
+                                                <td class="text-muted">{{ $transactions->firstItem() + $loop->index }}</td>
                                                 <td>
                                                     <span style="color:crimson"><strong>TransactionID: </strong> <br>{{ $transaction->transaction_id }}</span> <br>
                                                     <span style="color:rgb(27, 20, 220)"><strong>Request ID: </strong> <br>{{ $transaction->reference_id }}</span> <br><br>

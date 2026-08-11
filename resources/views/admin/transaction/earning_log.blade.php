@@ -103,6 +103,7 @@
                                 <table id="table-extended-success" class="table mb-0">
                                     <thead>
                                         <tr>
+                                            <th>S/N</th>
                                             <th>Upline</th>
                                             <th>Downline</th>
                                             <th>Payment Details</th>
@@ -113,7 +114,7 @@
                                     <tbody>
                                         @foreach ($transactions as $transaction)
                                             <tr>
-                                               
+                                                <td class="text-muted">{{ $transactions->firstItem() + $loop->index }}</td>
                                                 <td>{{ $transaction->customer->user->name }} <br>
                                                     <a href="{{ route('customers.edit', $transaction->customer->user->id)}}">{{ $transaction->customer->user->email  }}</a> <br>
                                                     {{ $transaction->customer_phone }} <br>

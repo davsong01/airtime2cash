@@ -1732,14 +1732,17 @@ class TransactionController extends Controller
             'to' => ['nullable', 'date', 'after_or_equal:from'],
         ]);
 
-        $baseQuery = TransactionLog::whereNotNull('wallet_funding_provider')->where('unique_element', 'WALLET-FUNDING');
+        $baseQuery = TransactionLog::query()
+            ->with(['customer.user:id,firstname,lastname,email,phone', 'api:id,name,slug'])
+            ->where('unique_element', 'WALLET-FUNDING')
+            ->whereNotNull('api_id');
         $metrics = (clone $baseQuery)
             ->selectRaw("COALESCE(SUM(CASE WHEN status IN ('delivered', 'success') THEN amount ELSE 0 END), 0) AS successful")
             ->selectRaw("COALESCE(SUM(CASE WHEN status = 'failed' THEN amount ELSE 0 END), 0) AS failed")
             ->selectRaw("COALESCE(SUM(CASE WHEN status = 'attention-required' THEN amount ELSE 0 END), 0) AS attention_required")
             ->first();
         $transactions = $baseQuery->latest();
-        $providers = PaymentGateway::latest()->get();
+        $providers = API::query()->where('is_payment_gateway', true)->orderBy('name')->get(['id', 'name', 'slug']);
 
         if ($request->email) {
             $transactions->where('customer_email', 'like', '%' . trim($request->email) . '%');
@@ -1750,7 +1753,7 @@ class TransactionController extends Controller
         }
 
         if ($request->payment_provider) {
-            $transactions->where('wallet_funding_provider', $request->payment_provider);
+            $transactions->where('api_id', $request->payment_provider);
         }
 
         if ($request->status) {
@@ -2472,13 +2475,16 @@ class TransactionController extends Controller
                 : ['status' => 'failed', 'message' => 'No supported bank transfer provider found.'];
         } else {
             if ($trans->reason == 'WALLET-FUNDING') {
-                if ($trans->wallet_funding_provider == 1) {
-                    $monnify = new MonnifyController($trans->provider);
+                $provider = $trans->provider ?: API::query()->find($trans->wallet_funding_provider);
+                $providerSlug = strtolower((string) ($provider?->slug ?? ''));
+
+                if ($providerSlug === 'monnify') {
+                    $monnify = new MonnifyController($provider);
                     return $monnify->verifyTransaction($trans->transaction_reference);
                 }
 
-                if ($trans->wallet_funding_provider == 2) {
-                    $squad = new SquadController($trans->provider);
+                if ($providerSlug === 'squad') {
+                    $squad = new SquadController($provider);
                     return $squad->verifyTransaction($trans->transaction_reference);
                 }
             }else{
@@ -2506,7 +2512,7 @@ class TransactionController extends Controller
             ], 404);
         }
 
-        if ($transaction->provider_id == 1) {
+        if (strtolower((string) ($transaction->gateway?->slug ?? '')) === 'monnify') {
             $monnify = new MonnifyController($transaction->gateway);
             $result = $monnify->verifyTransaction($reference);
 
@@ -2521,7 +2527,7 @@ class TransactionController extends Controller
             ]);
         }
 
-        if ($transaction->wallet_funding_provider == 2) {
+        if (strtolower((string) ($transaction->gateway?->slug ?? '')) === 'squad') {
             $squad = new SquadController($transaction->gateway);
             $result = $squad->verifyTransaction($reference);
 

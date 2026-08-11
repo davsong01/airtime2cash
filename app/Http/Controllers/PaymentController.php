@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\API;
 use Illuminate\Http\Request;
-use App\Models\PaymentGateway;
 use App\Models\TransactionLog;
 use Illuminate\Support\Facades\DB;
 use App\Models\ReservedAccountNumber;
@@ -18,19 +17,20 @@ class PaymentController extends Controller
     public function redirectToUrl(Request $request)
     {
         $provider = resolvePaymentGatewayProvider();
+        $providerApi = $provider;
 
-        if (empty($provider)) {
+        if (empty($providerApi)) {
             return false;
         }
-
-        $providerSettings = resolvePaymentGatewaySetting($provider->slug);
 
         // Log Wallet
         $wallet = new WalletController();
         $balance = $wallet->getWalletBalance(auth()->user());
         $reference = $this->generateRequestId();
         $extra_charge = getSettings()->card_funding_extra_charge > 0 ? getSettings()->card_funding_extra_charge : 0;
-        $provider_charge = $providerSettings ? (($providerSettings->charge / 100) * $request->amount) : 0;
+        $provider_charge = $providerApi && filled($providerApi->charge)
+            ? (($providerApi->charge / 100) * $request->amount)
+            : 0;
         $provider_charge = $provider_charge + $extra_charge;
 
         $amount = $request->amount - $provider_charge;
@@ -55,7 +55,8 @@ class PaymentController extends Controller
         $request['quantity'] = 1;
         $request['unique_element'] = 'WALLET-FUNDING';
         $request['provider_charge'] = $provider_charge;
-        $request['wallet_funding_provider'] = $providerSettings?->id;
+        $request['wallet_funding_provider'] = $providerApi?->id;
+        $request['api_id'] = $providerApi?->id;
 
         $transaction =  app('App\Http\Controllers\TransactionController')->logTransaction($request->all());
 
@@ -78,19 +79,33 @@ class PaymentController extends Controller
 
     public function dumpCallback(Request $request, $provider)
     {
-        if ($provider == 1) {
+        $providerApi = API::query()->find($provider) ?: resolvePaymentGatewayProvider($provider);
+        $providerSlug = strtolower((string) ($providerApi?->slug ?? ''));
+        $account_number = null;
+        $session_id = null;
+        $transaction_reference = null;
+        $payment_method = null;
+        $paid_on = null;
+
+        if ($providerSlug === 'monnify') {
             $account_number = $request['eventData']['destinationAccountInformation']['accountNumber'];
             $session_id = $request['eventData']['paymentSourceInformation'][0]['sessionId'];
             $transaction_reference = $request['eventData']['transactionReference'] ?? $request['eventData']['paymentReference'];
             $payment_method = $request['eventData']['paymentMethod'];
             $paid_on = $request['eventData']['paidOn'];
+        } elseif ($providerSlug === 'squad') {
+            $account_number = data_get($request->all(), 'data.accountNumber');
+            $session_id = data_get($request->all(), 'data.sessionId');
+            $transaction_reference = data_get($request->all(), 'data.transactionReference') ?? data_get($request->all(), 'reference');
+            $payment_method = data_get($request->all(), 'data.paymentMethod', 'BANK_TRANSFER');
+            $paid_on = data_get($request->all(), 'data.paidOn');
         }
 
         $check = ReservedAccountCallback::where(['session_id' => $session_id, 'transaction_reference' => $transaction_reference])->first();
         if (!$check) {
             ReservedAccountCallback::create([
                 'raw' => json_encode($request->all()),
-                'provider_id' => $provider,
+                'provider_id' => $providerApi?->id ?? $provider,
                 'paid_on' => $paid_on ?? null,
                 'session_id' => $session_id,
                 'account_number' => $account_number,
@@ -130,7 +145,8 @@ class PaymentController extends Controller
 
                 $decodeCall = json_decode($call['raw'], true);
                 $account = ReservedAccountNumber::with('customer')->where('account_number', $call['account_number'])->first();
-                $provider = PaymentGateway::where('id', $call->provider_id)->first();
+                $provider = API::query()->find($call->provider_id) ?: resolvePaymentGatewayProvider($call->provider_id);
+                $providerSlug = strtolower((string) ($provider?->slug ?? ''));
 
                 if (!$account) {
                     ReservedAccountCallback::whereIn('id', $ids)->update(['status' => 'no-account']);
@@ -140,7 +156,7 @@ class PaymentController extends Controller
                 $customer = $account->customer;
                 $user = $account->customer->user;
 
-                if ($call['provider_id'] == 1) {
+                if ($providerSlug === 'monnify') {
                     $payment_type = $call->payment_method;
 
                     if ($payment_type === 'CARD') {
@@ -163,7 +179,7 @@ class PaymentController extends Controller
                     }
                 }
 
-                if ($call->provider_id == 2) {
+                if ($providerSlug === 'squad') {
                     $squad = new SquadController($provider);
                     $analyze = $squad->verifyTransaction($call->transaction_reference);
 
@@ -201,16 +217,17 @@ class PaymentController extends Controller
                     $request['customer_email'] = $user->email;
                     $request['customer_phone'] = $user->phone;
                     $request['customer_name'] = $user->firstname;
-                    $request['reason'] = 'WALLET-FUNDING';
-                    $request['amount'] = $original_amount;
-                    $request['total_amount'] = $amount;
-                    $request['discount'] = 0;
-                    $request['unit_price'] =  $amount;
-                    $request['quantity'] = 1;
-                    $request['unique_element'] = 'WALLET-FUNDING';
-                    $request['provider_charge'] = $provider_charge;
-                    $request['wallet_funding_provider'] = $call['provider_id'];
-                    $request['account_number'] =  $call['account_number'];
+                $request['reason'] = 'WALLET-FUNDING';
+                $request['amount'] = $original_amount;
+                $request['total_amount'] = $amount;
+                $request['discount'] = 0;
+                $request['unit_price'] =  $amount;
+                $request['quantity'] = 1;
+                $request['unique_element'] = 'WALLET-FUNDING';
+                $request['provider_charge'] = $provider_charge;
+                $request['wallet_funding_provider'] = $provider?->id;
+                $request['api_id'] = $provider?->id;
+                $request['account_number'] =  $call['account_number'];
 
                     $transaction =  app('App\Http\Controllers\TransactionController')->logTransaction($request);
 

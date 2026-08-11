@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\API;
 use App\Models\Wallet;
 use App\Models\Product;
 use App\Models\Category;
@@ -84,7 +85,7 @@ class TransactionLog extends Model
 
     public function provider()
     {
-        return $this->belongsTo(PaymentGateway::class, 'wallet_funding_provider');
+        return $this->belongsTo(API::class, 'api_id');
     }
 
     public function api()

@@ -10,7 +10,6 @@ use App\Models\API;
 use App\Mail\EmailMessages;
 use Illuminate\Support\Arr;
 use App\Models\Announcement;
-use App\Models\PaymentGateway;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\View;
@@ -185,14 +184,22 @@ if (!function_exists("getBankTransferPricingAmountRange")) {
 if (!function_exists("getPaymentGatewayReservedAccountCharge")) {
     function getPaymentGatewayReservedAccountCharge($provider = null)
     {
-        $gateway = PaymentGateway::where('id', $provider)->first();
+        $gateway = API::query()->find($provider);
+
+        if (! $gateway) {
+            return [
+                'type' => 'flat',
+                'value' => 0,
+                'display_value' => getSettings()->currency . number_format(0, 1),
+            ];
+        }
         
-        if ($gateway->reserved_account_payment_charge_type == 'flat') {
-            $charge = $gateway->reserved_account_payment_charge;
+        if (($gateway->reserved_account_payment_charge_type ?? 'flat') == 'flat') {
+            $charge = (float) ($gateway->reserved_account_payment_charge ?? 0);
             $display_value = isset(getSettings()->currency) ? getSettings()->currency . number_format($charge, 1): number_format($charge, 1);
             $type = 'flat';
         } else {
-            $charge = $gateway->reserved_account_payment_charge;
+            $charge = (float) ($gateway->reserved_account_payment_charge ?? 0);
             $display_value = $charge . '%';
             $type = 'percentage';
         }
@@ -403,17 +410,9 @@ if (!function_exists("createReservedAccount")) {
 }
 
 if (!function_exists("resolvePaymentGatewaySetting")) {
-    function resolvePaymentGatewaySetting($gateway = null): ?PaymentGateway
+    function resolvePaymentGatewaySetting($gateway = null): ?API
     {
-        $gateway = $gateway ?? getSettings()?->payment_gateway;
-
-        if (blank($gateway)) {
-            return null;
-        }
-
-        return PaymentGateway::query()
-            ->when(is_numeric($gateway), fn ($query) => $query->whereKey((int) $gateway), fn ($query) => $query->where('slug', $gateway))
-            ->first();
+        return resolvePaymentGatewayProvider($gateway);
     }
 }
 
@@ -430,19 +429,7 @@ if (!function_exists("resolvePaymentGatewayProvider")) {
             ->when(is_numeric($gateway), fn ($query) => $query->whereKey((int) $gateway), fn ($query) => $query->where('slug', $gateway))
             ->first();
 
-        if ($provider) {
-            return $provider;
-        }
-
-        $legacyGateway = PaymentGateway::query()
-            ->when(is_numeric($gateway), fn ($query) => $query->whereKey((int) $gateway), fn ($query) => $query->where('slug', $gateway))
-            ->first();
-
-        if (! $legacyGateway) {
-            return null;
-        }
-
-        return API::query()->where('slug', $legacyGateway->slug)->first();
+        return $provider;
     }
 }
 

@@ -92,6 +92,7 @@
                                 <table id="table-extended-success" class="table mb-0">
                                     <thead>
                                         <tr>
+                                            <th>S/N</th>
                                             <th>Customer</th>
                                             <th>Transaction ID</th>
                                             <th>Type</th>
@@ -102,6 +103,7 @@
                                     <tbody>
                                         @foreach ($transactions as $transaction)
                                             <tr>
+                                                <td class="text-muted">{{ $transactions->firstItem() + $loop->index }}</td>
                                                 <td>{{ $transaction->customer->user->name }} <br>
                                                     <a href="">{{ $transaction->customer->user->email }}</a> <br>
                                                     {{ $transaction->customer->user->phone }}

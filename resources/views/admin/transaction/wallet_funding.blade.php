@@ -130,6 +130,7 @@
                                 <table id="table-extended-success" class="table mb-0">
                                     <thead>
                                         <tr>
+                                            <th>S/N</th>
                                             <th>Customer</th>
                                             <th>Transaction</th>
                                             <th>Payment Details</th>
@@ -140,15 +141,22 @@
                                         @foreach ($transactions as $transaction)
                                         
                                             <tr>
+                                                <td class="text-muted">{{ $transactions->firstItem() + $loop->index }}</td>
                                                 <td>{{ $transaction->customer_name }} <br>
                                                     <a href="">{{ $transaction->customer_email  }}</a> <br>
                                                     {{ $transaction->customer_phone }} <br>
-                                                    @if($transaction->status == 'success')
-                                                    <button class="btn btn-primary btn-sm">{{ucfirst($transaction->status) }}</button>
-                                                    @else
-                                                    <button class="btn btn-danger btn-sm">{{ucfirst($transaction->status) }}</button>
-                                                    @endif
-                                                </td>
+                                                @php
+                                                    $status = strtolower((string) ($transaction->status ?? 'pending'));
+                                                    $isSuccessful = in_array($status, ['success', 'successful', 'delivered', 'completed', 'approved'], true);
+                                                @endphp
+                                                @if($isSuccessful)
+                                                    <button class="btn btn-primary btn-sm">{{ ucfirst($transaction->status) }}</button>
+                                                @elseif($status === 'attention-required')
+                                                    <button class="btn btn-warning btn-sm">{{ ucfirst(str_replace('-', ' ', $transaction->status)) }}</button>
+                                                @else
+                                                    <button class="btn btn-danger btn-sm">{{ ucfirst($transaction->status) }}</button>
+                                                @endif
+                                            </td>
                                                 <td>
                                                     <small>
                                                     <strong>Account Number: </strong>{{ $transaction->account_number }} <br>
@@ -157,6 +165,7 @@
                                                     <strong>Total Amount: </strong>{!! getSettings()->currency. number_format((float) $transaction->total_amount,2) !!} <br>
                                                     <strong>Initial Balance: </strong>{!! getSettings()->currency. number_format((float) $transaction->balance_before, 2) !!} <br>
                                                     <strong>Final Balance: </strong>{!! getSettings()->currency. number_format((float) $transaction->balance_after, 2) !!} <br>
+                                                    <strong>Provider: </strong>{{ $transaction->api?->name ?? 'Unknown API' }} <br>
                                                     <strong>Date: </strong>{{ date("M jS, Y g:iA", strtotime($transaction->created_at)) }}
 
                                                     </small>

@@ -50,6 +50,7 @@
                                             <table class="table table-striped dataex-html5-selectors">
                                                 <thead>
                                                     <tr>
+                                                        <th>S/N</th>
                                                         <th>Biller</th>
                                                         <th>Refined Data</th>
                                                         <th>Raw Data</th>
@@ -61,6 +62,7 @@
                                                 <tbody>
                                                     @foreach ( $billers as $biller )
                                                     <tr>
+                                                        <td class="text-muted">{{ $loop->iteration }}</td>
                                                         <td>{{ $biller->billers_code }}</td>
                                                         <td>
                                                             @foreach(json_decode($biller->refined_data, true) as $key => $value)

@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Models\PaymentGateway;
+use App\Models\API;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
@@ -17,6 +17,6 @@ class ReservedAccountCallback extends Model
 
     public function gateway()
     {
-        return $this->belongsTo(PaymentGateway::class, 'provider_id');
+        return $this->belongsTo(API::class, 'provider_id');
     }
 }
