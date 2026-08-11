@@ -137,7 +137,7 @@
                                                                                     </div>
                                                                                 </fieldset>
                                                                             </div>
-                                                                            
+
                                                                             <div class="col-md-12" id="receive-div" style="display:none">
                                                                                 <fieldset class="form-group">
                                                                                     <label for="receive" class="">Amount to receive  {!! getSettings()['currency'] !!}</label>
@@ -178,20 +178,20 @@
                                                                                 <small class="footnote" style="color:red">Please ensure that bank details entered are correct to enable us complete the transaction</small>
                                                                             </div>
                                                                         </div>
-                                                                    
+
+                                                                    <div class="form-group mb-50 mt-2">
+                                                                        <div class="checkbox checkbox-success checkbox-glow">
+                                                                            <input type="checkbox" id="agreement" name="agreement" required>
+                                                                            <label for="agreement"><p>I have read and agree to the instructions</p></label>
+                                                                        </div>
+                                                                    </div>
                                                                     <button id="buy-buttonx" style="margin-top:4px" class="btn btn-primary" type="submit" onclick="return submitForm()">PROCEED</button>
                                                                 </div>
-                                                                <div class="col-md-6 order-1 order-sm-2">   
+                                                                <div class="col-md-6 order-1 order-sm-2">
                                                                     <div id="instruction-div" style="display: none">
                                                                         <p style="background-color: rgb(220, 227, 231);padding: 15px;border-radius: 5px;margin-bottom: 15px;color: rgb(40, 83, 107);">Instructions</p>
                                                                         <p id="instruction"></p>
-                                                                        <div class="form-group mb-50 mt-2 ">
-                                                                            <div class="checkbox checkbox-success checkbox-glow">
-                                                                                <input type="checkbox" id="agreement" name="agreement" required>
-                                                                                <label for="agreement"><p>I have read and agree to these instructions</p></label>
-                                                                            </div>
-                                                                        </div>
-                                                                    </div> 
+                                                                    </div>
                                                                     <div id="legacy-auto-flow" class="legacy-auto-flow" style="display:none">
                                                                         <div class="alert alert-danger" id="legacy-auto-error" style="display:none"></div>
                                                                         <div id="legacy-pin-stage">
@@ -421,7 +421,7 @@
             $("#amount").val('');
             $('#receive-div').hide()
             $('#payment-div').hide()
-            
+
 
             if (product == '') {
                 $("#amount").val('');
@@ -438,7 +438,7 @@
                 var image = $('#product').find(':selected').data('image');
                 var title = $('#product').find(':selected').data('name');
                 var description = $('#product').find(':selected').data('description');
-                
+
                 $('#product-image-div').show();
                 $("#product-image").attr("src", image);
                 $("#product-title").html(title);
@@ -446,14 +446,14 @@
                 showInstruction(instruction);
                 $("#rate-div").show();
                 $("#rate").val(discounted_rate);
-                
+
                 if(min != '' && max != ''){
                     $("#airtime-range").html('The Minimum and Maximum amount for '+title + ' is '+min + ' and ' +max + ' respectively');
                     $("#airtime-range").show();
                 }else{
                     $("#airtime-range").hide();
                 }
-                
+
                 $("#amount").attr({
                     "max": max,
                     "min": min,
@@ -485,13 +485,13 @@
             }
             var fixed_price = $('#product').find(':selected').data('fixed_price');
         });
-        
-        $("#amount").keyup(function(){        
+
+        $("#amount").keyup(function(){
             var rate = parseInt($('#rate').val());
             var amount = parseInt($('#amount').val());
             var min = parseInt($('#amount').attr('min')) ?? 50;
             var max = parseInt($('#amount').attr('max'));
-            
+
             var receive = 0;
             if(amount > 0 && amount >= min && amount <= max){
                 receive = amount - ((rate/100) * amount);

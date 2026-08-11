@@ -149,7 +149,7 @@
                         </div>
                         <div class="form-check">
                             <input type="checkbox" id="agreement" name="agreement" class="form-check-input" required>
-                            <label for="agreement" class="form-check-label">I have read and agree to these instructions</label>
+                            <label for="agreement" class="form-check-label">I have read and agree to the instructions</label>
                         </div>
                     </div>
                 </div>

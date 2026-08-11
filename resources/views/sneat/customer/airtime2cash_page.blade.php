@@ -45,6 +45,7 @@
         .a2c-instruction-card #instruction ol, .a2c-instruction-card #instruction ul { padding-left: 1.2rem; }
         .a2c-trust-strip { display: flex; padding: .85rem 1rem; gap: .75rem; align-items: center; border-top: 1px solid rgba(67,89,113,.08); color: var(--bs-secondary-color); background: rgba(67,89,113,.025); font-size: .78rem; }
         .a2c-action-bar { display: flex; padding: 1rem 1.25rem; gap: 1rem; align-items: center; justify-content: space-between; border-top: 1px solid rgba(67,89,113,.08); background: rgba(255,255,255,.94); }
+        .a2c-action-stack { display: flex; flex-direction: column; gap: .75rem; min-width: 0; }
         .a2c-action-note { display: flex; align-items: center; gap: .55rem; color: var(--bs-secondary-color); font-size: .8rem; }
         .a2c-action-bar .purchase-submit { min-width: 230px; min-height: 48px; }
         .a2c-secure-flow { background: linear-gradient(145deg, rgba(255,255,255,.98), rgba(243,250,248,.94)); }
@@ -60,9 +61,10 @@
         .a2c-native-select { position: absolute !important; width: 1px !important; height: 1px !important; opacity: 0 !important; pointer-events: none !important; }
         [data-bs-theme="dark"] .a2c-card, [data-bs-theme="dark"] .a2c-mode-deck, [data-bs-theme="dark"] .conversion-mode-option, [data-bs-theme="dark"] .a2c-network-option, [data-bs-theme="dark"] .a2c-action-bar { background-color: rgba(43,44,64,.94); }
         [data-bs-theme="dark"] .a2c-rate-box { background: rgba(43,44,64,.72); }
+        @media (max-width: 1199.98px) { .a2c-action-bar { align-items: stretch; flex-direction: column; } .a2c-action-stack { width: 100%; } .a2c-action-bar .purchase-submit { width: 100%; min-width: 0; } }
         @media (max-width: 991.98px) { .a2c-instruction-card { position: static; } }
         @media (max-width: 767.98px) { .a2c-network-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .a2c-mode-heading { align-items: flex-start; flex-direction: column; } }
-        @media (max-width: 575.98px) { .a2c-workspace::before { inset-inline: -.5rem; } .a2c-card { border-radius: .95rem; } .a2c-mode-deck, .a2c-form-body, .a2c-calculator { padding: 1rem; } .conversion-mode-option { min-height: 92px; padding: .8rem; } .a2c-network-option { min-height: 102px; } .a2c-stage-summary { grid-template-columns: 1fr; } .a2c-secure-flow { padding: 1.25rem !important; } .a2c-action-bar { align-items: stretch; flex-direction: column; } .a2c-action-bar .purchase-submit { width: 100%; min-width: 0; } }
+        @media (max-width: 575.98px) { .a2c-workspace::before { inset-inline: -.5rem; } .a2c-card { border-radius: .95rem; } .a2c-mode-deck, .a2c-form-body, .a2c-calculator { padding: 1rem; } .conversion-mode-option { min-height: 92px; padding: .8rem; } .a2c-network-option { min-height: 102px; } .a2c-stage-summary { grid-template-columns: 1fr; } .a2c-secure-flow { padding: 1.25rem !important; } }
 
 
     </style>
@@ -278,7 +280,14 @@
                     </section>
 
                     <section class="a2c-card a2c-action-bar">
-                        <span class="a2c-action-note"><i class="bx bx-lock-alt fs-5 text-success"></i>Your conversion details are transmitted securely.</span>
+                        <div class="a2c-action-stack">
+                            <span class="a2c-action-note"><i class="bx bx-lock-alt fs-5 text-success"></i>Your conversion details are transmitted securely.</span>
+                            <label class="conversion-agreement" for="agreement" id="agreement-panel">
+                                <input type="checkbox" class="form-check-input conversion-agreement-check" id="agreement" name="agreement" value="1" required>
+                                <span class="conversion-agreement-icon"><i class="bx bx-check-shield"></i></span>
+                                <span class="conversion-agreement-copy"><strong>I have read and agree to the instructions</strong><small>Confirm before submitting this conversion.</small></span>
+                            </label>
+                        </div>
                         <button id="buy-button" class="purchase-submit btn btn-primary" type="submit">
                             <i class="bx bx-transfer me-1"></i>
                             <span>Submit conversion</span>
@@ -300,11 +309,6 @@
                             </div>
                             <div id="instruction-div" style="display:none">
                                 <div id="instruction" class="text-body mb-4"></div>
-                                <label class="conversion-agreement" for="agreement" id="agreement-panel">
-                                    <input type="checkbox" class="form-check-input conversion-agreement-check" id="agreement" name="agreement" value="1" required>
-                                    <span class="conversion-agreement-icon"><i class="bx bx-check-shield"></i></span>
-                                    <span class="conversion-agreement-copy"><strong>I have read and agree to these instructions</strong><small>Confirm before submitting this conversion.</small></span>
-                                </label>
                             </div>
                         </div>
                         <div class="a2c-trust-strip"><i class="bx bx-shield-quarter fs-5 text-success"></i><span>Never share your SIM PIN or OTP with a person. Enter it only in the secure Auto Transfer step.</span></div>

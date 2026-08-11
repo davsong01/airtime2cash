@@ -237,7 +237,7 @@
                                                     <p id="instruction" class="mb-3"></p>
                                                     <div class="form-check">
                                                         <input type="checkbox" class="form-check-input" id="agreement" name="agreement" required>
-                                                        <label class="form-check-label" for="agreement">I have read and agree to these instructions</label>
+                                                        <label class="form-check-label" for="agreement">I have read and agree to the instructions</label>
                                                     </div>
                                                 </div>
                                             </div>
