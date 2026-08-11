@@ -23,6 +23,9 @@ class API extends Model
         'is_bank_verification' => 'boolean',
         'is_auto_share' => 'boolean',
         'is_payment_gateway' => 'boolean',
+        'availability_score' => 'integer',
+        'availability_check_transactions_count' => 'integer',
+        'availability_checked_at' => 'datetime',
     ];
 
     protected function createdAt(): Attribute

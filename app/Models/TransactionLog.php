@@ -18,7 +18,31 @@ class TransactionLog extends Model
     protected $guarded = [];
     protected $casts = [
         'charge_breakdown' => 'array',
+        'completed_at' => 'datetime',
     ];
+
+    protected static function booted(): void
+    {
+        static::saving(function (self $transaction) {
+            if ($transaction->shouldMarkCompletedAt() && blank($transaction->completed_at)) {
+                $transaction->completed_at = now();
+            }
+        });
+    }
+
+    public function shouldMarkCompletedAt(): bool
+    {
+        return in_array(
+            strtolower((string) ($this->status ?? '')),
+            $this->successfulStatuses(),
+            true
+        );
+    }
+
+    public function successfulStatuses(): array
+    {
+        return ['success', 'successful', 'completed', 'approved', 'delivered'];
+    }
 
     public function product()
     {
