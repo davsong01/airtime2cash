@@ -36,6 +36,32 @@ class API extends Model
             get: fn (string $value) => date("M jS, Y", strtotime($value)),
         );
     }
+
+    protected function availabilityStatusClass(): Attribute
+    {
+        return Attribute::make(
+            get: fn (?string $value, array $attributes) => match ($attributes['availability_status'] ?? null) {
+                'unstable' => 'unstable',
+                'degraded', 'poor', 'fair', 'moderate' => 'degraded',
+                'stable', 'very_stable' => 'stable',
+                'healthy', 'excellent' => 'healthy',
+                default => null,
+            },
+        );
+    }
+
+    protected function availabilityStatusLabel(): Attribute
+    {
+        return Attribute::make(
+            get: fn (?string $value, array $attributes) => match ($attributes['availability_status'] ?? null) {
+                'unstable' => 'Unstable',
+                'degraded', 'poor', 'fair', 'moderate' => 'Degraded',
+                'stable', 'very_stable' => 'Stable',
+                'healthy', 'excellent' => 'Healthy',
+                default => null,
+            },
+        );
+    }
     
     public function products(){
         return $this->hasMany(Product::class, 'api_id');

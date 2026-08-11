@@ -87,9 +87,13 @@ class TransactionController extends Controller
         }
 
         $banks = Bank::active()->orderBy('bank_name')->get();
+        $activeProvider = API::query()
+            ->whereKey(getSettings()?->auto_share_provider_id)
+            ->where('status', 'active')
+            ->first();
 
         if (!empty($category) && $category->status == 'active') {
-            return view(themeView('customer', 'airtime2cash_page'), compact('category', 'banks'));
+            return view(themeView('customer', 'airtime2cash_page'), compact('category', 'banks', 'activeProvider'));
         } else {
             return back();
         }
@@ -114,6 +118,7 @@ class TransactionController extends Controller
             ->whereKey(getSettings()->bank_transfer_provider_id)
             ->where('status', 'active')
             ->first();
+        $activeProvider = $pricingProvider;
         $pricingBands = $pricingProvider?->pricing_data ?? [];
         $pricingEnabled = (bool) ($pricingProvider?->pricing_data_status ?? false);
         $pricingAvailable = $pricingEnabled && !empty($pricingBands);
@@ -126,7 +131,7 @@ class TransactionController extends Controller
         $walletBalance = walletBalance(auth()->user());
 
         if (!empty($product) && $product->status == 'active') {
-            return view(themeView('customer', 'wallet2bank_transfer_page'), compact('product', 'banks', 'pricingProvider', 'pricingBands', 'pricingAmountRange', 'providerMin', 'minimumRequiredBalance', 'pricingEnabled', 'pricingAvailable', 'walletBalance'));
+            return view(themeView('customer', 'wallet2bank_transfer_page'), compact('product', 'banks', 'pricingProvider', 'activeProvider', 'pricingBands', 'pricingAmountRange', 'providerMin', 'minimumRequiredBalance', 'pricingEnabled', 'pricingAvailable', 'walletBalance'));
         } else {
             return back();
         }

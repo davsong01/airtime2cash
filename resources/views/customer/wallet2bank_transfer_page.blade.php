@@ -178,6 +178,18 @@
         background: rgba(255, 251, 235, .95);
         color: #92400e;
     }
+    .provider-health-strip { display:flex; margin-bottom:1rem; padding:.9rem 1rem; align-items:center; justify-content:space-between; gap:1rem; border:1px solid rgba(148,163,184,.18); border-radius:14px; background:linear-gradient(145deg,#fff, #f8fafc); }
+    .provider-health-strip strong, .provider-health-strip small { display:block; }
+    .provider-health-kicker { display:inline-flex; margin-bottom:.2rem; color:#64748b; font-size:.68rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+    .provider-health-strip small { color:#64748b; }
+    .provider-health-badge { display:inline-flex; align-items:center; gap:.35rem; padding:.42rem .7rem; border-radius:999px; font-size:.72rem; font-weight:800; text-transform:capitalize; white-space:nowrap; }
+    .provider-health-badge.unstable { color:#991b1b; background:rgba(239,68,68,.14); }
+    .provider-health-badge.degraded { color:#111827; background:rgba(17,24,39,.12); }
+    .provider-health-badge.stable { color:#9a6700; background:rgba(245,158,11,.15); }
+    .provider-health-badge.healthy { color:#166534; background:rgba(34,197,94,.14); }
+    [data-bs-theme="dark"] .provider-health-strip { border-color:rgba(148,163,184,.24); background:rgba(43,44,64,.94); }
+    [data-bs-theme="dark"] .provider-health-kicker, [data-bs-theme="dark"] .provider-health-strip small { color:#cbd5e1; }
+    [data-bs-theme="dark"] .provider-health-badge.degraded { color:#e5e7eb; background:rgba(75,85,99,.4); }
 </style>
 @endsection
 
@@ -205,6 +217,21 @@
                                                 </div>
                                                 <div class="card-content">
                                                     <div class="card-body">
+                                                        @if($activeProvider && $activeProvider->availability_status_class && $activeProvider->availability_checked_at)
+                                                            <div class="provider-health-strip">
+                                                                <div>
+                                                                    <span class="provider-health-kicker">Auto Transfer Status</span>
+                                                                    <small>Checked {{ $activeProvider->availability_checked_at->diffForHumans() }}</small>
+                                                                    @if($activeProvider->availability_status_class === 'unstable')
+                                                                        <small class="text-danger mt-1">Auto transfer looks unstable right now, so manual processing may be the safer option.</small>
+                                                                    @endif
+                                                                </div>
+                                                                <span class="provider-health-badge {{ $activeProvider->availability_status_class }}">
+                                                                    <i class="bx bx-pulse"></i>
+                                                                    {{ $activeProvider->availability_status_label }}
+                                                                </span>
+                                                            </div>
+                                                        @endif
                                                         <form action="{{route('initialize.wallet2banktransaction', $product->id)}}" method="POST" onsubmit="return confirm('I have entered correct details');">
                                                             @csrf
                                                             @include('layouts.alerts')

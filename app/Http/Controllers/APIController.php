@@ -34,7 +34,7 @@ class APIController extends Controller
         $availabilitySummary = [
             'providers' => $apis->count(),
             'checked_providers' => $apis->whereNotNull('availability_checked_at')->count(),
-            'healthy_providers' => $apis->filter(fn (API $api) => in_array($api->availability_status, ['stable', 'healthy'], true))->count(),
+            'healthy_providers' => $apis->filter(fn (API $api) => in_array($api->availability_status_class, ['stable', 'healthy'], true))->count(),
             'average_score' => $availabilityScores->isNotEmpty() ? (int) round($availabilityScores->avg()) : null,
             'availability_check_transactions_count' => $apis->sum(fn (API $api) => (int) ($api->availability_check_transactions_count ?? 0)),
             'successful_transactions' => $apis->sum(fn (API $api) => (int) ($api->successful_transactions ?? 0)),

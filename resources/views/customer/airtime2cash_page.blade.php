@@ -4,6 +4,8 @@
     $autoShareProducts = $category->products->where('auto_share_status', 'active')->count();
     $defaultTransferMode = old('transfer_mode', $manualProducts ? 'manual' : 'auto_share');
     $autoTransferInstruction = $category->products->firstWhere('auto_share_status', 'active')?->auto_share_instruction;
+    $activeProviderAvailability = $activeProvider?->availability_status_class;
+    $activeProviderAvailabilityLabel = $activeProvider?->availability_status_label;
 ?>
 @extends('layouts.app')
 @section('title', $category->seo_title)
@@ -40,6 +42,18 @@
     .legacy-auto-summary span { padding:.75rem; border:1px solid #e2e9e6; border-radius:9px; background:#fff; }
     .legacy-auto-summary small, .legacy-auto-summary strong { display:block; }
     .legacy-secret-input { height:50px; text-align:center; font-size:18px; font-weight:700; letter-spacing:.25em; }
+    .provider-health-strip { display:flex; margin-bottom:1rem; padding:.9rem 1rem; align-items:center; justify-content:space-between; gap:1rem; border:1px solid rgba(148,163,184,.18); border-radius:14px; background:linear-gradient(145deg,#fff, #f8fafc); }
+    .provider-health-strip strong, .provider-health-strip small { display:block; }
+    .provider-health-kicker { display:inline-flex; margin-bottom:.2rem; color:#64748b; font-size:.68rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+    .provider-health-strip small { color:#64748b; }
+    .provider-health-badge { display:inline-flex; align-items:center; gap:.35rem; padding:.42rem .7rem; border-radius:999px; font-size:.72rem; font-weight:800; text-transform:capitalize; white-space:nowrap; }
+    .provider-health-badge.unstable { color:#991b1b; background:rgba(239,68,68,.14); }
+    .provider-health-badge.degraded { color:#111827; background:rgba(17,24,39,.12); }
+    .provider-health-badge.stable { color:#9a6700; background:rgba(245,158,11,.15); }
+    .provider-health-badge.healthy { color:#166534; background:rgba(34,197,94,.14); }
+    [data-bs-theme="dark"] .provider-health-strip { border-color:rgba(148,163,184,.24); background:rgba(43,44,64,.94); }
+    [data-bs-theme="dark"] .provider-health-kicker, [data-bs-theme="dark"] .provider-health-strip small { color:#cbd5e1; }
+    [data-bs-theme="dark"] .provider-health-badge.degraded { color:#e5e7eb; background:rgba(75,85,99,.4); }
     @media(max-width:767px) { .legacy-auto-summary { grid-template-columns:1fr; } #initialize { padding:.8rem; } }
 </style>
 @endsection
@@ -71,6 +85,21 @@
                                                             <div class="row">
                                                                 <div class="col-md-6 order-2 order-sm-1">
                                                                     <h5>Airtime to Cash</h5>
+                                                                        @if($activeProvider && $activeProviderAvailability && $activeProvider?->availability_checked_at)
+                                                                            <div class="provider-health-strip">
+                                                                                <div>
+                                                                                    <span class="provider-health-kicker">Auto Transfer Status</span>
+                                                                                    <small>Checked {{ $activeProvider->availability_checked_at->diffForHumans() }}</small>
+                                                                                    @if($activeProviderAvailability === 'unstable')
+                                                                                        <small class="text-danger mt-1">Auto transfer looks unstable right now, so manual processing may be the safer option.</small>
+                                                                                    @endif
+                                                                                </div>
+                                                                                <span class="provider-health-badge {{ $activeProviderAvailability }}">
+                                                                                    <i class="bx bx-pulse"></i>
+                                                                                    {{ $activeProviderAvailabilityLabel }}
+                                                                                </span>
+                                                                            </div>
+                                                                        @endif
                                                                         <div class="d-flex pb-1 justify-content-start align-items-center w-100" id="product-image-div" style="display:none !important">
                                                                             <img class="product-images product-image" style="padding-right: 8px;height: 70px;" id="product-image" src="" alt="">
                                                                             <div>

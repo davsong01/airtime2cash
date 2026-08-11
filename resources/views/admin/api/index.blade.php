@@ -29,22 +29,18 @@
         .provider-summary-card.is-info { border-color:rgba(0,123,255,.18); background:linear-gradient(145deg, rgba(255,255,255,.98), rgba(240,247,255,.9)); }
         .provider-summary-card.is-danger { border-color:rgba(220,53,69,.18); background:linear-gradient(145deg, rgba(255,255,255,.98), rgba(255,241,243,.9)); }
         .provider-summary-chip { display:inline-flex; align-items:center; gap:.35rem; margin-top:.7rem; padding:.33rem .6rem; border-radius:999px; font-size:.7rem; font-weight:800; }
-        .provider-summary-chip.stable { color:#168f5b; background:rgba(40,199,111,.12); }
-        .provider-summary-chip.warning { color:#b7791f; background:rgba(255,193,7,.14); }
-        .provider-summary-chip.info { color:#0f5fa6; background:rgba(0,123,255,.12); }
-        .provider-summary-chip.danger { color:#c53030; background:rgba(220,53,69,.12); }
-        .provider-summary-chip.excellent { color:#1e40af; background:rgba(30,64,175,.12); }
+        .provider-summary-chip.unstable { color:#991b1b; background:rgba(239,68,68,.12); }
+        .provider-summary-chip.degraded { color:#111827; background:rgba(17,24,39,.12); }
+        .provider-summary-chip.stable { color:#9a6700; background:rgba(245,158,11,.14); }
+        .provider-summary-chip.healthy { color:#166534; background:rgba(34,197,94,.12); }
         .provider-availability { margin-top:1rem; padding:1rem; border-radius:.75rem; background:#f8fbff; border:1px solid #e4edf7; }
         .provider-availability-head { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:.75rem; margin-bottom:.8rem; }
         .provider-availability-title { font-size:.75rem; font-weight:800; letter-spacing:.03em; text-transform:uppercase; color:#6c7a89; }
         .provider-availability-badge { display:inline-flex; align-items:center; gap:.35rem; padding:.34rem .65rem; border-radius:999px; font-size:.72rem; font-weight:800; text-transform:capitalize; }
-        .provider-availability-badge.low { color:#d9534f; background:rgba(217,83,79,.12); }
-        .provider-availability-badge.poor { color:#ff8c42; background:rgba(255,140,66,.12); }
-        .provider-availability-badge.fair { color:#cc8b00; background:rgba(204,139,0,.12); }
-        .provider-availability-badge.moderate { color:#6b7c93; background:rgba(107,124,147,.12); }
-        .provider-availability-badge.stable { color:#168f5b; background:rgba(40,199,111,.12); }
-        .provider-availability-badge.very_stable { color:#0f766e; background:rgba(15,118,110,.12); }
-        .provider-availability-badge.excellent { color:#1e40af; background:rgba(30,64,175,.12); }
+        .provider-availability-badge.unstable { color:#991b1b; background:rgba(239,68,68,.12); }
+        .provider-availability-badge.degraded { color:#111827; background:rgba(17,24,39,.12); }
+        .provider-availability-badge.stable { color:#9a6700; background:rgba(245,158,11,.15); }
+        .provider-availability-badge.healthy { color:#166534; background:rgba(34,197,94,.14); }
         .provider-availability-grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:.75rem; }
         .provider-availability-item { padding:.7rem .8rem; border-radius:.65rem; background:#fff; border:1px solid #edf2f7; }
         .provider-availability-item span { display:block; font-size:.68rem; font-weight:700; letter-spacing:.03em; text-transform:uppercase; color:#8a94a6; }
@@ -89,13 +85,13 @@
             </div>
 
             <div class="provider-summary-grid">
-                <div class="provider-summary-card {{ ($availabilitySummary['average_score'] ?? null) === 0 ? 'is-danger' : ((($availabilitySummary['average_score'] ?? null) !== null && $availabilitySummary['average_score'] >= 60) ? 'is-good' : ((($availabilitySummary['average_score'] ?? null) !== null && $availabilitySummary['average_score'] < 40) ? 'is-danger' : 'is-info')) }}">
+                <div class="provider-summary-card {{ ($availabilitySummary['average_score'] ?? null) === null ? 'is-warning' : ((($availabilitySummary['average_score'] ?? null) < 26) ? 'is-danger' : ((($availabilitySummary['average_score'] ?? null) < 51) ? 'is-info' : ((($availabilitySummary['average_score'] ?? null) < 76) ? 'is-warning' : 'is-good'))) }}">
                     <span class="provider-summary-label">Average availability</span>
                     <span class="provider-summary-value">{{ $availabilitySummary['average_score'] !== null ? $availabilitySummary['average_score'] . '%' : 'N/A' }}</span>
                     <span class="provider-summary-meta">{{ number_format((int) $availabilitySummary['providers']) }} providers in monitor</span>
-                    <span class="provider-summary-chip {{ ($availabilitySummary['average_score'] ?? null) === null ? 'warning' : (($availabilitySummary['average_score'] === 0) ? 'danger' : (($availabilitySummary['average_score'] >= 90) ? 'excellent' : (($availabilitySummary['average_score'] >= 60) ? 'stable' : 'info'))) }}">
+                    <span class="provider-summary-chip {{ ($availabilitySummary['average_score'] ?? null) === null ? 'stable' : ((($availabilitySummary['average_score'] ?? null) < 26) ? 'unstable' : ((($availabilitySummary['average_score'] ?? null) < 51) ? 'degraded' : ((($availabilitySummary['average_score'] ?? null) < 76) ? 'stable' : 'healthy'))) }}">
                         <i class="bx bx-pulse"></i>
-                        {{ ($availabilitySummary['average_score'] ?? null) === null ? 'Not checked' : (($availabilitySummary['average_score'] === 0) ? 'Unavailable' : (($availabilitySummary['average_score'] >= 90) ? 'Excellent' : (($availabilitySummary['average_score'] >= 60) ? 'Stable' : 'Watch closely'))) }}
+                        {{ ($availabilitySummary['average_score'] ?? null) === null ? 'Not checked' : ((($availabilitySummary['average_score'] ?? null) < 26) ? 'Unstable' : ((($availabilitySummary['average_score'] ?? null) < 51) ? 'Degraded' : ((($availabilitySummary['average_score'] ?? null) < 76) ? 'Stable' : 'Healthy'))) }}
                     </span>
                 </div>
                 <div class="provider-summary-card is-info">
@@ -137,10 +133,12 @@
                             <div class="provider-availability">
                                 <div class="provider-availability-head">
                                     <div class="provider-availability-title">Availability monitor</div>
-                                    <span class="provider-availability-badge {{ $api->availability_status ?? 'unknown' }}">
-                                        <i class="bx bx-pulse"></i>
-                                        {{ $api->availability_status ? str_replace('_', ' ', ucfirst($api->availability_status)) : 'Not checked' }}
-                                    </span>
+                                    @if($api->availability_checked_at && $api->availability_status_class)
+                                        <span class="provider-availability-badge {{ $api->availability_status_class }}">
+                                            <i class="bx bx-pulse"></i>
+                                            {{ $api->availability_status_label }}
+                                        </span>
+                                    @endif
                                 </div>
 
                                 <div class="provider-availability-grid">

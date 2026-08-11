@@ -54,13 +54,24 @@
         .a2c-stage-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: .75rem; padding: 1rem; border: 1px solid rgba(67,89,113,.1); border-radius: 1rem; background: rgba(255,255,255,.78); }
         .a2c-stage-summary small, .a2c-stage-summary strong { display: block; }
         .a2c-stage-summary small { color: var(--bs-secondary-color); margin-bottom: .2rem; }
-        .a2c-stage-summary strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .a2c-secret-input { min-height: 52px; font-size: 1.15rem; font-weight: 700; letter-spacing: .28em; text-align: center; }
-        .a2c-flow-error { border: 0; border-left: 4px solid var(--bs-danger); }
-        .a2c-step-pill { display: inline-flex; gap: .4rem; align-items: center; padding: .38rem .7rem; border-radius: 999px; color: #00875a; background: rgba(0,168,107,.1); font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
-        .a2c-native-select { position: absolute !important; width: 1px !important; height: 1px !important; opacity: 0 !important; pointer-events: none !important; }
-        [data-bs-theme="dark"] .a2c-card, [data-bs-theme="dark"] .a2c-mode-deck, [data-bs-theme="dark"] .conversion-mode-option, [data-bs-theme="dark"] .a2c-network-option, [data-bs-theme="dark"] .a2c-action-bar { background-color: rgba(43,44,64,.94); }
-        [data-bs-theme="dark"] .a2c-rate-box { background: rgba(43,44,64,.72); }
+    .a2c-stage-summary strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .a2c-secret-input { min-height: 52px; font-size: 1.15rem; font-weight: 700; letter-spacing: .28em; text-align: center; }
+    .a2c-flow-error { border: 0; border-left: 4px solid var(--bs-danger); }
+    .a2c-step-pill { display: inline-flex; gap: .4rem; align-items: center; padding: .38rem .7rem; border-radius: 999px; color: #00875a; background: rgba(0,168,107,.1); font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+    .a2c-native-select { position: absolute !important; width: 1px !important; height: 1px !important; opacity: 0 !important; pointer-events: none !important; }
+    .a2c-provider-health { display:flex; margin: 0 0 1rem; padding: .9rem 1rem; align-items:center; justify-content:space-between; gap: 1rem; border: 1px solid rgba(67,89,113,.12); border-radius: 1rem; background: linear-gradient(145deg, rgba(255,255,255,.98), rgba(242,247,251,.94)); box-shadow: 0 .6rem 1.4rem rgba(67,89,113,.08); }
+    .a2c-provider-health strong, .a2c-provider-health small { display:block; }
+    .a2c-provider-health-label { display:inline-flex; margin-bottom:.2rem; color: var(--bs-secondary-color); font-size:.68rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+    .a2c-provider-health small { color: var(--bs-secondary-color); }
+    .a2c-provider-health-badge { display:inline-flex; align-items:center; gap:.35rem; padding:.42rem .72rem; border-radius:999px; font-size:.72rem; font-weight:800; text-transform:capitalize; white-space:nowrap; }
+    .a2c-provider-health-badge.unstable { color:#991b1b; background:rgba(239,68,68,.14); }
+    .a2c-provider-health-badge.degraded { color:#111827; background:rgba(17,24,39,.12); }
+    .a2c-provider-health-badge.stable { color:#9a6700; background:rgba(245,158,11,.15); }
+    .a2c-provider-health-badge.healthy { color:#166534; background:rgba(34,197,94,.14); }
+    [data-bs-theme="dark"] .a2c-provider-health { border-color: rgba(67,89,113,.18); background: rgba(43,44,64,.94); }
+    [data-bs-theme="dark"] .a2c-provider-health-badge.degraded { color:#e5e7eb; background: rgba(75,85,99,.4); }
+    [data-bs-theme="dark"] .a2c-card, [data-bs-theme="dark"] .a2c-mode-deck, [data-bs-theme="dark"] .conversion-mode-option, [data-bs-theme="dark"] .a2c-network-option, [data-bs-theme="dark"] .a2c-action-bar { background-color: rgba(43,44,64,.94); }
+    [data-bs-theme="dark"] .a2c-rate-box { background: rgba(43,44,64,.72); }
         @media (max-width: 1199.98px) { .a2c-action-bar { align-items: stretch; flex-direction: column; } .a2c-action-stack { width: 100%; } .a2c-action-bar .purchase-submit { width: 100%; min-width: 0; } }
         @media (max-width: 991.98px) { .a2c-instruction-card { position: static; } }
         @media (max-width: 767.98px) { .a2c-network-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .a2c-mode-heading { align-items: flex-start; flex-direction: column; } }
@@ -76,6 +87,8 @@
     $autoShareProducts = $category->products->where('auto_share_status', 'active')->count();
     $defaultTransferMode = old('transfer_mode', $manualProducts ? 'manual' : 'auto_share');
     $autoTransferInstruction = $category->products->firstWhere('auto_share_status', 'active')?->auto_share_instruction;
+    $activeProviderAvailability = $activeProvider?->availability_status_class;
+    $activeProviderAvailabilityLabel = $activeProvider?->availability_status_label;
 @endphp
 
 @section('content')
@@ -103,6 +116,21 @@
                     </div>
                     <span class="badge bg-label-success rounded-pill"><i class="bx bx-shield-quarter me-1"></i>Secure conversion</span>
                 </div>
+                @if($activeProvider && $activeProviderAvailability && $activeProvider->availability_checked_at)
+                    <div class="a2c-provider-health">
+                        <div>
+                            <span class="a2c-provider-health-label">Auto Transfer Status</span>
+                            <small>Checked {{ $activeProvider->availability_checked_at->diffForHumans() }}</small>
+                            @if($activeProviderAvailability === 'unstable')
+                                <small class="text-danger d-block mt-1">Auto transfer looks unstable right now, so manual processing may be the safer option.</small>
+                            @endif
+                        </div>
+                        <span class="a2c-provider-health-badge {{ $activeProviderAvailability }}">
+                            <i class="bx bx-pulse"></i>
+                            {{ $activeProviderAvailabilityLabel }}
+                        </span>
+                    </div>
+                @endif
                 <div class="row g-3 conversion-mode-options">
                     <div class="col-md-6">
                         <input class="btn-check" type="radio" name="transfer_mode" id="transfer-mode-manual" value="manual" autocomplete="off" @checked($defaultTransferMode === 'manual') @disabled(!$manualProducts)>

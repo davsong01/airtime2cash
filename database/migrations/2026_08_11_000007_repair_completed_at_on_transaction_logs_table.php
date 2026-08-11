@@ -7,7 +7,8 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     /**
-     * Run the migrations.
+     * Run a one-off repair for existing transaction log rows that already
+     * reached a terminal state before the completed_at rules were added.
      */
     public function up(): void
     {
@@ -24,7 +25,7 @@ return new class extends Migration
     }
 
     /**
-     * Reverse the migrations.
+     * Reverse the repair.
      */
     public function down(): void
     {
