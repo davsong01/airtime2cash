@@ -1,6 +1,7 @@
 <?php
     $verifiable = verifiableUniqueElements();
     $defaultTransferMode = old('transfer_mode', 'auto_share');
+    $showProviderStatus = (bool) (getSettings()->show_provider_status_on_customer_pages ?? true);
 ?>
 @extends('layouts.app')
 @section('title', $category->seo_title ?? getSettings()->seo_title)
@@ -217,8 +218,8 @@
                                                 </div>
                                                 <div class="card-content">
                                                     <div class="card-body">
-                                                        @if($activeProvider && $activeProvider->availability_status_class && $activeProvider->availability_checked_at)
-                                                            <div class="provider-health-strip">
+                    @if($showProviderStatus && $activeProvider && $activeProvider->availability_status_class && $activeProvider->availability_checked_at)
+                        <div class="provider-health-strip">
                                                                 <div>
                                                                     <span class="provider-health-kicker">Auto Transfer Status</span>
                                                                     <small>Checked {{ $activeProvider->availability_checked_at->diffForHumans() }}</small>

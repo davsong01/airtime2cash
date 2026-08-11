@@ -12,5 +12,6 @@ class Settings extends Model
     protected $casts = [
         'captcha_settings' => 'array',
         'google_dashboard_ad_enabled' => 'boolean',
+        'show_provider_status_on_customer_pages' => 'boolean',
     ];
 }

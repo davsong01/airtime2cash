@@ -6,6 +6,7 @@
     $autoTransferInstruction = $category->products->firstWhere('auto_share_status', 'active')?->auto_share_instruction;
     $activeProviderAvailability = $activeProvider?->availability_status_class;
     $activeProviderAvailabilityLabel = $activeProvider?->availability_status_label;
+    $showProviderStatus = (bool) (getSettings()->show_provider_status_on_customer_pages ?? true);
 ?>
 @extends('layouts.app')
 @section('title', $category->seo_title)
@@ -85,7 +86,7 @@
                                                             <div class="row">
                                                                 <div class="col-md-6 order-2 order-sm-1">
                                                                     <h5>Airtime to Cash</h5>
-                                                                        @if($activeProvider && $activeProviderAvailability && $activeProvider?->availability_checked_at)
+                                                                        @if($showProviderStatus && $activeProvider && $activeProviderAvailability && $activeProvider?->availability_checked_at)
                                                                             <div class="provider-health-strip">
                                                                                 <div>
                                                                                     <span class="provider-health-kicker">Auto Transfer Status</span>

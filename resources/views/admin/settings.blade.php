@@ -190,6 +190,17 @@
                                                                                 <input type="text" class="form-control" id="support_link" name="support_link" value="{{ old('support_link', $settings->support_link) }}" placeholder="Support Link">
                                                                             </fieldset>
                                                                         </div>
+
+                                                                        <div class="col-md-6">
+                                                                            <fieldset class="form-group">
+                                                                                <label class="d-block" for="show_provider_status_on_customer_pages">Provider Status on Customer Pages</label>
+                                                                                <div class="custom-control custom-switch">
+                                                                                    <input type="checkbox" class="custom-control-input" id="show_provider_status_on_customer_pages" name="show_provider_status_on_customer_pages" value="1" @checked(old('show_provider_status_on_customer_pages', $settings->show_provider_status_on_customer_pages ?? true))>
+                                                                                    <label class="custom-control-label" for="show_provider_status_on_customer_pages">Show active provider status on Airtime to Cash and Wallet to Bank pages</label>
+                                                                                </div>
+                                                                                <small class="text-muted d-block mt-50">Disable this if you want customer pages to hide provider availability details.</small>
+                                                                            </fieldset>
+                                                                        </div>
                                                                     </div>
                                                                 </div>
                                                             </div>

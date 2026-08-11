@@ -57,6 +57,7 @@ class SettingsController extends Controller
                 'whatsapp_number' => '',
                 'google_ad_code' => '',
                 'google_dashboard_ad_enabled' => true,
+                'show_provider_status_on_customer_pages' => true,
                 'seo_title' => '',
                 'seo_description' => '',
                 'support_link' => '',
@@ -110,6 +111,7 @@ class SettingsController extends Controller
                 'auto_share_provider_id' => ['nullable', 'integer', 'exists:apis,id'],
                 'bank_transfer_provider_id' => ['required', 'integer', 'exists:apis,id'],
                 'bank_verification_provider_id' => ['nullable', 'integer', 'exists:apis,id'],
+                'show_provider_status_on_customer_pages' => ['nullable', 'boolean'],
 
             ]);
 
@@ -131,6 +133,7 @@ class SettingsController extends Controller
         $data['admin_layout'] = in_array($adminLayout, ['legacy'], true) ? $adminLayout : 'legacy';
         $data['customer_layout'] = in_array($customerLayout, ['legacy', 'modern'], true) ? $customerLayout : 'legacy';
         $data['google_dashboard_ad_enabled'] = $request->boolean('google_dashboard_ad_enabled');
+        $data['show_provider_status_on_customer_pages'] = $request->boolean('show_provider_status_on_customer_pages');
 
         foreach ($colorFields as $field) {
             $data[$field] = strtoupper($request->string($field)->toString());

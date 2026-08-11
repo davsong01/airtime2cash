@@ -89,6 +89,7 @@
     $autoTransferInstruction = $category->products->firstWhere('auto_share_status', 'active')?->auto_share_instruction;
     $activeProviderAvailability = $activeProvider?->availability_status_class;
     $activeProviderAvailabilityLabel = $activeProvider?->availability_status_label;
+    $showProviderStatus = (bool) (getSettings()->show_provider_status_on_customer_pages ?? true);
 @endphp
 
 @section('content')
@@ -116,7 +117,7 @@
                     </div>
                     <span class="badge bg-label-success rounded-pill"><i class="bx bx-shield-quarter me-1"></i>Secure conversion</span>
                 </div>
-                @if($activeProvider && $activeProviderAvailability && $activeProvider->availability_checked_at)
+                @if($showProviderStatus && $activeProvider && $activeProviderAvailability && $activeProvider->availability_checked_at)
                     <div class="a2c-provider-health">
                         <div>
                             <span class="a2c-provider-health-label">Auto Transfer Status</span>
