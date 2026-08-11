@@ -140,8 +140,9 @@ class ApiAvailabilityMonitorService
     private function scoreBand(int $score): string
     {
         return match (true) {
+            $score <= 20 => 'critical',
             $score <= 25 => 'unstable',
-            $score <= 50 => 'degraded',
+            $score <= 50 => 'average',
             $score <= 75 => 'stable',
             default => 'healthy',
         };
