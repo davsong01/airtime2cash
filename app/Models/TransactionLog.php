@@ -34,7 +34,7 @@ class TransactionLog extends Model
     {
         return in_array(
             strtolower((string) ($this->status ?? '')),
-            $this->successfulStatuses(),
+            $this->terminalStatuses(),
             true
         );
     }
@@ -42,6 +42,19 @@ class TransactionLog extends Model
     public function successfulStatuses(): array
     {
         return ['success', 'successful', 'completed', 'approved', 'delivered'];
+    }
+
+    public function failedStatuses(): array
+    {
+        return ['failed', 'declined', 'rejected', 'cancelled', 'canceled'];
+    }
+
+    public function terminalStatuses(): array
+    {
+        return array_values(array_unique(array_merge(
+            $this->successfulStatuses(),
+            $this->failedStatuses()
+        )));
     }
 
     public function product()

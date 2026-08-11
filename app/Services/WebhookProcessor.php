@@ -88,7 +88,9 @@ class WebhookProcessor
                             ? ($this->extractMessage($payload) ?? 'Transaction completed successfully.')
                             : ($this->extractMessage($payload) ?? 'Transaction failed.'),
                         'decline_reason' => $isFailed ? ($this->extractMessage($payload) ?? 'Transaction failed.') : null,
-                        'completed_at' => $isSuccessful ? ($transaction->completed_at ?? now()) : $transaction->completed_at,
+                        'completed_at' => ($isSuccessful || $isFailed)
+                            ? ($transaction->completed_at ?? now())
+                            : $transaction->completed_at,
                     ]);
                 } elseif ($transaction instanceof TransactionLog) {
                     $transaction->update($this->resolveTransactionLogUpdates($transaction, $payload, $providerStatus, $isSuccessful, $isFailed));
@@ -191,7 +193,7 @@ class WebhookProcessor
         ] + (Schema::hasColumn('transaction_logs', 'provider_status')
             ? ['provider_status' => $providerStatus ?: ($isSuccessful ? 'successful' : 'failed')]
             : []) + (Schema::hasColumn('transaction_logs', 'completed_at')
-            ? ['completed_at' => $isSuccessful ? ($transaction->completed_at ?? now()) : $transaction->completed_at]
+            ? ['completed_at' => ($isSuccessful || $isFailed) ? ($transaction->completed_at ?? now()) : $transaction->completed_at]
             : []);
     }
 

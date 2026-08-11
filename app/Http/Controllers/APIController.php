@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Providers\KingsVtuController;
 use App\Models\API;
 use App\Models\Bank;
+use App\Services\ApiAvailabilityMonitorService;
 use App\Services\AutoSyncService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -15,7 +16,33 @@ class APIController extends Controller
     public function index()
     {
         $apis = API::withCount('products')->get();
-        return view('admin.api.index', compact('apis'));
+        $availabilityScores = $apis->pluck('availability_score')->filter(fn ($score) => $score !== null);
+        $lastCheckedAt = $apis->pluck('availability_checked_at')->filter()->sortDesc()->first();
+        $monitorUrl = route('cron.api-availability-monitor', [
+            'windowMinutes' => 60,
+            'sampleSize' => 20,
+        ]);
+
+        $monitorToken = trim((string) env('API_AVAILABILITY_MONITOR_TOKEN', ''));
+
+        if ($monitorToken !== '') {
+            $monitorUrl .= (str_contains($monitorUrl, '?') ? '&' : '?') . http_build_query([
+                'token' => $monitorToken,
+            ]);
+        }
+
+        $availabilitySummary = [
+            'providers' => $apis->count(),
+            'checked_providers' => $apis->whereNotNull('availability_checked_at')->count(),
+            'healthy_providers' => $apis->filter(fn (API $api) => in_array($api->availability_status, ['stable', 'healthy'], true))->count(),
+            'average_score' => $availabilityScores->isNotEmpty() ? (int) round($availabilityScores->avg()) : null,
+            'availability_check_transactions_count' => $apis->sum(fn (API $api) => (int) ($api->availability_check_transactions_count ?? 0)),
+            'successful_transactions' => $apis->sum(fn (API $api) => (int) ($api->successful_transactions ?? 0)),
+            'failed_transactions' => $apis->sum(fn (API $api) => (int) ($api->failed_transactions ?? 0)),
+            'last_checked_at' => $lastCheckedAt,
+        ];
+
+        return view('admin.api.index', compact('apis', 'availabilitySummary', 'monitorUrl'));
     }
 
     public function create()
@@ -256,6 +283,39 @@ class APIController extends Controller
             'count' => $fetchedCount,
             'synced_count' => $syncedCount,
         ]);
+    }
+
+    public function monitorAvailability(Request $request, ApiAvailabilityMonitorService $monitor)
+    {
+        $expectedToken = (string) env('API_AVAILABILITY_MONITOR_TOKEN', '');
+        $providedToken = (string) $request->query('token', '');
+
+        if ($expectedToken !== '' && ! hash_equals($expectedToken, $providedToken)) {
+            return response()->json([
+                'status' => 'failed',
+                'message' => 'Unauthorized.',
+            ], 403);
+        }
+
+        $windowMinutes = max(1, (int) $request->route('windowMinutes', 60));
+        $sampleSize = max(1, (int) $request->route('sampleSize', 20));
+
+        try {
+            return response()->json(
+                $monitor->run($windowMinutes, $sampleSize)
+            );
+        } catch (Throwable $e) {
+            Log::error('API availability monitor failed.', [
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+
+            return response()->json([
+                'status' => 'failed',
+                'message' => 'Unable to complete availability monitor right now.',
+            ], 500);
+        }
     }
 
     private function decodePricingBands(?string $pricingData): array

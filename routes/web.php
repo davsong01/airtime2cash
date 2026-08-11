@@ -54,6 +54,7 @@ Route::get('cron/analyze-webhook/{pick}', [CallbackOperationsController::class, 
 // Payment provider webhooks
 Route::post('log-p-callback/{provider}', [PaymentController::class, 'dumpCallback'])->name('log.payment.response');
 Route::get('cron/analyze-callback', [PaymentController::class, 'analyzeCallbackResponse'])->name('callback.analyze');
+Route::get('cron/api-availability-monitor/{windowMinutes?}/{sampleSize?}', [APIController::class, 'monitorAvailability'])->name('cron.api-availability-monitor');
 // End Payment provider webhooks
 Route::get('cron/sendemails', [Controller::class, 'cronSendEmails']);
 Route::get('generate-api-keys', function(){

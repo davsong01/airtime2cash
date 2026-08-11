@@ -12,7 +12,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Airtime2CashTransactions extends Model
 {
     protected $guarded = [];
-    protected $casts = ['provider_response' => 'array'];
+    protected $casts = [
+        'provider_response' => 'array',
+        'completed_at' => 'datetime',
+    ];
     use HasFactory;
 
     public function product(){

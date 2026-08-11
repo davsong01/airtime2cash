@@ -11,13 +11,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        if (! Schema::hasTable('transaction_logs') || ! Schema::hasColumn('transaction_logs', 'completed_at')) {
+        if (! Schema::hasTable('airtime2_cash_transactions') || ! Schema::hasColumn('airtime2_cash_transactions', 'completed_at')) {
             return;
         }
 
-        DB::table('transaction_logs')
+        DB::table('airtime2_cash_transactions')
             ->whereNull('completed_at')
-            ->whereIn('status', ['success', 'successful', 'completed', 'approved', 'delivered', 'failed', 'declined', 'rejected', 'cancelled', 'canceled'])
+            ->whereIn('status', ['success', 'successful', 'completed', 'approved', 'failed', 'declined'])
             ->update([
                 'completed_at' => DB::raw('COALESCE(updated_at, created_at, NOW())'),
             ]);
@@ -28,12 +28,12 @@ return new class extends Migration
      */
     public function down(): void
     {
-        if (! Schema::hasTable('transaction_logs') || ! Schema::hasColumn('transaction_logs', 'completed_at')) {
+        if (! Schema::hasTable('airtime2_cash_transactions') || ! Schema::hasColumn('airtime2_cash_transactions', 'completed_at')) {
             return;
         }
 
-        DB::table('transaction_logs')
-            ->whereIn('status', ['success', 'successful', 'completed', 'approved', 'delivered', 'failed', 'declined', 'rejected', 'cancelled', 'canceled'])
+        DB::table('airtime2_cash_transactions')
+            ->whereIn('status', ['success', 'successful', 'completed', 'approved', 'failed', 'declined'])
             ->whereNotNull('completed_at')
             ->update([
                 'completed_at' => null,

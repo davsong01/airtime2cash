@@ -7,6 +7,7 @@
     }else {
         $color = 'green';
     }
+    $completedAt = $transaction->completed_at ?? $transaction->updated_at ?? null;
 ?>
 @extends('layouts.app')
 @section('title', 'Transaction Completed')
@@ -179,6 +180,15 @@
                                                                                 </div>
 
                                                                                 <div class="item-progress value">{{ ucfirst($transaction->status) }}</div>
+                                                                                </div>
+                                                                            </li>
+                                                                            <li class="d-flex mb-1">
+                                                                                 <div class="d-flex w-100 flex-wrap align-items-center justify-content-between gap-2">
+                                                                                <div class="me-2">
+                                                                                    <p class="mb-0 lh-1 key">Completed at: </p>
+                                                                                </div>
+
+                                                                                <div class="item-progress value">{{ $completedAt ? $completedAt->format('M jS, Y g:iA') : 'Awaiting completion' }}</div>
                                                                                 </div>
                                                                             </li>
                                                                            

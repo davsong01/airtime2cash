@@ -28,6 +28,9 @@
     $productInitial = str($productName)->substr(0, 2)->upper();
     $transferMode = $transaction->transfer_mode === 'auto_share' ? 'Auto Transfer' : 'Manual Transfer';
     $createdAt = $transaction->created_at;
+    $completedAt = $transaction->completed_at ?? $transaction->updated_at ?? null;
+    $completedLabel = $completedAt ? $completedAt->format('M j, Y · g:i A') : 'Awaiting completion';
+    $isCompleted = filled($transaction->completed_at) || in_array($status, ['approved', 'declined', 'successful', 'failed'], true);
 @endphp
 
 @extends('sneat.layouts.app')
@@ -202,6 +205,10 @@
                             <li class="a2c-timeline-item {{ $status === 'approved' ? 'is-complete' : '' }}">
                                 <span class="a2c-timeline-dot"><i class="bx {{ $status === 'approved' ? 'bx-check' : 'bx-wallet' }}"></i></span>
                                 <span class="a2c-timeline-copy"><strong>Payout approved</strong><small>{{ $status === 'approved' ? 'The payout for this conversion has been approved.' : 'This step follows a successful review.' }}</small></span>
+                            </li>
+                            <li class="a2c-timeline-item {{ $isCompleted ? 'is-complete' : 'is-current' }}">
+                                <span class="a2c-timeline-dot"><i class="bx {{ $isCompleted ? 'bx-check' : 'bx-time-five' }}"></i></span>
+                                <span class="a2c-timeline-copy"><strong>Completed</strong><small>{{ $completedAt ? 'Completed at ' . $completedLabel : 'The transaction has not been completed yet.' }}</small></span>
                             </li>
                         </ol>
                     </div>

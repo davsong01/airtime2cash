@@ -1030,7 +1030,7 @@ class TransactionController extends Controller
                     ? ($providerResponse['message'] ?? data_get($providerResponse, 'data.transaction.details'))
                     : null,
 
-                'completed_at' => $statusCode === 1
+                'completed_at' => in_array($statusCode, [0, 1], true)
                     ? ($transaction->completed_at ?? now())
                     : $transaction->completed_at,
             ]);
@@ -2710,6 +2710,7 @@ class TransactionController extends Controller
             'description' => 'Airtime2Cash Request was declined by ADMIN',
             'approved_by' => auth()->user()->admin->id,
             'decline_reason' => $request->decline_reason,
+            'completed_at' => $transaction->completed_at ?? now(),
         ]);
 
         $subject = "Airtime2Cash Transaction Update";

@@ -6,6 +6,8 @@
     }else {
         $color = 'green';
     }
+    $completedAt = $transaction->completed_at ?? $transaction->updated_at ?? $transaction->created_at;
+    $completedAtText = $completedAt ? date("M jS, Y g:iA", strtotime($completedAt)) : 'Awaiting completion';
 ?>
 @extends('layouts.app')
 @section('title', 'Transction Details')
@@ -127,6 +129,13 @@
                                                                 @endif
                                                                 @if($transaction->status == 'declined')
                                                                 <span style="color:red"><strong>Declined:</strong> {{ $transaction->updated_at}} 
+                                                                @endif
+                                                                <br>
+                                                                <strong>Completed:</strong>
+                                                                @if($transaction->status == 'pending' && blank($transaction->completed_at))
+                                                                    Awaiting completion
+                                                                @else
+                                                                    {{ $completedAtText }}
                                                                 @endif
                                                             </div>
                                                             <div class="col-md-4">

@@ -25,6 +25,8 @@ class API extends Model
         'is_payment_gateway' => 'boolean',
         'availability_score' => 'integer',
         'availability_check_transactions_count' => 'integer',
+        'successful_transactions' => 'integer',
+        'failed_transactions' => 'integer',
         'availability_checked_at' => 'datetime',
     ];
 

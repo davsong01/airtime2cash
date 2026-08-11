@@ -480,15 +480,16 @@ class AutoSyncService
                     $completedAmount = (float) ($providerTransaction['actual_amount'] ?? $providerTransaction['amount'] ?? 0);
                     $this->settlement->settle($transaction, $completedAmount, $payload, $resolvedBy);
                 } elseif (in_array($providerStatus, ['failed', 'declined', 'cancelled'], true)) {
-                    if ($transaction->status !== 'approved') {
-                        $transaction->update([
-                            'status' => 'declined',
-                            'provider_status' => $providerStatus,
-                            'provider_response' => json_encode($payload),
-                            'description' => $providerTransaction['details'] ?? 'Auto Transfer failed at AutoSync.',
-                            'approved_by' => $resolvedBy ?? $transaction->approved_by,
-                        ]);
-                    }
+                if ($transaction->status !== 'approved') {
+                    $transaction->update([
+                        'status' => 'declined',
+                        'provider_status' => $providerStatus,
+                        'provider_response' => json_encode($payload),
+                        'description' => $providerTransaction['details'] ?? 'Auto Transfer failed at AutoSync.',
+                        'approved_by' => $resolvedBy ?? $transaction->approved_by,
+                        'completed_at' => $transaction->completed_at ?? now(),
+                    ]);
+                }
                 } else {
                     throw new RuntimeException('Webhook does not contain a final AutoSync transaction status.');
                 }
