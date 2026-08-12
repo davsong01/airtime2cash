@@ -610,6 +610,8 @@ class MonnifyController extends BankTransferProviderController
     public function redirectToGateway(Request $request, $transaction)
     {
         $token = $this->login();
+        $paymentReference = (string) $request['reference'];
+        $redirectUrl = route('payment-callback', $this->api()?->id);
 
         if (empty($token)) {
             return [
@@ -622,11 +624,11 @@ class MonnifyController extends BankTransferProviderController
             'amount' => $request->amount,
             'customerName' => auth()->user()->firstname . ' ' . auth()->user()->lastname,
             'customerEmail' => auth()->user()->email,
-            'paymentReference' => $request['reference'],
+            'paymentReference' => $paymentReference,
             'paymentDescription' => 'WALLET-FUNDING',
             'currencyCode' => 'NGN',
             'contractCode' => $this->api()?->contract_id,
-            'redirectUrl' => route('payment-callback', $this->api()?->id),
+            'redirectUrl' => $redirectUrl,
             'paymentMethods' => ['CARD', 'ACCOUNT_TRANSFER'],
         ]);
 
@@ -641,9 +643,27 @@ class MonnifyController extends BankTransferProviderController
             'POST'
         );
 
+        $responsePaymentReference = (string) data_get($response, 'responseBody.paymentReference');
+        $responseRedirectUrl = (string) data_get($response, 'responseBody.redirectUrl');
+        $checkoutUrl = data_get($response, 'responseBody.checkoutUrl');
+        $monnifyTransactionReference = (string) data_get($response, 'responseBody.transactionReference');
+
+        if (filled($monnifyTransactionReference)) {
+            $requestData = json_decode((string) ($transaction->request_data ?? '{}'), true);
+            $requestData = is_array($requestData) ? $requestData : [];
+            $requestData['monnify_transaction_reference'] = $monnifyTransactionReference;
+
+            $transaction->update([
+                'request_data' => json_encode($requestData),
+                'api_response' => json_encode($response),
+            ]);
+        }
+
         return [
-            'status' => (($response['responseCode'] ?? null) === 0 && ($response['responseMessage'] ?? null) === 'success') ? 'success' : 'failed',
-            'url' => $response['responseBody']['checkoutUrl'] ?? null,
+            'status' => (($response['requestSuccessful'] ?? false) === true
+                && $responsePaymentReference === $paymentReference
+                && filled($checkoutUrl)) ? 'success' : 'failed',
+            'url' => $checkoutUrl,
             'api_response' => $response,
         ];
     }

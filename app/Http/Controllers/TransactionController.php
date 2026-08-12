@@ -808,7 +808,10 @@ class TransactionController extends Controller
     public function transactionStatus($transaction_id)
     {
         $transaction = TransactionLog::with(['product', 'variation', 'bank'])
-            ->where('transaction_id', $transaction_id)
+            ->where(function ($query) use ($transaction_id) {
+                $query->where('transaction_id', $transaction_id)
+                    ->orWhere('reference_id', $transaction_id);
+            })
             ->firstOrFail();
 
         return view(themeView('customer', 'transaction_status'), compact('transaction'));

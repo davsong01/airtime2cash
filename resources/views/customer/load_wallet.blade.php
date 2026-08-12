@@ -43,6 +43,45 @@
         background: linear-gradient(135deg, #4f46e5, #7c3aed);
         box-shadow: 0 10px 20px -12px rgba(79, 70, 229, 0.6);
     }
+
+    .wallet-balance-card {
+        border: 0;
+        border-radius: 1.25rem;
+        background: linear-gradient(135deg, #0f172a 0%, #1d4ed8 55%, #7c3aed 100%);
+        color: #fff;
+        box-shadow: 0 18px 40px -18px rgba(15, 23, 42, 0.45);
+        overflow: hidden;
+    }
+
+    .wallet-balance-card__label {
+        font-size: 0.8rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        opacity: 0.8;
+    }
+
+    .wallet-balance-card__amount {
+        font-size: clamp(1.9rem, 4vw, 2.8rem);
+        font-weight: 800;
+        line-height: 1;
+    }
+
+    .wallet-balance-card__note {
+        color: rgba(255, 255, 255, 0.8);
+    }
+
+    .wallet-balance-card__pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.45rem 0.75rem;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.12);
+        color: #fff;
+        font-size: 0.78rem;
+        font-weight: 600;
+        backdrop-filter: blur(8px);
+    }
 </style>
 @endsection
 
@@ -237,6 +276,25 @@
                                         </div>
                                     </div>
                                 </section>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row mt-3 mb-4">
+                    <div class="col-12 col-lg-8">
+                        <div class="card wallet-balance-card">
+                            <div class="card-body p-4">
+                                <div class="d-flex align-items-start justify-content-between flex-wrap gap-3">
+                                    <div>
+                                        <div class="wallet-balance-card__label mb-2">Current wallet balance</div>
+                                        <div class="wallet-balance-card__amount">{{ getSettings()->currency }}{{ number_format((float) walletBalance(auth()->user()), 2) }}</div>
+                                        <div class="wallet-balance-card__note mt-2">Use this balance for purchases, transfers, and wallet-based services.</div>
+                                    </div>
+                                    <div class="d-flex flex-column gap-2 align-items-start align-items-lg-end">
+                                        <span class="wallet-balance-card__pill"><i class="bx bx-wallet"></i> Live balance</span>
+                                        <span class="wallet-balance-card__pill"><i class="bx bx-shield-quarter"></i> KYC verified actions</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>

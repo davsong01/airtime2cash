@@ -270,7 +270,15 @@ class PaymentController extends Controller
         $wallet = new WalletController();
         $balance = $wallet->getWalletBalance(auth()->user());
 
-        $reference_id = $request->paymentReference ?? $request->reference ?? $request->trxref ?? $request->transactionReference ?? null;
+        $reference_id = $request->paymentReference
+            ?? $request->query('paymentReference')
+            ?? $request->transactionReference
+            ?? $request->query('transactionReference')
+            ?? $request->reference
+            ?? $request->query('reference')
+            ?? $request->trxref
+            ?? $request->query('trxref')
+            ?? null;
         $transaction = TransactionLog::where('reference_id', $reference_id)->first();
         if (!$transaction || !$reference_id) {
             return abort(404);
@@ -279,6 +287,7 @@ class PaymentController extends Controller
 
         // Verify Transaction
         $verify = $this->verifyPayment($reference_id, $provider_id);
+
         $verifiedAmount = (float) data_get($verify, 'amount', 0);
         $expectedAmount = (float) $transaction->amount;
 
@@ -310,7 +319,7 @@ class PaymentController extends Controller
 
                 $this->sendTransactionEmail($transaction, auth()->user());
 
-                return redirect(route('transaction.status', $transaction->transaction_id));
+                return redirect(route('transaction.status', $transaction->reference_id));
             } catch (\Throwable $th) {
                 DB::rollBack();
                 $transaction->update([
@@ -318,7 +327,7 @@ class PaymentController extends Controller
                     'status' => 'attention-required',
                     'descr' => 'Wallet Funding of ' . getSettings()->currency . number_format($paid, 2) . ' failed. Transaction unverified',
                 ]);
-                return redirect(route('transaction.status', $transaction->transaction_id));
+                return redirect(route('transaction.status', $transaction->reference_id));
             }
         } else {
             $transaction->update([
