@@ -322,6 +322,24 @@
                                                                 <label for="contract_id">Contract ID</label>
                                                                 <input type="text" class="form-control" name="contract_id" value="{{ old('contract_id', optional($api)->contract_id) }}" placeholder="Enter contract id" id="contract_id">
                                                             </fieldset>
+                                                            <fieldset class="form-group mb-3">
+                                                                <label for="charge">Card Funding Charge</label>
+                                                                <input type="number" min="0" step="0.01" class="form-control" name="charge" value="{{ old('charge', optional($api)->charge) }}" placeholder="Enter charge" id="charge">
+                                                                <small class="text-muted d-block mt-50">This is the provider charge used for card-based wallet funding. The extra card funding charge in Settings is added separately at checkout.</small>
+                                                            </fieldset>
+                                                            <fieldset class="form-group mb-3">
+                                                                <label for="reserved_account_payment_charge_type">Reserved Account Charge Type</label>
+                                                                <select class="form-control" name="reserved_account_payment_charge_type" id="reserved_account_payment_charge_type">
+                                                                    <option value="flat" @selected(old('reserved_account_payment_charge_type', optional($api)->reserved_account_payment_charge_type ?? 'flat') === 'flat')>Flat</option>
+                                                                    <option value="percentage" @selected(old('reserved_account_payment_charge_type', optional($api)->reserved_account_payment_charge_type) === 'percentage')>Percentage</option>
+                                                                </select>
+                                                                <small class="text-muted d-block mt-50">Choose whether the reserved account charge is a fixed amount or percentage.</small>
+                                                            </fieldset>
+                                                            <fieldset class="form-group mb-3">
+                                                                <label for="reserved_account_payment_charge">Reserved Account Payment Charge</label>
+                                                                <input type="number" min="0" step="0.01" class="form-control" name="reserved_account_payment_charge" value="{{ old('reserved_account_payment_charge', optional($api)->reserved_account_payment_charge) }}" placeholder="Enter reserved account charge" id="reserved_account_payment_charge">
+                                                                <small class="text-muted d-block mt-50">Used for wallet funding via reserved account transfers.</small>
+                                                            </fieldset>
                                                             <div class="form-group mb-0">
                                                                 <label for="live_base_url">Live Base URL</label>
                                                                 <input type="text" class="form-control" name="live_base_url" value="{{ old('live_base_url', optional($api)->live_base_url) }}" placeholder="Enter live base url" id="live_base_url">

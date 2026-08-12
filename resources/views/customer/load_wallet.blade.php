@@ -11,6 +11,10 @@
 </style>
 @endsection
 @section('content')
+@php
+    $allowCardFunding = strtolower((string) (getSettings()->allow_fund_with_card ?? 'no')) === 'yes';
+    $allowReservedAccountFunding = strtolower((string) (getSettings()->allow_fund_with_reserved_account ?? 'no')) === 'yes';
+@endphp
 <!-- Content wrapper -->
 <div class="app-content content">
     <div class="content-overlay"></div>
@@ -42,24 +46,24 @@
                                                             <a href="{{ route('update.kyc.details') }}" class="btn btn-info btn-sm">Update KYC details here</a>
                                                         @else
                                                             <ul class="nav nav-tabs nav-fill" id="myTab" role="tablist">
-                                                                @if(getSettings()->allow_fund_with_card == 'yes')
+                                                                @if($allowCardFunding)
                                                                 <li class="nav-item">
                                                                     <a class="nav-link active" id="home-tab-fill" data-toggle="tab" href="#product-details" role="tab" aria-controls="product-details" aria-selected="true">
                                                                         Fund with Card
                                                                     </a>
                                                                 </li>
                                                                 @endif
-                                                                @if(getSettings()->allow_fund_with_reserved_account == 'yes')
+                                                                @if($allowReservedAccountFunding)
                                                                 <li class="nav-item">
-                                                                    <a class="nav-link" id="profile-tab-fill" data-toggle="tab" href="#variations" role="tab" aria-controls="variations" aria-selected="false">
+                                                                    <a class="nav-link {{ $allowCardFunding ? '' : 'active' }}" id="profile-tab-fill" data-toggle="tab" href="#variations" role="tab" aria-controls="variations" aria-selected="{{ $allowCardFunding ? 'false' : 'true' }}">
                                                                         Fund with bank transfer
                                                                     </a>
                                                                 </li>
                                                                 @endif
                                                             </ul>
                                                             <div class="tab-content pt-1">
-                                                                @if(getSettings()->allow_fund_with_card == 'yes')
-                                                                <div class="tab-pane {{ getSettings()->allow_fund_with_card == 'yes' ? 'active' : ''}}" id="product-details" role="tabpanel" aria-labelledby="home-tab-fill">
+                                                                @if($allowCardFunding)
+                                                                <div class="tab-pane {{ $allowCardFunding ? 'active' : ''}}" id="product-details" role="tabpanel" aria-labelledby="home-tab-fill">
                                                                     <p>Credit your wallet now, and spend from it later. No Need to enter card details everytime you want to make a Payment. Make Faster Payments. 
                                                                     <br>  <small style="color:red"><b>NOTE: </b>A charge of <strong>{{number_format($gateway->charge, 1)}}% @if(getSettings()->card_funding_extra_charge > 0)+ {!!getSettings()->currency !!}{{getSettings()->card_funding_extra_charge}} @endif </strong>is applicable to this method of wallet funding</small>
                                                                     </p>
@@ -79,8 +83,8 @@
                                                                     </form>
                                                                 </div>
                                                                 @endif
-                                                                @if(getSettings()->allow_fund_with_reserved_account == 'yes')
-                                                                    <div class="tab-pane {{ getSettings()->allow_fund_with_card  !== 'yes' ? 'active' : ''}}" id="variations" role="tabpanel" aria-labelledby="profile-tab-fill">
+                                                                @if($allowReservedAccountFunding)
+                                                                    <div class="tab-pane {{ $allowCardFunding ? '' : 'active' }}" id="variations" role="tabpanel" aria-labelledby="profile-tab-fill">
                                                                         @if(auth()->user()->customer->reserved_accounts->count() > 0)
                                                                             <p>To fund your wallet, make payment into any of the accounts below. Your Wallet will be credited automatically. Account number is dedicated to crediting your wallet.<br><br><strong style="color:red">IMPORTANT:</strong><br> Payments made into any of these account are automated. This means that once you transfer, your wallet is credited automatically. <br>
                                                                             P.S: Just like every other transfers, you could experience a slight delay in wallet funding. You only need to hold on patiently as your wallet would be credited once processed. You do not need to contact support after funding your wallet, It is automated. <br>

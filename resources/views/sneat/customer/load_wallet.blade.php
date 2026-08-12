@@ -2,18 +2,16 @@
 @section('title', 'Fund Wallet')
 
 @php
-    $walletFundingCharge = null;
-    if (!empty($provider)) {
-        $walletFundingCharge = getPaymentGatewayReservedAccountCharge($provider->id);
-    } elseif (!empty($gateway)) {
-        $walletFundingCharge = getPaymentGatewayReservedAccountCharge($gateway->id);
-    }
-
-    $walletFundingChargeText = $walletFundingCharge['display_value'] ?? null;
+    $allowCardFunding = strtolower((string) (getSettings()->allow_fund_with_card ?? 'no')) === 'yes';
+    $allowReservedAccountFunding = strtolower((string) (getSettings()->allow_fund_with_reserved_account ?? 'no')) === 'yes';
+    $cardFundingCharge = (float) ($gateway->charge ?? 0);
+    $cardFundingExtraCharge = (float) (getSettings()->card_funding_extra_charge ?? 0);
     $walletFundingSubtitle = 'Choose a funding method that fits your account and KYC status.';
-    if ($walletFundingChargeText) {
-        $walletFundingSubtitle .= ' Wallet funding charge is ' . $walletFundingChargeText . '.';
+    $walletFundingSubtitle .= ' Card funding charge is ' . number_format($cardFundingCharge, 1) . '%';
+    if ($cardFundingExtraCharge > 0) {
+        $walletFundingSubtitle .= ' + ' . getSettings()->currency . number_format($cardFundingExtraCharge, 2);
     }
+    $walletFundingSubtitle .= '.';
 @endphp
 
 @section('content')
@@ -36,20 +34,20 @@
                 <div class="card customer-form-card">
                     <div class="card-body">
                         <ul class="nav nav-pills mb-4" role="tablist">
-                            @if(getSettings()->allow_fund_with_card == 'yes')
+                            @if($allowCardFunding)
                                 <li class="nav-item">
                                     <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#fund-card" type="button">Fund with Card</button>
                                 </li>
                             @endif
-                            @if(getSettings()->allow_fund_with_reserved_account == 'yes')
+                            @if($allowReservedAccountFunding)
                                 <li class="nav-item">
-                                    <button class="nav-link {{ getSettings()->allow_fund_with_card == 'yes' ? '' : 'active' }}" data-bs-toggle="tab" data-bs-target="#fund-bank" type="button">Fund with Bank Transfer</button>
+                                    <button class="nav-link {{ $allowCardFunding ? '' : 'active' }}" data-bs-toggle="tab" data-bs-target="#fund-bank" type="button">Fund with Bank Transfer</button>
                                 </li>
                             @endif
                         </ul>
 
                         <div class="tab-content">
-                            @if(getSettings()->allow_fund_with_card == 'yes')
+                            @if($allowCardFunding)
                                 <div class="tab-pane fade show active" id="fund-card">
                                     <div class="row g-4 align-items-center">
                                         <div class="col-lg-7">
@@ -74,8 +72,8 @@
                                 </div>
                             @endif
 
-                            @if(getSettings()->allow_fund_with_reserved_account == 'yes')
-                                <div class="tab-pane fade {{ getSettings()->allow_fund_with_card == 'yes' ? '' : 'show active' }}" id="fund-bank">
+                            @if($allowReservedAccountFunding)
+                                <div class="tab-pane fade {{ $allowCardFunding ? '' : 'show active' }}" id="fund-bank">
                                     @if(auth()->user()->customer->reserved_accounts->count() > 0)
                                         <div class="alert alert-success">
                                             Bank transfer funding is automatic. Once you transfer, your wallet is credited after processing.
