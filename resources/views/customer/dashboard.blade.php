@@ -186,6 +186,20 @@
                                         </a>
                                     </div>
                                 </div>
+                                @php
+                                    $walletToBankProduct = \App\Models\Product::where('id', env('TRANSFER_TO_BANK_PRODUCT_ID'))
+                                        ->where('status', 'active')
+                                        ->first();
+                                @endphp
+                                @if($walletToBankProduct)
+                                    <div class="col-md-4" style="padding-bottom: 5px;">
+                                        <div class="button-container">
+                                            <a target="_blank" href="{{ route('wallet-to-bank', $walletToBankProduct->slug) }}" class="fund-wallet-btn" style="background-color: #198754">
+                                                <span style="font-size: 11px;" class="icon"><i class="bx bx-transfer" style="font-size:24px;"></i></span> <span class="display">&nbsp;Wallet 2 Bank Transfer</span>
+                                            </a>
+                                        </div>
+                                    </div>
+                                @endif
                                 @foreach (getCategories() as $category)
                                 <?php
                                     $colors = [

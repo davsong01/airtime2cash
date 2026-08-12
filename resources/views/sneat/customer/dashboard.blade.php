@@ -302,7 +302,10 @@
         $airtimeToCashActive = \App\Models\Category::where('type', 'airtime2cash')
             ->where('status', 'active')
             ->exists();
-        $serviceCount = $services->count() + ($airtimeToCashActive ? 1 : 0);
+        $walletToBankProduct = \App\Models\Product::where('id', env('TRANSFER_TO_BANK_PRODUCT_ID'))
+            ->where('status', 'active')
+            ->first();
+        $serviceCount = $services->count() + ($airtimeToCashActive ? 1 : 0) + ($walletToBankProduct ? 1 : 0);
         $referralLink = url('/register') . '?referral=' . $user->username;
         $firstName = $user->firstname ?: $user->username;
         $quickActions = [
@@ -369,11 +372,17 @@
 
                     <div class="dashboard-wallet-actions d-flex flex-wrap gap-2 mb-4">
                         <a href="{{ route('customer.load.wallet') }}" class="dashboard-wallet-primary-action btn px-4">
-                            <i class="bx bx-plus-circle me-1"></i> Fund Wallet
+                            <i class="bx bx-plus-circle me-1"></i> Fund Wallet For VTU Trade
+
                         </a>
                         @if($airtimeToCashActive)
                             <a href="{{ route('airtime-to-cash') }}" class="dashboard-wallet-secondary-action btn px-4">
                                 <i class="bx bx-transfer-alt me-1"></i> Airtime to Cash
+                            </a>
+                        @endif
+                        @if($walletToBankProduct)
+                            <a href="{{ route('wallet-to-bank', $walletToBankProduct->slug) }}" class="dashboard-wallet-secondary-action btn px-4">
+                                <i class="bx bx-transfer me-1"></i> Wallet 2 Bank Transfer
                             </a>
                         @endif
                     </div>
@@ -465,6 +474,17 @@
                                     <span class="dashboard-service-icon bg-label-primary"><i class="bx bx-transfer-alt"></i></span>
                                     <div class="flex-grow-1">
                                         <h6 class="mb-0">Airtime to Cash</h6>
+                                    </div>
+                                    <i class="bx bx-chevron-right text-muted"></i>
+                                </a>
+                            </div>
+                        @endif
+                        @if($walletToBankProduct)
+                            <div class="col-sm-6">
+                                <a href="{{ route('wallet-to-bank', $walletToBankProduct->slug) }}" class="dashboard-service d-flex align-items-center gap-3 rounded p-3 text-decoration-none text-body">
+                                    <span class="dashboard-service-icon bg-label-success"><i class="bx bx-transfer"></i></span>
+                                    <div class="flex-grow-1">
+                                        <h6 class="mb-0">Wallet 2 Bank Transfer</h6>
                                     </div>
                                     <i class="bx bx-chevron-right text-muted"></i>
                                 </a>

@@ -187,7 +187,7 @@ if (!function_exists("getPaymentGatewayReservedAccountCharge")) {
         if (! $gateway) {
             return [
                 'type' => 'flat',
-                'value' => 0,
+                'value' => 100,
                 'display_value' => getSettings()->currency . number_format(0, 1),
             ];
         }

@@ -1,11 +1,26 @@
 @extends('sneat.layouts.app')
 @section('title', 'Fund Wallet')
 
+@php
+    $walletFundingCharge = null;
+    if (!empty($provider)) {
+        $walletFundingCharge = getPaymentGatewayReservedAccountCharge($provider->id);
+    } elseif (!empty($gateway)) {
+        $walletFundingCharge = getPaymentGatewayReservedAccountCharge($gateway->id);
+    }
+
+    $walletFundingChargeText = $walletFundingCharge['display_value'] ?? null;
+    $walletFundingSubtitle = 'Choose a funding method that fits your account and KYC status.';
+    if ($walletFundingChargeText) {
+        $walletFundingSubtitle .= ' Wallet funding charge is ' . $walletFundingChargeText . '.';
+    }
+@endphp
+
 @section('content')
     @include('sneat.customer.partials.page-header', [
         'eyebrow' => 'Wallet',
         'title' => 'Fund Wallet',
-        'subtitle' => 'Choose a funding method that fits your account and KYC status.',
+        'subtitle' => $walletFundingSubtitle,
     ])
 
     @include('sneat.layouts.alerts')
