@@ -250,99 +250,135 @@
                                                 @method('PATCH')
                                             @endif
                                             @include('layouts.alerts')
-                                            <div class="row">
-                                                <div class="col-lg-6 mb-4">
-                                                    <div class="section-card h-100 border">
+                                            <div class="row mb-4">
+                                                <div class="col-12">
+                                                    <div class="section-card border">
                                                         <div class="card-header bg-transparent">
                                                             <h6 class="font-weight-bold mb-0">Provider Details</h6>
                                                             <div class="small mt-0.5">Identity and routing information for this provider.</div>
                                                         </div>
                                                         <div class="card-body">
-                                                            <fieldset class="form-group mb-3">
-                                                                <label for="name">Name</label>
-                                                                <input type="text" class="form-control" id="name" name="name" value="{{ old('name', optional($api)->name) }}" placeholder="Enter name" required>
-                                                            </fieldset>
-                                                            <fieldset class="form-group mb-3">
-                                                                <label for="slug">Slug</label>
-                                                                <input type="text" class="form-control" name="slug" value="{{ old('slug', optional($api)->slug) }}" placeholder="Enter slug" id="slug" required>
-                                                            </fieldset>
-                                                            <fieldset class="form-group mb-3">
-                                                                <label for="warning_threshold_status">Warning Threshold Status</label>
-                                                                <select class="form-control" name="warning_threshold_status" id="warning_threshold_status" required>
-                                                                    <option value="">Select</option>
-                                                                    <option value="active" {{ old('warning_threshold_status', optional($api)->warning_threshold_status) == 'active' ? 'selected' : '' }}>Active</option>
-                                                                    <option value="inactive" {{ old('warning_threshold_status', optional($api)->warning_threshold_status) == 'inactive' ? 'selected' : '' }}>Inactive</option>
-                                                                </select>
-                                                            </fieldset>
-                                                            <fieldset class="form-group mb-3">
-                                                                <label for="warning_threshold">Balance Warning Threshold</label>
-                                                                <input type="number" class="form-control" name="warning_threshold" value="{{ old('warning_threshold', optional($api)->warning_threshold) }}" placeholder="Enter warning threshold" id="warning_threshold">
-                                                            </fieldset>
-                                                            <fieldset class="form-group mb-0">
-                                                                <label for="sandbox_base_url">Sandbox Base URL</label>
-                                                                <input type="text" class="form-control" name="sandbox_base_url" value="{{ old('sandbox_base_url', optional($api)->sandbox_base_url) }}" placeholder="Enter sandbox base url" id="sandbox_base_url">
-                                                            </fieldset>
+                                                            <div class="row">
+                                                                <div class="col-md-6">
+                                                                    <fieldset class="form-group mb-3">
+                                                                        <label for="name">Name</label>
+                                                                        <input type="text" class="form-control" id="name" name="name" value="{{ old('name', optional($api)->name) }}" placeholder="Enter name" required>
+                                                                    </fieldset>
+                                                                </div>
+                                                                <div class="col-md-6">
+                                                                    <fieldset class="form-group mb-3">
+                                                                        <label for="slug">Slug</label>
+                                                                        <input type="text" class="form-control" name="slug" value="{{ old('slug', optional($api)->slug) }}" placeholder="Enter slug" id="slug" required>
+                                                                    </fieldset>
+                                                                </div>
+                                                                <div class="col-md-6">
+                                                                    <fieldset class="form-group mb-3">
+                                                                        <label for="warning_threshold_status">Warning Threshold Status</label>
+                                                                        <select class="form-control" name="warning_threshold_status" id="warning_threshold_status" required>
+                                                                            <option value="">Select</option>
+                                                                            <option value="active" {{ old('warning_threshold_status', optional($api)->warning_threshold_status) == 'active' ? 'selected' : '' }}>Active</option>
+                                                                            <option value="inactive" {{ old('warning_threshold_status', optional($api)->warning_threshold_status) == 'inactive' ? 'selected' : '' }}>Inactive</option>
+                                                                        </select>
+                                                                    </fieldset>
+                                                                </div>
+                                                                <div class="col-md-6">
+                                                                    <fieldset class="form-group mb-3">
+                                                                        <label for="warning_threshold">Balance Warning Threshold</label>
+                                                                        <input type="number" class="form-control" name="warning_threshold" value="{{ old('warning_threshold', optional($api)->warning_threshold) }}" placeholder="Enter warning threshold" id="warning_threshold">
+                                                                    </fieldset>
+                                                                </div>
+                                                                <div class="col-md-6">
+                                                                    <fieldset class="form-group mb-0">
+                                                                        <label for="sandbox_base_url">Sandbox Base URL</label>
+                                                                        <input type="text" class="form-control" name="sandbox_base_url" value="{{ old('sandbox_base_url', optional($api)->sandbox_base_url) }}" placeholder="Enter sandbox base url" id="sandbox_base_url">
+                                                                    </fieldset>
+                                                                </div>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
+                                            </div>
 
-                                                <div class="col-lg-6 mb-4">
-                                                    <div class="section-card h-100 border">
+                                            <div class="row mb-4">
+                                                <div class="col-12">
+                                                    <div class="section-card border">
                                                         <div class="card-header bg-transparent">
                                                             <h6 class="font-weight-bold text-dark mb-0">Integration Settings</h6>
                                                             <div class="text-muted small mt-0.5">Control status, credentials, and live endpoints.</div>
                                                         </div>
                                                         <div class="card-body">
-                                                            <fieldset class="form-group mb-3">
-                                                                <label for="status">API Status</label>
-                                                                <select class="form-control" name="status" id="status" required>
-                                                                    <option value="">Select</option>
-                                                                    <option value="active" {{ old('status', optional($api)->status) == 'active' ? 'selected' : '' }}>Active</option>
-                                                                    <option value="inactive" {{ old('status', optional($api)->status) == 'inactive' ? 'selected' : '' }}>Inactive</option>
-                                                                </select>
-                                                            </fieldset>
-                                                            <fieldset class="form-group mb-3">
-                                                                <label for="api_key">API Key</label>
-                                                                <input type="text" class="form-control" name="api_key" value="{{ old('api_key', optional($api)->api_key) }}" placeholder="Enter api key" id="api_key">
-                                                            </fieldset>
-                                                            <fieldset class="form-group mb-3">
-                                                                <label for="secret_key">Secret Key</label>
-                                                                <input type="text" class="form-control" name="secret_key" value="{{ old('secret_key', optional($api)->secret_key) }}" placeholder="Enter secret key" id="secret_key">
-                                                            </fieldset>
-                                                            <fieldset class="form-group mb-3">
-                                                                <label for="public_key">Public Key</label>
-                                                                <input type="text" class="form-control" name="public_key" value="{{ old('public_key', optional($api)->public_key) }}" placeholder="Enter public key" id="public_key">
-                                                            </fieldset>
-                                                            <fieldset class="form-group mb-3">
-                                                                <label for="account_number">Account Number</label>
-                                                                <input type="text" class="form-control" name="account_number" value="{{ old('account_number', optional($api)->account_number) }}" placeholder="Enter account number" id="account_number">
-                                                                <small class="text-muted d-block mt-50">Used by providers that need an internal settlement or wallet account number.</small>
-                                                            </fieldset>
-                                                            <fieldset class="form-group mb-3">
-                                                                <label for="contract_id">Contract ID</label>
-                                                                <input type="text" class="form-control" name="contract_id" value="{{ old('contract_id', optional($api)->contract_id) }}" placeholder="Enter contract id" id="contract_id">
-                                                            </fieldset>
-                                                            <fieldset class="form-group mb-3">
-                                                                <label for="charge">Card Funding Charge</label>
-                                                                <input type="number" min="0" step="0.01" class="form-control" name="charge" value="{{ old('charge', optional($api)->charge) }}" placeholder="Enter charge" id="charge">
-                                                                <small class="text-muted d-block mt-50">This is the provider charge used for card-based wallet funding. The extra card funding charge in Settings is added separately at checkout.</small>
-                                                            </fieldset>
-                                                            <fieldset class="form-group mb-3">
-                                                                <label for="reserved_account_payment_charge_type">Reserved Account Charge Type</label>
-                                                                <select class="form-control" name="reserved_account_payment_charge_type" id="reserved_account_payment_charge_type">
-                                                                    <option value="flat" @selected(old('reserved_account_payment_charge_type', optional($api)->reserved_account_payment_charge_type ?? 'flat') === 'flat')>Flat</option>
-                                                                    <option value="percentage" @selected(old('reserved_account_payment_charge_type', optional($api)->reserved_account_payment_charge_type) === 'percentage')>Percentage</option>
-                                                                </select>
-                                                                <small class="text-muted d-block mt-50">Choose whether the reserved account charge is a fixed amount or percentage.</small>
-                                                            </fieldset>
-                                                            <fieldset class="form-group mb-3">
-                                                                <label for="reserved_account_payment_charge">Reserved Account Payment Charge</label>
-                                                                <input type="number" min="0" step="0.01" class="form-control" name="reserved_account_payment_charge" value="{{ old('reserved_account_payment_charge', optional($api)->reserved_account_payment_charge) }}" placeholder="Enter reserved account charge" id="reserved_account_payment_charge">
-                                                                <small class="text-muted d-block mt-50">Used for wallet funding via reserved account transfers.</small>
-                                                            </fieldset>
-                                                            <div class="form-group mb-0">
-                                                                <label for="live_base_url">Live Base URL</label>
-                                                                <input type="text" class="form-control" name="live_base_url" value="{{ old('live_base_url', optional($api)->live_base_url) }}" placeholder="Enter live base url" id="live_base_url">
+                                                            <div class="row">
+                                                                <div class="col-md-6">
+                                                                    <fieldset class="form-group mb-3">
+                                                                        <label for="status">API Status</label>
+                                                                        <select class="form-control" name="status" id="status" required>
+                                                                            <option value="">Select</option>
+                                                                            <option value="active" {{ old('status', optional($api)->status) == 'active' ? 'selected' : '' }}>Active</option>
+                                                                            <option value="inactive" {{ old('status', optional($api)->status) == 'inactive' ? 'selected' : '' }}>Inactive</option>
+                                                                        </select>
+                                                                    </fieldset>
+                                                                </div>
+                                                                <div class="col-md-6">
+                                                                    <fieldset class="form-group mb-3">
+                                                                        <label for="api_key">API Key</label>
+                                                                        <input type="text" class="form-control" name="api_key" value="{{ old('api_key', optional($api)->api_key) }}" placeholder="Enter api key" id="api_key">
+                                                                    </fieldset>
+                                                                </div>
+                                                                <div class="col-md-6">
+                                                                    <fieldset class="form-group mb-3">
+                                                                        <label for="secret_key">Secret Key</label>
+                                                                        <input type="text" class="form-control" name="secret_key" value="{{ old('secret_key', optional($api)->secret_key) }}" placeholder="Enter secret key" id="secret_key">
+                                                                    </fieldset>
+                                                                </div>
+                                                                <div class="col-md-6">
+                                                                    <fieldset class="form-group mb-3">
+                                                                        <label for="public_key">Public Key</label>
+                                                                        <input type="text" class="form-control" name="public_key" value="{{ old('public_key', optional($api)->public_key) }}" placeholder="Enter public key" id="public_key">
+                                                                    </fieldset>
+                                                                </div>
+                                                                <div class="col-md-6">
+                                                                    <fieldset class="form-group mb-3">
+                                                                        <label for="account_number">Account Number</label>
+                                                                        <input type="text" class="form-control" name="account_number" value="{{ old('account_number', optional($api)->account_number) }}" placeholder="Enter account number" id="account_number">
+                                                                        <small class="text-muted d-block mt-50">Used by providers that need an internal settlement or wallet account number.</small>
+                                                                    </fieldset>
+                                                                </div>
+                                                                <div class="col-md-6">
+                                                                    <fieldset class="form-group mb-3">
+                                                                        <label for="contract_id">Contract ID</label>
+                                                                        <input type="text" class="form-control" name="contract_id" value="{{ old('contract_id', optional($api)->contract_id) }}" placeholder="Enter contract id" id="contract_id">
+                                                                    </fieldset>
+                                                                </div>
+                                                                <div class="col-md-6">
+                                                                    <fieldset class="form-group mb-3">
+                                                                        <label for="charge">Card Funding Charge</label>
+                                                                        <input type="number" min="0" step="0.01" class="form-control" name="charge" value="{{ old('charge', optional($api)->charge) }}" placeholder="Enter charge" id="charge">
+                                                                        <small class="text-muted d-block mt-50">This is the provider charge used for card-based wallet funding. The extra card funding charge in Settings is added separately at checkout.</small>
+                                                                    </fieldset>
+                                                                </div>
+                                                                <div class="col-md-6">
+                                                                    <fieldset class="form-group mb-3">
+                                                                        <label for="reserved_account_payment_charge_type">Reserved Account Charge Type</label>
+                                                                        <select class="form-control" name="reserved_account_payment_charge_type" id="reserved_account_payment_charge_type">
+                                                                            <option value="flat" @selected(old('reserved_account_payment_charge_type', optional($api)->reserved_account_payment_charge_type ?? 'flat') === 'flat')>Flat</option>
+                                                                            <option value="percentage" @selected(old('reserved_account_payment_charge_type', optional($api)->reserved_account_payment_charge_type) === 'percentage')>Percentage</option>
+                                                                        </select>
+                                                                        <small class="text-muted d-block mt-50">Choose whether the reserved account charge is a fixed amount or percentage.</small>
+                                                                    </fieldset>
+                                                                </div>
+                                                                <div class="col-md-6">
+                                                                    <fieldset class="form-group mb-3">
+                                                                        <label for="reserved_account_payment_charge">Reserved Account Payment Charge</label>
+                                                                        <input type="number" min="0" step="0.01" class="form-control" name="reserved_account_payment_charge" value="{{ old('reserved_account_payment_charge', optional($api)->reserved_account_payment_charge) }}" placeholder="Enter reserved account charge" id="reserved_account_payment_charge">
+                                                                        <small class="text-muted d-block mt-50">Used for wallet funding via reserved account transfers.</small>
+                                                                    </fieldset>
+                                                                </div>
+                                                                <div class="col-md-6">
+                                                                    <div class="form-group mb-0">
+                                                                        <label for="live_base_url">Live Base URL</label>
+                                                                        <input type="text" class="form-control" name="live_base_url" value="{{ old('live_base_url', optional($api)->live_base_url) }}" placeholder="Enter live base url" id="live_base_url">
+                                                                    </div>
+                                                                </div>
                                                             </div>
                                                             <div class="pricing-section-block">
                                                                 <h6 class="font-weight-bold mb-3">Capabilities</h6>
@@ -385,6 +421,7 @@
                                                         </div>
                                                     </div>
                                                 </div>
+                                            </div>
 
                                                 <div class="col-12 mb-4">
                                                     <div class="section-card pricing-band-shell border {{ $pricingDataEnabled ? '' : 'pricing-band-shell--disabled' }}" id="pricing-band-shell">
