@@ -11,7 +11,7 @@ class MonnifyController extends BankTransferProviderController
     {
         return 'monnify';
     }
-    
+
     public function login()
     {
         $provider = $this->api();
@@ -629,6 +629,7 @@ class MonnifyController extends BankTransferProviderController
             'redirectUrl' => route('payment-callback', $this->api()?->id),
             'paymentMethods' => ['CARD', 'ACCOUNT_TRANSFER'],
         ]);
+
 
         $response = $this->basicApiCall(
             rtrim((string) $this->baseUrl(), '/') . '/api/v1/merchant/transactions/init-transaction',
