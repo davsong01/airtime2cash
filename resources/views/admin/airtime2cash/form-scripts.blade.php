@@ -51,6 +51,15 @@
             @error('auto_share_rate')
                 $('#auto-share-rate-tab').tab('show');
             @enderror
+            @error('auto_share_profit_percentage')
+                $('#auto-share-rate-tab').tab('show');
+            @enderror
+            @error('rate')
+                $('#manual-rate-tab').tab('show');
+            @enderror
+            @error('manual_profit_percentage')
+                $('#manual-rate-tab').tab('show');
+            @enderror
         });
     </script>
 @endsection

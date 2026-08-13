@@ -107,7 +107,7 @@
                                     <div class="card-body">
                                         <span class="ops-metric-icon is-success"><i class="bx bx-trending-up"></i></span>
                                         <span class="ops-metric-label">Income</span>
-                                        <strong>{!! getSettings()->currency !!}{{ number_format((float) $transaction->amount_charged, 2) }}</strong>
+                                        <strong>{!! getSettings()->currency !!}{{ number_format((float) ($transaction->profit ?? 0), 2) }}</strong>
                                         <small>Conversion revenue recorded</small>
                                     </div>
                                 </div>
@@ -201,8 +201,11 @@
                                                             <div class="col-md-4">
                                                                 <strong class="heads" style="color:green">Payment Details</strong> <br>
                                                                 <strong>Amount to Transfer: </strong>{!! getSettings()->currency. number_format($transaction->total_amount, 2) !!} <br>
+                                                                <strong>Transfer Method: </strong>{{ $transaction->transfer_mode === 'auto_share' ? 'Auto Share' : 'Manual Transfer' }} <br>
                                                                 <strong>Charge Rate: </strong>{{ $transaction->charge_rate }}% <br>
+                                                                <strong>Profit Percentage: </strong>{{ number_format((float) ($transaction->profit_percentage ?? 0), 2) }}% <br>
                                                                 <strong>Charge Amount: </strong>{!! getSettings()->currency. number_format($transaction->amount_charged, 2) !!} <br>
+                                                                <strong>Profit: </strong>{!! getSettings()->currency. number_format((float) ($transaction->profit ?? 0), 2) !!} <br>
                                                                 <strong>Amount to Receive: </strong>{!! getSettings()->currency. number_format($transaction->amount_paid,2) !!} <br>
                                                                 <strong>Date: </strong>{{ date("M jS, Y g:iA", strtotime($transaction->created_at)) }}
                                                             </div>

@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use App\Models\CustomerLevel;
 use App\Models\KycData;
 use App\Models\ReferralEarning;
+use App\Models\Airtime2CashTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use App\Models\ReservedAccountNumber;
@@ -241,7 +242,7 @@ class CustomerController extends Controller
             return redirect(404);
         }
 
-        $allowedTabs = ['account', 'transactions', 'downlines', 'kyc', 'reserved-account', 'actions'];
+        $allowedTabs = ['account', 'transactions', 'airtime2cash-transactions', 'downlines', 'kyc', 'reserved-account', 'actions'];
         $activeTab = in_array($request->query('tab'), $allowedTabs, true)
             ? $request->query('tab')
             : 'account';
@@ -256,12 +257,20 @@ class CustomerController extends Controller
             ->selectRaw('COALESCE(SUM(amount), 0) as total')
             ->selectRaw('COALESCE(SUM(CASE WHEN api_id IS NOT NULL AND unique_element = \'WALLET-FUNDING\' THEN amount ELSE 0 END), 0) as funded_total')
             ->first();
+        $airtimeTransactionSummary = Airtime2CashTransactions::where('customer_id', $customer)
+            ->selectRaw('COALESCE(SUM(total_amount), 0) as total')
+            ->selectRaw("COALESCE(SUM(CASE WHEN status IN ('approved', 'successful') THEN total_amount ELSE 0 END), 0) as successful_total")
+            ->selectRaw("COALESCE(SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END), 0) as pending_count")
+            ->selectRaw("COALESCE(SUM(CASE WHEN status = 'declined' THEN 1 ELSE 0 END), 0) as declined_count")
+            ->first();
         $transTotal = $curr . number_format((float) $transactionSummary->total, 2);
         $fundTotal = $curr . number_format((float) $transactionSummary->funded_total, 2);
-        $balances = ['Wallet Balance' => $balance, 'Referral Earning' => $ref, 'Transaction Total' => $transTotal, 'Funds Total' => $fundTotal];
+        $a2cTotal = $curr . number_format((float) $airtimeTransactionSummary->total, 2);
+        $balances = ['Wallet Balance' => $balance, 'Referral Earning' => $ref, 'Transaction Total' => $transTotal, 'A2C Total' => $a2cTotal, 'Funds Total' => $fundTotal];
         $downlines = collect();
         $reservedAccount = collect();
         $transactions = null;
+        $airtimeTransactions = null;
         $kycData = collect();
         $blacklists = collect();
         $customerLevels = collect();
@@ -270,6 +279,11 @@ class CustomerController extends Controller
             $customerLevels = CustomerLevel::orderBy('order', 'ASC')->get();
         } elseif ($activeTab === 'transactions') {
             $transactions = $user->customer->transactions()->latest()->paginate(10);
+        } elseif ($activeTab === 'airtime2cash-transactions') {
+            $airtimeTransactions = Airtime2CashTransactions::with(['product', 'provider'])
+                ->where('customer_id', $customer)
+                ->latest()
+                ->paginate(10);
         } elseif ($activeTab === 'downlines') {
             $downlines = ReferralEarning::where('customer_id', $customer)
                 ->with('referredCustomer.user')
@@ -304,6 +318,7 @@ class CustomerController extends Controller
                 'balances' => $balances,
                 'customerLevels' => $customerLevels,
                 'transactions' => $transactions,
+                'airtimeTransactions' => $airtimeTransactions,
                 'kycData' => $kycData,
                 'blacklists' => $blacklists,
                 'activeTab' => $activeTab,

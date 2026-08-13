@@ -109,12 +109,23 @@
                                     <label class="custom-control-label" for="manual_status"><span class="sr-only">Toggle manual transfers</span></label>
                                 </div>
                             </div>
-                            <div class="form-group mb-0">
-                                <label for="rate">Charge rate ({{ $rateUnit }}) <span class="text-danger">*</span></label>
-                                <div class="input-group">
-                                    <input type="number" step="0.01" min="0" class="form-control @error('rate') is-invalid @enderror" id="rate" name="rate" value="{{ old('rate', $product?->rate) }}" required>
-                                    <div class="input-group-append"><span class="input-group-text">{{ $rateUnit }}</span></div>
-                                    @error('rate')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                            <div class="row">
+                                <div class="col-md-6 form-group mb-0">
+                                    <label for="rate">Charge rate ({{ $rateUnit }}) <span class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                        <input type="number" step="0.01" min="0" max="100" class="form-control @error('rate') is-invalid @enderror" id="rate" name="rate" value="{{ old('rate', $product?->rate) }}" required>
+                                        <div class="input-group-append"><span class="input-group-text">{{ $rateUnit }}</span></div>
+                                        @error('rate')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                    </div>
+                                </div>
+                                <div class="col-md-6 form-group mb-0">
+                                    <label for="manual_profit_percentage">Profit Percentage (%)</label>
+                                    <div class="input-group">
+                                        <input type="number" step="0.01" min="0" max="100" class="form-control @error('manual_profit_percentage') is-invalid @enderror" id="manual_profit_percentage" name="manual_profit_percentage" value="{{ old('manual_profit_percentage', $product?->manual_profit_percentage) }}" placeholder="0.00">
+                                        <div class="input-group-append"><span class="input-group-text">%</span></div>
+                                        @error('manual_profit_percentage')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                    </div>
+                                    <small class="form-text text-muted">Manual income recorded in admin logs uses this percentage.</small>
                                 </div>
                             </div>
                         </div>
@@ -131,12 +142,23 @@
                                     <label class="custom-control-label" for="auto_share_status"><span class="sr-only">Toggle Auto Share transfers</span></label>
                                 </div>
                             </div>
-                            <div class="form-group mb-0">
-                                <label for="auto_share_rate">Charge rate ({{ $rateUnit }}) <span class="text-danger">*</span></label>
-                                <div class="input-group">
-                                    <input type="number" step="0.01" min="0" class="form-control @error('auto_share_rate') is-invalid @enderror" id="auto_share_rate" name="auto_share_rate" value="{{ old('auto_share_rate', $product?->auto_share_rate ?? $product?->rate) }}" required>
-                                    <div class="input-group-append"><span class="input-group-text">{{ $rateUnit }}</span></div>
-                                    @error('auto_share_rate')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                            <div class="row">
+                                <div class="col-md-6 form-group mb-0">
+                                    <label for="auto_share_rate">Charge rate ({{ $rateUnit }}) <span class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                        <input type="number" step="0.01" min="0" max="100" class="form-control @error('auto_share_rate') is-invalid @enderror" id="auto_share_rate" name="auto_share_rate" value="{{ old('auto_share_rate', $product?->auto_share_rate ?? $product?->rate) }}" required>
+                                        <div class="input-group-append"><span class="input-group-text">{{ $rateUnit }}</span></div>
+                                        @error('auto_share_rate')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                    </div>
+                                </div>
+                                <div class="col-md-6 form-group mb-0">
+                                    <label for="auto_share_profit_percentage">Profit Percentage (%)</label>
+                                    <div class="input-group">
+                                        <input type="number" step="0.01" min="0" max="100" class="form-control @error('auto_share_profit_percentage') is-invalid @enderror" id="auto_share_profit_percentage" name="auto_share_profit_percentage" value="{{ old('auto_share_profit_percentage', $product?->auto_share_profit_percentage) }}" placeholder="0.00">
+                                        <div class="input-group-append"><span class="input-group-text">%</span></div>
+                                        @error('auto_share_profit_percentage')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                    </div>
+                                    <small class="form-text text-muted">Auto share income recorded in admin logs uses this percentage.</small>
                                 </div>
                             </div>
                             <div class="form-group mt-2 mb-0">

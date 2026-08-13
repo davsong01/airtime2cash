@@ -79,10 +79,15 @@ class TransactionController extends Controller
         }
 
         foreach ($category->products as $product) {
-            $discount = Discount::where('product_id', $product->id)->where('customer_level', auth()->user()->customer->level->id)->first();
-            $product->discounted_rate = (!empty($discount) && $discount->price < $product->rate) ? $discount->price : $product->rate;
-            $product->manual_discounted_rate = $product->discounted_rate;
-            $product->auto_share_discounted_rate = $product->auto_share_rate ?? $product->rate;
+            $discount = Discount::where('product_id', $product->id)
+                ->where('customer_level', auth()->user()->customer->level->id)
+                ->first();
+
+            $manualRate = !empty($discount) ? $discount->price : $product->rate;
+            $product->manual_discounted_rate = ((float) $manualRate >= 1) ? $manualRate : $product->rate;
+
+            $autoShareRate = $product->auto_share_rate ?? $product->rate;
+            $product->auto_share_discounted_rate = ((float) $autoShareRate >= 1) ? $autoShareRate : $product->rate;
         }
 
         $banks = Bank::active()->orderBy('bank_name')->get();
@@ -297,8 +302,10 @@ class TransactionController extends Controller
         if ($request->transfer_mode === 'manual') {
             $discount = Discount::where('product_id', $product->id)->where('customer_level', auth()->user()->customer->level->id)->first();
             $rate = (!empty($discount) && $discount->price < $product->rate) ? $discount->price : $product->rate;
+            $profitPercentage = $product->manual_profit_percentage;
         } else {
             $rate = $product->auto_share_rate ?? $product->rate;
+            $profitPercentage = $product->auto_share_profit_percentage;
         }
 
         $max = $product->max;
@@ -307,6 +314,8 @@ class TransactionController extends Controller
 
         $amount_charged = ($rate / 100) * $amount;
         $amount_paid = $amount - $amount_charged;
+        $profitPercentage = is_numeric($profitPercentage) ? (float) $profitPercentage : 0;
+        $profit = $profitPercentage > 0 ? (($amount / 100) * $profitPercentage) : 0;
 
         if ($amount > 0 && $amount >= $min && $amount <= $max) {
             $amount = $amount - (($rate / 100) * $amount);
@@ -327,6 +336,8 @@ class TransactionController extends Controller
             'amount_charged' => $amount_charged,
             'amount_paid' => $amount_paid,
             'charge_rate' => $rate,
+            'profit_percentage' => $profitPercentage,
+            'profit' => $profit,
             'transfer_mode' => $request->transfer_mode,
             'product_id' => $product->id,
             'customer_id' => auth()->user()->customer->id,
@@ -398,6 +409,8 @@ class TransactionController extends Controller
                 <strong>Amount Charged:</strong> ' . e(getSettings()->currency) . number_format($log->amount_charged, 2) . '<br>
                 <strong>Amount to Receive:</strong> ' . e(getSettings()->currency) . number_format($log->amount_paid, 2) . '<br>
                 <strong>Charge Rate:</strong> ' . number_format($log->charge_rate) . '%<br>
+                <strong>Profit Percentage:</strong> ' . number_format((float) ($log->profit_percentage ?? 0), 2) . '%<br>
+                <strong>Profit:</strong> ' . e(getSettings()->currency) . number_format((float) ($log->profit ?? 0), 2) . '<br>
                 <strong>Transfer Method:</strong> ' . e($log->transfer_mode === 'auto_share' ? 'Auto Transfer' : 'Manual Transfer') . '<br>
                 <strong>Total Credit to transfer:</strong> ' . e(getSettings()->currency) . number_format($log->total_amount, 2) . '<br>
                 <strong>Phone Numbers:</strong> ' . e($log->phone_numbers) . '<br>

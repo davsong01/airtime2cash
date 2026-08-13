@@ -50,7 +50,7 @@ class DashboardController extends Controller
 
             $airtimeToCashSummary = Airtime2CashTransactions::where('type', 'credit')
                 ->selectRaw("SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending_count")
-                ->selectRaw("COALESCE(SUM(CASE WHEN status = 'approved' THEN amount_charged ELSE 0 END), 0) AS recorded_charges")
+                ->selectRaw("COALESCE(SUM(CASE WHEN status = 'approved' THEN COALESCE(profit, 0) ELSE 0 END), 0) AS recorded_charges")
                 ->first();
             $recordedEarnings = (float) $transactionSummary->recorded_charges
                 + (float) $airtimeToCashSummary->recorded_charges;
@@ -135,22 +135,47 @@ class DashboardController extends Controller
     public function customerOfTheMonth()
     {
         $firstdayofmonth = Carbon::today()->startOfMonth();
-        if(env('ENT') == 'local'){
-            $count = TransactionLog::with('customer')->where('reason', 'Product Purchase')
-            ->whereIn('status', ['completed', 'delivered', 'success'])
-            ->addSelect(DB::raw('SUM(total_amount) as total_amount, COUNT(id) as count,customer_id'))
+        $now = Carbon::now();
+
+        $successfulTransactionStatuses = ['completed', 'delivered', 'success', 'approved', 'successful'];
+
+        $productTransactions = DB::table('transaction_logs')
+            ->selectRaw('customer_id, COUNT(*) as count, COALESCE(SUM(total_amount), 0) as total_amount')
+            ->whereIn('reason', ['Product Purchase', 'Airtime2Cash Payment'])
+            ->whereIn('status', $successfulTransactionStatuses)
+            ->whereRaw('COALESCE(completed_at, created_at) BETWEEN ? AND ?', [$firstdayofmonth, $now])
+            ->groupBy('customer_id');
+
+        $airtimeTransactions = DB::table('airtime2_cash_transactions as a2c')
+            ->selectRaw('a2c.customer_id, COUNT(*) as count, COALESCE(SUM(a2c.total_amount), 0) as total_amount')
+            ->whereIn('a2c.status', ['approved', 'successful'])
+            ->whereRaw('COALESCE(a2c.completed_at, a2c.created_at) BETWEEN ? AND ?', [$firstdayofmonth, $now])
+            ->whereNotExists(function ($query) use ($successfulTransactionStatuses) {
+                $query->select(DB::raw(1))
+                    ->from('transaction_logs as tl')
+                    ->whereColumn('tl.transaction_id', 'a2c.transaction_id')
+                    ->where('tl.reason', 'Airtime2Cash Payment')
+                    ->whereIn('tl.status', $successfulTransactionStatuses);
+            })
+            ->groupBy('a2c.customer_id');
+
+        $winner = DB::query()
+            ->fromSub(
+                $productTransactions->unionAll($airtimeTransactions),
+                'customer_month_activity'
+            )
+            ->selectRaw('customer_id, SUM(count) as count, SUM(total_amount) as total_amount')
             ->groupBy('customer_id')
-            ->orderBy('total_amount', 'DESC')->first();
-        }else{
-            $count = TransactionLog::with('customer')->where('reason', 'Product Purchase')
-            ->whereIn('status',['completed','delivered','success'])
-            ->addSelect(DB::raw('SUM(total_amount) as total_amount, COUNT(id) as count,customer_id'))
-                ->groupBy('customer_id')
-                ->whereBetween('created_at', [$firstdayofmonth, Carbon::now()])
-                ->orderBy('total_amount', 'DESC')->first();
+            ->orderByDesc('total_amount')
+            ->first();
+
+        if (! $winner) {
+            return null;
         }
 
-        return $count;
+        $winner->customer = Customer::with('user')->find($winner->customer_id);
+
+        return $winner;
     }
 
     public function resetTransactionPin()

@@ -196,8 +196,8 @@
                                         </td>
                                         <td>
                                             <strong class="d-block">{{ $currency }}{{ number_format($transaction->total_amount, 2) }}</strong>
-                                            <small class="d-block text-muted">Rate {{ number_format($transaction->charge_rate, 2) }}%</small>
-                                            <small class="d-block text-success">Income {{ $currency }}{{ number_format($transaction->amount_charged, 2) }}</small>
+                                            <small class="d-block text-muted">Profit rate {{ number_format((float) ($transaction->profit_percentage ?? 0), 2) }}%</small>
+                                            <small class="d-block text-success">Income {{ $currency }}{{ number_format((float) ($transaction->profit ?? 0), 2) }}</small>
                                         </td>
                                         <td>
                                             <strong class="d-block">{{ $currency }}{{ number_format($transaction->amount_paid, 2) }}</strong>

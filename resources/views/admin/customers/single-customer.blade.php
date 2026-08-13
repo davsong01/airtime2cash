@@ -14,6 +14,7 @@
     $tabs = [
         'account' => ['label' => 'Account', 'icon' => 'bx bx-user-circle', 'view' => 'profile-account'],
         'transactions' => ['label' => 'Transactions', 'icon' => 'bx bx-receipt', 'view' => 'profile-transactions'],
+        'airtime2cash-transactions' => ['label' => 'Airtime to Cash', 'icon' => 'bx bx-phone-call', 'view' => 'profile-airtime-transactions'],
         'downlines' => ['label' => 'Referrals', 'icon' => 'bx bx-git-branch', 'view' => 'profile-referrals'],
         'kyc' => ['label' => 'KYC', 'icon' => 'bx bx-id-card', 'view' => 'profile-kyc'],
         'reserved-account' => ['label' => 'Reserved accounts', 'icon' => 'bx bx-building-house', 'view' => 'profile-reserved-accounts'],

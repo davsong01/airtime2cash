@@ -15,6 +15,8 @@ class Airtime2CashTransactions extends Model
     protected $casts = [
         'provider_response' => 'array',
         'completed_at' => 'datetime',
+        'profit_percentage' => 'decimal:2',
+        'profit' => 'decimal:2',
     ];
     use HasFactory;
 
