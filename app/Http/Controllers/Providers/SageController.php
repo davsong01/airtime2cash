@@ -127,8 +127,8 @@ class SageController extends BankTransferProviderController
             $headers
         );
 
-        Log::info($response);
-        
+        // Log::info($response);
+
         if (! is_array($response) || empty($response)) {
             return [
                 'status' => 'pending',
