@@ -30,6 +30,6 @@ jobs:
             git pull origin production
             # composer update
             php artisan migrate --force
-            rm -rf ../moder-assets && cp -r public/moder-assets ../moder-assets
+            rm -rf ../modern-assets && cp -r public/modern-assets ../modern-assets
             php artisan optimize:clear
             echo "Deployment to Server completed!"
