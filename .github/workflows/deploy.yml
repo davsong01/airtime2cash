@@ -1,0 +1,35 @@
+name: Deploy to production
+
+on:
+  push:
+    branches:
+      - production
+  pull_request:
+    branches:
+      - production
+    types: [closed]
+
+jobs:
+  deploy:
+    # This logic ensures the job only runs on a push OR a successful merge
+    if: github.event_name == 'push' || (github.event.pull_request.merged == true)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Executing remote ssh commands
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: 198.54.116.119
+          username: airtrbrn
+          port: 21098
+          password: ${{ secrets.SSH_PASSWORD }}
+          script: |
+            set -euo pipefail
+            trap 'echo "Deployment stopped: a command failed before seeders could run."' ERR
+            cd portal.airtime2cash.com/v2
+            git stash
+            git pull origin production
+            # composer update
+            php artisan migrate --force
+            rm -rf ../moder-assets && cp -r public/moder-assets ../moder-assets
+            php artisan optimize:clear
+            echo "Deployment to Server completed!"
