@@ -126,6 +126,16 @@ class SageController extends BankTransferProviderController
             $headers
         );
 
+        if (! is_array($response) || empty($response)) {
+            return [
+                'status' => 'pending',
+                'provider_status' => 'pending',
+                'error' => null,
+                'request_data' => $payload,
+                'api_response' => $response,
+            ];
+        }
+
         $providerStatus = strtolower((string) data_get($response, 'data.transaction.status', data_get($response, 'status', 'failed')));
         $successful = in_array($providerStatus, ['successful', 'success', 'completed'], true)
             || (($response['success'] ?? false) === true && ($response['status'] ?? null) === 'success');
@@ -162,6 +172,17 @@ class SageController extends BankTransferProviderController
                 ];
 
                 $requery = $this->control->basicApiCall($url, json_encode($payload), $headers);
+
+                if (! is_array($requery) || empty($requery)) {
+                    return [
+                        'status' => 'pending',
+                        'api_status' => false,
+                        'provider_status' => 'pending',
+                        'api_response' => $requery,
+                        'payload' => $payload,
+                        'message' => 'Provider did not return a response. The transaction remains pending.',
+                    ];
+                }
 
                 $format = [
                     'status' => $requery['success'] ?? null,

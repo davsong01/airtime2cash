@@ -48,6 +48,16 @@ abstract class BankTransferProviderController extends Controller
         return ['pending', 'processing', 'initiated', 'awaiting_processing', 'in_progress', 'pending_authorization'];
     }
 
+    protected function noProviderResponse(string $message = 'Provider did not return a response. The transaction remains pending.', array $extra = []): array
+    {
+        return array_merge([
+            'status' => 'pending',
+            'provider_status' => 'pending',
+            'error' => null,
+            'message' => $message,
+        ], $extra);
+    }
+
     protected function makeLocalResponse(string $status = 'success', string $message = 'Request processed successfully.', array $extra = []): array
     {
         return array_merge([
@@ -149,6 +159,13 @@ abstract class BankTransferProviderController extends Controller
             'POST'
         );
 
+        if (! is_array($response) || empty($response)) {
+            return $this->noProviderResponse('Provider did not return a transfer response. The transaction remains pending.', [
+                'request_data' => $payload,
+                'api_response' => $response,
+            ]);
+        }
+
         $status = $this->providerStatus($response ?: []);
         $success = in_array($status, ['successful', 'success', 'completed'], true)
             || (($response['success'] ?? false) === true && in_array(($response['status'] ?? null), ['success', 'successful'], true));
@@ -181,6 +198,13 @@ abstract class BankTransferProviderController extends Controller
             $this->headers(),
             'POST'
         );
+
+        if (! is_array($response) || empty($response)) {
+            return $this->noProviderResponse('Provider did not return a requery response. The transaction remains pending.', [
+                'request_data' => $payload,
+                'api_response' => $response,
+            ]);
+        }
 
         return [
             'status' => (bool) data_get($response, 'success', false),

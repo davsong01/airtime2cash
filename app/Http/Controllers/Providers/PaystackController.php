@@ -93,6 +93,16 @@ class PaystackController extends BankTransferProviderController
             'POST'
         );
 
+        if (! is_array($recipient) || empty($recipient)) {
+            return [
+                'status' => 'pending',
+                'provider_status' => 'pending',
+                'error' => null,
+                'request_data' => $recipientPayload,
+                'api_response' => $recipient,
+            ];
+        }
+
         $recipientCode = data_get($recipient, 'data.recipient_code');
 
         if (blank($recipientCode)) {
@@ -141,6 +151,17 @@ class PaystackController extends BankTransferProviderController
             'GET'
         );
 
+        if (! is_array($response) || empty($response)) {
+            return [
+                'status' => 'pending',
+                'api_status' => false,
+                'provider_status' => 'pending',
+                'api_response' => $response,
+                'payload' => ['reference' => $transaction->transaction_id],
+                'message' => 'Provider did not return a response. The transaction remains pending.',
+            ];
+        }
+
         $status = strtolower((string) data_get($response, 'data.status', data_get($response, 'status', 'pending')));
 
         return [
@@ -161,6 +182,17 @@ class PaystackController extends BankTransferProviderController
             $this->headers(),
             'GET'
         );
+
+        if (! is_array($response) || empty($response)) {
+            return [
+                'status' => 'pending',
+                'provider_status' => 'pending',
+                'amount' => 0,
+                'api_status' => false,
+                'api_response' => $response,
+                'message' => 'Provider did not return a response. The transaction remains pending.',
+            ];
+        }
 
         $status = strtolower((string) data_get($response, 'data.status', data_get($response, 'status', 'failed')));
         $amount = (float) data_get($response, 'data.amount', 0);
@@ -218,6 +250,15 @@ class PaystackController extends BankTransferProviderController
             $this->headers(),
             'POST'
         );
+
+        if (! is_array($response) || empty($response)) {
+            return [
+                'status' => 'pending',
+                'provider_status' => 'pending',
+                'url' => null,
+                'api_response' => $response,
+            ];
+        }
 
         return [
             'status' => (($response['status'] ?? false) === true && !empty($response['data']['authorization_url'] ?? null)) ? 'success' : 'failed',

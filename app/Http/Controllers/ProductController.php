@@ -23,7 +23,7 @@ class ProductController extends Controller
         $categories = Category::all();
         foreach ($categories as $category) {
             $products = app("App\Http\Controllers\Providers\KingsVtuController")->getProducts($category->slug);
-            
+
             if (isset($products['status']) && $products['status'] == 'success') {
                 $products = $products['data']['products'] ?? [];
                 if (!empty($products)) {
@@ -50,8 +50,8 @@ class ProductController extends Controller
                         }
                     }
 
-                } 
-            } 
+                }
+            }
         }
 
         return back()->with('message', 'Products successfully pulled, please proceed to update products');
@@ -222,7 +222,7 @@ class ProductController extends Controller
             "servercode" => $request->servercode,
             "quantity_graduation" => $request->quantity_graduation,
             "allow_subscription_type" => $request->allow_subscription_type,
-            
+
             'referral_percentage' => $request->referral_percentage,
         ]);
 

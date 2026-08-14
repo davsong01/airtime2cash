@@ -247,6 +247,16 @@ class MonnifyController extends BankTransferProviderController
             'POST'
         );
 
+        if (! is_array($response) || empty($response)) {
+            return [
+                'status' => 'pending',
+                'provider_status' => 'pending',
+                'error' => null,
+                'request_data' => $payload,
+                'api_response' => $response,
+            ];
+        }
+
         $providerStatus = strtolower((string) data_get($response, 'responseBody.status', data_get($response, 'data.status', data_get($response, 'status', 'failed'))));
         $success = in_array($providerStatus, ['success', 'successful', 'completed'], true)
             || (($response['requestSuccessful'] ?? false) === true && (string) ($response['responseCode'] ?? '') === '0' && in_array($providerStatus, ['success', 'completed'], true));
@@ -302,6 +312,16 @@ class MonnifyController extends BankTransferProviderController
             'POST'
         );
 
+        if (! is_array($response) || empty($response)) {
+            return [
+                'status' => 'pending',
+                'provider_status' => 'pending',
+                'error' => null,
+                'request_data' => $payload,
+                'api_response' => $response,
+            ];
+        }
+
         $providerStatus = strtolower((string) data_get($response, 'responseBody.status', data_get($response, 'status', 'failed')));
         $success = (($response['requestSuccessful'] ?? false) === true && (string) ($response['responseCode'] ?? '') === '0')
             || in_array($providerStatus, ['success', 'successful', 'completed', 'authorized'], true);
@@ -349,6 +369,18 @@ class MonnifyController extends BankTransferProviderController
             ],
             'GET'
         );
+
+        if (! is_array($response) || empty($response)) {
+            return [
+                'status' => 'pending',
+                'provider_status' => 'pending',
+                'error' => null,
+                'request_data' => [
+                    'reference' => $reference,
+                ],
+                'api_response' => $response,
+            ];
+        }
 
         $providerStatus = strtolower((string) data_get($response, 'responseBody.status', data_get($response, 'status', 'failed')));
         $success = (($response['requestSuccessful'] ?? false) === true && (string) ($response['responseCode'] ?? '') === '0')
@@ -642,6 +674,15 @@ class MonnifyController extends BankTransferProviderController
             ],
             'POST'
         );
+
+        if (! is_array($response) || empty($response)) {
+            return [
+                'status' => 'pending',
+                'provider_status' => 'pending',
+                'url' => null,
+                'api_response' => $response,
+            ];
+        }
 
         $responsePaymentReference = (string) data_get($response, 'responseBody.paymentReference');
         $responseRedirectUrl = (string) data_get($response, 'responseBody.redirectUrl');

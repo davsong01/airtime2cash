@@ -76,7 +76,15 @@ class WebhookProcessor
                 $isPending = in_array($providerStatus, ['pending', 'processing', 'initiated'], true);
 
                 if (! $isSuccessful && ! $isFailed && ! $isPending) {
-                    throw new RuntimeException('Webhook does not contain a final transaction status.');
+                    $webhook->update([
+                        'processing_status' => 'pending',
+                        'processed_at' => null,
+                        'resolved_by' => $resolvedBy,
+                        'resolved_at' => now(),
+                        'last_error' => null,
+                    ]);
+
+                    return $webhook->fresh();
                 }
 
                 if ($transaction instanceof Airtime2CashTransactions) {
