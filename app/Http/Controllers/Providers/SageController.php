@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Providers;
 
 use App\Models\API;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class SageController extends BankTransferProviderController
 {
@@ -126,6 +127,8 @@ class SageController extends BankTransferProviderController
             $headers
         );
 
+        Log::info($response);
+        
         if (! is_array($response) || empty($response)) {
             return [
                 'status' => 'pending',
@@ -199,7 +202,7 @@ class SageController extends BankTransferProviderController
                     'user_status' => 'success',
                     'response' => '',
                     'api_response' => $requery ?? null,
-                    'payload' => $payload,
+                    'payload' => $payload ?? '',
                     'message' => $th->getMessage() . '. File: ' . $th->getFile() . '. Line:' . $th->getLine(),
                 ];
             }
