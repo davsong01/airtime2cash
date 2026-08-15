@@ -39,7 +39,7 @@
                                         <form action="{{route('customerlevel.update', $customerlevel->id)}}" method="POST">
                                             @csrf
                                             @method('PATCH')
-                                             <div class="row">
+                                            <div class="row">
                                                 <div class="col-md-6">
                                                     <fieldset class="form-group">
                                                         <label for="name">Name</label>
@@ -65,14 +65,27 @@
                                                         <label for="order">Order</label>
                                                         <input type="number" class="form-control" name="order" value="{{ $customerlevel->order ?? old('order') }}" placeholder="Enter order" id="order" required>
                                                     </fieldset>
+                                                    <fieldset class="form-group">
+                                                        <label for="status">Status</label>
+                                                        <select class="form-control" name="status" id="status" required>
+                                                            <option value="1" {{ old('status', (int) $customerlevel->status ? '1' : '0') == '1' ? 'selected' : '' }}>Enabled</option>
+                                                            <option value="0" {{ old('status', (int) $customerlevel->status ? '1' : '0') == '0' ? 'selected' : '' }}>Disabled</option>
+                                                        </select>
+                                                    </fieldset>
                                                 </div>
                                                 
                                                 <div class="col-md-12">
-                                                <button class="btn btn-primary" type="submit">Update</button>
-    
+                                                    <button class="btn btn-primary" type="submit">Update</button>
                                                 </div>
                                             </div>
                                         </form>
+                                        @if($customerlevel->customers()->count() < 1)
+                                            <form action="{{ route('customerlevel.destroy', $customerlevel->id) }}" method="POST" class="mt-2" onsubmit="return confirm('Are you sure you want to delete forever?');">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="btn btn-danger">Delete</button>
+                                            </form>
+                                        @endif
                                     </div>
                                 </div>
                             </div>

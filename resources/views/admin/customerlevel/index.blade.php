@@ -55,6 +55,7 @@
                                                     <tr>
                                                         <th>Name</th>
                                                         <th>Order</th>
+                                                        <th>Status</th>
                                                         <th>Customers Count</th>
                                                         <th>Upgrade Amount</th>
                                                         @if(hasAccess('customerlevel.edit') || hasAccess('customerlevel.destroy'))
@@ -71,6 +72,11 @@
                                                                 @endif
                                                             </td>
                                                             <td>{{ $level->order }}</td>
+                                                            <td>
+                                                                <span class="badge {{ $level->status ? 'badge-light-success' : 'badge-light-danger' }} px-1 py-50">
+                                                                    {{ $level->status ? 'Enabled' : 'Disabled' }}
+                                                                </span>
+                                                            </td>
                                                             <td>{{ $level->customers_count }}</td>
                                                             <td>{!! getSettings()['currency'] !!}{{ number_format($level->upgrade_amount) }}
                                                             </td>
@@ -81,7 +87,7 @@
                                                                     type="button" class="btn btn-primary btn-sm mr-1 mb-1"><span class="align-middle ml-25">View/Edit</span></button></a>
                                                                 @endif
                                                                 @if(hasAccess('customerlevel.destroy'))
-                                                                    @if ($level->customers_count < 1)
+                                                                    {{-- @if ($level->customers_count < 1) --}}
                                                                         <form
                                                                             action="{{ route('customerlevel.destroy', $level->id) }}"
                                                                             class="btn btn-custon-four btn-bg-cl-social"
@@ -93,11 +99,10 @@
                                                                             <button type="submit"
                                                                                 class="btn btn-danger btn-sm mr-1 mb-1"
                                                                                 data-toggle="tooltip"
-                                                                                title="Delete Customer Level">Delete Customer
-                                                                                Level
+                                                                                title="Delete Customer Level">Delete
                                                                             </button>
                                                                         </form>
-                                                                    @endif
+                                                                    {{-- @endif --}}
                                                                 @endif
                                                             </td>
                                                             @endif

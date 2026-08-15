@@ -225,6 +225,7 @@ Route::middleware(['auth', 'verified', 'admin', 'ipcheck', 'adminRoute'])->prefi
     Route::get('customers-suspended/{status}', [CustomerController::class, 'customers'])->name('customers.suspended');
     Route::get('customer/edit/{id}', [CustomerController::class, 'singleCustomer'])->name('customers.edit');
     Route::post('customer/update/{id}', [CustomerController::class, 'updateCustomer'])->name('customers.update');
+    Route::post('customers/bulk-actions', [CustomerController::class, 'bulkActions'])->name('customers.bulk-actions');
     Route::resource('customerlevel', CustomerLevelController::class);
     Route::get('customers-unverified', [CustomerController::class, 'unverifiedCustomers'])->name('customers.unverified');
     Route::get('customers-verify/{customer}', [CustomerController::class, 'verifyCustomer'])->name('customer.verify');

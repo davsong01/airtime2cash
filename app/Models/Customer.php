@@ -16,7 +16,10 @@ class Customer extends Model
 
     public function level()
     {
-        return $this->belongsTo(CustomerLevel::class, 'customer_level');
+        return $this->belongsTo(CustomerLevel::class, 'customer_level')->withDefault([
+            'name' => 'Unassigned',
+            'status' => false,
+        ]);
     }
 
     public function kycdata()

@@ -1,4 +1,5 @@
 @php $verifiable = verifiableUniqueElements(); @endphp
+@php $selectedProductId = old('product', $selectedProduct?->id); @endphp
 @extends('sneat.layouts.app')
 @section('title', $category->seo_title)
 @section('keywords', $category->seo_keywords)
@@ -295,9 +296,13 @@
             });
         });
 
-        $("#amount").val('');
-        $('#product').val('').trigger('change.select2');
         var variations = [];
+        $("#amount").val('');
+        @if(!empty($selectedProductId))
+            $('#product').val('{{ $selectedProductId }}').trigger('change.select2');
+        @else
+            $('#product').val('').trigger('change.select2');
+        @endif
 
         $('#product').on('change', function () {
             var fixed_price = $('#product').find(':selected').data('fixed_price');

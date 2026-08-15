@@ -1,5 +1,6 @@
 <?php
     $verifiable = verifiableUniqueElements();
+    $selectedProductId = old('product', $selectedProduct?->id);
 ?>
 @extends('layouts.app')
 @section('title', $category->seo_title)
@@ -327,7 +328,11 @@
 
     $(document).ready(function () {
         $("#amount").val('');
-        $('#product').val('');
+        @if(!empty($selectedProductId))
+            $('#product').val('{{ $selectedProductId }}');
+        @else
+            $('#product').val('');
+        @endif
                 
         var variations = [];
 
@@ -528,7 +533,9 @@
 
         $('.select2').select2();
 
-        
+        @if(!empty($selectedProductId))
+            $('#product').trigger('change');
+        @endif
     });
 </script>
 

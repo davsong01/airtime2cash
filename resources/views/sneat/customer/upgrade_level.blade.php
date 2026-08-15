@@ -4,6 +4,7 @@
 @section('content')
     @php
         $currentLevel = auth()->user()->customer?->level?->name ?? 'N/A';
+        $currentLevelId = auth()->user()->customer?->level?->id ?? 0;
     @endphp
 
     @include('sneat.customer.partials.page-header', [
@@ -33,7 +34,7 @@
                             <select class="form-select" name="level" id="level" required>
                                 <option value="">Select</option>
                                 @foreach ($levels as $level)
-                                    <option value="{{ $level->id }}" {{ auth()->user()->customer->level->id == $level->id ? 'selected' : '' }}>
+                                    <option value="{{ $level->id }}" {{ $currentLevelId == $level->id ? 'selected' : '' }}>
                                         {{ $level->name }} ({{ getSettings()['currency'] }}{{ $level->upgrade_amount }})
                                     </option>
                                 @endforeach

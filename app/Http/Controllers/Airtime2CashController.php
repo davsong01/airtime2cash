@@ -20,7 +20,7 @@ class Airtime2CashController extends Controller
     public function create()
     {
         $categories = Category::where('status', 'active')->where('type', 'airtime2cash')->get();
-        $customerlevel = CustomerLevel::orderBy('order', 'ASC')->get();
+        $customerlevel = CustomerLevel::enabled()->orderBy('order', 'ASC')->get();
         
         return view('admin.airtime2cash.create', compact('categories', 'customerlevel'));
     }
@@ -38,8 +38,12 @@ class Airtime2CashController extends Controller
             "fixed_price" => "nullable",
             "rate" => "required|numeric|min:0|max:100",
             "manual_profit_percentage" => "nullable|numeric|min:0|max:100",
+            "manual_level_rate" => "nullable|array",
+            "manual_level_rate.*" => "nullable|numeric|min:0|max:100",
             "auto_share_rate" => "required|numeric|min:0|max:100",
             "auto_share_profit_percentage" => "nullable|numeric|min:0|max:100",
+            "auto_share_level_rate" => "nullable|array",
+            "auto_share_level_rate.*" => "nullable|numeric|min:0|max:100",
             "manual_status" => "required|in:active,inactive",
             "auto_share_status" => "required|in:active,inactive",
             "instruction" => "nullable|string",
@@ -92,19 +96,8 @@ class Airtime2CashController extends Controller
             ]
         );
 
-        if (isset($request->productlevel) && isset($product)) {
-            foreach ($request->productlevel as $key => $price) {
-                Discount::updateOrCreate([
-                    'customer_level' => $key,
-                    'product_id' => $product->id,
-                ], [
-                    'status' => 'active',
-                    'customer_level' => $key,
-                    'product_id' => $product->id,
-                    'price' => $price ?? 0
-                ]);
-            }
-        }
+        $this->syncAirtimeCustomerLevelRates($product, $request->manual_level_rate ?? [], 'manual');
+        $this->syncAirtimeCustomerLevelRates($product, $request->auto_share_level_rate ?? [], 'auto_share');
 
         return redirect(route('airtime2cash.edit', $product->id))->with('message', 'Product Added Successfully');
     }
@@ -114,7 +107,7 @@ class Airtime2CashController extends Controller
         $product = Product::where('id', $id)->first();
         $categories = Category::where('status', 'active')->where('type', 'airtime2cash')->get();
 
-        $customerlevel = CustomerLevel::orderBy('order', 'ASC')->get();
+        $customerlevel = CustomerLevel::enabled()->orderBy('order', 'ASC')->get();
 
         return view('admin.airtime2cash.edit', compact('categories', 'product', 'customerlevel'));
     }
@@ -126,8 +119,12 @@ class Airtime2CashController extends Controller
             "status" => "required",
             "rate" => "required|numeric|min:0|max:100",
             "manual_profit_percentage" => "nullable|numeric|min:0|max:100",
+            "manual_level_rate" => "nullable|array",
+            "manual_level_rate.*" => "nullable|numeric|min:0|max:100",
             "auto_share_rate" => "required|numeric|min:0|max:100",
             "auto_share_profit_percentage" => "nullable|numeric|min:0|max:100",
+            "auto_share_level_rate" => "nullable|array",
+            "auto_share_level_rate.*" => "nullable|numeric|min:0|max:100",
             "manual_status" => "required|in:active,inactive",
             "auto_share_status" => "required|in:active,inactive",
             "instruction" => "nullable|string",
@@ -180,21 +177,43 @@ class Airtime2CashController extends Controller
             ]
         );
 
-        $productLevel = $request->productlevel;
-
-        if (isset($productLevel) && count($productLevel) > 0 && isset($product)) {
-            foreach ($productLevel as $key => $price) {
-                Discount::updateOrCreate([
-                    'customer_level' => $key,
-                    'product_id' => $product->id,
-                ], [
-                    'customer_level' => $key,
-                    'product_id' => $product->id,
-                    'price' => $price ?? 0
-                ]);
-            }
-        }
+        $this->syncAirtimeCustomerLevelRates($product, $request->manual_level_rate ?? [], 'manual');
+        $this->syncAirtimeCustomerLevelRates($product, $request->auto_share_level_rate ?? [], 'auto_share');
         
         return back()->with('message', 'Update Successfull');
+    }
+
+    private function syncAirtimeCustomerLevelRates(Product $product, array $rates, string $transferMode): void
+    {
+        foreach ($rates as $levelId => $price) {
+            $normalizedPrice = $this->normalizeAirtimeCustomerLevelRate($price);
+
+            Discount::updateOrCreate([
+                'customer_level' => $levelId,
+                'product_id' => $product->id,
+                'transfer_mode' => $transferMode,
+            ], [
+                'status' => 'active',
+                'customer_level' => $levelId,
+                'product_id' => $product->id,
+                'transfer_mode' => $transferMode,
+                'price' => $normalizedPrice,
+            ]);
+        }
+    }
+
+    private function normalizeAirtimeCustomerLevelRate($price): ?float
+    {
+        if ($price === null || $price === '') {
+            return null;
+        }
+
+        if (!is_numeric($price)) {
+            return null;
+        }
+
+        $price = (float) $price;
+
+        return $price > 0 ? $price : null;
     }
 }

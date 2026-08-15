@@ -83,13 +83,43 @@
                 </section>
 
                 <section class="card ops-panel">
-                    <div class="card-header d-flex align-items-center justify-content-between">
-                        <div><span class="ops-section-kicker">Account directory</span><h5 class="mb-0">{{ number_format($customers->total()) }} matching customers</h5></div>
-                        <span class="badge badge-light-primary px-1 py-50">Newest first</span>
+                    <div class="card-header d-flex align-items-center justify-content-between flex-wrap">
+                        <div class="mb-1 mb-sm-0"><span class="ops-section-kicker">Account directory</span><h5 class="mb-0">{{ number_format($customers->total()) }} matching customers</h5></div>
+                        <div class="d-flex align-items-center flex-wrap" style="gap: .5rem;">
+                            <span class="badge badge-light-primary px-1 py-50">Newest first</span>
+                            @if($canEditCustomers)
+                                <select class="form-control form-control-sm" id="bulkActionSelect" style="min-width: 180px;">
+                                    <option value="">Bulk action</option>
+                                    <option value="deactivate">Deactivate</option>
+                                    <option value="activate">Activate</option>
+                                    <option value="suspend">Suspend</option>
+                                    <option value="delete">Delete</option>
+                                    <option value="move_level">Move to level</option>
+                                </select>
+                                <button type="button" class="btn btn-sm btn-secondary" id="bulkActionApplyBtn">Apply</button>
+                            @endif
+                        </div>
                     </div>
                     <div class="table-responsive">
+                        <form id="customerBulkForm" method="POST" action="{{ route('customers.bulk-actions') }}">
+                            @csrf
+                            <input type="hidden" name="action" id="bulkActionValue">
+                            <input type="hidden" name="customer_ids" id="bulkCustomerIds">
+                        </form>
                         <table class="table table-hover mb-0 ops-table ops-customer-table">
-                            <thead><tr><th>S/N</th><th>Customer</th><th>Account</th><th>Verification</th><th>Balances</th><th>Joined</th>@if($canEditCustomers)<th class="text-right">Action</th>@endif</tr></thead>
+                            <thead>
+                                <tr>
+                                    @if($canEditCustomers)
+                                        <th style="width: 44px;">
+                                            <div class="custom-control custom-checkbox">
+                                                <input type="checkbox" class="custom-control-input" id="selectAllCustomers">
+                                                <label class="custom-control-label" for="selectAllCustomers"></label>
+                                            </div>
+                                        </th>
+                                    @endif
+                                    <th>S/N</th><th>Customer</th><th>Account</th><th>Verification</th><th>Balances</th><th>Joined</th>@if($canEditCustomers)<th class="text-right">Action</th>@endif
+                                </tr>
+                            </thead>
                             <tbody>
                                 @forelse($customers as $user)
                                     @php
@@ -99,6 +129,14 @@
                                         $kycVerified = $user->customer?->kyc_status === 'verified';
                                     @endphp
                                     <tr>
+                                        @if($canEditCustomers)
+                                            <td>
+                                                <div class="custom-control custom-checkbox">
+                                                    <input type="checkbox" class="custom-control-input customer-checkbox" id="customerSelect{{ $user->id }}" value="{{ $user->id }}" form="customerBulkForm">
+                                                    <label class="custom-control-label" for="customerSelect{{ $user->id }}"></label>
+                                                </div>
+                                            </td>
+                                        @endif
                                         <td class="text-muted">{{ $customers->firstItem() + $loop->index }}</td>
                                         <td><div class="d-flex align-items-center"><span class="ops-customer-mark">{{ str($name)->substr(0, 1)->upper() }}</span><div class="min-width-0"><a href="{{ route('customers.edit', $user->id) }}" class="d-block font-weight-bold text-truncate">{{ $name }}</a><small class="d-block text-muted text-truncate">{{ $user->email }}</small><small class="d-block text-muted">{{ $user->phone ?: 'No phone number' }}</small></div></div></td>
                                         <td><strong class="d-block">{{ '@' . ($user->username ?: 'not-set') }}</strong><span class="badge badge-light-{{ $statusColor }} mt-50">{{ ucfirst(str_replace('-', ' ', $status)) }}</span><small class="d-block text-muted mt-50">{{ $user->customer?->level?->name ?: 'No level assigned' }}</small></td>
@@ -108,7 +146,7 @@
                                         @if($canEditCustomers)<td class="text-right"><a href="{{ route('customers.edit', $user->id) }}" class="btn btn-sm btn-primary"><i class="bx bx-user mr-25"></i> Open</a></td>@endif
                                     </tr>
                                 @empty
-                                    <tr><td colspan="7" class="text-center py-3"><i class="bx bx-user-x d-block font-large-1 text-muted mb-1"></i><strong>No customers found</strong><p class="text-muted mb-0">Try clearing or adjusting the filters.</p></td></tr>
+                                    <tr><td colspan="{{ $canEditCustomers ? 8 : 7 }}" class="text-center py-3"><i class="bx bx-user-x d-block font-large-1 text-muted mb-1"></i><strong>No customers found</strong><p class="text-muted mb-0">Try clearing or adjusting the filters.</p></td></tr>
                                 @endforelse
                             </tbody>
                         </table>
@@ -118,4 +156,81 @@
             </div>
         </div>
     </div>
+
+    @if($canEditCustomers)
+        <div class="modal fade" id="moveLevelModal" tabindex="-1" role="dialog" aria-labelledby="moveLevelModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered" role="document">
+                <div class="modal-content">
+                    <form method="POST" action="{{ route('customers.bulk-actions') }}" id="moveLevelForm">
+                        @csrf
+                        <input type="hidden" name="action" value="move_level">
+                        <input type="hidden" name="customer_ids" id="moveLevelCustomerIds">
+                        <div class="modal-header">
+                            <div>
+                                <h5 class="modal-title" id="moveLevelModalLabel">Move selected customers</h5>
+                                <small class="text-muted">Choose the target active customer level.</small>
+                            </div>
+                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="form-group mb-0">
+                                <label for="moveLevelId">Customer level</label>
+                                <select class="form-control" name="level_id" id="moveLevelId" required>
+                                    <option value="">Select level</option>
+                                    @foreach($activeCustomerLevels as $level)
+                                        <option value="{{ $level->id }}">{{ $level->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-light" data-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary" onclick="return confirm('Move the selected customers to this level?')">Move</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    @endif
+@endsection
+
+@section('page-script')
+    <script>
+        document.getElementById('selectAllCustomers')?.addEventListener('change', function () {
+            document.querySelectorAll('.customer-checkbox').forEach(checkbox => checkbox.checked = this.checked);
+        });
+
+        document.getElementById('bulkActionApplyBtn')?.addEventListener('click', function () {
+            const action = document.getElementById('bulkActionSelect')?.value;
+            const ids = Array.from(document.querySelectorAll('.customer-checkbox:checked')).map(checkbox => checkbox.value);
+
+            if (!action || ids.length === 0) {
+                alert('Select an action and at least one customer.');
+                return;
+            }
+
+            if (action === 'move_level') {
+                document.getElementById('moveLevelCustomerIds').value = ids.join(',');
+                $('#moveLevelModal').modal('show');
+                return;
+            }
+
+            const messages = {
+                activate: 'Activate the selected customer(s)?',
+                deactivate: 'Deactivate the selected customer(s)?',
+                suspend: 'Suspend the selected customer(s)?',
+                delete: 'Delete the selected customer(s)? This will mark them as deleted.',
+            };
+
+            if (!window.confirm(messages[action] || 'Apply this action to the selected customer(s)?')) {
+                return;
+            }
+
+            document.getElementById('bulkActionValue').value = action;
+            document.getElementById('bulkCustomerIds').value = ids.join(',');
+            document.getElementById('customerBulkForm').submit();
+        });
+    </script>
 @endsection

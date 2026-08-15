@@ -58,6 +58,12 @@
 .a2c-shared-limits-heading { display: flex; margin-bottom: .85rem; flex-direction: column; }
 .a2c-shared-limits-heading strong { color: #354a55; font-size: .85rem; }
 .a2c-shared-limits-heading span { margin-top: .15rem; color: #84919b; font-size: .74rem; }
+.a2c-level-rates { margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed #e0e6e9; }
+.a2c-level-rates-heading { display: flex; margin-bottom: .85rem; flex-direction: column; gap: .15rem; }
+.a2c-level-rates-heading strong { color: #354a55; font-size: .84rem; }
+.a2c-level-rates-heading span { color: #84919b; font-size: .74rem; }
+.a2c-level-rates .form-group label { margin-bottom: .35rem; font-size: .72rem; }
+.a2c-level-rates .input-group-text { font-size: .72rem; }
 .a2c-form-aside { position: sticky; top: 95px; }
 .a2c-preview-card,
 .a2c-save-card { border: 1px solid #e4e9ec; border-radius: .7rem; box-shadow: 0 .55rem 1.5rem rgba(34,48,62,.06); }

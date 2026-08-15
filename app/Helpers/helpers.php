@@ -800,6 +800,32 @@ if (!function_exists("customerMenuData")) {
             ];
         }
 
+        $menuProducts = Product::query()
+            ->with('category')
+            ->where('status', 'active')
+            ->where('type', 'general')
+            ->where('show_in_menu', true)
+            ->whereHas('category', function ($query) {
+                $query->where('status', 'active');
+            })
+            ->orderBy('display_name')
+            ->get();
+
+        foreach ($menuProducts as $product) {
+            if (! $product->category) {
+                continue;
+            }
+
+            $paymentItems[] = [
+                'label' => $product->display_name,
+                'href' => route('open.transaction.page', ['slug' => $product->category->slug, 'product' => $product->id]),
+                'icon_html' => $product->category->icon ?: null,
+                'icon_key' => 'grid-alt',
+                'modern_icon_key' => modernServiceIconKey($product->category),
+                'active_paths' => ['customer/' . $product->category->slug],
+            ];
+        }
+
         $airtimeToCash = Category::where('type', 'airtime2cash')->where('status', 'active')->first();
         if ($airtimeToCash) {
             $paymentItems[] = [

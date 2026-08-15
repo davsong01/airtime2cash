@@ -68,7 +68,7 @@
                             </div>
                             <div>
                                 <small>Customer level</small>
-                                <strong>{{ $customer->level->name ?? 'Level 1' }}</strong>
+                                <strong>{{ $customer?->level?->name ?? 'Unassigned' }}</strong>
                             </div>
                         </div>
                     </div>

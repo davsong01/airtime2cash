@@ -128,6 +128,27 @@
                                     <small class="form-text text-muted">Manual income recorded in admin logs uses this percentage.</small>
                                 </div>
                             </div>
+
+                            <div class="a2c-level-rates">
+                                <div class="a2c-level-rates-heading">
+                                    <strong>Customer level overrides</strong>
+                                    <span>Leave blank or set 0 to use the main manual charge rate.</span>
+                                </div>
+                                <div class="row">
+                                    @forelse($customerlevel as $level)
+                                        <div class="col-md-6 form-group mb-3">
+                                            <label for="manual-level-rate-{{ $level->id }}">{{ $level->name }} override ({{ $rateUnit }})</label>
+                                            <div class="input-group">
+                                                <input type="number" step="0.01" min="0" class="form-control @error('manual_level_rate.' . $level->id) is-invalid @enderror" id="manual-level-rate-{{ $level->id }}" name="manual_level_rate[{{ $level->id }}]" value="{{ old('manual_level_rate.' . $level->id, $editing ? $product?->customer_level_transfer_price($level->id, 'manual') : '') }}" placeholder="Use main manual rate">
+                                                <div class="input-group-append"><span class="input-group-text">{{ $rateUnit }}</span></div>
+                                                @error('manual_level_rate.' . $level->id)<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                            </div>
+                                        </div>
+                                    @empty
+                                        <div class="col-12"><div class="alert alert-light mb-0">No customer levels are configured yet.</div></div>
+                                    @endforelse
+                                </div>
+                            </div>
                         </div>
 
                         <div class="tab-pane fade" id="auto-share-rate-panel" role="tabpanel" aria-labelledby="auto-share-rate-tab">
@@ -167,6 +188,27 @@
                                 @error('auto_share_product_code')<div class="invalid-feedback">{{ $message }}</div>@enderror
                                 <small class="form-text text-muted">Required when Auto Share is active. Use AutoSync's product ID/code for this network.</small>
                             </div>
+
+                            <div class="a2c-level-rates">
+                                <div class="a2c-level-rates-heading">
+                                    <strong>Customer level overrides</strong>
+                                    <span>Leave blank or set 0 to use the main auto charge rate.</span>
+                                </div>
+                                <div class="row">
+                                    @forelse($customerlevel as $level)
+                                        <div class="col-md-6 form-group mb-3">
+                                            <label for="auto-share-level-rate-{{ $level->id }}">{{ $level->name }} override ({{ $rateUnit }})</label>
+                                            <div class="input-group">
+                                                <input type="number" step="0.01" min="0" class="form-control @error('auto_share_level_rate.' . $level->id) is-invalid @enderror" id="auto-share-level-rate-{{ $level->id }}" name="auto_share_level_rate[{{ $level->id }}]" value="{{ old('auto_share_level_rate.' . $level->id, $editing ? $product?->customer_level_transfer_price($level->id, 'auto_share') : '') }}" placeholder="Use main auto rate">
+                                                <div class="input-group-append"><span class="input-group-text">{{ $rateUnit }}</span></div>
+                                                @error('auto_share_level_rate.' . $level->id)<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                            </div>
+                                        </div>
+                                    @empty
+                                        <div class="col-12"><div class="alert alert-light mb-0">No customer levels are configured yet.</div></div>
+                                    @endforelse
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -193,31 +235,6 @@
                         </div>
                     </div>
                     <div class="a2c-rule-note"><i class="bx bx-info-circle"></i> The maximum amount should be greater than the minimum amount.</div>
-                </div>
-            </section>
-
-            <section class="card a2c-form-section">
-                <div class="card-header a2c-section-heading">
-                    <span class="a2c-section-icon is-blue"><i class="bx bx-group"></i></span>
-                    <div>
-                        <h4>Customer-level rates</h4>
-                        <p>Override the default charge for each customer level.</p>
-                    </div>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        @forelse($customerlevel as $level)
-                            <div class="col-md-6 form-group">
-                                <label for="productlevel-{{ $level->id }}">{{ $level->name }} charge ({{ $rateUnit }}) @unless($editing)<span class="text-danger">*</span>@endunless</label>
-                                <div class="input-group">
-                                    <input type="number" step="0.01" min="0" class="form-control" id="productlevel-{{ $level->id }}" name="productlevel[{{ $level->id }}]" value="{{ old('productlevel.' . $level->id, $editing ? $product->customer_level_price($level->id) : '') }}" @required(!$editing)>
-                                    <div class="input-group-append"><span class="input-group-text">{{ $rateUnit }}</span></div>
-                                </div>
-                            </div>
-                        @empty
-                            <div class="col-12"><div class="alert alert-light mb-0">No customer levels are configured yet.</div></div>
-                        @endforelse
-                    </div>
                 </div>
             </section>
 

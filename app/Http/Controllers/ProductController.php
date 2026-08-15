@@ -61,7 +61,7 @@ class ProductController extends Controller
     {
         $categories = Category::where('status', 'active')->where('type', 'general')->get();
         $apis = API::where('status', 'active')->get();
-        $customerlevel = CustomerLevel::orderBy('order', 'ASC')->get();
+        $customerlevel = CustomerLevel::enabled()->orderBy('order', 'ASC')->get();
 
         return view('admin.product.create', compact('categories', 'apis', 'customerlevel'));
     }
@@ -85,6 +85,7 @@ class ProductController extends Controller
             "system_price" => "nullable",
             "image" => "required|mimes:jpeg,png|max:1024",
             "allow_subscription_type" => 'nullable',
+            "show_in_menu" => 'nullable|boolean',
             'referral_percentage' => 'nullable',
         ]);
 
@@ -125,6 +126,7 @@ class ProductController extends Controller
                 "max" => $request->max,
                 "servercode" => $request->servercode,
                 "allow_subscription_type" => $request->allow_subscription_type ?? 'no',
+                "show_in_menu" => $request->boolean('show_in_menu'),
                 'referral_percentage' => $request->referral_percentage,
             ]
         );
@@ -163,7 +165,7 @@ class ProductController extends Controller
         $categories = Category::where('status', 'active')->where('type', 'general')->get();
         $variations = Variation::where('product_id', $product->id)->where('api_id', $product->api_id)->get();
         $apis = API::where('status', 'active')->get();
-        $customerlevel = CustomerLevel::orderBy('order', 'ASC')->get();
+        $customerlevel = CustomerLevel::enabled()->orderBy('order', 'ASC')->get();
 
         return view('admin.product.edit', compact('categories', 'apis', 'product', 'variations', 'customerlevel'));
     }
@@ -191,6 +193,7 @@ class ProductController extends Controller
             "min" => 'nullable',
             "max" => 'nullable',
             "allow_subscription_type" => "nullable",
+            "show_in_menu" => 'nullable|boolean',
             'referral_percentage' => 'nullable',
 
         ]);
@@ -222,6 +225,7 @@ class ProductController extends Controller
             "servercode" => $request->servercode,
             "quantity_graduation" => $request->quantity_graduation,
             "allow_subscription_type" => $request->allow_subscription_type,
+            "show_in_menu" => $request->boolean('show_in_menu'),
 
             'referral_percentage' => $request->referral_percentage,
         ]);

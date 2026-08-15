@@ -63,6 +63,13 @@
                                                         <label for="order">Order</label>
                                                         <input type="number" class="form-control" name="order" value="{{ old('order') }}" placeholder="Enter order" id="order" required>
                                                     </fieldset>
+                                                    <fieldset class="form-group">
+                                                        <label for="status">Status</label>
+                                                        <select class="form-control" name="status" id="status" required>
+                                                            <option value="1" @selected(old('status', '1') == '1')>Enabled</option>
+                                                            <option value="0" @selected(old('status') == '0')>Disabled</option>
+                                                        </select>
+                                                    </fieldset>
                                                 </div>
                                             
                                                 <div class="col-md-12">

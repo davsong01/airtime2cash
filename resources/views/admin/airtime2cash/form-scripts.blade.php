@@ -60,6 +60,15 @@
             @error('manual_profit_percentage')
                 $('#manual-rate-tab').tab('show');
             @enderror
+            @if($errors->has('manual_level_rate.*'))
+                $('#manual-rate-tab').tab('show');
+            @endif
+            @if($errors->has('auto_share_level_rate.*'))
+                $('#auto-share-rate-tab').tab('show');
+            @endif
+            @if($errors->has('auto_share_product_code'))
+                $('#auto-share-rate-tab').tab('show');
+            @endif
         });
     </script>
 @endsection

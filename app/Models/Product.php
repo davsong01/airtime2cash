@@ -34,4 +34,22 @@ class Product extends Model
         $price = Discount::where(['product_id' => $this->id, 'customer_level' => $level])->value('price');
         return $price;
     }
+
+    public function customer_level_transfer_price($level, string $transferMode)
+    {
+        $price = Discount::where([
+            'product_id' => $this->id,
+            'customer_level' => $level,
+            'transfer_mode' => $transferMode,
+        ])->where('price', '>', 0)->value('price');
+
+        if ($price === null && $transferMode === 'manual') {
+            $price = Discount::where([
+                'product_id' => $this->id,
+                'customer_level' => $level,
+            ])->whereNull('transfer_mode')->where('price', '>', 0)->value('price');
+        }
+
+        return $price;
+    }
 }

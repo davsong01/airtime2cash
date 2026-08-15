@@ -96,9 +96,63 @@ class CustomerController extends Controller
             ->selectRaw("SUM(CASE WHEN users.created_at >= ? THEN 1 ELSE 0 END) AS new_this_month", [now()->startOfMonth()])
             ->first();
 
-        $customer_levels = CustomerLevel::orderBy('name')->get();
+        $customer_levels = CustomerLevel::enabled()->orderBy('name')->get();
+        $activeCustomerLevels = $customer_levels;
 
-        return view('admin.customers.index', compact('customers', 'customer_levels', 'summary', 'selectedStatus'));
+        return view('admin.customers.index', compact('customers', 'customer_levels', 'activeCustomerLevels', 'summary', 'selectedStatus'));
+    }
+
+    public function bulkActions(Request $request)
+    {
+        $this->validate($request, [
+            'action' => ['required', 'in:activate,deactivate,suspend,delete,move_level'],
+            'customer_ids' => ['required', 'string'],
+            'level_id' => ['nullable', 'integer'],
+        ]);
+
+        $customerIds = collect(explode(',', $request->customer_ids))
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($customerIds)) {
+            return back()->with('error', 'Please select at least one customer');
+        }
+
+        if ($request->action === 'move_level') {
+            $this->validate($request, [
+                'level_id' => ['required', 'integer', 'exists:customer_levels,id'],
+            ]);
+
+            $level = CustomerLevel::enabled()->where('id', $request->level_id)->first();
+
+            if (!$level) {
+                return back()->with('error', 'Please select an enabled customer level');
+            }
+
+            Customer::whereIn('user_id', $customerIds)->update([
+                'customer_level' => $level->id,
+            ]);
+
+            return back()->with('message', 'Selected customers moved to ' . $level->name . ' successfully');
+        }
+
+        $status = match ($request->action) {
+            'activate' => 'active',
+            'deactivate' => 'inactive',
+            'suspend' => 'suspended',
+            'delete' => 'delete',
+        };
+
+        User::whereIn('id', $customerIds)
+            ->where('type', '!=', 'admin')
+            ->update([
+                'status' => $status,
+            ]);
+
+        return back()->with('message', 'Selected customers updated successfully');
     }
 
     function unverifiedCustomers(Request $request, $status = null)
@@ -276,7 +330,7 @@ class CustomerController extends Controller
         $customerLevels = collect();
 
         if ($activeTab === 'account') {
-            $customerLevels = CustomerLevel::orderBy('order', 'ASC')->get();
+            $customerLevels = CustomerLevel::enabled()->orderBy('order', 'ASC')->get();
         } elseif ($activeTab === 'transactions') {
             $transactions = $user->customer->transactions()->latest()->paginate(10);
         } elseif ($activeTab === 'airtime2cash-transactions') {
@@ -338,7 +392,12 @@ class CustomerController extends Controller
         $user->update($request->except(['_token', 'ip', 'customerlevel']));
 
         if(!empty($request->customerlevel)){
-            $level = CustomerLevel::where('id', $request->customerlevel)->first();
+            $level = CustomerLevel::enabled()->where('id', $request->customerlevel)->first();
+
+            if (!$level) {
+                return back()->with('error', 'Please select an enabled customer level');
+            }
+
             $user->customer->customer_level = $level->id;
 
             if(!empty($level->transaction)){

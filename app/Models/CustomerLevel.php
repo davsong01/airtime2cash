@@ -10,9 +10,17 @@ class CustomerLevel extends Model
 {
     use HasFactory;
     protected $guarded = [];
+    protected $casts = [
+        'status' => 'boolean',
+    ];
     
     public function customers(){
         return $this->hasMany(Customer::class, 'customer_level');
+    }
+
+    public function scopeEnabled($query)
+    {
+        return $query->where('status', true);
     }
 
     public function variation_price($variation_id)

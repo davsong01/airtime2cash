@@ -72,7 +72,7 @@
                                                                 <div class="col-md-6">   
                                                                     <fieldset class="form-group">
                                                                         <label for="email">Customer Level</label> <a target="_blank" href="{{ route('customer.level.upgrade')}}" style="font-size: smaller;">&nbsp;&nbsp;Upgrade</a>
-                                                                        <input autocomplete="false" type="phone" class="form-control" disabled value="Level {{ auth()->user()->customer->level->name }}">
+                                                                        <input autocomplete="false" type="phone" class="form-control" disabled value="Level {{ auth()->user()->customer?->level?->name ?? 'Unassigned' }}">
                                                                     </fieldset>
                                                                 </div>
                                                                 @endif

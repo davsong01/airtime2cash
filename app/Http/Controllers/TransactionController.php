@@ -46,8 +46,18 @@ class TransactionController extends Controller
             }
         ])->where('status', 'active')->where('slug', $slug)->first();
 
+        $selectedProductId = request()->integer('product');
+        $selectedProduct = null;
+
+        if ($selectedProductId && $category) {
+            $selectedProduct = $category->products
+                ->where('id', $selectedProductId)
+                ->where('status', 'active')
+                ->first();
+        }
+
         if (!empty($category) && $category->status == 'active') {
-            return view(themeView('customer', 'single_category_page'), compact('category'));
+            return view(themeView('customer', 'single_category_page'), compact('category', 'selectedProduct'));
         } else {
             return back();
         }
@@ -78,16 +88,14 @@ class TransactionController extends Controller
             return back()->with('error', 'Airtime to Cash is not currently available.');
         }
 
+        $levelId = $this->activeCustomerLevelId(auth()->user());
+
         foreach ($category->products as $product) {
-            $discount = Discount::where('product_id', $product->id)
-                ->where('customer_level', auth()->user()->customer->level->id)
-                ->first();
+            $manualRate = $levelId ? $product->customer_level_transfer_price($levelId, 'manual') : null;
+            $autoShareRate = $levelId ? $product->customer_level_transfer_price($levelId, 'auto_share') : null;
 
-            $manualRate = !empty($discount) ? $discount->price : $product->rate;
-            $product->manual_discounted_rate = ((float) $manualRate >= 1) ? $manualRate : $product->rate;
-
-            $autoShareRate = $product->auto_share_rate ?? $product->rate;
-            $product->auto_share_discounted_rate = ((float) $autoShareRate >= 1) ? $autoShareRate : $product->rate;
+            $product->manual_discounted_rate = ((float) ($manualRate ?? 0) >= 1) ? $manualRate : $product->rate;
+            $product->auto_share_discounted_rate = ((float) ($autoShareRate ?? 0) >= 1) ? $autoShareRate : ($product->auto_share_rate ?? $product->rate);
         }
 
         $banks = Bank::active()->orderBy('bank_name')->get();
@@ -299,12 +307,15 @@ class TransactionController extends Controller
             return back()->withInput()->with('error', 'The selected network is not available for this transfer method.');
         }
 
+        $levelId = $this->activeCustomerLevelId(auth()->user());
+
         if ($request->transfer_mode === 'manual') {
-            $discount = Discount::where('product_id', $product->id)->where('customer_level', auth()->user()->customer->level->id)->first();
-            $rate = (!empty($discount) && $discount->price < $product->rate) ? $discount->price : $product->rate;
+            $discountedRate = $levelId ? $product->customer_level_transfer_price($levelId, 'manual') : null;
+            $rate = ((float) ($discountedRate ?? 0) >= 1) ? $discountedRate : $product->rate;
             $profitPercentage = $product->manual_profit_percentage;
         } else {
-            $rate = $product->auto_share_rate ?? $product->rate;
+            $discountedRate = $levelId ? $product->customer_level_transfer_price($levelId, 'auto_share') : null;
+            $rate = ((float) ($discountedRate ?? 0) >= 1) ? $discountedRate : ($product->auto_share_rate ?? $product->rate);
             $profitPercentage = $product->auto_share_profit_percentage;
         }
 
@@ -1245,10 +1256,21 @@ class TransactionController extends Controller
         }
     }
 
+    private function activeCustomerLevelId(?User $user): ?int
+    {
+        $level = $user?->customer?->level;
+
+        if (empty($level) || !((bool) ($level->status ?? false))) {
+            return null;
+        }
+
+        return (int) $level->id;
+    }
+
     public function getDiscount($resource, $type, $amount = null, $getRate = null)
     {
         $discount = 0;
-        $level = auth()->user()->customer->customer_level;
+        $level = $this->activeCustomerLevelId(auth()->user());
         $amount = $amount;
 
         if ($type == 'variation') {

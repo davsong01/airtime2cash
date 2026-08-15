@@ -189,7 +189,8 @@ class DashboardController extends Controller
 
     public function showUpgradeForm()
     {
-        $levels = CustomerLevel::orderBy('order', 'ASC')->where('id', '>', auth()->user()->customer->level->id)->get();
+        $currentLevelId = (int) (auth()->user()->customer?->level?->id ?? 0);
+        $levels = CustomerLevel::enabled()->orderBy('order', 'ASC')->where('id', '>', $currentLevelId)->get();
         return view(themeView('customer', 'upgrade_level'), compact('levels'));
     }
 
@@ -202,7 +203,7 @@ class DashboardController extends Controller
 
     public function upgradeAccount(Request $request)
     {
-        $level = CustomerLevel::where('id', $request->level)->first();
+        $level = CustomerLevel::enabled()->where('id', $request->level)->first();
         if (!$level) {
             return back()->with('error', 'Level not found');
         }
