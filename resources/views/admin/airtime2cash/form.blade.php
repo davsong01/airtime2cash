@@ -130,7 +130,7 @@
                             </div>
 
                             <div class="a2c-level-rates">
-                                <div class="a2c-level-rates-heading">
+                                <div class="a2c-level-rates-heading mt-2">
                                     <strong>Customer level overrides</strong>
                                     <span>Leave blank or set 0 to use the main manual charge rate.</span>
                                 </div>
@@ -190,7 +190,7 @@
                             </div>
 
                             <div class="a2c-level-rates">
-                                <div class="a2c-level-rates-heading">
+                                <div class="a2c-level-rates-heading mt-2">
                                     <strong>Customer level overrides</strong>
                                     <span>Leave blank or set 0 to use the main auto charge rate.</span>
                                 </div>
