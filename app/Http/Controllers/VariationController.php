@@ -43,7 +43,13 @@ class VariationController extends Controller
                 return back()->with('error', 'Variations could not be pulled from provider');
             }
         } else {
-            return back()->with('error', 'Error while pulling categories' . $variations['errors'] ?? '');
+            $errors = $variations['errors'] ?? '';
+
+            if (is_array($errors) || is_object($errors)) {
+                $errors = json_encode($errors);
+            }
+
+            return back()->with('error', 'Error while pulling variations' . (!empty($errors) ? ': ' . $errors : ''));
         }
 
         return view('admin.category.index', compact('categories'));
