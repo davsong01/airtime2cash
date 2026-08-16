@@ -29,6 +29,15 @@ class AuthenticatedSessionController extends Controller
         $request->authenticate();
 
         $user = auth()->user();
+
+        // if (bounceBlacklist($user?->phone, $user?->email, $user?->email)) {
+        //     Auth::guard('web')->logout();
+        //     $request->session()->invalidate();
+        //     $request->session()->regenerateToken();
+
+        //     return redirect()->route('login')->with('error', 'This account has been blacklisted. Please contact support.');
+        // }
+
         // Check if account is inactive
         if ($user->status !== 'active') {
             Auth::guard('web')->logout();

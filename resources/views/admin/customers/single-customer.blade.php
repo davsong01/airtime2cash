@@ -134,27 +134,5 @@
             modalImage.src = image.src;
             $(modal).modal('show');
         }
-
-        function toggleBlacklist(input) {
-            if (!window.confirm('Are you sure you want to change this blacklist status?')) {
-                input.checked = !input.checked;
-                return;
-            }
-
-            $.get('{{ route('black.list.status') }}', {
-                id: input.dataset.id,
-                status: input.dataset.status
-            }).done(function (response) {
-                if (response.code === 1) {
-                    input.dataset.status = response.status;
-                } else {
-                    input.checked = !input.checked;
-                    window.alert(response.message || 'The status could not be changed.');
-                }
-            }).fail(function () {
-                input.checked = !input.checked;
-                window.alert('The status could not be changed.');
-            });
-        }
     </script>
 @endsection

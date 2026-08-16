@@ -23,10 +23,11 @@
                         <div><h6 class="mb-25">{{ $risk['title'] }}</h6><small class="text-muted">{{ $risk['value'] ?: 'Not available' }}</small></div>
                     </div>
                     @if($risk['record'])
-                        <div class="custom-control custom-switch custom-switch-success">
-                            <input type="checkbox" class="custom-control-input" id="blacklist-{{ $risk['type'] }}" @checked($risk['record']->status === 'active') data-id="{{ $risk['record']->id }}" data-status="{{ $risk['record']->status }}" onchange="toggleBlacklist(this)">
-                            <label class="custom-control-label" for="blacklist-{{ $risk['type'] }}"></label>
-                        </div>
+                        <form action="{{ route('customer-blacklist.destroy', $risk['record']->id) }}" method="POST" onsubmit="return confirm('Remove this item from the blacklist?');">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="btn btn-outline-danger btn-sm"><i class="bx bx-trash mr-25"></i> Remove</button>
+                        </form>
                     @endif
                 </div>
                 @unless($risk['record'])
@@ -34,7 +35,6 @@
                         @csrf
                         <input type="hidden" name="type" value="{{ $risk['type'] }}">
                         <input type="hidden" name="value" value="{{ $risk['value'] }}">
-                        <input type="hidden" name="status" value="active">
                         <button type="submit" class="btn btn-outline-danger btn-sm" @disabled(!$risk['value'])><i class="bx bx-block mr-25"></i> Add to blacklist</button>
                     </form>
                 @endunless

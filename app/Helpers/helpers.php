@@ -1,20 +1,34 @@
 <?php
 
-use App\Models\KycData;
+use App\Http\Controllers\WalletController;
+use App\Mail\EmailMessages;
+use App\Models\Announcement;
+use App\Models\API;
+use App\Models\Bank;
+use App\Models\BlackList;
 use App\Models\Category;
 use App\Models\Customer;
 use App\Models\EmailLog;
+use App\Models\KycData;
 use App\Models\Product;
 use App\Models\Settings;
-use App\Models\API;
-use App\Mail\EmailMessages;
 use Illuminate\Support\Arr;
-use App\Models\Announcement;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\View;
-use App\Http\Controllers\WalletController;
-use App\Models\Bank;
+
+if (!function_exists("bounceBlacklist")) {
+    function bounceBlacklist($phone, $user, $mail = null): bool
+    {
+        $values = array_filter([$mail, $phone, $user]);
+
+        if (empty($values)) {
+            return false;
+        }
+
+        return BlackList::whereIn('value', $values)->exists();
+    }
+}
 
 if (!function_exists("mask")) {
     function mask($word, $a = 2, $b = 9, $c = 9, $d = 10)

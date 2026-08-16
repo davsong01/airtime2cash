@@ -85,7 +85,6 @@ class RolePermissionSeeder extends Seeder
             'customerlevel.destroy',
             'duplicate.product',
             'api.balance',
-            'black.list.status',
             'admin.trans',
             'admin.walletlog',
             'admin.walletfundinglog',

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Mail\EmailMessages;
 use App\Models\BillerLog;
+use App\Models\BlackList;
 use App\Models\EmailApiSetting;
 use App\Models\EmailLog;
 use App\Models\GeneralSetting;
@@ -123,6 +124,7 @@ class Controller extends BaseController
     {
         return 1;
     }
+
 
     // public function settings(){
     //     return GeneralSetting::first();

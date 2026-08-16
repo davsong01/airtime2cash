@@ -59,18 +59,6 @@
                                                             value="{{ old('value') }}"
                                                             placeholder="Enter item to blacklist" id="value" required>
                                                     </fieldset>
-                                                    <fieldset class="form-group">
-                                                        <label for="type">Status</label>
-                                                        <select class="form-control" name="status" id="type" required>
-                                                            <option value="">Select Status</option>
-                                                            <option value="active"
-                                                                {{ old('active') == 'active' ? 'selected' : '' }}>Active
-                                                            </option>
-                                                            <option value="in-active"
-                                                                {{ old('in-active') == 'in-active' ? 'selected' : '' }}>In Active
-                                                            </option>
-                                                        </select>
-                                                    </fieldset>
                                                     <div class="mt-2">
                                                         <button class="btn btn-primary" type="submit">Submit</button>
                                                     </div>

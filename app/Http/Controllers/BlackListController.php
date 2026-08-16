@@ -32,12 +32,11 @@ class BlackListController extends Controller
         $request->validate([
             'type' => 'required',
             'value' => 'required',
-            'status' => 'required'
         ]);
 
         BlackList::create([
             'type' => $request->type,
-            'value' => $request->value
+            'value' => $request->value,
         ]);
         return back()->with('message', 'Item added to blacklist successfully');
     }
@@ -69,25 +68,10 @@ class BlackListController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(BlackList $blackList)
+    public function destroy(BlackList $customerBlacklist)
     {
-        //
-    }
+        $customerBlacklist->delete();
 
-    public function status(Request $request)
-    {
-        $request->validate([
-            'status' => 'required',
-            'id' => 'required|integer'
-        ]);
-
-        $status = $request->status == 'active' ? 'in-active' : 'active';
-        $black = BlackList::find($request->id)->update(['status' => $status]);
-
-        if ($black) {
-            return ['code' => 1, 'status' => $status, 'message' => 'Success'];
-        } else {
-            return ['code' => 0, 'message' => 'Failed to set status'];
-        }
+        return back()->with('message', 'Item removed from blacklist successfully');
     }
 }

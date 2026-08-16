@@ -170,8 +170,6 @@ Route::middleware(['auth', 'verified', 'admin', 'ipcheck', 'adminRoute'])->prefi
     Route::get('emails/destroy/{id}', [EmailLogController::class, 'destroy'])->name('emails.destroy');
     Route::get('emails/clear', [EmailLogController::class, 'sweep'])->name('emails.sweep');
     Route::get('emails', [EmailLogController::class, 'index'])->name('emails.index');
-    Route::get('black-list-status', [BlackListController::class, 'status'])->name('black.list.status');
-
     Route::get('setup-emails', [EmailApiController::class, 'edit'])->name('email.setup');
     Route::post('setup-emails', [EmailApiController::class, 'update'])->name('email.setup.update');
 

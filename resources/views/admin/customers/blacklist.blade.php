@@ -21,7 +21,6 @@
                                 <thead>
                                     <tr>
                                         <th>Blacklist Item</th>
-                                        <th>Status</th>
                                         <th>Date</th>
                                         <th>Action</th>
                                     </tr>
@@ -37,16 +36,14 @@
                                                    Email:  {{ $customer->email }} <br>
                                                    Phone Number: {{ $customer->phone }}
                                             </td> --}}
-
                                             <td>{{ $customer->value }}</td>
-                                            <td>{{ ucfirst($customer->status) }}</td>
                                             <td>{{ $customer->created_at->toDateString('en-GB') }}</td>
                                             <td>
-                                                <div class="custom-control custom-switch custom-switch-success custom-switch-glow custom-control-inline mb-1">
-                                                    <input type="checkbox" class="custom-control-input" id="customSwitchGlow2-{{ $customer->id }}" @checked($customer->status == 'active') data-id="{{ $customer->id }}" data-value="{{ $customer->status }}">
-                                                    <label class="custom-control-label" for="customSwitchGlow2-{{ $customer->id }}">
-                                                    </label>
-                                                </div>
+                                                <form action="{{ route('customer-blacklist.destroy', $customer->id) }}" method="POST" onsubmit="return confirm('Remove this item from the blacklist?');">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bx bx-trash mr-25"></i> Remove</button>
+                                                </form>
                                             </td>
                                         </tr>
                                     @endforeach
@@ -62,25 +59,4 @@
     </div>
 
     @section('page-script')
-        <script>
-            $('.custom-control-input').on('change', function toggleStatus () {
-                let check = confirm('Are you sure you want to perform this action?');
-                if (check) {
-                    let status = $(this).attr('data-value');
-                    let id = $(this).attr('data-id');
-                    $.ajax({
-                        url: 'black-list-status',
-                        data: {status, id},
-                        success: e => {
-                            alert(e.message)
-                            if (e.code == 1) {
-                                let status = $(this).attr('data-value', e.status);
-                            }
-                        },
-                        error: () => alert('Request could not be completed!'),
-                    });
-                }
-            })
-
-        </script>
     @endsection

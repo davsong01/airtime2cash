@@ -72,7 +72,11 @@ class RegisteredUserController extends Controller
             'password' => ['required', Rules\Password::defaults()],
             'privacy' => ['required'],
         ]);
-        
+
+        if (bounceBlacklist($request->phone, $request->email, $request->email)) {
+            return back()->withInput()->with('error', 'This account has been blacklisted. Please contact support.');
+        }
+
         $user = User::create([
             'firstname' => $request->first_name,
             'lastname' => $request->last_name,
@@ -123,7 +127,7 @@ class RegisteredUserController extends Controller
             'referal_wallet' => 0,
             'customer_level' => env('DEFAULT_CUSTOMER_LEVEL_ID') ?? 1,
         ]);
-        
+
         KycData::create([
             'key' => 'PHONE_NUMBER',
             'value' => $user->phone,
