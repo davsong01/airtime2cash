@@ -29,7 +29,6 @@ class AuthenticatedSessionController extends Controller
         $request->authenticate();
 
         $user = auth()->user();
-
         // Check if account is inactive
         if ($user->status !== 'active') {
             Auth::guard('web')->logout();
