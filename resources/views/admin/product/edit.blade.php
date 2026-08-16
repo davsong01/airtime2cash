@@ -141,14 +141,14 @@
                                                                                         <option value="no" {{ $product->allow_subscription_type == 'no' ? 'selected' : ''}}>No</option>
                                                                                     </select>
                                                                                 </fieldset>
-                                                                                <fieldset class="form-group">
+                                                                                {{-- <fieldset class="form-group">
                                                                                     <input type="hidden" name="show_in_menu" value="0">
                                                                                     <div class="custom-control custom-switch custom-switch-success">
                                                                                         <input type="checkbox" class="custom-control-input" id="show_in_menu" name="show_in_menu" value="1" {{ old('show_in_menu', $product->show_in_menu) ? 'checked' : '' }}>
                                                                                         <label class="custom-control-label" for="show_in_menu">Show in customer menu</label>
                                                                                     </div>
                                                                                     <small class="form-text text-muted">When enabled, this product appears directly in the customer menu after the service categories.</small>
-                                                                                </fieldset>
+                                                                                </fieldset> --}}
                                                                                 <fieldset class="form-group" id="referral_percentage">
                                                                                     <label for="referral_percentage">Referral Percentage(%)</label>
                                                                                     <input type="number" class="form-control" id="referral_percentage" step="0.01" name="referral_percentage" value="{{ $product->referral_percentage ?? old('referral_percentage') }}" placeholder="Enter percentage for referral earnings">
