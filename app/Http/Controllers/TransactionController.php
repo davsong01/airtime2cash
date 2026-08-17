@@ -1664,6 +1664,7 @@ class TransactionController extends Controller
     public function transView(Request $request)
     {
         $request->validate([
+            'api' => ['nullable', 'integer'],
             'service' => ['nullable', 'integer'],
             'status' => ['nullable', 'in:delivered,success,failed,attention-required'],
             'from' => ['nullable', 'date'],
@@ -1679,6 +1680,7 @@ class TransactionController extends Controller
 
         $transactions = $baseQuery->with(['category', 'variation', 'api', 'airtime2cash'])->latest();
         $products = Product::orderBy('display_name')->get(['id', 'display_name']);
+        $apis = API::query()->orderBy('name')->get(['id', 'name', 'slug']);
 
         if ($request->email) {
             $transactions->where('customer_email', 'like', '%' . trim($request->email) . '%');
@@ -1690,6 +1692,9 @@ class TransactionController extends Controller
 
         if ($request->service) {
             $transactions->where('product_id', $request->service);
+        }
+        if ($request->api) {
+            $transactions->where('api_id', $request->api);
         }
         if ($request->transaction_id) {
             $transactions->where('transaction_id', 'like', '%' . trim($request->transaction_id) . '%');
@@ -1714,6 +1719,7 @@ class TransactionController extends Controller
         return view('admin.transaction.index', [
             'transactions' => $transactions,
             'products' => $products,
+            'apis' => $apis,
             'success' => $metrics->successful,
             'failed' => $metrics->failed,
             'attention_required' => $metrics->attention_required,
@@ -2200,7 +2206,7 @@ class TransactionController extends Controller
         return null;
     }
 
-    private function applyProviderVerificationResult(TransactionLog $transaction, array $response, ?string $resolutionSource = null): array
+    private function applyProviderVerificationResult(TransactionLog $transaction, array $response, ?string $resolutionSource = null, bool $persistApiResponse = true): array
     {
         if (($response['status'] ?? null) === 'skipped') {
             return [
@@ -2223,7 +2229,7 @@ class TransactionController extends Controller
                 null,
                 $transaction->balance_after,
                 $providerStatus,
-                $response,
+                $persistApiResponse ? $response : null,
             );
 
             return [
@@ -2241,7 +2247,7 @@ class TransactionController extends Controller
                 $sourceNote . data_get($response, 'message', 'Transaction failed after provider verification.'),
                 $transaction->balance_before,
                 $providerStatus,
-                $response,
+                $persistApiResponse ? $response : null,
             );
 
             return [
@@ -2250,14 +2256,22 @@ class TransactionController extends Controller
             ];
         }
 
+        $pendingDescription = 'Provider still returned a pending response after requery.';
+        $pendingExtras = $sourceNote . $pendingDescription;
+
         $this->markTransactionResolved(
             $transaction,
             'pending',
-            $sourceNote . 'Provider still returned a pending response after requery.',
-            $sourceNote . data_get($response, 'message', 'Provider still returned a pending response after requery.'),
+            $pendingDescription,
+            $sourceNote . data_get($response, 'message', $pendingDescription),
             $transaction->balance_after,
             $providerStatus,
-            $response,
+            $persistApiResponse ? $response : null,
+            $pendingExtras,
+            [
+                'resolution_source' => trim($resolutionSource ?? ''),
+                'resolution_note' => $pendingExtras,
+            ],
         );
 
         return [
@@ -2340,7 +2354,7 @@ class TransactionController extends Controller
                     continue;
                 }
 
-                $result = $this->applyProviderVerificationResult($transaction, $response, 'CRON/System');
+                $result = $this->applyProviderVerificationResult($transaction, $response, 'CRON/System', false);
                 $summary['processed']++;
                 $summary[$result['status'] ?? 'pending'] = ($summary[$result['status'] ?? 'pending'] ?? 0) + 1;
             } catch (\Throwable $exception) {
@@ -2508,7 +2522,7 @@ class TransactionController extends Controller
         $wallet->updateCustomerWallet($user, $amount, 'credit');
     }
 
-    private function markTransactionResolved(TransactionLog $transaction, string $status, string $descr, ?string $failureReason = null, ?float $balanceAfter = null, ?string $providerStatus = null, mixed $apiResponse = null): void
+    private function markTransactionResolved(TransactionLog $transaction, string $status, string $descr, ?string $failureReason = null, ?float $balanceAfter = null, ?string $providerStatus = null, mixed $apiResponse = null, ?string $extras = null, ?array $extraInfo = null): void
     {
         $updates = [
             'status' => $status,
@@ -2525,6 +2539,15 @@ class TransactionController extends Controller
 
         if ($apiResponse !== null) {
             $updates['api_response'] = is_array($apiResponse) ? json_encode($apiResponse) : $apiResponse;
+        }
+
+        if ($extras !== null) {
+            $updates['extras'] = $extras;
+        }
+
+        if ($extraInfo !== null) {
+            $currentExtraInfo = $this->decodedTransactionExtraInfo($transaction);
+            $updates['extra_info'] = json_encode(array_merge($currentExtraInfo, $extraInfo));
         }
 
         $transaction->update($updates);
@@ -2567,6 +2590,19 @@ class TransactionController extends Controller
         }
 
         $decoded = json_decode((string) $apiResponse, true);
+
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    private function decodedTransactionExtraInfo(TransactionLog $transaction): array
+    {
+        $extraInfo = $transaction->extra_info ?? [];
+
+        if (is_array($extraInfo)) {
+            return $extraInfo;
+        }
+
+        $decoded = json_decode((string) $extraInfo, true);
 
         return is_array($decoded) ? $decoded : [];
     }

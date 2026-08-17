@@ -49,7 +49,7 @@ use Illuminate\Support\Facades\Route;
 // Provider webhooks
 Route::post('log-provider-webhook/{provider_id}', [CallbackOperationsController::class, 'logWebhook'])->name('log.provider.webhook');
 Route::get('cron/analyze-webhook/{pick}', [CallbackOperationsController::class, 'analyzeProviderCallbackResponse'])->name('callback.provider.analyze');
-Route::get('cron/requery-pending-transactions/{api?}', [TransactionController::class, 'requeryPendingTransactionsByApi'])->name('admin.requery.pending.transactions.by.api');
+Route::get('cron/requery-pending-transactions/{api?}/{pick?}', [TransactionController::class, 'requeryPendingTransactionsByApi'])->name('admin.requery.pending.transactions.by.api');
 
 // End provider webhooks
 

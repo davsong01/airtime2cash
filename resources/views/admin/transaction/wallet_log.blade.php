@@ -133,19 +133,22 @@
                                             <tr>
                                                 <td class="text-muted">{{ $transactions->firstItem() + $loop->index }}</td>
                                                 <td>{{ $transaction->customer->user->name }} <br>
-                                                    <a href="">{{ $transaction->customer->user->email }}</a> <br>
+                                                    <a href="{{ $transaction->customer?->user ? route('customers.edit', $transaction->customer->user->id) : '#' }}">
+                                                        {{ $transaction->customer->user->email }}
+                                                    </a> <br>
                                                     {{ $transaction->customer->user->phone }}
                                                 </td>
                                                 <td>
-                                                    @if($transaction->reason == 'Airtime2Cash Payment')
-                                                    <a target="_blank" href="{{ route('admin.single.airtime2cash.transaction.view', $transaction->airtime2cash->id) }}">
+                                                    @php
+                                                        $walletTransactionLink = $transaction->transaction_log
+                                                            ? route('admin.single.transaction.view', $transaction->transaction_log->id)
+                                                            : ($transaction->airtime2cash
+                                                                ? route('admin.single.airtime2cash.transaction.view', $transaction->airtime2cash->id)
+                                                                : '#');
+                                                    @endphp
+                                                    <a target="_blank" href="{{ $walletTransactionLink }}">
                                                         {{ $transaction->transaction_id }}
                                                     </a>
-                                                    @else
-                                                    <a target="_blank" href="{{ $transaction->transaction_log ? route('admin.single.transaction.view', $transaction->transaction_log->id) : '#' }}">
-                                                        {{ $transaction->transaction_id }}
-                                                    </a>
-                                                    @endif
                                                 </td>
                                                 <td style="color:{{ $transaction->type == 'credit' ? 'green' : 'red'}}">{{ ucfirst($transaction->type) }}</td>
                                                 <td>{!! getSettings()->currency. number_format($transaction->amount) !!}</td>

@@ -298,30 +298,28 @@
                                                                      <a href="{{ route('transaction.receipt.download', $transaction->id)}}" target="_blank" class="btn btn-primary btn-sm" style="color:#fff;"><i class="fa fa-download"></i> Download Receipt</a> <br>
                                                                     @endif
                                                                 </div>
-                                                                <div class="col-md-3">
+                                                               <div class="col-md-3">
                                                                    <strong>Request Id:</strong> <br>{{ $transaction->reference_id }} <br>
                                                                    <strong>IP Address: </strong><br>{{ $transaction->ip_address }} <br>
-                                                                   @if(!empty($transaction->extras))
-                                                                    <li class="d-flex mb-1">
-                                                                        <div class="d-flex w-100 flex-wrap align-items-center justify-content-between gap-2">
-                                                                            <div class="me-2">
-                                                                                <p class="mb-0 lh-1 key"><strong>Extras:</strong> <br></p>
-                                                                            </div>
-                                                                            <div class="">{{ ucfirst($transaction->extras) }}</div>
+                                                                   @if(!empty($transaction->extras) || !empty($transaction->extra_info))
+                                                                    <div class="card mt-2">
+                                                                        <div class="card-header py-1 px-2">
+                                                                            <strong>System Notes</strong>
                                                                         </div>
-                                                                    </li>
-                                                                    @endif
-                                                                    @if(!empty($transaction->extra_info))
-                                                                        @foreach ( json_decode($transaction->extra_info) as $key=>$value )
-                                                                            <li class="d-flex mb-1">
-                                                                            <div class="d-flex w-100 flex-wrap align-items-center justify-content-between gap-2">
-                                                                                <div class="me-2">
-                                                                                    <p class="mb-0 lh-1 key"><strong>{{ $key }}:</strong> </p>
-                                                                                </div>
-                                                                                <div class="item-progres value">{{ ucfirst($value) }}sd</div>
-                                                                            </div>
-                                                                        </li>
-                                                                        @endforeach
+                                                                        <div class="card-body py-2 px-2" style="font-size: 12px; line-height: 1.6;">
+                                                                            @if(!empty($transaction->extras))
+                                                                                <div><strong>Extras:</strong> {{ $transaction->extras }}</div>
+                                                                            @endif
+                                                                            @if(!empty($transaction->extra_info))
+                                                                                @php
+                                                                                    $decodedExtraInfo = json_decode($transaction->extra_info, true) ?: [];
+                                                                                @endphp
+                                                                                @foreach ($decodedExtraInfo as $key => $value)
+                                                                                    <div><strong>{{ $key }}:</strong> {{ is_array($value) ? json_encode($value) : $value }}</div>
+                                                                                @endforeach
+                                                                            @endif
+                                                                        </div>
+                                                                    </div>
                                                                     @endif
                                                                 </div>
                                                                 <div class="col-md-3">

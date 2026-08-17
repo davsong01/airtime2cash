@@ -109,6 +109,17 @@
                                     </div>
                                     <div class="col-md-3">
                                         <fieldset class="form-group">
+                                            <label for="api">API</label>
+                                            <select class="form-control" name="api" id="api">
+                                                <option value="">Select</option>
+                                                @foreach ($apis as $api)
+                                                    <option value="{{ $api->id }}" {{ \Request::get('api') == $api->id ? 'selected' : ''}}>{{ $api->name }}</option>
+                                                @endforeach
+                                            </select>
+                                        </fieldset>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <fieldset class="form-group">
                                             <label for="transaction_id">Transaction ID</label>
                                             <input type="text" class="form-control" id="transaction_id" name="transaction_id" placeholder="Enter transaction ID" value="{{ \Request::get('transaction_id')}}">
                                         </fieldset>
