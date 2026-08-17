@@ -175,7 +175,11 @@
 				</tr>                                                        
 				@endif
 				@if(!empty($transaction['extra_info']))
-					@foreach ( json_decode($transaction['extra_info']) as $key=>$value )
+					@php
+						$decodedExtraInfo = json_decode($transaction['extra_info'], true) ?: [];
+					@endphp
+					@foreach ($decodedExtraInfo as $key => $value)
+						@continue(str_starts_with((string) $key, 'resolution_'))
 					<tr class="item">
 						<td>{{ $key }}</td>
 						<td>{{ ucfirst($value) }}</td>

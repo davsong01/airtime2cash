@@ -23,7 +23,9 @@
 
     if (filled($transaction['extra_info'] ?? null)) {
         $decodedExtraInfo = json_decode($transaction['extra_info'], true);
-        $extraInfo = is_array($decodedExtraInfo) ? $decodedExtraInfo : [];
+        $extraInfo = is_array($decodedExtraInfo)
+            ? array_filter($decodedExtraInfo, fn ($value, $key) => ! str_starts_with((string) $key, 'resolution_'), ARRAY_FILTER_USE_BOTH)
+            : [];
     }
 
     $embedPublicImage = static function (?string $relativePath, int $maxWidth, int $maxHeight): ?string {

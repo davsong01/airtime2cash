@@ -225,7 +225,11 @@
                                                                             </li>
                                                                             @endif
                                                                             @if(!empty($transaction->extra_info))
-                                                                                @foreach ( json_decode($transaction->extra_info) as $key=>$value )
+                                                                                @php
+                                                                                    $decodedExtraInfo = json_decode($transaction->extra_info, true) ?: [];
+                                                                                @endphp
+                                                                                @foreach ($decodedExtraInfo as $key => $value)
+                                                                                    @continue(str_starts_with((string) $key, 'resolution_'))
                                                                                     <li class="d-flex mb-1">
                                                                                     <div class="d-flex w-100 flex-wrap align-items-center justify-content-between gap-2">
                                                                                     <div class="me-2">
