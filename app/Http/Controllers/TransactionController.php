@@ -572,8 +572,18 @@ class TransactionController extends Controller
             return back()->with('error', 'The selected product/service does not seem to exist, kindly try again');
         }
 
+        $settings = getSettings();
+        $availableTransferModes = array_values(array_filter([
+            (($settings->wallet_to_bank_transfer_auto_status ?? 'enabled') === 'enabled') ? 'auto_share' : null,
+            (($settings->wallet_to_bank_transfer_manual_status ?? 'enabled') === 'enabled') ? 'manual' : null,
+        ]));
+
+        if (empty($availableTransferModes)) {
+            return back()->with('error', 'Wallet to bank transfer is currently unavailable. Please try again later.');
+        }
+
         $request->validate([
-            'transfer_mode' => ['nullable', 'in:manual,auto_share'],
+            'transfer_mode' => ['nullable', Rule::in($availableTransferModes)],
         ]);
 
         $providerMin = 60;
@@ -657,7 +667,11 @@ class TransactionController extends Controller
         $request['unique_element'] = 'Wallet2Bank';
         $request['discount'] = 0;
         $request['api_id'] = $chargeDetails['provider_id'] ?? getSettings()->bank_transfer_provider_id ?? null;
-        $request['transfer_mode'] = $request->input('transfer_mode', 'auto_share');
+        $request['transfer_mode'] = $request->input('transfer_mode', $availableTransferModes[0]);
+
+        if (! in_array($request['transfer_mode'], $availableTransferModes, true)) {
+            return back()->with('error', 'The selected transfer method is currently unavailable.');
+        }
 
         $wallet = new WalletController();
 

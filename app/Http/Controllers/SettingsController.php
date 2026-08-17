@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Settings;
 use Illuminate\Http\Request;
 use App\Models\API;
+use Illuminate\Validation\Rule;
 
 class SettingsController extends Controller
 {
@@ -58,6 +59,8 @@ class SettingsController extends Controller
                 'google_ad_code' => '',
                 'google_dashboard_ad_enabled' => true,
                 'show_provider_status_on_customer_pages' => true,
+                'wallet_to_bank_transfer_auto_status' => 'enabled',
+                'wallet_to_bank_transfer_manual_status' => 'enabled',
                 'seo_title' => '',
                 'seo_description' => '',
                 'support_link' => '',
@@ -112,6 +115,8 @@ class SettingsController extends Controller
                 'bank_transfer_provider_id' => ['required', 'integer', 'exists:apis,id'],
                 'bank_verification_provider_id' => ['nullable', 'integer', 'exists:apis,id'],
                 'show_provider_status_on_customer_pages' => ['nullable', 'boolean'],
+                'wallet_to_bank_transfer_auto_status' => ['required', Rule::in(['enabled', 'disabled'])],
+                'wallet_to_bank_transfer_manual_status' => ['required', Rule::in(['enabled', 'disabled'])],
 
             ]);
 

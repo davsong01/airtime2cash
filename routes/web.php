@@ -149,6 +149,7 @@ Route::middleware(['auth', 'verified', 'admin', 'ipcheck', 'adminRoute'])->prefi
 
     Route::get('pull-product', [ProductController::class, 'pullProducts'])->name('product.pull');
     Route::get('repull-product', [ProductController::class, 'pullProducts'])->name('product.repull');
+    Route::post('product/bulk-delete', [ProductController::class, 'bulkDelete'])->name('product.bulk-delete');
 
     Route::get('duplicate-product/{product}', [ProductController::class, 'duplicateProduct'])->name('duplicate.product');
     Route::resource('api', APIController::class);

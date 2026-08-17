@@ -3,19 +3,94 @@
 namespace App\Http\Controllers;
 
 use App\Models\API;
-use App\Models\Product;
 use App\Models\Category;
+use App\Models\CustomerLevel;
 use App\Models\Discount;
+use App\Models\Product;
+use App\Models\TransactionLog;
 use App\Models\Variation;
 use Illuminate\Http\Request;
-use App\Models\CustomerLevel;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class ProductController extends Controller
 {
     public function index()
     {
-        $products = Product::with(['api', 'variations'])->orderBy('created_at', 'DESC')->get();
+        $products = Product::with(['api', 'variations'])
+            ->withCount([
+                'transactions',
+                'variations as variations_transactions_count' => function ($query) {
+                    $query->whereHas('transaction');
+                },
+            ])
+            ->orderBy('created_at', 'DESC')
+            ->get();
         return view('admin.product.index', compact('products'));
+    }
+
+    public function destroy(Product $product)
+    {
+        if ($this->hasAttachedTransactions($product)) {
+            return back()->with('error', 'This product cannot be deleted because it already has transactions attached.');
+        }
+
+        DB::transaction(function () use ($product): void {
+            Discount::where('product_id', $product->id)->delete();
+
+            $variationIds = Variation::where('product_id', $product->id)->pluck('id');
+
+            if ($variationIds->isNotEmpty()) {
+                Discount::whereIn('variation_id', $variationIds)->delete();
+                Variation::whereIn('id', $variationIds)->delete();
+            }
+
+            $product->delete();
+        });
+
+        return back()->with('message', 'Product deleted successfully');
+    }
+
+    public function bulkDelete(Request $request)
+    {
+        $validated = $request->validate([
+            'product_ids' => ['required', 'array', 'min:1'],
+            'product_ids.*' => ['integer', 'exists:products,id'],
+        ]);
+
+        $products = Product::with('variations')->whereIn('id', $validated['product_ids'])->get();
+        $deleted = 0;
+        $skipped = 0;
+
+        foreach ($products as $product) {
+            if ($this->hasAttachedTransactions($product)) {
+                $skipped++;
+                continue;
+            }
+
+            DB::transaction(function () use ($product): void {
+                Discount::where('product_id', $product->id)->delete();
+
+                $variationIds = $product->variations->pluck('id');
+
+                if ($variationIds->isNotEmpty()) {
+                    Discount::whereIn('variation_id', $variationIds)->delete();
+                    Variation::whereIn('id', $variationIds)->delete();
+                }
+
+                $product->delete();
+            });
+
+            $deleted++;
+        }
+
+        $message = $deleted . ' product(s) deleted successfully.';
+
+        if ($skipped > 0) {
+            $message .= ' ' . $skipped . ' product(s) were skipped because they have attached transactions.';
+        }
+
+        return back()->with('message', $message);
     }
 
     public function pullProducts()
@@ -23,9 +98,10 @@ class ProductController extends Controller
         $categories = Category::all();
         foreach ($categories as $category) {
             $products = app("App\Http\Controllers\Providers\KingsVtuController")->getProducts($category->slug);
-
+            Log::info($products);
             if (isset($products['status']) && $products['status'] == 'success') {
                 $products = $products['data']['products'] ?? [];
+
                 if (!empty($products)) {
                     foreach ($products as $key => $product) {
                         $allproducts = Product::pluck('slug')->toArray();
@@ -247,5 +323,20 @@ class ProductController extends Controller
         }
 
         return back()->with('message', 'Update Successfull');
+    }
+
+    protected function hasAttachedTransactions(Product $product): bool
+    {
+        if ($product->transactions()->exists()) {
+            return true;
+        }
+
+        $variationIds = $product->variations()->pluck('id');
+
+        if ($variationIds->isEmpty()) {
+            return false;
+        }
+
+        return TransactionLog::whereIn('variation_id', $variationIds)->exists();
     }
 }

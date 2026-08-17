@@ -1,7 +1,14 @@
 <?php
+    $settings = getSettings();
     $verifiable = verifiableUniqueElements();
-    $defaultTransferMode = old('transfer_mode', 'auto_share');
-    $showProviderStatus = (bool) (getSettings()->show_provider_status_on_customer_pages ?? true);
+    $wallet2bankAutoEnabled = (($settings->wallet_to_bank_transfer_auto_status ?? 'enabled') === 'enabled');
+    $wallet2bankManualEnabled = (($settings->wallet_to_bank_transfer_manual_status ?? 'enabled') === 'enabled');
+    $availableTransferModes = array_values(array_filter([
+        $wallet2bankAutoEnabled ? 'auto_share' : null,
+        $wallet2bankManualEnabled ? 'manual' : null,
+    ]));
+    $defaultTransferMode = old('transfer_mode', $availableTransferModes[0] ?? 'auto_share');
+    $showProviderStatus = (bool) ($settings->show_provider_status_on_customer_pages ?? true);
 ?>
 @extends('layouts.app')
 @section('title', $category->seo_title ?? getSettings()->seo_title)
@@ -242,31 +249,50 @@
                                                                 </div>
                                                                 <div class="col-md-12 mb-2">
                                                                     <label class="d-block mb-2">Transfer Method</label>
-                                                                    <div class="transfer-mode-grid">
-                                                                        <div>
-                                                                            <input class="transfer-mode-input" type="radio" name="transfer_mode" id="transfer-mode-auto" value="auto_share" @checked($defaultTransferMode === 'auto_share')>
-                                                                            <label class="transfer-mode-option" for="transfer-mode-auto">
-                                                                                <span class="transfer-mode-badge"><i class="bx bx-bolt-circle"></i></span>
-                                                                                <span>
-                                                                                    <strong>Auto Transfer</strong>
-                                                                                    <small>Use the active transfer provider for a faster settlement.</small>
-                                                                                </span>
-                                                                            </label>
+                                                                    @if(empty($availableTransferModes))
+                                                                        <div class="alert alert-warning mb-0">
+                                                                            Wallet to bank transfer is currently unavailable. Please try again later.
                                                                         </div>
-                                                                        <div>
-                                                                            <input class="transfer-mode-input" type="radio" name="transfer_mode" id="transfer-mode-manual" value="manual" @checked($defaultTransferMode === 'manual')>
-                                                                            <label class="transfer-mode-option" for="transfer-mode-manual">
-                                                                                <span class="transfer-mode-badge"><i class="bx bx-hand"></i></span>
-                                                                                <span>
-                                                                                    <strong>Manual Transfer</strong>
-                                                                                    <small>Queued for admin review and sent to WhatsApp for manual processing.</small>
-                                                                                </span>
-                                                                            </label>
+                                                                    @elseif(count($availableTransferModes) > 1)
+                                                                        <div class="transfer-mode-grid">
+                                                                            @if($wallet2bankAutoEnabled)
+                                                                                <div>
+                                                                                    <input class="transfer-mode-input" type="radio" name="transfer_mode" id="transfer-mode-auto" value="auto_share" @checked($defaultTransferMode === 'auto_share')>
+                                                                                    <label class="transfer-mode-option" for="transfer-mode-auto">
+                                                                                        <span class="transfer-mode-badge"><i class="bx bx-bolt-circle"></i></span>
+                                                                                        <span>
+                                                                                            <strong>Auto Transfer</strong>
+                                                                                            <small>Use the active transfer provider for a faster settlement.</small>
+                                                                                        </span>
+                                                                                    </label>
+                                                                                </div>
+                                                                            @endif
+                                                                            @if($wallet2bankManualEnabled)
+                                                                                <div>
+                                                                                    <input class="transfer-mode-input" type="radio" name="transfer_mode" id="transfer-mode-manual" value="manual" @checked($defaultTransferMode === 'manual')>
+                                                                                    <label class="transfer-mode-option" for="transfer-mode-manual">
+                                                                                        <span class="transfer-mode-badge"><i class="bx bx-hand"></i></span>
+                                                                                        <span>
+                                                                                            <strong>Manual Transfer</strong>
+                                                                                            <small>Queued for admin review and sent to WhatsApp for manual processing.</small>
+                                                                                        </span>
+                                                                                    </label>
+                                                                                </div>
+                                                                            @endif
                                                                         </div>
-                                                                    </div>
-                                                                    <div class="manual-resolution-note mt-3" id="manual-resolution-note" style="display:none">
-                                                                        Manual transfers depend on an admin being online and may take a while during busy periods.
-                                                                    </div>
+                                                                        <div class="manual-resolution-note mt-3" id="manual-resolution-note" style="display:none">
+                                                                            Manual transfers depend on an admin being online and may take a while during busy periods.
+                                                                        </div>
+                                                                    @else
+                                                                        <input type="hidden" name="transfer_mode" value="{{ $defaultTransferMode }}">
+                                                                        <div class="alert alert-info mb-0">
+                                                                            @if($defaultTransferMode === 'manual')
+                                                                                Manual Transfer is available for this wallet-to-bank request. Manual resolution depends on an admin being online and may take a while during busy periods.
+                                                                            @else
+                                                                                Auto Transfer is available for this wallet-to-bank request.
+                                                                            @endif
+                                                                        </div>
+                                                                    @endif
                                                                 </div>
                                                                 <div class="col-md-12">
                                                                     @php
@@ -582,7 +608,7 @@
                                                                     </div>
                                                                 </div>
                                                                 <div class="col-md-12">
-                                                                            <button style="margin-top:4px" class="btn btn-primary" id="transfer-submit" type="submit" @disabled(!$canWithdraw)>PROCEED </button>
+                                                                            <button style="margin-top:4px" class="btn btn-primary" id="transfer-submit" type="submit" @disabled(!$canWithdraw || empty($availableTransferModes))>PROCEED </button>
                                                                 </div>
 
                                                             </div>
@@ -727,8 +753,11 @@
             const verifyBankSection = document.getElementById('verify-bank-section');
             const submitButton = document.querySelector('#buy-buttonx');
             const transferModes = document.querySelectorAll('input[name="transfer_mode"]');
+            const transferModeFallback = document.querySelector('input[type="hidden"][name="transfer_mode"]');
             const updateTransferModeUi = function () {
-                const selectedMode = document.querySelector('input[name="transfer_mode"]:checked')?.value || 'auto_share';
+                const selectedMode = document.querySelector('input[name="transfer_mode"]:checked')?.value
+                    || transferModeFallback?.value
+                    || 'auto_share';
                 if (manualResolutionNote) {
                     manualResolutionNote.style.display = selectedMode === 'manual' ? 'block' : 'none';
                 }
@@ -740,9 +769,11 @@
                 }
             };
 
-            transferModes.forEach(function (radio) {
-                radio.addEventListener('change', updateTransferModeUi);
-            });
+            if (transferModes.length > 0) {
+                transferModes.forEach(function (radio) {
+                    radio.addEventListener('change', updateTransferModeUi);
+                });
+            }
 
             $("#amount").val('');
             $('#product').val('');

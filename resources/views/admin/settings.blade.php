@@ -201,6 +201,28 @@
                                                                                 <small class="text-muted d-block mt-50">Disable this if you want customer pages to hide provider availability details.</small>
                                                                             </fieldset>
                                                                         </div>
+
+                                                                        <div class="col-md-6">
+                                                                            <fieldset class="form-group">
+                                                                                <label for="wallet_to_bank_transfer_auto_status">Wallet to Bank Transfer - Auto</label>
+                                                                                <select name="wallet_to_bank_transfer_auto_status" class="form-control" id="wallet_to_bank_transfer_auto_status" required>
+                                                                                    <option value="enabled" @selected(old('wallet_to_bank_transfer_auto_status', $settings->wallet_to_bank_transfer_auto_status ?? 'enabled') === 'enabled')>Enabled</option>
+                                                                                    <option value="disabled" @selected(old('wallet_to_bank_transfer_auto_status', $settings->wallet_to_bank_transfer_auto_status ?? 'enabled') === 'disabled')>Disabled</option>
+                                                                                </select>
+                                                                                <small class="text-muted d-block mt-50">Controls whether customers can select Auto Transfer on the wallet-to-bank page.</small>
+                                                                            </fieldset>
+                                                                        </div>
+
+                                                                        <div class="col-md-6">
+                                                                            <fieldset class="form-group">
+                                                                                <label for="wallet_to_bank_transfer_manual_status">Wallet to Bank Transfer - Manual</label>
+                                                                                <select name="wallet_to_bank_transfer_manual_status" class="form-control" id="wallet_to_bank_transfer_manual_status" required>
+                                                                                    <option value="enabled" @selected(old('wallet_to_bank_transfer_manual_status', $settings->wallet_to_bank_transfer_manual_status ?? 'enabled') === 'enabled')>Enabled</option>
+                                                                                    <option value="disabled" @selected(old('wallet_to_bank_transfer_manual_status', $settings->wallet_to_bank_transfer_manual_status ?? 'enabled') === 'disabled')>Disabled</option>
+                                                                                </select>
+                                                                                <small class="text-muted d-block mt-50">Controls whether customers can select Manual Transfer on the wallet-to-bank page.</small>
+                                                                            </fieldset>
+                                                                        </div>
                                                                     </div>
                                                                 </div>
                                                             </div>
