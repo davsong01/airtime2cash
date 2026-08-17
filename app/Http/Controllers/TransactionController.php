@@ -916,7 +916,7 @@ class TransactionController extends Controller
                     'status' => $query['status'],
                     'message' => 'Transaction Pending!',
                 ];
-
+                
                 $user_status = 'pending';
                 $balance_after = $request['balance_before'] - $request['total_amount'];
             } else if (isset($query) && $query['status_code'] == 0) {
@@ -2152,64 +2152,84 @@ class TransactionController extends Controller
         return back()->with('message', 'Transaction updated successfully.');
     }
 
-    private function resolvePendingTransactionByProvider(TransactionLog $transaction)
+    private function resolveTransactionProvider(TransactionLog $transaction, bool $allowFallback = true): ?API
     {
-        $provider = $transaction->api ?: API::query()
+        $provider = $transaction->api ?: API::query()->find($transaction->api_id);
+
+        if ($provider) {
+            return $provider;
+        }
+
+        if (! $allowFallback) {
+            return null;
+        }
+
+        return API::query()
             ->whereKey(getSettings()->bank_transfer_provider_id)
             ->where('status', 'active')
             ->first();
+    }
 
-        if (! $provider) {
-            return back()->with('error', 'No active provider is attached to this transaction.');
-        }
-
+    private function requeryPendingTransactionWithProvider(TransactionLog $transaction, API $provider): array|null
+    {
         $controller = resolveProviderController($provider);
 
         if (! $controller) {
-            return back()->with('error', 'Unable to resolve the transaction provider controller.');
+            return null;
         }
 
-        if (strtolower((string) ($provider->slug ?? '')) === 'monnify' && $this->transactionProviderStatus($transaction) === 'pending_authorization') {
-            return back()->with('warning', 'This Monnify transfer is waiting for OTP authorization. Use the Monnify OTP actions in the modal.');
-        }
-
-        $response = null;
         $transactionType = strtolower((string) ($transaction->product?->type ?? $transaction->unique_element ?? $transaction->reason ?? ''));
 
         if ($transactionType === 'wallet2bank' || str_contains($transactionType, 'wallet to bank')) {
             if (! method_exists($controller, 'requery')) {
-                return back()->with('error', 'This provider does not support transaction requery.');
+                return null;
             }
 
-            $response = $controller->requery($transaction);
-        } elseif (method_exists($controller, 'verifyTransaction')) {
+            return (array) $controller->requery($transaction);
+        }
+
+        if (method_exists($controller, 'verifyTransaction')) {
             $reference = $transaction->reference_id
                 ?: $transaction->transaction_reference
                 ?: $transaction->request_id
                 ?: $transaction->transaction_id;
 
-            $response = $controller->verifyTransaction((string) $reference);
-        } else {
-            return back()->with('error', 'This provider does not support transaction processing.');
+            return (array) $controller->verifyTransaction((string) $reference);
+        }
+
+        return null;
+    }
+
+    private function applyProviderVerificationResult(TransactionLog $transaction, array $response, ?string $resolutionSource = null): array
+    {
+        if (($response['status'] ?? null) === 'skipped') {
+            return [
+                'status' => 'skipped',
+                'message' => $response['message'] ?? 'Transaction skipped.',
+            ];
         }
 
         $providerStatus = strtolower((string) data_get($response, 'provider_status', data_get($response, 'status', 'pending')));
         $isSuccessful = in_array($providerStatus, ['successful', 'success', 'completed'], true)
             || (bool) data_get($response, 'status', false) === true;
         $isFailed = in_array($providerStatus, ['failed', 'rejected', 'declined', 'error'], true);
+        $sourceNote = $resolutionSource ? '[' . $resolutionSource . '] ' : '';
 
         if ($isSuccessful) {
             $this->markTransactionResolved(
                 $transaction,
                 'success',
-                'Transaction processed successfully after provider verification.',
+                $sourceNote . 'Transaction processed successfully after provider verification.',
                 null,
                 $transaction->balance_after,
                 $providerStatus,
                 $response,
             );
 
-            return back()->with('message', 'Transaction processed successfully.');
+            return [
+                'status' => 'success',
+                'message' => 'Transaction processed successfully.',
+            ];
         }
 
         if ($isFailed) {
@@ -2217,27 +2237,131 @@ class TransactionController extends Controller
             $this->markTransactionResolved(
                 $transaction,
                 'failed',
-                'Transaction failed after provider verification.',
-                data_get($response, 'message', 'Transaction failed after provider verification.'),
+                $sourceNote . 'Transaction failed after provider verification.',
+                $sourceNote . data_get($response, 'message', 'Transaction failed after provider verification.'),
                 $transaction->balance_before,
                 $providerStatus,
                 $response,
             );
 
-            return back()->with('message', 'Transaction failed after provider verification.');
+            return [
+                'status' => 'failed',
+                'message' => 'Transaction failed after provider verification.',
+            ];
         }
 
         $this->markTransactionResolved(
             $transaction,
             'pending',
-            'Provider still returned a pending response after requery.',
-            data_get($response, 'message', 'Provider still returned a pending response after requery.'),
+            $sourceNote . 'Provider still returned a pending response after requery.',
+            $sourceNote . data_get($response, 'message', 'Provider still returned a pending response after requery.'),
             $transaction->balance_after,
             $providerStatus,
             $response,
         );
 
-        return back()->with('warning', 'Provider still returned a pending response. The transaction remains pending.');
+        return [
+            'status' => 'pending',
+            'message' => 'Provider still returned a pending response. The transaction remains pending.',
+        ];
+    }
+
+    private function resolvePendingTransactionByProvider(TransactionLog $transaction)
+    {
+        $provider = $this->resolveTransactionProvider($transaction);
+
+        if (! $provider) {
+            return back()->with('error', 'No active provider is attached to this transaction.');
+        }
+
+        $response = $this->requeryPendingTransactionWithProvider($transaction, $provider);
+
+        if (! is_array($response)) {
+            return back()->with('error', 'This provider does not support transaction processing.');
+        }
+
+        $result = $this->applyProviderVerificationResult($transaction, $response);
+
+        return match ($result['status'] ?? 'pending') {
+            'success' => back()->with('message', 'Transaction processed successfully.'),
+            'failed' => back()->with('message', 'Transaction failed after provider verification.'),
+            default => back()->with('warning', 'Provider still returned a pending response. The transaction remains pending.'),
+        };
+    }
+
+    public function requeryPendingTransactionsByApi(Request $request, ?API $api = null, ?int $pick = null)
+    {
+        $pickValue = $request->has('pick') ? (int) $request->input('pick') : $pick;
+        $limit = is_numeric($pickValue) && (int) $pickValue > 0
+            ? min((int) $pickValue, 500)
+            : null;
+
+        $query = TransactionLog::with(['product', 'variation', 'bank', 'customer.user', 'api'])
+            ->where('status', 'pending')
+            ->orderBy('id', 'ASC');
+
+        if ($api) {
+            $query->where('api_id', $api->id);
+        }
+
+        if ($limit !== null) {
+            $query->take($limit);
+        }
+
+        $transactions = $query->get();
+
+        if ($transactions->isEmpty()) {
+            return back()->with('warning', $api
+                ? 'No pending transactions were found for this provider.'
+                : 'No pending transactions were found.');
+        }
+
+        $summary = [
+            'processed' => 0,
+            'successful' => 0,
+            'failed' => 0,
+            'pending' => 0,
+            'skipped' => 0,
+        ];
+
+        foreach ($transactions as $transaction) {
+            try {
+                $provider = $this->resolveTransactionProvider($transaction, false);
+
+                if (! $provider) {
+                    $summary['skipped']++;
+                    continue;
+                }
+
+                $response = $this->requeryPendingTransactionWithProvider($transaction, $provider);
+
+                if (! is_array($response)) {
+                    $summary['skipped']++;
+                    continue;
+                }
+
+                $result = $this->applyProviderVerificationResult($transaction, $response, 'CRON/System');
+                $summary['processed']++;
+                $summary[$result['status'] ?? 'pending'] = ($summary[$result['status'] ?? 'pending'] ?? 0) + 1;
+            } catch (\Throwable $exception) {
+                $summary['skipped']++;
+                Log::warning('Bulk provider requery failed for a transaction.', [
+                    'api_id' => $api->id,
+                    'transaction_id' => $transaction->transaction_id,
+                    'message' => $exception->getMessage(),
+                ]);
+            }
+        }
+
+        return back()->with('message', sprintf(
+            'Bulk requery completed%s. Processed: %d, Successful: %d, Failed: %d, Pending: %d, Skipped: %d.',
+            $api ? ' for ' . $api->name : '',
+            $summary['processed'],
+            $summary['successful'],
+            $summary['failed'],
+            $summary['pending'],
+            $summary['skipped'],
+        ));
     }
 
     private function authorizePendingMonnifyTransaction(TransactionLog $transaction, string $authorizationCode)
