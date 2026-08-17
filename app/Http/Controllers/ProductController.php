@@ -15,18 +15,63 @@ use Illuminate\Support\Facades\Log;
 
 class ProductController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $products = Product::with(['api', 'variations'])
+        $categories = Category::query()
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        $apis = API::query()
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        $baseQuery = Product::query()
+            ->with(['api:id,name', 'category:id,name', 'variations' => function ($query) {
+                $query->select('id', 'product_id', 'status', 'api_id', 'system_name', 'api_name', 'slug', 'created_at');
+            }])
             ->withCount([
                 'transactions',
                 'variations as variations_transactions_count' => function ($query) {
                     $query->whereHas('transaction');
                 },
+                'variations as active_variations_count' => function ($query) {
+                    $query->where('status', 'active');
+                },
             ])
-            ->orderBy('created_at', 'DESC')
-            ->get();
-        return view('admin.product.index', compact('products'));
+            ->when($request->filled('search'), function ($query) use ($request) {
+                $search = trim((string) $request->search);
+
+                $query->where(function ($subQuery) use ($search) {
+                    $subQuery->where('name', 'like', '%' . $search . '%')
+                        ->orWhere('display_name', 'like', '%' . $search . '%')
+                        ->orWhere('slug', 'like', '%' . $search . '%');
+                });
+            })
+            ->when($request->filled('status'), fn ($query) => $query->where('status', $request->status))
+            ->when($request->filled('category_id'), fn ($query) => $query->where('category_id', $request->category_id))
+            ->when($request->filled('api_id'), fn ($query) => $query->where('api_id', $request->api_id))
+            ->when($request->filled('variations'), fn ($query) => $query->where('has_variations', $request->variations === 'yes' ? 'yes' : 'no'))
+            ->orderBy('created_at', 'DESC');
+
+        $summaryQuery = clone $baseQuery;
+
+        $products = (clone $baseQuery)
+            ->paginate(15)
+            ->withQueryString();
+
+        $summary = (object) [
+            'total' => (clone $summaryQuery)->count(),
+            'active' => (clone $summaryQuery)->where('status', 'active')->count(),
+            'with_variations' => (clone $summaryQuery)->where('has_variations', 'yes')->count(),
+            'deletable' => (clone $summaryQuery)
+                ->whereDoesntHave('transactions')
+                ->whereDoesntHave('variations', function ($query) {
+                    $query->whereHas('transaction');
+                })
+                ->count(),
+        ];
+
+        return view('admin.product.index', compact('products', 'summary', 'categories', 'apis'));
     }
 
     public function destroy(Product $product)
