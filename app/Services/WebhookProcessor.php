@@ -50,12 +50,33 @@ class WebhookProcessor
                     throw new RuntimeException('No local transaction matches this webhook.');
                 }
 
+                $verification = $this->verifyTransactionWithProvider($webhook, $transaction);
+
+                if (! is_array($verification)) {
+                    $webhook->update([
+                        'processing_status' => 'pending',
+                        'processed_at' => null,
+                        'resolved_by' => $resolvedBy,
+                        'resolved_at' => now(),
+                        'last_error' => 'Provider verification could not be performed.',
+                    ]);
+
+                    return $webhook->fresh();
+                }
+
+                $verifiedResponse = $verification['api_response'] ?? $verification;
+                $verifiedStatus = strtolower((string) ($verification['provider_status'] ?? $verification['status'] ?? 'pending'));
+                $verifiedMessage = $verification['message'] ?? null;
+                $isSuccessful = ($verification['status'] ?? null) === 'success';
+                $isFailed = ($verification['status'] ?? null) === 'failed';
+                $isPending = ($verification['status'] ?? null) === 'pending';
+
                 $webhook->update([
                     'customer_id' => $transaction->customer_id ?? $webhook->customer_id,
                     'transaction_id' => $transaction->transaction_id ?? $webhook->transaction_id,
                     'provider_reference' => $webhook->provider_reference ?? $this->extractReference($payload),
                     'request_ref' => $webhook->request_ref ?? $this->extractRequestRef($payload),
-                    'provider_status' => $this->extractProviderStatus($payload, $transaction),
+                    'provider_status' => $verifiedStatus,
                 ]);
 
                 if (! $this->transactionIsPending($transaction)) {
@@ -69,11 +90,6 @@ class WebhookProcessor
 
                     return $webhook->fresh();
                 }
-
-                $providerStatus = strtolower((string) $webhook->provider_status);
-                $isSuccessful = in_array($providerStatus, ['successful', 'success', 'completed', 'approved'], true);
-                $isFailed = in_array($providerStatus, ['failed', 'declined', 'cancelled', 'canceled', 'reversed'], true);
-                $isPending = in_array($providerStatus, ['pending', 'processing', 'initiated'], true);
 
                 if (! $isSuccessful && ! $isFailed && ! $isPending) {
                     $webhook->update([
@@ -90,18 +106,18 @@ class WebhookProcessor
                 if ($transaction instanceof Airtime2CashTransactions) {
                     $transaction->update([
                         'status' => $isSuccessful ? 'successful' : 'failed',
-                        'provider_status' => $providerStatus ?: ($isSuccessful ? 'successful' : 'failed'),
-                        'provider_response' => json_encode($payload, JSON_THROW_ON_ERROR),
+                        'provider_status' => $verifiedStatus ?: ($isSuccessful ? 'successful' : 'failed'),
+                        'provider_response' => json_encode($verifiedResponse, JSON_THROW_ON_ERROR),
                         'description' => $isSuccessful
-                            ? ($this->extractMessage($payload) ?? 'Transaction completed successfully.')
-                            : ($this->extractMessage($payload) ?? 'Transaction failed.'),
-                        'decline_reason' => $isFailed ? ($this->extractMessage($payload) ?? 'Transaction failed.') : null,
+                            ? ($verifiedMessage ?? $this->extractMessage($verifiedResponse) ?? 'Transaction completed successfully.')
+                            : ($verifiedMessage ?? $this->extractMessage($verifiedResponse) ?? 'Transaction failed.'),
+                        'decline_reason' => $isFailed ? ($verifiedMessage ?? $this->extractMessage($verifiedResponse) ?? 'Transaction failed.') : null,
                         'completed_at' => ($isSuccessful || $isFailed)
                             ? ($transaction->completed_at ?? now())
                             : $transaction->completed_at,
                     ]);
                 } elseif ($transaction instanceof TransactionLog) {
-                    $transaction->update($this->resolveTransactionLogUpdates($transaction, $payload, $providerStatus, $isSuccessful, $isFailed));
+                    $transaction->update($this->resolveTransactionLogUpdates($transaction, $verification ?? $payload, $verifiedStatus, $isSuccessful, $isFailed));
                 } else {
                     throw new RuntimeException('Unsupported transaction model attached to this webhook.');
                 }
@@ -126,6 +142,96 @@ class WebhookProcessor
 
             return $webhook->fresh();
         });
+    }
+
+    private function verifyTransactionWithProvider(Webhook $webhook, Airtime2CashTransactions|TransactionLog $transaction): ?array
+    {
+        $provider = $webhook->provider
+            ?? ($transaction instanceof TransactionLog ? $transaction->api : null);
+
+        $controller = resolveProviderController($provider);
+
+        if (! $controller) {
+            return null;
+        }
+
+        $reference = $this->resolveVerificationReference($webhook, $transaction);
+
+        try {
+            if (method_exists($controller, 'verifyTransaction') && filled($reference)) {
+                return $this->normalizeVerificationResult((array) $controller->verifyTransaction((string) $reference));
+            }
+
+            if (method_exists($controller, 'requery')) {
+                return $this->normalizeVerificationResult((array) $controller->requery($transaction));
+            }
+        } catch (\Throwable $exception) {
+            return [
+                'status' => 'pending',
+                'provider_status' => 'pending',
+                'message' => $exception->getMessage(),
+                'api_response' => [
+                    'error' => $exception->getMessage(),
+                ],
+            ];
+        }
+
+        return null;
+    }
+
+    private function resolveVerificationReference(Webhook $webhook, Airtime2CashTransactions|TransactionLog $transaction): ?string
+    {
+        return $this->firstString([
+            $webhook->provider_reference,
+            $webhook->request_ref,
+            data_get($transaction, 'reference_id'),
+            data_get($transaction, 'transaction_reference'),
+            data_get($transaction, 'request_id'),
+            data_get($transaction, 'transaction_id'),
+        ]);
+    }
+
+    private function normalizeVerificationResult(array $verification): array
+    {
+        $rawStatus = data_get($verification, 'status');
+        $apiResponse = data_get($verification, 'api_response', $verification);
+        $providerStatus = strtolower((string) (
+            data_get($verification, 'provider_status')
+            ?? data_get($apiResponse, 'responseBody.paymentStatus')
+            ?? data_get($apiResponse, 'responseBody.transaction.status')
+            ?? data_get($apiResponse, 'data.transaction.status')
+            ?? data_get($apiResponse, 'data.status')
+            ?? data_get($apiResponse, 'status')
+            ?? (is_string($rawStatus) ? $rawStatus : '')
+        ));
+        $message = $this->firstString([
+            data_get($verification, 'message'),
+            data_get($verification, 'error'),
+            data_get($apiResponse, 'responseMessage'),
+            data_get($apiResponse, 'response_description'),
+            data_get($apiResponse, 'message'),
+        ]);
+
+        $isSuccess = in_array($providerStatus, ['successful', 'success', 'completed', 'paid', 'overpaid', 'approved', 'authorized'], true)
+            || $rawStatus === true
+            || (is_string($rawStatus) && in_array(strtolower($rawStatus), ['successful', 'success', 'completed', 'paid', 'overpaid', 'approved', 'authorized'], true));
+
+        $isPending = in_array($providerStatus, ['pending', 'processing', 'initiated', 'awaiting_processing', 'in_progress', 'pending_authorization'], true)
+            || (is_string($message) && Str::contains(Str::lower($message), ['pending', 'processing', 'initiated', 'awaiting']));
+
+        $isFailed = in_array($providerStatus, ['failed', 'declined', 'cancelled', 'canceled', 'reversed', 'rejected', 'error', 'expired'], true)
+            || ($rawStatus === false && ! $isPending);
+
+        if (! $isSuccess && ! $isPending && ! $isFailed) {
+            $isPending = true;
+        }
+
+        return [
+            'status' => $isSuccess ? 'success' : ($isPending ? 'pending' : 'failed'),
+            'provider_status' => $providerStatus ?: ($isSuccess ? 'successful' : ($isPending ? 'pending' : 'failed')),
+            'message' => $message,
+            'api_response' => $apiResponse,
+        ];
     }
 
     private function transactionIsPending(Airtime2CashTransactions|TransactionLog|null $transaction): bool
@@ -174,9 +280,13 @@ class WebhookProcessor
         return null;
     }
 
-    private function resolveTransactionLogUpdates(TransactionLog $transaction, array $payload, string $providerStatus, bool $isSuccessful, bool $isFailed): array
+    private function resolveTransactionLogUpdates(TransactionLog $transaction, array $verification, string $providerStatus, bool $isSuccessful, bool $isFailed): array
     {
-        $message = $this->extractMessage($payload);
+        $payload = data_get($verification, 'api_response', $verification);
+        $message = $this->firstString([
+            data_get($verification, 'message'),
+            $this->extractMessage(is_array($payload) ? $payload : []),
+        ]);
         $isWalletToBank = Str::of((string) ($transaction->product?->type ?? $transaction->unique_element ?? ''))
             ->lower()
             ->contains('wallet2bank');

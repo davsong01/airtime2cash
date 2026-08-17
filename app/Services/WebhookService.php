@@ -46,6 +46,7 @@ class WebhookService
             }
 
             $payload = $request->all();
+            
             if (empty($payload)) {
                 $rawContent = trim((string) $request->getContent());
                 if ($rawContent !== '') {
@@ -68,7 +69,7 @@ class WebhookService
             $headers = $this->normalizeHeaders($request->headers->all());
             $controller = resolveProviderController($provider);
             $verification = ['status' => true, 'reference' => null];
-
+            
             if ($controller && method_exists($controller, 'verifyWebhookSignature')) {
                 $verification = (array) $controller->verifyWebhookSignature($request);
             }

@@ -10,16 +10,19 @@ use App\Services\WebhookProcessor;
 use App\Services\WebhookService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Throwable;
 
 class CallbackOperationsController extends Controller
 {
     public function logWebhook(Request $request, int $provider_id){
+        Log::error("Provider Webhook", ['request' => $request->all(), 'provider_id' => $provider_id]);
         return app(WebhookService::class)->logWebhookResponse($request, $provider_id);
     }
 
-    public function analyzeProviderCallbackResponse($pick){
+    public function analyzeProviderCallbackResponse(int $pick){
+        Log::error('Webhook Analyzing started');
         return app(WebhookService::class)->analyzeWebhookResponse($pick);
     }
 
