@@ -2205,7 +2205,7 @@ class TransactionController extends Controller
 
         return null;
     }
-
+    
     private function applyProviderVerificationResult(TransactionLog $transaction, array $response, ?string $resolutionSource = null, bool $persistApiResponse = true): array
     {
         if (($response['status'] ?? null) === 'skipped') {
@@ -2222,14 +2222,21 @@ class TransactionController extends Controller
         $sourceNote = $resolutionSource ? '[' . $resolutionSource . '] ' : '';
 
         if ($isSuccessful) {
+            $bulkMeta = $resolutionSource ? [
+                'resolution_source' => trim($resolutionSource),
+                'resolution_note' => $sourceNote . 'Transaction processed successfully after provider verification.',
+            ] : null;
+
             $this->markTransactionResolved(
                 $transaction,
                 'success',
-                $sourceNote . 'Transaction processed successfully after provider verification.',
+                'Transaction processed successfully after provider verification.',
                 null,
                 $transaction->balance_after,
                 $providerStatus,
                 $persistApiResponse ? $response : null,
+                null,
+                $bulkMeta,
             );
 
             return [
@@ -2240,14 +2247,21 @@ class TransactionController extends Controller
 
         if ($isFailed) {
             $this->refundResolvedTransactionIfNeeded($transaction, 'Transaction failed after provider verification.');
+            $bulkMeta = $resolutionSource ? [
+                'resolution_source' => trim($resolutionSource),
+                'resolution_note' => $sourceNote . data_get($response, 'message', 'Transaction failed after provider verification.'),
+            ] : null;
+
             $this->markTransactionResolved(
                 $transaction,
                 'failed',
-                $sourceNote . 'Transaction failed after provider verification.',
+                'Transaction failed after provider verification.',
                 $sourceNote . data_get($response, 'message', 'Transaction failed after provider verification.'),
                 $transaction->balance_before,
                 $providerStatus,
                 $persistApiResponse ? $response : null,
+                null,
+                $bulkMeta,
             );
 
             return [
@@ -2258,6 +2272,11 @@ class TransactionController extends Controller
 
         $pendingDescription = 'Provider still returned a pending response after requery.';
         $pendingExtras = $sourceNote . $pendingDescription;
+        $bulkMeta = $resolutionSource ? [
+            'resolution_source' => trim($resolutionSource),
+            'resolution_note' => $pendingExtras,
+            'provider_message' => data_get($response, 'message', $pendingDescription),
+        ] : null;
 
         $this->markTransactionResolved(
             $transaction,
@@ -2267,11 +2286,8 @@ class TransactionController extends Controller
             $transaction->balance_after,
             $providerStatus,
             $persistApiResponse ? $response : null,
-            $pendingExtras,
-            [
-                'resolution_source' => trim($resolutionSource ?? ''),
-                'resolution_note' => $pendingExtras,
-            ],
+            null,
+            $bulkMeta,
         );
 
         return [
@@ -2547,7 +2563,7 @@ class TransactionController extends Controller
 
         if ($extraInfo !== null) {
             $currentExtraInfo = $this->decodedTransactionExtraInfo($transaction);
-            $updates['extra_info'] = json_encode(array_merge($currentExtraInfo, $extraInfo));
+            $updates['extra_info'] = json_encode(array_merge($currentExtraInfo, $extraInfo), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         }
 
         $transaction->update($updates);
