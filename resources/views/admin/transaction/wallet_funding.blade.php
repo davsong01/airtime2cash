@@ -178,15 +178,14 @@
                                                     {{ $transaction->customer_phone }} <br>
                                                 @php
                                                     $status = strtolower((string) ($transaction->status ?? 'pending'));
-                                                    $isSuccessful = in_array($status, ['success', 'successful', 'delivered', 'completed', 'approved'], true);
+                                                    $statusButtonClass = match (true) {
+                                                        in_array($status, ['success', 'successful', 'delivered', 'completed', 'approved'], true) => 'btn-success',
+                                                        $status === 'pending' => 'btn-warning',
+                                                        $status === 'attention-required' => 'btn-warning',
+                                                        default => 'btn-danger',
+                                                    };
                                                 @endphp
-                                                @if($isSuccessful)
-                                                    <button class="btn btn-primary btn-sm">{{ ucfirst($transaction->status) }}</button>
-                                                @elseif($status === 'attention-required')
-                                                    <button class="btn btn-warning btn-sm">{{ ucfirst(str_replace('-', ' ', $transaction->status)) }}</button>
-                                                @else
-                                                    <button class="btn btn-danger btn-sm">{{ ucfirst($transaction->status) }}</button>
-                                                @endif
+                                                <button class="btn {{ $statusButtonClass }} btn-sm">{{ ucfirst(str_replace('-', ' ', $transaction->status ?? 'pending')) }}</button>
                                             </td>
                                                 <td>
                                                     <small>

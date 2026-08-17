@@ -186,11 +186,15 @@
                                                     <a href="">{{ $transaction->customer_email  }}</a> <br>
                                                     {{ $transaction->customer_phone }} <br>
                                                      {{ date("M jS, Y g:iA", strtotime($transaction->created_at)) }} <br>
-                                                    @if($transaction->status == 'success' || $transaction->status == 'delivered')
-                                                    <button class="btn btn-success btn-sm" readonly>{{ucfirst($transaction->status) }}</button>
-                                                    @else
-                                                    <button class="btn btn-danger btn-sm" readonly>{{ucfirst($transaction->status) }}</button>
-                                                    @endif 
+                                                    @php
+                                                        $statusButtonClass = match ($transaction->status) {
+                                                            'success', 'delivered' => 'btn-success',
+                                                            'pending' => 'btn-warning',
+                                                            'failed' => 'btn-danger',
+                                                            default => 'btn-secondary',
+                                                        };
+                                                    @endphp
+                                                    <button class="btn {{ $statusButtonClass }} btn-sm" readonly>{{ ucfirst($transaction->status) }}</button>
                                                     
                                                    
                                                 </td>
