@@ -22,7 +22,7 @@ class ProductController extends Controller
             ->get(['id', 'name']);
 
         $apis = API::query()
-            ->orderBy('name')
+            ->whereIn('slug', ['kingsvtu', 'vtpass'])->orderBy('name')
             ->get(['id', 'name']);
 
         $baseQuery = Product::query()

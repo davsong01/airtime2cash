@@ -222,7 +222,7 @@
                                         <option value="no" @selected(request('variations') === 'no')>No</option>
                                     </select>
                                 </div>
-                                <div class="col-md-6 col-xl-1 d-flex align-items-end">
+                                <div class="col-md-6 col-xl-2 d-flex align-items-end">
                                     <button class="btn btn-primary btn-block" type="submit">
                                         <i class="bx bx-search mr-25"></i> Apply
                                     </button>
