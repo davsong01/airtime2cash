@@ -9,6 +9,7 @@ use App\Models\Discount;
 use App\Models\Product;
 use App\Models\TransactionLog;
 use App\Models\Variation;
+use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -140,42 +141,75 @@ class ProductController extends Controller
 
     public function pullProducts()
     {
-        $categories = Category::all();
-        foreach ($categories as $category) {
-            $products = app("App\Http\Controllers\Providers\KingsVtuController")->getProducts($category->slug);
-            Log::info($products);
-            if (isset($products['status']) && $products['status'] == 'success') {
-                $products = $products['data']['products'] ?? [];
+        try {
+            $categories = Category::all();
+            $controller = app("App\Http\Controllers\Providers\KingsVtuController");
 
-                if (!empty($products)) {
-                    foreach ($products as $key => $product) {
-                        $allproducts = Product::pluck('slug')->toArray();
-                        if(!in_array($product['slug'], $allproducts)){
-                            Product::create(
-                                [
-                                    "category_id" => $category->id,
-                                    "name" => $product['display_name'],
-                                    "display_name" => $product['display_name'],
-                                    "slug" => $product['slug'],
-                                    "status" => 'inactive',
-                                    "description" => $product['description'] ?? null,
-                                    "min" => $product['min'] ?? null,
-                                    "max" => $product['max'] ?? null,
-                                    "allow_quantity" => $product['allow_quantity'] ?? null,
-                                    "fixed_price" => $product['fixed_price'] ?? null,
-                                    "allow_subscription_type" => $product['allow_subscription_type'] ?? null,
-                                    "has_variations" => $product['has_variations'] ?? null,
-                                    "image" => $product['image'] ?? null ,
-                                ]
-                            );
-                        }
+            foreach ($categories as $category) {
+                try {
+                    $response = $controller->getProducts($category->slug);
+
+                    if (($response['status'] ?? null) !== 'success') {
+                        Log::warning('Product pull failed for category', [
+                            'category' => $category->slug,
+                            'response' => $response,
+                        ]);
+
+                        continue;
                     }
 
+                    $products = $response['data']['products'] ?? [];
+
+                    foreach ($products as $product) {
+                        if (empty($product['slug'])) {
+                            continue;
+                        }
+
+                        $model = Product::firstOrNew([
+                            'slug' => $product['slug'],
+                        ]);
+
+                        if (! $model->exists) {
+                            $model->status = 'inactive';
+                        }
+
+                        $model->fill([
+                            'category_id' => $category->id,
+                            'name' => $product['display_name'] ?? $product['slug'],
+                            'display_name' => $product['display_name'] ?? $product['slug'],
+                            'description' => $product['description'] ?? null,
+                            'min' => $product['min'] ?? null,
+                            'max' => $product['max'] ?? null,
+                            'allow_quantity' => $product['allow_quantity'] ?? null,
+                            'fixed_price' => $product['fixed_price'] ?? null,
+                            'allow_subscription_type' => $product['allow_subscription_type'] ?? null,
+                            'has_variations' => $product['has_variations'] ?? null,
+                            'image' => $product['image'] ?? null,
+                        ]);
+
+                        $model->save();
+                    }
+                } catch (Exception $e) {
+                    Log::error('Failed pulling products for category', [
+                        'category_id' => $category->id,
+                        'category' => $category->slug,
+                        'message' => $e->getMessage(),
+                    ]);
+
+                    continue;
                 }
             }
-        }
 
-        return back()->with('message', 'Products successfully pulled, please proceed to update products');
+            return back()->with('message', 'Products successfully pulled and updated.');
+        } catch (Exception $e) {
+            Log::error('Product pull failed', [
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+
+            return back()->with('error', 'Unable to pull products. Please try again.');
+        }
     }
 
     public function create()
