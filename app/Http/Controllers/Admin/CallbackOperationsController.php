@@ -17,7 +17,7 @@ use Throwable;
 class CallbackOperationsController extends Controller
 {
     public function logWebhook(Request $request, int $provider_id){
-        Log::error("Provider Webhook", ['request' => $request->all(), 'provider_id' => $provider_id]);
+        // Log::error("Provider Webhook", ['request' => $request->all(), 'provider_id' => $provider_id]);
         return app(WebhookService::class)->logWebhookResponse($request, $provider_id);
     }
 

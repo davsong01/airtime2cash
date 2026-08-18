@@ -67,19 +67,19 @@ class WebhookService
             }
 
             $headers = $this->normalizeHeaders($request->headers->all());
-            $controller = resolveProviderController($provider);
-            $verification = ['status' => true, 'reference' => null];
+            // $controller = resolveProviderController($provider);
+            // $verification = ['status' => true, 'reference' => null];
             
-            if ($controller && method_exists($controller, 'verifyWebhookSignature')) {
-                $verification = (array) $controller->verifyWebhookSignature($request);
-            }
+            // if ($controller && method_exists($controller, 'verifyWebhookSignature')) {
+            //     $verification = (array) $controller->verifyWebhookSignature($request);
+            // }
 
-            if (! (bool) ($verification['status'] ?? false)) {
-                return response()->json([
-                    'status' => false,
-                    'message' => $verification['message'] ?? 'Invalid webhook signature.',
-                ], 403);
-            }
+            // if (! (bool) ($verification['status'] ?? false)) {
+            //     return response()->json([
+            //         'status' => false,
+            //         'message' => $verification['message'] ?? 'Invalid webhook signature.',
+            //     ], 403);
+            // }
 
             $providerReference = $this->extractProviderReference($payload, $verification['reference'] ?? null);
             $requestRef = $this->extractRequestReference($payload);
