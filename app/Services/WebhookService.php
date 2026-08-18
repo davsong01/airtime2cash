@@ -162,7 +162,7 @@ class WebhookService
                 'message' => 'Webhook logged successfully.',
             ], 200);
         } catch (\Throwable $exception) {
-            Log::error('Webhook processing failed', [
+            Log::error('Webhook logging failed', [
                 'provider_id' => $providerId,
                 'error' => $exception->getMessage(),
                 'payload' => $request->all(),
