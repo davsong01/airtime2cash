@@ -207,7 +207,7 @@
         <div class="content-overlay"></div>
         <div class="content-wrapper">
             <div class="content-header row">
-                <div class="content-header-left col-12 mb-3 mt-1">
+                <div class="content-header-left col-12 mb-2 mt-1">
                     <div class="row breadcrumbs-top">
                         <div class="col-12">
                             <div class="breadcrumb-wrapper col-12">
@@ -260,19 +260,19 @@
                                                         <div class="card-body">
                                                             <div class="row">
                                                                 <div class="col-md-6">
-                                                                    <fieldset class="form-group mb-3">
+                                                                    <fieldset class="form-group mb-2">
                                                                         <label for="name">Name</label>
                                                                         <input type="text" class="form-control" id="name" name="name" value="{{ old('name', optional($api)->name) }}" placeholder="Enter name" required>
                                                                     </fieldset>
                                                                 </div>
                                                                 <div class="col-md-6">
-                                                                    <fieldset class="form-group mb-3">
+                                                                    <fieldset class="form-group mb-2">
                                                                         <label for="slug">Slug</label>
                                                                         <input type="text" class="form-control" name="slug" value="{{ old('slug', optional($api)->slug) }}" placeholder="Enter slug" id="slug" required>
                                                                     </fieldset>
                                                                 </div>
                                                                 <div class="col-md-6">
-                                                                    <fieldset class="form-group mb-3">
+                                                                    <fieldset class="form-group mb-2">
                                                                         <label for="warning_threshold_status">Warning Threshold Status</label>
                                                                         <select class="form-control" name="warning_threshold_status" id="warning_threshold_status" required>
                                                                             <option value="">Select</option>
@@ -282,7 +282,7 @@
                                                                     </fieldset>
                                                                 </div>
                                                                 <div class="col-md-6">
-                                                                    <fieldset class="form-group mb-3">
+                                                                    <fieldset class="form-group mb-2">
                                                                         <label for="warning_threshold">Balance Warning Threshold</label>
                                                                         <input type="number" class="form-control" name="warning_threshold" value="{{ old('warning_threshold', optional($api)->warning_threshold) }}" placeholder="Enter warning threshold" id="warning_threshold">
                                                                     </fieldset>
@@ -309,7 +309,7 @@
                                                         <div class="card-body">
                                                             <div class="row">
                                                                 <div class="col-md-6">
-                                                                    <fieldset class="form-group mb-3">
+                                                                    <fieldset class="form-group mb-2">
                                                                         <label for="status">API Status</label>
                                                                         <select class="form-control" name="status" id="status" required>
                                                                             <option value="">Select</option>
@@ -319,45 +319,45 @@
                                                                     </fieldset>
                                                                 </div>
                                                                 <div class="col-md-6">
-                                                                    <fieldset class="form-group mb-3">
+                                                                    <fieldset class="form-group mb-2">
                                                                         <label for="api_key">API Key</label>
                                                                         <input type="text" class="form-control" name="api_key" value="{{ old('api_key', optional($api)->api_key) }}" placeholder="Enter api key" id="api_key">
                                                                     </fieldset>
                                                                 </div>
                                                                 <div class="col-md-6">
-                                                                    <fieldset class="form-group mb-3">
+                                                                    <fieldset class="form-group mb-2">
                                                                         <label for="secret_key">Secret Key</label>
                                                                         <input type="text" class="form-control" name="secret_key" value="{{ old('secret_key', optional($api)->secret_key) }}" placeholder="Enter secret key" id="secret_key">
                                                                     </fieldset>
                                                                 </div>
                                                                 <div class="col-md-6">
-                                                                    <fieldset class="form-group mb-3">
+                                                                    <fieldset class="form-group mb-2">
                                                                         <label for="public_key">Public Key</label>
                                                                         <input type="text" class="form-control" name="public_key" value="{{ old('public_key', optional($api)->public_key) }}" placeholder="Enter public key" id="public_key">
                                                                     </fieldset>
                                                                 </div>
                                                                 <div class="col-md-6">
-                                                                    <fieldset class="form-group mb-3">
+                                                                    <fieldset class="form-group mb-2">
                                                                         <label for="account_number">Account Number</label>
                                                                         <input type="text" class="form-control" name="account_number" value="{{ old('account_number', optional($api)->account_number) }}" placeholder="Enter account number" id="account_number">
                                                                         <small class="text-muted d-block mt-50">Used by providers that need an internal settlement or wallet account number.</small>
                                                                     </fieldset>
                                                                 </div>
                                                                 <div class="col-md-6">
-                                                                    <fieldset class="form-group mb-3">
+                                                                    <fieldset class="form-group mb-2">
                                                                         <label for="contract_id">Contract ID</label>
                                                                         <input type="text" class="form-control" name="contract_id" value="{{ old('contract_id', optional($api)->contract_id) }}" placeholder="Enter contract id" id="contract_id">
                                                                     </fieldset>
                                                                 </div>
                                                                 <div class="col-md-6">
-                                                                    <fieldset class="form-group mb-3">
+                                                                    <fieldset class="form-group mb-2">
                                                                         <label for="charge">Card Funding Charge</label>
                                                                         <input type="number" min="0" step="0.01" class="form-control" name="charge" value="{{ old('charge', optional($api)->charge) }}" placeholder="Enter charge" id="charge">
                                                                         <small class="text-muted d-block mt-50">This is the provider charge used for card-based wallet funding. The extra card funding charge in Settings is added separately at checkout.</small>
                                                                     </fieldset>
                                                                 </div>
                                                                 <div class="col-md-6">
-                                                                    <fieldset class="form-group mb-3">
+                                                                    <fieldset class="form-group mb-2">
                                                                         <label for="reserved_account_payment_charge_type">Reserved Account Charge Type</label>
                                                                         <select class="form-control" name="reserved_account_payment_charge_type" id="reserved_account_payment_charge_type">
                                                                             <option value="flat" @selected(old('reserved_account_payment_charge_type', optional($api)->reserved_account_payment_charge_type ?? 'flat') === 'flat')>Flat</option>
@@ -367,7 +367,7 @@
                                                                     </fieldset>
                                                                 </div>
                                                                 <div class="col-md-6">
-                                                                    <fieldset class="form-group mb-3">
+                                                                    <fieldset class="form-group mb-2">
                                                                         <label for="reserved_account_payment_charge">Reserved Account Payment Charge</label>
                                                                         <input type="number" min="0" step="0.01" class="form-control" name="reserved_account_payment_charge" value="{{ old('reserved_account_payment_charge', optional($api)->reserved_account_payment_charge) }}" placeholder="Enter reserved account charge" id="reserved_account_payment_charge">
                                                                         <small class="text-muted d-block mt-50">Used for wallet funding via reserved account transfers.</small>
@@ -379,7 +379,7 @@
                                                                         <input type="text" class="form-control" name="live_base_url" value="{{ old('live_base_url', optional($api)->live_base_url) }}" placeholder="Enter live base url" id="live_base_url">
                                                                     </div>
                                                                 </div>
-                                                                <div class="col-12 mt-3">
+                                                                <div class="col-12">
                                                                     <fieldset class="form-group mb-0">
                                                                         <label for="pending_note">Pending Note</label>
                                                                         <textarea class="form-control" name="pending_note" id="pending_note" rows="4" placeholder="Enter a reassuring note customers should see while a transaction is still pending">{{ old('pending_note', optional($api)->pending_note) }}</textarea>
@@ -388,7 +388,7 @@
                                                                 </div>
                                                             </div>
                                                             <div class="pricing-section-block">
-                                                                <h6 class="font-weight-bold mb-3">Capabilities</h6>
+                                                                <h6 class="font-weight-bold mb-2">Capabilities</h6>
                                                                 <div class="row">
                                                                     <div class="col-sm-6 mb-2">
                                                                         <div class="custom-control custom-checkbox">
@@ -455,7 +455,7 @@
                                                                 <input type="hidden" name="extra_charges" id="extra_charges" value="{{ $extraChargesValue }}">
 
                                                                 <div class="pricing-section-block">
-                                                                    <div class="d-flex align-items-start justify-content-between flex-wrap mb-3">
+                                                                    <div class="d-flex align-items-start justify-content-between flex-wrap mb-2">
                                                                         <div>
                                                                             <h6 class="font-weight-bold mb-0">Pricing Bands</h6>
                                                                             <div class="text-muted small mt-0.5">Range-based fees that apply to a matching transfer amount.</div>
@@ -466,7 +466,7 @@
                                                                         The matching band decides the fee for the amount the customer enters.
                                                                         <div class="small mt-1">Fee = Provider Fee + Our Charge + any band extra charges.</div>
                                                                     </div>
-                                                                    <div id="pricing-bands" class="mb-3"></div>
+                                                                    <div id="pricing-bands" class="mb-2"></div>
                                                                     <div class="text-right">
                                                                         <button type="button" class="btn btn-sm btn-primary px-3 py-1" id="add-price-band" style="border-radius: 0.5rem;">
                                                                             <i class="bx bx-plus mr-1"></i> Add Price Band
@@ -475,13 +475,13 @@
                                                                 </div>
 
                                                                 <div class="pricing-section-block">
-                                                                    <div class="d-flex align-items-start justify-content-between flex-wrap mb-3">
+                                                                    <div class="d-flex align-items-start justify-content-between flex-wrap mb-2">
                                                                         <div>
                                                                             <h6 class="font-weight-bold mb-0">Additional Charges</h6>
                                                                             <div class="text-muted small mt-0.5">Charges here apply to every transfer on this provider, regardless of band.</div>
                                                                         </div>
                                                                     </div>
-                                                                    <div id="extra-charges" class="mb-3"></div>
+                                                                    <div id="extra-charges" class="mb-2"></div>
                                                                     <div class="text-right">
                                                                         <button type="button" class="btn btn-sm btn-outline-success px-3 py-1" id="add-extra-charge" style="border-radius: 0.5rem;">
                                                                             <i class="bx bx-plus mr-1"></i> Add Charge
@@ -602,15 +602,15 @@ document.addEventListener('DOMContentLoaded', function () {
             const normalized = normalizeCharge(charge);
 
             return `
-                <div class="pricing-band-item mb-3" data-global-charge-index="${index}">
-                    <div class="d-flex align-items-center justify-content-between mb-3">
+                <div class="pricing-band-item mb-2" data-global-charge-index="${index}">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
                         <div class="pricing-band-item__title"><span class="pricing-band-item__index">${index + 1}</span><strong>Charge ${index + 1}</strong></div>
                         <button type="button" class="btn btn-sm btn-outline-danger" data-remove-global-charge="${index}" style="border-radius: 0.5rem;">
                             <i class="bx bx-trash"></i>
                         </button>
                     </div>
                     <div class="row">
-                        <div class="col-md-8 mb-3 mb-md-0">
+                        <div class="col-md-8 mb-2 mb-md-0">
                             <label class="form-label">Charge Name</label>
                             <input type="text" class="form-control" data-global-charge-field="charge_name" data-global-charge-index="${index}" value="${escapeHtml(normalized.charge_name)}" placeholder="e.g. Stamp charge">
                         </div>
@@ -632,7 +632,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const renderChargeRows = (charges, bandIndex) => {
         if (!charges.length) {
             return `
-                <div class="pricing-empty-state p-3 mb-3">
+                <div class="pricing-empty-state p-3 mb-2">
                     No extra charges added to this band yet. Use the button below to add one.
                 </div>
             `;
@@ -643,7 +643,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             return `
                 <div class="pricing-band-item mb-2" data-band-charge="${bandIndex}:${chargeIndex}">
-                    <div class="d-flex align-items-center justify-content-between mb-3">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
                         <div class="pricing-band-item__title">
                             <span class="pricing-band-item__index">${chargeIndex + 1}</span>
                             <strong>Charge ${chargeIndex + 1}</strong>
@@ -653,7 +653,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         </button>
                     </div>
                     <div class="row">
-                        <div class="col-md-8 mb-3 mb-md-0">
+                        <div class="col-md-8 mb-2 mb-md-0">
                             <label class="form-label">Charge Name</label>
                             <input type="text" class="form-control" data-charge-field="charge_name" data-band-index="${bandIndex}" data-charge-index="${chargeIndex}" value="${escapeHtml(normalized.charge_name)}" placeholder="e.g. Stamp charge">
                         </div>
@@ -676,33 +676,33 @@ document.addEventListener('DOMContentLoaded', function () {
             const nestedCharges = Array.isArray(normalized.extra_charges) ? normalized.extra_charges : [];
 
             return `
-                <div class="pricing-band-item mb-3" data-band-index="${index}">
-                    <div class="d-flex align-items-center justify-content-between mb-3">
+                <div class="pricing-band-item mb-2" data-band-index="${index}">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
                         <div class="pricing-band-item__title"><span class="pricing-band-item__index">${index + 1}</span><strong>Price Band ${index + 1}</strong></div>
                         <button type="button" class="btn btn-sm btn-outline-danger" data-remove-band="${index}" style="border-radius: 0.5rem;">
                             <i class="bx bx-trash"></i>
                         </button>
                     </div>
                     <div class="row">
-                        <div class="col-md-4 mb-3 mb-md-0">
+                        <div class="col-md-4 mb-2 mb-md-0">
                             <label class="form-label">Band Name</label>
                             <input type="text" class="form-control" data-band-field="band_name" data-band-index="${index}" value="${escapeHtml(normalized.band_name)}">
                         </div>
-                        <div class="col-md-2 mb-3 mb-md-0">
+                        <div class="col-md-2 mb-2 mb-md-0">
                             <label class="form-label">Min Amount</label>
                             <div class="input-group">
                                 <div class="input-group-prepend"><span class="input-group-text">${currencySymbol}</span></div>
                                 <input type="number" min="0" step="0.01" class="form-control" data-band-field="min_amount" data-band-index="${index}" value="${escapeHtml(normalized.min_amount)}">
                             </div>
                         </div>
-                        <div class="col-md-2 mb-3 mb-md-0">
+                        <div class="col-md-2 mb-2 mb-md-0">
                             <label class="form-label">Max Amount</label>
                             <div class="input-group">
                                 <div class="input-group-prepend"><span class="input-group-text">${currencySymbol}</span></div>
                                 <input type="number" min="0" step="0.01" class="form-control" data-band-field="max_amount" data-band-index="${index}" value="${escapeHtml(normalized.max_amount)}">
                             </div>
                         </div>
-                        <div class="col-md-2 mb-3 mb-md-0">
+                        <div class="col-md-2 mb-2 mb-md-0">
                             <label class="form-label">Provider Fee</label>
                             <div class="input-group">
                                 <div class="input-group-prepend"><span class="input-group-text">${currencySymbol}</span></div>
@@ -718,7 +718,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         </div>
                     </div>
                     <div class="pricing-section-block">
-                        <div class="d-flex align-items-start justify-content-between flex-wrap mb-3">
+                        <div class="d-flex align-items-start justify-content-between flex-wrap mb-2">
                             <div>
                                 <h6 class="font-weight-bold mb-0">Band Extra Charges</h6>
                                 <div class="text-muted small mt-0.5">Additional charges that apply when this band matches.</div>
