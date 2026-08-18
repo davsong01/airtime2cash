@@ -20,6 +20,7 @@ class TransactionLog extends Model
     protected $casts = [
         'charge_breakdown' => 'array',
         'completed_at' => 'datetime',
+        'resolution_date' => 'datetime',
     ];
 
     protected static function booted(): void

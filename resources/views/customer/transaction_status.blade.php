@@ -9,6 +9,9 @@
     }
     $isWalletToBank = strtolower((string) ($transaction->reason ?? '')) === 'wallet to bank transfer';
     $chargeBreakdown = collect(normalizeChargeBreakdown($transaction->charge_breakdown ?? []))->filter(fn ($charge) => is_array($charge));
+    $pendingNote = strtolower((string) ($transaction->status ?? 'pending')) === 'pending'
+        ? trim((string) ($transaction->api?->pending_note ?? ''))
+        : '';
 ?>
 @extends('layouts.app')
 @section('title', 'Transaction Completed')
@@ -153,12 +156,16 @@
                                                         <div class="card content-area">
                                                         <div class="card-innr">
                                                             <div class="row">
-
                                                                 <div class="col-md-12">
                                                                     @if(!empty($transaction->extras))
                                                                     <h3 style="color:#D50000;font-weight: bold;font-size: 28px;line-height: 28px;text-align: center;"><strong>{{ $transaction->extras }}</strong></h3>
                                                                     @endif
                                                                     <small style="display:block;font-family: Roboto;font-style: italic;font-weight: normal;font-size: 12px;line-height: 20px;color: #575A5F;text-align:center;">{{ $transaction->instruction }}</small>
+                                                                    @if(!empty($pendingNote))
+                                                                        <div class="alert alert-info mt-2 mb-0 text-left" role="alert" style="border-radius: 10px;">
+                                                                            <span>{{ $pendingNote }}</span>
+                                                                        </div>
+                                                                    @endif
                                                                 </div>
                                                             </div>
                                                             <div class="row">

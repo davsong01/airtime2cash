@@ -2214,7 +2214,7 @@ class TransactionController extends Controller
                 'message' => $response['message'] ?? 'Transaction skipped.',
             ];
         }
-
+        
         $providerStatus = strtolower((string) data_get($response, 'provider_status', data_get($response, 'status', 'pending')));
         $isSuccessful = in_array($providerStatus, ['successful', 'success', 'completed'], true)
             || (bool) data_get($response, 'status', false) === true;
@@ -2227,17 +2227,18 @@ class TransactionController extends Controller
                 'resolution_note' => $sourceNote . 'Transaction processed successfully after provider verification.',
             ] : null;
 
-            $this->markTransactionResolved(
-                $transaction,
-                'success',
-                'Transaction processed successfully after provider verification.',
-                null,
-                $transaction->balance_after,
-                $providerStatus,
-                $persistApiResponse ? $response : null,
-                null,
-                $bulkMeta,
-            );
+        $this->markTransactionResolved(
+            $transaction,
+            'success',
+            'Transaction processed successfully after provider verification.',
+            null,
+            $transaction->balance_after,
+            $providerStatus,
+            $persistApiResponse ? $response : null,
+            null,
+            $bulkMeta,
+            $resolutionSource === 'CRON/System' ? now() : null,
+        );
 
             return [
                 'status' => 'success',
@@ -2262,6 +2263,7 @@ class TransactionController extends Controller
                 $persistApiResponse ? $response : null,
                 null,
                 $bulkMeta,
+                $resolutionSource === 'CRON/System' ? now() : null,
             );
 
             return [
@@ -2288,6 +2290,7 @@ class TransactionController extends Controller
             $persistApiResponse ? $response : null,
             null,
             $bulkMeta,
+            null,
         );
 
         return [
@@ -2538,7 +2541,7 @@ class TransactionController extends Controller
         $wallet->updateCustomerWallet($user, $amount, 'credit');
     }
 
-    private function markTransactionResolved(TransactionLog $transaction, string $status, string $descr, ?string $failureReason = null, ?float $balanceAfter = null, ?string $providerStatus = null, mixed $apiResponse = null, ?string $extras = null, ?array $extraInfo = null): void
+    private function markTransactionResolved(TransactionLog $transaction, string $status, string $descr, ?string $failureReason = null, ?float $balanceAfter = null, ?string $providerStatus = null, mixed $apiResponse = null, ?string $extras = null, ?array $extraInfo = null, $resolutionDate = null): void
     {
         $updates = [
             'status' => $status,
@@ -2564,6 +2567,10 @@ class TransactionController extends Controller
         if ($extraInfo !== null) {
             $currentExtraInfo = $this->decodedTransactionExtraInfo($transaction);
             $updates['extra_info'] = json_encode(array_merge($currentExtraInfo, $extraInfo), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        }
+
+        if ($resolutionDate !== null && Schema::hasColumn('transaction_logs', 'resolution_date')) {
+            $updates['resolution_date'] = $resolutionDate;
         }
 
         $transaction->update($updates);

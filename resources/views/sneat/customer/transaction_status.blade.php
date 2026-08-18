@@ -26,6 +26,9 @@
     $extraInfo = [];
     $isWalletToBank = strtolower((string) ($transaction->reason ?? '')) === 'wallet to bank transfer';
     $chargeBreakdown = collect(normalizeChargeBreakdown($transaction->charge_breakdown ?? []))->filter(fn ($charge) => is_array($charge));
+    $pendingNote = $status === 'pending'
+        ? trim((string) ($transaction->api?->pending_note ?? ''))
+        : '';
 
     if (filled($transaction->extra_info)) {
         $decodedExtraInfo = json_decode($transaction->extra_info, true);
@@ -353,6 +356,13 @@
                     </div>
                 </div>
             </div>
+            @if(filled($pendingNote))
+                <div class="px-4 pt-3">
+                    <div class="alert alert-info mb-0" role="alert" style="border-radius: .95rem;">
+                        <span>{{ $pendingNote }}</span>
+                    </div>
+                </div>
+            @endif
 
             @if(filled($transaction->descr) || filled($transaction->extras) || filled($transaction->instruction))
                 <div class="transaction-detail-section py-3">

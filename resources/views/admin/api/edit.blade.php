@@ -379,6 +379,13 @@
                                                                         <input type="text" class="form-control" name="live_base_url" value="{{ old('live_base_url', optional($api)->live_base_url) }}" placeholder="Enter live base url" id="live_base_url">
                                                                     </div>
                                                                 </div>
+                                                                <div class="col-12 mt-3">
+                                                                    <fieldset class="form-group mb-0">
+                                                                        <label for="pending_note">Pending Note</label>
+                                                                        <textarea class="form-control" name="pending_note" id="pending_note" rows="4" placeholder="Enter a reassuring note customers should see while a transaction is still pending">{{ old('pending_note', optional($api)->pending_note) }}</textarea>
+                                                                        <small class="text-muted d-block mt-50">Shown to customers on pending transactions to reassure them that the transfer is still being processed.</small>
+                                                                    </fieldset>
+                                                                </div>
                                                             </div>
                                                             <div class="pricing-section-block">
                                                                 <h6 class="font-weight-bold mb-3">Capabilities</h6>

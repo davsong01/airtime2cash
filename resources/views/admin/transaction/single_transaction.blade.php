@@ -134,9 +134,19 @@
 @section('content')
 @php
     $transactionStatus = strtolower((string) ($transaction->status ?? 'pending'));
-    $transactionCompletedAt = $transaction->completed_at ?? $transaction->updated_at ?? $transaction->created_at;
+    $transactionCompletedAt = $transaction->resolution_date ?? $transaction->completed_at ?? $transaction->updated_at ?? $transaction->created_at;
     $transactionCompletedLabel = $transactionCompletedAt ? date("M jS, Y g:iA", strtotime($transactionCompletedAt)) : 'Awaiting completion';
     $transactionProvider = $transaction->api?->name ?? 'Unknown provider';
+    $transactionExtraInfo = [];
+
+    if (!empty($transaction->extra_info)) {
+        $decodedTransactionExtraInfo = json_decode($transaction->extra_info, true);
+        $transactionExtraInfo = is_array($decodedTransactionExtraInfo) ? $decodedTransactionExtraInfo : [];
+    }
+
+    $resolutionSource = trim((string) data_get($transactionExtraInfo, 'resolution_source', ''));
+    $resolutionNote = trim((string) data_get($transactionExtraInfo, 'resolution_note', ''));
+    $resolutionDate = $transaction->resolution_date ?? data_get($transactionExtraInfo, 'resolution_date');
 @endphp
 <!-- Content wrapper -->
 <div class="app-content content txn-details-page">
@@ -301,22 +311,22 @@
                                                                <div class="col-md-3">
                                                                    <strong>Request Id:</strong> <br>{{ $transaction->reference_id }} <br>
                                                                    <strong>IP Address: </strong><br>{{ $transaction->ip_address }} <br>
-                                                                   @if(!empty($transaction->extras) || !empty($transaction->extra_info))
-                                                                    <div class="card mt-2">
-                                                                        <div class="card-header py-1 px-2">
-                                                                            <strong>System Notes</strong>
-                                                                        </div>
-                                                                        <div class="card-body py-2 px-2" style="font-size: 12px; line-height: 1.6;">
-                                                                            @if(!empty($transaction->extras))
-                                                                                <div><strong>Extras:</strong> {{ $transaction->extras }}</div>
+                                                                   @if(filled($resolutionSource) || filled($resolutionNote) || filled($resolutionDate) || !empty($transaction->extras) || !empty($transaction->extra_info))
+                                                                    <div class="card mt-1">
+                                                                        <strong>Resolution Notes</strong>
+                                                                       
+                                                                        <div style="font-size: 12px; line-height: 1.6;">
+                                                                            @if(filled($resolutionSource))
+                                                                                <div><strong>Resolution Source:</strong> {{ $resolutionSource }}</div>
                                                                             @endif
-                                                                            @if(!empty($transaction->extra_info))
-                                                                                @php
-                                                                                    $decodedExtraInfo = json_decode($transaction->extra_info, true) ?: [];
-                                                                                @endphp
-                                                                                @foreach ($decodedExtraInfo as $key => $value)
-                                                                                    <div><strong>{{ $key }}:</strong> {{ is_array($value) ? json_encode($value) : $value }}</div>
-                                                                                @endforeach
+                                                                            @if(filled($resolutionNote))
+                                                                                <div><strong>Resolution Note:</strong> {{ $resolutionNote }}</div>
+                                                                            @endif
+                                                                            @if(filled($resolutionDate))
+                                                                                <div><strong>Resolution Date:</strong> {{ \Illuminate\Support\Carbon::parse($resolutionDate)->format('M jS, Y g:iA') }}</div>
+                                                                            @endif
+                                                                            @if(!empty($transaction->extras))
+                                                                                <div class="mt-1"><strong>Extras:</strong> {{ $transaction->extras }}</div>
                                                                             @endif
                                                                         </div>
                                                                     </div>
