@@ -128,6 +128,24 @@
                                     <small class="form-text text-muted">Manual income recorded in admin logs uses this percentage.</small>
                                 </div>
                             </div>
+                            <div class="row mt-3">
+                                <div class="col-md-6 form-group mb-0">
+                                    <label for="manual_min">Minimum amount ({{ $currency }})</label>
+                                    <div class="input-group">
+                                        <div class="input-group-prepend"><span class="input-group-text">{{ $currency }}</span></div>
+                                        <input type="number" step="0.01" min="0" class="form-control @error('manual_min') is-invalid @enderror" id="manual_min" name="manual_min" value="{{ old('manual_min', $product?->manual_min) }}" placeholder="Use shared range if blank or 0">
+                                        @error('manual_min')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                    </div>
+                                </div>
+                                <div class="col-md-6 form-group mb-0">
+                                    <label for="manual_max">Maximum amount ({{ $currency }})</label>
+                                    <div class="input-group">
+                                        <div class="input-group-prepend"><span class="input-group-text">{{ $currency }}</span></div>
+                                        <input type="number" step="0.01" min="0" class="form-control @error('manual_max') is-invalid @enderror" id="manual_max" name="manual_max" value="{{ old('manual_max', $product?->manual_max) }}" placeholder="Use shared range if blank or 0">
+                                        @error('manual_max')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                    </div>
+                                </div>
+                            </div>
 
                             <div class="a2c-level-rates">
                                 <div class="a2c-level-rates-heading mt-2">
@@ -180,6 +198,24 @@
                                         @error('auto_share_profit_percentage')<div class="invalid-feedback">{{ $message }}</div>@enderror
                                     </div>
                                     <small class="form-text text-muted">Auto share income recorded in admin logs uses this percentage.</small>
+                                </div>
+                            </div>
+                            <div class="row mt-3">
+                                <div class="col-md-6 form-group mb-0">
+                                    <label for="auto_share_min">Minimum amount ({{ $currency }})</label>
+                                    <div class="input-group">
+                                        <div class="input-group-prepend"><span class="input-group-text">{{ $currency }}</span></div>
+                                        <input type="number" step="0.01" min="0" class="form-control @error('auto_share_min') is-invalid @enderror" id="auto_share_min" name="auto_share_min" value="{{ old('auto_share_min', $product?->auto_share_min) }}" placeholder="Use shared range if blank or 0">
+                                        @error('auto_share_min')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                    </div>
+                                </div>
+                                <div class="col-md-6 form-group mb-0">
+                                    <label for="auto_share_max">Maximum amount ({{ $currency }})</label>
+                                    <div class="input-group">
+                                        <div class="input-group-prepend"><span class="input-group-text">{{ $currency }}</span></div>
+                                        <input type="number" step="0.01" min="0" class="form-control @error('auto_share_max') is-invalid @enderror" id="auto_share_max" name="auto_share_max" value="{{ old('auto_share_max', $product?->auto_share_max) }}" placeholder="Use shared range if blank or 0">
+                                        @error('auto_share_max')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                    </div>
                                 </div>
                             </div>
                             <div class="form-group mt-2 mb-0">

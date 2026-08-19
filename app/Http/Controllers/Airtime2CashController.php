@@ -38,10 +38,14 @@ class Airtime2CashController extends Controller
             "fixed_price" => "nullable",
             "rate" => "required|numeric|min:0|max:100",
             "manual_profit_percentage" => "nullable|numeric|min:0|max:100",
+            "manual_min" => "nullable|numeric|min:0",
+            "manual_max" => "nullable|numeric|min:0",
             "manual_level_rate" => "nullable|array",
             "manual_level_rate.*" => "nullable|numeric|min:0|max:100",
             "auto_share_rate" => "required|numeric|min:0|max:100",
             "auto_share_profit_percentage" => "nullable|numeric|min:0|max:100",
+            "auto_share_min" => "nullable|numeric|min:0",
+            "auto_share_max" => "nullable|numeric|min:0",
             "auto_share_level_rate" => "nullable|array",
             "auto_share_level_rate.*" => "nullable|numeric|min:0|max:100",
             "manual_status" => "required|in:active,inactive",
@@ -57,6 +61,15 @@ class Airtime2CashController extends Controller
         if (!empty($request->image)) {
             $image = $this->uploadFile($request->image, 'products');
         }
+
+        if ($this->hasInvalidTransferRange($request->manual_min, $request->manual_max)) {
+            return back()->withInput()->with('error', 'Manual transfer maximum amount must be greater than or equal to the minimum amount.');
+        }
+
+        if ($this->hasInvalidTransferRange($request->auto_share_min, $request->auto_share_max)) {
+            return back()->withInput()->with('error', 'Auto share maximum amount must be greater than or equal to the minimum amount.');
+        }
+
         $slug = strtolower('airtime2cash-'.Str::slug($request->name));
     
         $product = Product::updateOrCreate(
@@ -77,8 +90,12 @@ class Airtime2CashController extends Controller
                 "api_id" => 1,
                 "rate" => $request->rate,
                 "manual_profit_percentage" => $request->filled('manual_profit_percentage') ? $request->manual_profit_percentage : null,
+                "manual_min" => $request->filled('manual_min') ? $request->manual_min : null,
+                "manual_max" => $request->filled('manual_max') ? $request->manual_max : null,
                 "auto_share_rate" => $request->auto_share_rate,
                 "auto_share_profit_percentage" => $request->filled('auto_share_profit_percentage') ? $request->auto_share_profit_percentage : null,
+                "auto_share_min" => $request->filled('auto_share_min') ? $request->auto_share_min : null,
+                "auto_share_max" => $request->filled('auto_share_max') ? $request->auto_share_max : null,
                 "manual_status" => $request->manual_status,
                 "auto_share_status" => $request->auto_share_status,
                 "status" => $request->status,
@@ -119,10 +136,14 @@ class Airtime2CashController extends Controller
             "status" => "required",
             "rate" => "required|numeric|min:0|max:100",
             "manual_profit_percentage" => "nullable|numeric|min:0|max:100",
+            "manual_min" => "nullable|numeric|min:0",
+            "manual_max" => "nullable|numeric|min:0",
             "manual_level_rate" => "nullable|array",
             "manual_level_rate.*" => "nullable|numeric|min:0|max:100",
             "auto_share_rate" => "required|numeric|min:0|max:100",
             "auto_share_profit_percentage" => "nullable|numeric|min:0|max:100",
+            "auto_share_min" => "nullable|numeric|min:0",
+            "auto_share_max" => "nullable|numeric|min:0",
             "auto_share_level_rate" => "nullable|array",
             "auto_share_level_rate.*" => "nullable|numeric|min:0|max:100",
             "manual_status" => "required|in:active,inactive",
@@ -143,6 +164,14 @@ class Airtime2CashController extends Controller
             $image = $product->image;
         }
 
+        if ($this->hasInvalidTransferRange($request->manual_min, $request->manual_max)) {
+            return back()->withInput()->with('error', 'Manual transfer maximum amount must be greater than or equal to the minimum amount.');
+        }
+
+        if ($this->hasInvalidTransferRange($request->auto_share_min, $request->auto_share_max)) {
+            return back()->withInput()->with('error', 'Auto share maximum amount must be greater than or equal to the minimum amount.');
+        }
+
         $slug = strtolower('airtime2cash-' . Str::slug($request->name));
         
         $product->update(
@@ -158,8 +187,12 @@ class Airtime2CashController extends Controller
                 "api_id" => 1,
                 "rate" => $request->rate,
                 "manual_profit_percentage" => $request->filled('manual_profit_percentage') ? $request->manual_profit_percentage : null,
+                "manual_min" => $request->filled('manual_min') ? $request->manual_min : null,
+                "manual_max" => $request->filled('manual_max') ? $request->manual_max : null,
                 "auto_share_rate" => $request->auto_share_rate,
                 "auto_share_profit_percentage" => $request->filled('auto_share_profit_percentage') ? $request->auto_share_profit_percentage : null,
+                "auto_share_min" => $request->filled('auto_share_min') ? $request->auto_share_min : null,
+                "auto_share_max" => $request->filled('auto_share_max') ? $request->auto_share_max : null,
                 "manual_status" => $request->manual_status,
                 "auto_share_status" => $request->auto_share_status,
                 "status" => $request->status,
@@ -181,6 +214,22 @@ class Airtime2CashController extends Controller
         $this->syncAirtimeCustomerLevelRates($product, $request->auto_share_level_rate ?? [], 'auto_share');
         
         return back()->with('message', 'Update Successfull');
+    }
+
+    private function hasInvalidTransferRange($min, $max): bool
+    {
+        if (! is_numeric($min) || ! is_numeric($max)) {
+            return false;
+        }
+
+        $min = (float) $min;
+        $max = (float) $max;
+
+        if ($min <= 0 || $max <= 0) {
+            return false;
+        }
+
+        return $max < $min;
     }
 
     private function syncAirtimeCustomerLevelRates(Product $product, array $rates, string $transferMode): void

@@ -191,6 +191,10 @@
                                             data-auto-share-rate="{{ $item->auto_share_discounted_rate }}"
                                             data-min="{{ $item->min }}"
                                             data-max="{{ $item->max }}"
+                                            data-manual-min="{{ $item->effectiveTransferMin('manual') }}"
+                                            data-manual-max="{{ $item->effectiveTransferMax('manual') }}"
+                                            data-auto-share-min="{{ $item->effectiveTransferMin('auto_share') }}"
+                                            data-auto-share-max="{{ $item->effectiveTransferMax('auto_share') }}"
                                             data-name="{{ $item->display_name }}"
                                             data-manual-instruction="{{ $item->instruction }}"
                                             data-auto-share-instruction="{{ $item->auto_share_instruction }}"
@@ -740,10 +744,14 @@
 
                 const discountedRate = Number.parseFloat(rawRate);
                 const minimum = Number.parseFloat(
-                    $selected.attr('data-min')
+                    isAutoTransfer()
+                        ? ($selected.attr('data-auto-share-min') ?? $selected.attr('data-auto_share_min'))
+                        : ($selected.attr('data-manual-min') ?? $selected.attr('data-manual_min'))
                 );
                 const maximum = Number.parseFloat(
-                    $selected.attr('data-max')
+                    isAutoTransfer()
+                        ? ($selected.attr('data-auto-share-max') ?? $selected.attr('data-auto_share_max'))
+                        : ($selected.attr('data-manual-max') ?? $selected.attr('data-manual_max'))
                 );
 
                 const normalizedRate = Number.isFinite(discountedRate)

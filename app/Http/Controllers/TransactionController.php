@@ -319,8 +319,8 @@ class TransactionController extends Controller
             $profitPercentage = $product->auto_share_profit_percentage;
         }
 
-        $max = $product->max;
-        $min = $product->min;
+        $min = $product->effectiveTransferMin($request->transfer_mode) ?? (float) ($product->min ?? 0);
+        $max = $product->effectiveTransferMax($request->transfer_mode) ?? (float) ($product->max ?? 0);
         $amount = $this->removeCharsInAmount($request->amount);
 
         $amount_charged = ($rate / 100) * $amount;

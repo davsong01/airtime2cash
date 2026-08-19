@@ -129,7 +129,7 @@
                                                                                     <select class="form-control js-example-basic-single" name="product" id="product" required>
                                                                                         <option value="">Select</option>
                                                                                         @foreach ($category->products as $item)
-                                                                                            <option value="{{ $item->id }}" data-manual_status="{{ $item->manual_status }}" data-auto_share_status="{{ $item->auto_share_status }}" data-manual_rate="{{ $item->manual_discounted_rate }}" data-auto_share_rate="{{ $item->auto_share_discounted_rate }}" data-allow_quantity="{{ $item->allow_quantity }}" data-min="{{ $item->min}}" data-max="{{$item->max}}" data-system_price="{{ $item->system_price }}" data-fixed_price="{{ $item->fixed_price}}" data-image="{{ asset($item->image) }}" data-name="{{ $item->name }}" data-manual_instruction="{{ $item->instruction }}" data-auto_share_instruction="{{ $item->auto_share_instruction }}" data-description="{{ $item->description }}">{{ $item->display_name }}</option>
+                                                                                        <option value="{{ $item->id }}" data-manual_status="{{ $item->manual_status }}" data-auto_share_status="{{ $item->auto_share_status }}" data-manual_rate="{{ $item->manual_discounted_rate }}" data-auto_share_rate="{{ $item->auto_share_discounted_rate }}" data-allow_quantity="{{ $item->allow_quantity }}" data-min="{{ $item->min}}" data-max="{{$item->max}}" data-manual-min="{{ $item->effectiveTransferMin('manual') }}" data-manual-max="{{ $item->effectiveTransferMax('manual') }}" data-auto-share-min="{{ $item->effectiveTransferMin('auto_share') }}" data-auto-share-max="{{ $item->effectiveTransferMax('auto_share') }}" data-system_price="{{ $item->system_price }}" data-fixed_price="{{ $item->fixed_price}}" data-image="{{ asset($item->image) }}" data-name="{{ $item->name }}" data-manual_instruction="{{ $item->instruction }}" data-auto_share_instruction="{{ $item->auto_share_instruction }}" data-description="{{ $item->description }}">{{ $item->display_name }}</option>
                                                                                         @endforeach
                                                                                     </select>
                                                                                     <div class="footnote">
@@ -442,8 +442,12 @@
             var discounted_rate = transferMode === 'auto_share'
                 ? $('#product').find(':selected').data('auto_share_rate')
                 : $('#product').find(':selected').data('manual_rate');
-            var max = $('#product').find(':selected').data('max');
-            var min = $('#product').find(':selected').data('min');
+            var min = transferMode === 'auto_share'
+                ? $('#product').find(':selected').data('auto_share_min')
+                : $('#product').find(':selected').data('manual_min');
+            var max = transferMode === 'auto_share'
+                ? $('#product').find(':selected').data('auto_share_max')
+                : $('#product').find(':selected').data('manual_max');
             var product = $('#product').val();
             var instruction = transferMode === 'auto_share'
                 ? $('#product').find(':selected').data('auto_share_instruction') || defaultAutoInstruction
@@ -477,17 +481,24 @@
                 $("#rate-div").show();
                 $("#rate").val(discounted_rate);
 
-                if(min != '' && max != ''){
+                if(Number.isFinite(Number(min)) && Number.isFinite(Number(max))){
                     $("#airtime-range").html('The Minimum and Maximum amount for '+title + ' is '+min + ' and ' +max + ' respectively');
                     $("#airtime-range").show();
                 }else{
                     $("#airtime-range").hide();
                 }
 
-                $("#amount").attr({
-                    "max": max,
-                    "min": min,
-                });
+                if (Number.isFinite(Number(min))) {
+                    $("#amount").attr("min", min);
+                } else {
+                    $("#amount").removeAttr("min");
+                }
+
+                if (Number.isFinite(Number(max))) {
+                    $("#amount").attr("max", max);
+                } else {
+                    $("#amount").removeAttr("max");
+                }
                 $('#amount-div').show()
 
             }
@@ -517,13 +528,13 @@
         });
 
         $("#amount").keyup(function(){
-            var rate = parseInt($('#rate').val());
-            var amount = parseInt($('#amount').val());
-            var min = parseInt($('#amount').attr('min')) ?? 50;
-            var max = parseInt($('#amount').attr('max'));
+            var rate = parseFloat($('#rate').val());
+            var amount = parseFloat($('#amount').val());
+            var min = parseFloat($('#amount').attr('min'));
+            var max = parseFloat($('#amount').attr('max'));
 
             var receive = 0;
-            if(amount > 0 && amount >= min && amount <= max){
+            if(amount > 0 && (!Number.isFinite(min) || amount >= min) && (!Number.isFinite(max) || amount <= max)){
                 receive = amount - ((rate/100) * amount);
                 $('#receive-div').show();
                 $('#receive').val(receive);

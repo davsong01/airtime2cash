@@ -34,6 +34,34 @@ class Product extends Model
         return $this->belongsTo(Category::class);
     }
 
+    public function effectiveTransferMin(string $transferMode): ?float
+    {
+        $modeKey = $transferMode === 'auto_share' ? 'auto_share_min' : 'manual_min';
+        $value = $this->{$modeKey} ?? null;
+
+        if (is_numeric($value) && (float) $value > 0) {
+            return (float) $value;
+        }
+
+        return is_numeric($this->min) && (float) $this->min > 0
+            ? (float) $this->min
+            : null;
+    }
+
+    public function effectiveTransferMax(string $transferMode): ?float
+    {
+        $modeKey = $transferMode === 'auto_share' ? 'auto_share_max' : 'manual_max';
+        $value = $this->{$modeKey} ?? null;
+
+        if (is_numeric($value) && (float) $value > 0) {
+            return (float) $value;
+        }
+
+        return is_numeric($this->max) && (float) $this->max > 0
+            ? (float) $this->max
+            : null;
+    }
+
     public function customer_level_price($level)
     {
         $price = null;
