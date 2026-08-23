@@ -6,7 +6,6 @@ use Carbon\Carbon;
 use App\Models\User;
 use App\Models\Customer;
 use App\Models\BlackList;
-use App\Models\Bank;
 use Illuminate\Http\Request;
 use App\Models\CustomerLevel;
 use App\Models\KycData;
@@ -362,9 +361,12 @@ class CustomerController extends Controller
                 ->unique()
                 ->values()
                 ->all();
-            $availableReservedBanks = Bank::active()
-                ->orderBy('bank_name')
-                ->get()
+            $reservedBankOptions = collect([
+                (object) ['cbn_code' => '50515', 'bank_name' => 'Moniepoint'],
+                (object) ['cbn_code' => '035', 'bank_name' => 'Wema Bank'],
+                (object) ['cbn_code' => '058', 'bank_name' => 'Guaranty Trust Bank'],
+            ]);
+            $availableReservedBanks = $reservedBankOptions
                 ->reject(fn ($bank) => in_array((string) $bank->cbn_code, $reservedBankCodes, true))
                 ->values();
             $kycData = KycData::where('customer_id', $customer)
