@@ -571,34 +571,42 @@ class MonnifyController extends BankTransferProviderController
             'POST'
         );
 
-        if (
-            ($response['responseCode'] ?? null) === 0 &&
-            ($response['responseMessage'] ?? null) === 'success'
-        ) {
-            foreach (($response['responseBody']['accounts'] ?? []) as $account) {
-                ReservedAccountNumber::updateOrCreate([
-                    'customer_id' => $data['customer_id'] ?? null,
-                    'account_number' => $account['accountNumber'] ?? null,
-                    'account_name' => $account['accountName'] ?? null,
-                    'bank_name' => $account['bankName'] ?? null,
-                    'bank_code' => $account['bankCode'] ?? null,
-                ], [
-                    'customer_id' => $data['customer_id'] ?? null,
-                    'admin_id' => $admin_id ?? null,
-                    'account_reference' => $response['responseBody']['accountReference'] ?? null,
-                    'account_number' => $account['accountNumber'] ?? null,
-                    'account_name' => $account['accountName'] ?? null,
-                    'bank_name' => $account['bankName'] ?? null,
-                    'bank_code' => $account['bankCode'] ?? null,
-                    'api_id' => $provider?->id,
-                    'status' => $response['responseBody']['status'] ?? null,
-                    'purpose' => 'WALLET-FUNDING',
-                    'bvn' => $response['responseBody']['bvn'] ?? null,
-                    'response' => json_encode($response),
-                ]);
-            }
+        try {
+            //code...
+            if (
+                ($response['responseCode'] ?? null) == 0 &&
+                ($response['responseMessage'] ?? null) == 'success'
+            ) {
+                foreach (($response['responseBody']['accounts'] ?? []) as $account) {
+                    ReservedAccountNumber::updateOrCreate([
+                        'customer_id' => $data['customer_id'] ?? null,
+                        'account_number' => $account['accountNumber'] ?? null,
+                        'account_name' => $account['accountName'] ?? null,
+                        'bank_name' => $account['bankName'] ?? null,
+                        'bank_code' => $account['bankCode'] ?? null,
+                    ], [
+                        'customer_id' => $data['customer_id'] ?? null,
+                        'admin_id' => $admin_id ?? null,
+                        'account_reference' => $response['responseBody']['accountReference'] ?? null,
+                        'account_number' => $account['accountNumber'] ?? null,
+                        'account_name' => $account['accountName'] ?? null,
+                        'bank_name' => $account['bankName'] ?? null,
+                        'bank_code' => $account['bankCode'] ?? null,
+                        'api_id' => $provider?->id,
+                        'status' => $response['responseBody']['status'] ?? null,
+                        'purpose' => 'WALLET-FUNDING',
+                        'bvn' => $response['responseBody']['bvn'] ?? null,
+                        'response' => json_encode($response),
+                    ]);
+                }
 
-            return ['status' => 'success', 'data' => ''];
+                return ['status' => 'success', 'data' => ''];
+            }
+        } catch (\Throwable $th) {
+            return [
+                'status' => 'failed',
+                'data' => $th->getMessage(),
+            ];
         }
 
         return [
