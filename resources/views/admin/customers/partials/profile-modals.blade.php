@@ -13,11 +13,18 @@
                         <div class="form-group">
                             <label for="bank">Banks</label>
                             <select class="form-control js-example-basic-single" name="bank[]" id="bank" required multiple>
-                                <option value="50515">Moniepoint</option>
-                                <option value="035">Wema Bank</option>
-                                <option value="058">Guaranty Trust Bank</option>
+                                @forelse($availableReservedBanks ?? collect() as $bank)
+                                    <option value="{{ $bank->cbn_code }}">{{ $bank->bank_name }}</option>
+                                @empty
+                                    <option value="" disabled>No additional banks available</option>
+                                @endforelse
                             </select>
                         </div>
+                        @if(empty(($availableReservedBanks ?? collect())->count()))
+                            <div class="alert alert-info mt-2 mb-0">
+                                This customer already has reserved accounts for all available banks.
+                            </div>
+                        @endif
                         <input type="hidden" name="bvn" value="{{ $kycData->get('BVN')->value ?? '' }}">
                         <input type="hidden" name="customer_id" value="{{ $customer->id }}">
                     </div>

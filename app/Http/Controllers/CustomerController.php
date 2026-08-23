@@ -6,6 +6,7 @@ use Carbon\Carbon;
 use App\Models\User;
 use App\Models\Customer;
 use App\Models\BlackList;
+use App\Models\Bank;
 use Illuminate\Http\Request;
 use App\Models\CustomerLevel;
 use App\Models\KycData;
@@ -323,6 +324,7 @@ class CustomerController extends Controller
         $balances = ['Wallet Balance' => $balance, 'Referral Earning' => $ref, 'Transaction Total' => $transTotal, 'A2C Total' => $a2cTotal, 'Funds Total' => $fundTotal];
         $downlines = collect();
         $reservedAccount = collect();
+        $availableReservedBanks = collect();
         $transactions = null;
         $airtimeTransactions = null;
         $kycData = collect();
@@ -353,6 +355,18 @@ class CustomerController extends Controller
                 ->where('customer_id', $customer)
                 ->orderBy('created_at', 'desc')
                 ->get();
+            $reservedBankCodes = $reservedAccount
+                ->pluck('bank_code')
+                ->filter()
+                ->map(fn ($code) => trim((string) $code))
+                ->unique()
+                ->values()
+                ->all();
+            $availableReservedBanks = Bank::active()
+                ->orderBy('bank_name')
+                ->get()
+                ->reject(fn ($bank) => in_array((string) $bank->cbn_code, $reservedBankCodes, true))
+                ->values();
             $kycData = KycData::where('customer_id', $customer)
                 ->where('key', 'BVN')
                 ->get()
@@ -376,6 +390,7 @@ class CustomerController extends Controller
                 'kycData' => $kycData,
                 'blacklists' => $blacklists,
                 'activeTab' => $activeTab,
+                'availableReservedBanks' => $availableReservedBanks,
             ]
         );
     }
