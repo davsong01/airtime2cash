@@ -45,6 +45,20 @@
                 @endforeach
             </select>
         </div>
+        <div class="col-md-6 form-group">
+            <label for="can_access_w2bank">Wallet 2 Bank access</label>
+            <select name="can_access_w2bank" class="form-control" id="can_access_w2bank">
+                <option value="0" @selected(! (bool) old('can_access_w2bank', $customer->can_access_w2bank ?? false))>Disabled</option>
+                <option value="1" @selected((bool) old('can_access_w2bank', $customer->can_access_w2bank ?? false))>Enabled</option>
+            </select>
+        </div>
+        <div class="col-md-6 form-group">
+            <label for="can_access_a2c">Airtime 2 Cash access</label>
+            <select name="can_access_a2c" class="form-control" id="can_access_a2c">
+                <option value="0" @selected(! (bool) old('can_access_a2c', $customer->can_access_a2c ?? false))>Disabled</option>
+                <option value="1" @selected((bool) old('can_access_a2c', $customer->can_access_a2c ?? false))>Enabled</option>
+            </select>
+        </div>
         <div class="col-md-6 d-flex align-items-end justify-content-md-end">
             <button type="submit" class="btn btn-success"><i class="bx bx-save mr-25"></i> Save account changes</button>
         </div>

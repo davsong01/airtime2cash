@@ -19,7 +19,7 @@ return new class extends Migration
             ->whereNull('completed_at')
             ->whereIn('status', ['success', 'successful', 'completed', 'approved', 'failed', 'declined'])
             ->update([
-                'completed_at' => DB::raw('COALESCE(updated_at, created_at, NOW())'),
+                'completed_at' => DB::raw('COALESCE(updated_at, created_at, CURRENT_TIMESTAMP)'),
             ]);
     }
 

@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Customer;
 use App\Models\Wallet;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class WalletController extends Controller
 {
@@ -26,6 +28,8 @@ class WalletController extends Controller
         $wallet = Wallet::create([
             'customer_id' => $data['customer_id'] ?? auth()->user()->customer->id,
             'amount' => $data['total_amount'],
+            'balance_before' => $data['balance_before'] ?? null,
+            'balance_after' => $data['balance_after'] ?? null,
             'type' => $data['type'],
             'transaction_id' => $data['transaction_id'] ?? null,
             'reason' => $data['reason'] ?? null,
@@ -37,46 +41,62 @@ class WalletController extends Controller
 
     public function updateCustomerWallet($user, $amount, $type)
     {
-        if ($type == 'credit') {
-            $user->customer->update([
-                'wallet' => $user->customer->wallet + $amount,
-            ]);
-        } else {
-            $user->customer->update([
-                'wallet' => $user->customer->wallet - $amount,
-            ]);
-        }
+        DB::transaction(function () use ($user, $amount, $type) {
+            $customer = Customer::query()
+                ->whereKey($user->customer->id)
+                ->lockForUpdate()
+                ->firstOrFail();
 
-        return;
+            $this->applyCustomerBalanceChange($customer, 'wallet', $amount, $type);
+        });
     }
 
     public function updateReferralWallet($user, $amount, $type)
     {
-        if ($type == 'credit') {
-            $user->customer->update([
-                'referal_wallet' => $user->customer->referal_wallet + $amount,
-            ]);
-        } else {
-            $user->customer->update([
-                'referal_wallet' => $user->customer->referal_wallet - $amount,
-            ]);
-        }
+        DB::transaction(function () use ($user, $amount, $type) {
+            $customer = Customer::query()
+                ->whereKey($user->customer->id)
+                ->lockForUpdate()
+                ->firstOrFail();
 
-        return;
+            $this->applyCustomerBalanceChange($customer, 'referal_wallet', $amount, $type);
+        });
     }
 
     public function updatea2CashWallet($user, $amount, $type)
     {
-        if ($type == 'credit') {
-            $user->customer->update([
-                'referal_wallet' => $user->customer->referal_wallet + $amount,
-            ]);
+        DB::transaction(function () use ($user, $amount, $type) {
+            $customer = Customer::query()
+                ->whereKey($user->customer->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $this->applyCustomerBalanceChange($customer, 'a2cashwallet', $amount, $type);
+        });
+    }
+
+    public function applyCustomerBalanceChange(Customer $customer, string $column, $amount, string $type): array
+    {
+        $currentBalance = (float) ($customer->{$column} ?? 0);
+        $amount = (float) $amount;
+
+        if ($type === 'credit') {
+            $nextBalance = $currentBalance + $amount;
         } else {
-            $user->customer->update([
-                'referal_wallet' => $user->customer->referal_wallet - $amount,
-            ]);
+            if ($currentBalance < $amount) {
+                throw new \RuntimeException('Insufficient wallet balance.');
+            }
+
+            $nextBalance = $currentBalance - $amount;
         }
 
-        return;
+        $customer->update([
+            $column => $nextBalance,
+        ]);
+
+        return [
+            'before' => $currentBalance,
+            'after' => $nextBalance,
+        ];
     }
 }

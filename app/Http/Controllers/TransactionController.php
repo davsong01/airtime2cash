@@ -8,6 +8,7 @@ use App\Http\Controllers\Providers\AutoSyncController;
 use App\Http\Controllers\WalletController;
 use App\Models\Airtime2CashTransactions;
 use App\Models\API;
+use App\Models\Customer;
 use App\Models\Bank;
 use App\Models\BillerLog;
 use App\Models\BlackList;
@@ -65,6 +66,10 @@ class TransactionController extends Controller
 
     public function airtimeToCash()
     {
+        if (! $this->customerCanAccessService('a2c')) {
+            return $this->serviceUnavailableResponse('Airtime 2 Cash', 'a2c');
+        }
+
         if (auth()->user()->customer->kyc_status == 'unverified') {
             $kycLink = '<a href="' . route('update.kyc.details') . '"><strong>complete your KYC now</strong></a>';
 
@@ -113,6 +118,10 @@ class TransactionController extends Controller
 
     public function walletToBank($slug)
     {
+        if (! $this->customerCanAccessService('wallet2bank')) {
+            return $this->serviceUnavailableResponse('Wallet 2 Bank', 'wallet2bank');
+        }
+
         $route = '<a style="color: yellow;" href="' . route("update.kyc.details") . '">HERE</a>';
 
         if (auth()->user()->customer->kyc_status == 'unverified') {
@@ -293,6 +302,10 @@ class TransactionController extends Controller
             'transfer_mode' => ['required', 'in:manual,auto_share'],
         ]);
 
+        if (! $this->customerCanAccessService('a2c')) {
+            return $this->serviceUnavailableResponse('Airtime 2 Cash', 'a2c');
+        }
+
         $statusColumn = $request->transfer_mode === 'auto_share'
             ? 'auto_share_status'
             : 'manual_status';
@@ -371,6 +384,16 @@ class TransactionController extends Controller
                 ['transaction_id' => $transaction_id],
                 $transaction
             );
+
+            $customer = auth()->user()->customer;
+            $currentBalance = (float) ($customer->wallet ?? 0);
+            $this->upsertAirtime2CashTransactionLog($log, $customer, [
+                'status' => 'pending',
+                'descr' => 'Airtime2Cash request initiated.',
+                'balance_before' => $currentBalance,
+                'balance_after' => $currentBalance,
+                'provider_status' => 'initiated',
+            ]);
 
             if ($request->input('transfer_mode') === 'auto_share') {
                 $providerId = getSettings()?->auto_share_provider_id;
@@ -568,6 +591,10 @@ class TransactionController extends Controller
 
     public function initializeWalletToBankTransaction(Request $request, Product $product)
     {
+        if (! $this->customerCanAccessService('wallet2bank')) {
+            return $this->serviceUnavailableResponse('Wallet 2 Bank', 'wallet2bank');
+        }
+
         if (empty($product)) {
             return back()->with('error', 'The selected product/service does not seem to exist, kindly try again');
         }
@@ -676,27 +703,49 @@ class TransactionController extends Controller
         $wallet = new WalletController();
 
         try {
-            DB::beginTransaction();
+            DB::transaction(function () use (&$transaction, $wallet, $request) {
+                $customer = Customer::query()
+                    ->whereKey(auth()->user()->customer->id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
 
-            $request['balance_after'] = $request['balance_before'] - $request['total_amount'];
-            $request['status'] = 'pending';
-            $request['user_status'] = 'pending';
-            $request['descr'] = $request['transfer_mode'] === 'manual'
-                ? 'Wallet to Bank Transfer initiated for manual processing.'
-                : 'Wallet to Bank Transfer initiated.';
+                $recentDuplicate = $this->findRecentWalletToBankDuplicate($customer, $request->all());
 
-            $transaction = $this->logTransaction($request->all());
+                if ($recentDuplicate) {
+                    throw new RuntimeException(
+                        'This looks like a duplicate wallet to bank transaction. Please wait 5 minutes and try again with the same parameters.'
+                    );
+                }
 
-            $wallet->logWallet($request->all());
-            $wallet->updateCustomerWallet(auth()->user(), $request['total_amount'], $request['type']);
+                $balance = (float) ($customer->wallet ?? 0);
 
-            DB::commit();
+                if ($balance < (float) $request['total_amount']) {
+                    throw new RuntimeException('Insufficient wallet balance. This transfer will debit ₦' . number_format((float) $request['total_amount'], 2));
+                }
+
+                $request['balance_before'] = $balance;
+                $request['balance_after'] = $balance - (float) $request['total_amount'];
+                $request['status'] = 'pending';
+                $request['user_status'] = 'pending';
+                $request['descr'] = $request['transfer_mode'] === 'manual'
+                    ? 'Wallet to Bank Transfer initiated for manual processing.'
+                    : 'Wallet to Bank Transfer initiated.';
+
+                $transaction = $this->logTransaction($request->all());
+
+                $wallet->logWallet($request->all());
+                $wallet->applyCustomerBalanceChange($customer, 'wallet', (float) $request['total_amount'], $request['type']);
+            });
         } catch (\Throwable $th) {
-            if (DB::transactionLevel() > 0) {
-                DB::rollBack();
+            Log::error(['Transaction Error' => 'Message: ' . $th->getMessage() . ' File: ' . $th->getFile() . ' Line: ' . $th->getLine()]);
+
+            if ($th instanceof RuntimeException && str_contains($th->getMessage(), 'duplicate wallet to bank transaction')) {
+                return back()->with('error', $th->getMessage());
             }
 
-            Log::error(['Transaction Error' => 'Message: ' . $th->getMessage() . ' File: ' . $th->getFile() . ' Line: ' . $th->getLine()]);
+            if ($th instanceof RuntimeException && str_contains($th->getMessage(), 'Insufficient wallet balance')) {
+                return back()->with('error', $th->getMessage());
+            }
 
             return back()->with('error', 'An error occured, please try again later');
         }
@@ -843,6 +892,62 @@ class TransactionController extends Controller
         }
     }
 
+    private function customerCanAccessService(string $service): bool
+    {
+        $customer = auth()->user()?->customer;
+
+        if (! $customer) {
+            return false;
+        }
+
+        return match ($service) {
+            'wallet2bank' => (bool) ($customer->can_access_w2bank ?? false),
+            'a2c' => (bool) ($customer->can_access_a2c ?? false),
+            default => true,
+        };
+    }
+
+    private function serviceUnavailableResponse(string $serviceLabel, string $serviceKey)
+    {
+        $settings = getSettings();
+        $adminWhatsappNumber = preg_replace('/\D+/', '', (string) ($settings->whatsapp_number ?? ''));
+        $message = "This service ({$serviceLabel}) is not available for you at the moment, please contact admin to set it up.";
+        $whatsappMessage = $serviceLabel . ' access request from ' . (auth()->user()?->email ?? 'customer') . '. Please enable this service for my account.';
+
+        return response()->view(themeView('customer', 'service_unavailable'), [
+            'serviceLabel' => $serviceLabel,
+            'serviceKey' => $serviceKey,
+            'message' => $message,
+            'adminWhatsappNumber' => $adminWhatsappNumber,
+            'adminWhatsappLink' => filled($adminWhatsappNumber)
+                ? 'https://api.whatsapp.com/send?phone=' . $adminWhatsappNumber . '&text=' . urlencode($whatsappMessage)
+                : null,
+        ], 403);
+    }
+
+    private function findRecentWalletToBankDuplicate(Customer $customer, array $request): ?TransactionLog
+    {
+        $query = TransactionLog::query()
+            ->where('customer_id', $customer->id)
+            ->where('reason', 'Wallet to Bank Transfer')
+            ->where('payment_method', 'wallet')
+            ->where('amount', (float) ($request['amount'] ?? 0))
+            ->where('bank_id', $request['bank_id'] ?? null)
+            ->where('account_number', $request['account_number'] ?? null)
+            ->where('created_at', '>=', now()->subMinutes(5))
+            ->orderByDesc('id');
+
+        if (Schema::hasColumn('transaction_logs', 'transfer_mode') && ! empty($request['transfer_mode'])) {
+            $query->where('transfer_mode', $request['transfer_mode']);
+        }
+
+        if (Schema::hasColumn('transaction_logs', 'bank_code') && ! empty($request['bank_code'])) {
+            $query->where('bank_code', $request['bank_code']);
+        }
+
+        return $query->first();
+    }
+
     public function transactionStatus($transaction_id)
     {
         $transaction = TransactionLog::with(['product', 'variation', 'bank'])
@@ -916,7 +1021,7 @@ class TransactionController extends Controller
                     'status' => $query['status'],
                     'message' => 'Transaction Pending!',
                 ];
-                
+
                 $user_status = 'pending';
                 $balance_after = $request['balance_before'] - $request['total_amount'];
             } else if (isset($query) && $query['status_code'] == 0) {
@@ -1036,14 +1141,18 @@ class TransactionController extends Controller
                 ->whereKey($transaction->getKey())
                 ->lockForUpdate()
                 ->firstOrFail();
+            $customer = Customer::query()
+                ->whereKey($transaction->customer_id)
+                ->lockForUpdate()
+                ->firstOrFail();
 
             // Only prevents duplicate wallet credit; provider response determines success.
             $alreadySettled = $transaction->status === 'successful';
+            $balanceBefore = (float) ($customer->wallet ?? 0);
+            $balanceAfter = $balanceBefore;
 
             if ($statusCode === 1 && ! $alreadySettled && (float) $transaction->amount_paid > 0) {
-                $user = $transaction->customer->user;
                 $wallet = new WalletController();
-                $balanceBefore = (float) $user->fresh()->customer->wallet_balance;
                 $balanceAfter = $balanceBefore + (float) $transaction->amount_paid;
 
                 $wallet->logWallet([
@@ -1052,15 +1161,29 @@ class TransactionController extends Controller
                     'total_amount' => (float) $transaction->amount_paid,
                     'transaction_id' => $transaction->transaction_id,
                     'reason' => 'Airtime-to-cash conversion',
+                    'balance_before' => $balanceBefore,
                     'balance_after' => $balanceAfter,
                 ]);
 
-                $wallet->updateCustomerWallet(
-                    $user,
-                    (float) $transaction->amount_paid,
-                    'credit'
-                );
+                $wallet->applyCustomerBalanceChange($customer, 'wallet', (float) $transaction->amount_paid, 'credit');
             }
+
+            if ($statusCode === 1 && $alreadySettled) {
+                $balanceAfter = $balanceBefore;
+            }
+
+            $this->upsertAirtime2CashTransactionLog($transaction, $customer, [
+                'status' => $statusCode === 1 ? 'successful' : ($statusCode === 2 ? 'pending' : 'failed'),
+                'descr' => $statusCode === 1
+                    ? 'Airtime2Cash conversion completed successfully.'
+                    : ($statusCode === 2
+                        ? 'Airtime2Cash conversion is pending provider confirmation.'
+                        : 'Airtime2Cash conversion failed.'),
+                'balance_before' => $balanceBefore,
+                'balance_after' => $balanceAfter,
+                'provider_status' => $providerStatus,
+                'api_response' => $providerResponse,
+            ]);
 
             $transaction->update([
                 'provider_status' => $providerStatus,
@@ -1382,6 +1505,80 @@ class TransactionController extends Controller
         return $trans;
     }
 
+    private function upsertAirtime2CashTransactionLog(
+        Airtime2CashTransactions $transaction,
+        Customer $customer,
+        array $overrides = []
+    ): TransactionLog {
+        $customerUser = $customer->relationLoaded('user') ? $customer->user : $customer->user()->first();
+        $amount = (float) ($transaction->amount_paid ?? 0);
+        $balanceBefore = (float) ($overrides['balance_before'] ?? ($customer->wallet ?? 0));
+        $status = $overrides['status'] ?? 'pending';
+        $balanceAfter = array_key_exists('balance_after', $overrides)
+            ? (float) $overrides['balance_after']
+            : ($status === 'pending' ? $balanceBefore : $balanceBefore + $amount);
+
+        $payload = [
+            'status' => $status,
+            'reference_id' => $transaction->transaction_id,
+            'transaction_id' => $transaction->transaction_id,
+            'payment_method' => $transaction->payment_method ?? 'wallet',
+            'customer_id' => $customer->id,
+            'customer_email' => $customerUser?->email,
+            'customer_phone' => $customerUser?->phone,
+            'customer_name' => $customerUser?->firstname ?? $customerUser?->name,
+            'discount' => 0,
+            'unit_price' => $amount,
+            'quantity' => 1,
+            'total_amount' => (float) ($transaction->total_amount ?? $amount),
+            'amount' => $amount,
+            'balance_before' => $balanceBefore,
+            'balance_after' => $balanceAfter,
+            'descr' => $overrides['descr'] ?? $transaction->description ?? 'Airtime2Cash transaction',
+            'product_id' => $transaction->product_id,
+            'product_name' => $transaction->product?->name,
+            'variation_id' => $transaction->variation_id ?? null,
+            'variation_name' => $transaction->variation_name ?? null,
+            'category_id' => $transaction->product?->category?->id,
+            'unique_element' => 'Airtime2Cash Payment',
+            'ip_address' => $overrides['ip_address'] ?? $this->getIpAddress(),
+            'domain_name' => $overrides['domain_name'] ?? $this->getDomainName(),
+            'app_version' => Session::get('app_version') ?? null,
+            'api_id' => $transaction->provider_id ?? $transaction->product?->api_id,
+            'reason' => 'Airtime2Cash Payment',
+            'provider_charge' => $transaction->amount_charged ?? null,
+            'charge_breakdown' => $overrides['charge_breakdown'] ?? null,
+            'bank_id' => $transaction->bank_id ?? null,
+            'account_name' => $transaction->account_name ?? null,
+            'account_number' => $transaction->account_number ?? null,
+        ];
+
+        if (Schema::hasColumn('transaction_logs', 'transfer_mode')) {
+            $payload['transfer_mode'] = $transaction->transfer_mode ?? null;
+        }
+
+        if (array_key_exists('provider_status', $overrides) && Schema::hasColumn('transaction_logs', 'provider_status')) {
+            $payload['provider_status'] = $overrides['provider_status'];
+        }
+
+        if (array_key_exists('api_response', $overrides)) {
+            $payload['api_response'] = is_array($overrides['api_response'])
+                ? json_encode($overrides['api_response'], JSON_THROW_ON_ERROR)
+                : $overrides['api_response'];
+        }
+
+        if (array_key_exists('request_data', $overrides) && Schema::hasColumn('transaction_logs', 'request_data')) {
+            $payload['request_data'] = is_array($overrides['request_data'])
+                ? json_encode($overrides['request_data'], JSON_THROW_ON_ERROR)
+                : $overrides['request_data'];
+        }
+
+        return TransactionLog::updateOrCreate(
+            ['transaction_id' => $transaction->transaction_id],
+            $payload
+        );
+    }
+
     public function removeCharsInAmount($code)
     {
         $chars = str_split($code);
@@ -1425,7 +1622,7 @@ class TransactionController extends Controller
             $transactions = $transactions->whereBetween('created_at', [$from, $to]);
         }
 
-        $transactions = $transactions->orderBy('created_at', 'DESC')->paginate(20);
+        $transactions = $transactions->orderBy('created_at', 'DESC')->paginate(50);
 
         $products = Product::where('status', 'active')->where('type', 'general')->get();
         return view(themeView('customer', 'mytransactions'), compact('transactions', 'products'));
@@ -1461,7 +1658,7 @@ class TransactionController extends Controller
             $transactions = $transactions->whereBetween('created_at', [$from, $to]);
         }
 
-        $transactions = $transactions->orderBy('created_at', 'DESC')->paginate(20);
+        $transactions = $transactions->orderBy('created_at', 'DESC')->paginate(50);
 
         $products = Product::where('type', 'airtime2cash')->where('status', 'active')->orderBy('created_at', 'DESC')->get();
 
@@ -1886,6 +2083,7 @@ class TransactionController extends Controller
         }
 
         $transactions = $transactions
+            ->with(['product', 'provider', 'wallets', 'transactionLog'])
             ->orderByRaw("CASE WHEN status = 'pending' THEN 0 ELSE 1 END")
             ->orderByRaw("CASE WHEN status = 'pending' THEN created_at END ASC")
             ->orderByDesc('created_at')
@@ -1963,13 +2161,61 @@ class TransactionController extends Controller
 
     public function singleAirtimeTransactionView(Airtime2CashTransactions $transaction)
     {
-        $verificationProviderId = getSettings()->bank_verification_provider_id ?: getSettings()->bank_transfer_provider_id;
-        $verificationProvider = API::query()
-            ->whereKey($verificationProviderId)
-            ->where('status', 'active')
-            ->first();
-        $banks = getWalletToBankBanks($verificationProvider);
+        $transaction->loadMissing(['product', 'provider', 'customer.user', 'wallets', 'transactionLog']);
+
+        $settings = getSettings();
+        $verificationProviderId = $settings?->bank_verification_provider_id ?: $settings?->bank_transfer_provider_id;
+        $verificationProvider = $verificationProviderId
+            ? API::query()
+                ->whereKey($verificationProviderId)
+                ->where('status', 'active')
+                ->first()
+            : null;
+        $banks = $verificationProvider ? getWalletToBankBanks($verificationProvider) : collect();
         return view('admin.transaction.single_airtime2cash_transaction', compact('transaction', 'banks'));
+    }
+
+    public function requeryAirtimeTransaction(Airtime2CashTransactions $transaction): JsonResponse
+    {
+        $transaction->loadMissing(['provider']);
+
+        $providerPayload = $transaction->provider_response;
+
+        if ($transaction->provider?->slug === 'autosync') {
+            try {
+                $providerPayload = app(AutoSyncService::class)->queryTransaction(
+                    $transaction,
+                    $transaction->provider
+                );
+            } catch (\Throwable $th) {
+                return response()->json([
+                    'status' => false,
+                    'message' => $th->getMessage(),
+                    'transaction_status' => $transaction->status,
+                    'provider_status' => $transaction->provider_status ?? $transaction->status ?? 'pending',
+                    'provider' => $transaction->provider?->name,
+                    'response' => $providerPayload,
+                ], 422);
+            }
+        } elseif (! is_array($providerPayload) && filled($transaction->bank_transfer_api_response)) {
+            $decodedBankResponse = json_decode((string) $transaction->bank_transfer_api_response, true);
+            $providerPayload = is_array($decodedBankResponse) ? $decodedBankResponse : $providerPayload;
+        }
+
+        $providerStatus = strtolower((string) data_get(
+            $providerPayload,
+            'data.transaction.status',
+            data_get($providerPayload, 'provider_status', $transaction->provider_status ?? $transaction->status ?? 'pending')
+        ));
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Airtime-to-cash provider status loaded successfully.',
+            'transaction_status' => $transaction->status,
+            'provider_status' => $providerStatus,
+            'provider' => $transaction->provider?->name,
+            'response' => $providerPayload,
+        ]);
     }
 
     function debitCustomerPage()
@@ -2205,7 +2451,7 @@ class TransactionController extends Controller
 
         return null;
     }
-    
+
     private function applyProviderVerificationResult(TransactionLog $transaction, array $response, ?string $resolutionSource = null, bool $persistApiResponse = true): array
     {
         if (($response['status'] ?? null) === 'skipped') {
@@ -2214,7 +2460,7 @@ class TransactionController extends Controller
                 'message' => $response['message'] ?? 'Transaction skipped.',
             ];
         }
-        
+
         $providerStatus = strtolower((string) data_get($response, 'provider_status', data_get($response, 'status', 'pending')));
         $isSuccessful = in_array($providerStatus, ['successful', 'success', 'completed'], true)
             || (bool) data_get($response, 'status', false) === true;
@@ -2795,46 +3041,70 @@ class TransactionController extends Controller
     {
         //Update wallet balance if payment method is Transfer to Wallet
         if ($transaction->payment_method == 'Transfer to Wallet') {
-            // Get Wallet Balance
-            $wallet = new WalletController();
-            $balance = $wallet->getWalletBalance(auth()->user());
+            try {
+                DB::transaction(function () use ($transaction): void {
+                    $wallet = new WalletController();
+                    $customer = Customer::query()
+                        ->whereKey($transaction->customer_id)
+                        ->lockForUpdate()
+                        ->firstOrFail();
 
-            // Log Wallet
-            $request['type'] = 'credit';
-            $request['customer_id'] = $transaction->customer_id;
-            $request['transaction_id'] = $transaction->transaction_id;
-            $request['request_id'] = $transaction->transaction_id;
-            $request['payment_method'] = 'wallet';
-            $request['ip_address'] = $this->getIpAddress();
-            $request['domain_name'] = $this->getDomainName();
-            $request['customer_email'] = $transaction->customer->user->email;
-            $request['customer_phone'] = $transaction->customer->user->phone;
-            $request['customer_name'] = $transaction->customer->user->firstname;
-            $request['product_id'] = $transaction->product_id;
-            $request['product_name'] = $transaction->product->name;
-            $request['unique_element'] = 'Airtime2Cash Payment';
-            $request['category_id'] = $transaction->product->category->id;
-            $request['discount'] = 0;
-            $request['reason'] = 'Airtime2Cash Payment';
-            $request['status'] = 'delivered';
-            $request['unit_price'] = $transaction->amount_paid;
-            $request['quantity'] = 1;
-            $request['total_amount'] = $transaction->amount_paid;
-            $request['amount'] = $transaction->amount_paid;
-            $request['balance_before'] = $balance;
-            $request['balance_after'] = $balance + $transaction->amount_paid;
-            $request['descr'] = $transaction->description;
+                    $balanceBefore = (float) ($customer->wallet ?? 0);
+                    $amount = (float) $transaction->amount_paid;
+                    $balanceAfter = $balanceBefore + $amount;
 
-            // Log basic transaction
-            $transactionlog = $this->logTransaction($request->all());
-            // Log wallet
-            $wal = $wallet->logWallet($request->all());
+                    $walletData = [
+                        'type' => 'credit',
+                        'customer_id' => $transaction->customer_id,
+                        'transaction_id' => $transaction->transaction_id,
+                        'payment_method' => 'wallet',
+                        'ip_address' => $this->getIpAddress(),
+                        'domain_name' => $this->getDomainName(),
+                        'customer_email' => $transaction->customer->user->email,
+                        'customer_phone' => $transaction->customer->user->phone,
+                        'customer_name' => $transaction->customer->user->firstname,
+                        'product_id' => $transaction->product_id,
+                        'product_name' => $transaction->product->name,
+                        'unique_element' => 'Airtime2Cash Payment',
+                        'category_id' => $transaction->product?->category?->id,
+                        'discount' => 0,
+                        'reason' => 'Airtime2Cash Payment',
+                        'status' => 'delivered',
+                        'unit_price' => $amount,
+                        'quantity' => 1,
+                        'total_amount' => $amount,
+                        'amount' => $amount,
+                        'balance_before' => $balanceBefore,
+                        'balance_after' => $balanceAfter,
+                        'descr' => $transaction->description,
+                        'api_id' => $transaction->provider_id,
+                    ];
 
-            // Update Customer Wallet
-            $wallet->updateCustomerWallet($transaction->customer->user, $request['total_amount'], $request['type']);
+                    $this->upsertAirtime2CashTransactionLog($transaction, $customer, [
+                        'status' => 'delivered',
+                        'descr' => $transaction->description ?? 'Airtime2Cash Request was approved and completed by ADMIN',
+                        'balance_before' => $balanceBefore,
+                        'balance_after' => $balanceAfter,
+                        'provider_status' => 'successful',
+                    ]);
 
-            $status = 'success';
-            $error = '';
+                    $wallet->logWallet($walletData);
+                    $wallet->updateCustomerWallet($transaction->customer->user, $amount, 'credit');
+                });
+
+                $status = 'success';
+                $error = '';
+            } catch (\Throwable $th) {
+                Log::error('Airtime2Cash manual approval failed.', [
+                    'message' => $th->getMessage(),
+                    'file' => $th->getFile(),
+                    'line' => $th->getLine(),
+                    'transaction_id' => $transaction->transaction_id,
+                    'admin_id' => auth()->id(),
+                ]);
+
+                return back()->with('error', 'An error occured when performing action: ' . $th->getMessage());
+            }
         } else {
             // Perform Transfer to bank actions
             $status = 'success';

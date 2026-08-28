@@ -85,7 +85,7 @@ class CustomerController extends Controller
             $customers->where('created_at', '<=', $request->to . ' 23:59:59');
         }
 
-        $customers = $customers->latest('id')->paginate(25)->withQueryString();
+        $customers = $customers->latest('id')->paginate(50)->withQueryString();
 
         $summary = User::where('users.type', '!=', 'admin')
             ->leftJoin('customers', 'customers.user_id', '=', 'users.id')
@@ -105,7 +105,7 @@ class CustomerController extends Controller
     public function bulkActions(Request $request)
     {
         $this->validate($request, [
-            'action' => ['required', 'in:activate,deactivate,suspend,delete,move_level'],
+            'action' => ['required', 'in:activate,deactivate,suspend,delete,move_level,enable_w2bank_access,disable_w2bank_access,enable_a2c_access,disable_a2c_access'],
             'customer_ids' => ['required', 'string'],
             'level_id' => ['nullable', 'integer'],
         ]);
@@ -137,6 +137,19 @@ class CustomerController extends Controller
             ]);
 
             return back()->with('message', 'Selected customers moved to ' . $level->name . ' successfully');
+        }
+
+        if (in_array($request->action, ['enable_w2bank_access', 'disable_w2bank_access', 'enable_a2c_access', 'disable_a2c_access'], true)) {
+            $updates = match ($request->action) {
+                'enable_w2bank_access' => ['can_access_w2bank' => 1],
+                'disable_w2bank_access' => ['can_access_w2bank' => 0],
+                'enable_a2c_access' => ['can_access_a2c' => 1],
+                'disable_a2c_access' => ['can_access_a2c' => 0],
+            };
+
+            Customer::whereIn('user_id', $customerIds)->update($updates);
+
+            return back()->with('message', 'Selected customers updated successfully');
         }
 
         $status = match ($request->action) {
@@ -304,7 +317,7 @@ class CustomerController extends Controller
         $user = User::with(['customer.level'])->findOrFail($id);
         $customer = $user->customer->id;
 
-        $curr = getSettings()->currency;
+        $curr = getSettings()?->currency ?? '₦';
         $balance = $curr . number_format(walletBalance($user), 2) ?? 0;
         $ref = $curr . number_format(referralBalance($user), 2) ?? 0;
         $transactionSummary = $user->customer->transactions()
@@ -335,7 +348,7 @@ class CustomerController extends Controller
         } elseif ($activeTab === 'transactions') {
             $transactions = $user->customer->transactions()->latest()->paginate(10);
         } elseif ($activeTab === 'airtime2cash-transactions') {
-            $airtimeTransactions = Airtime2CashTransactions::with(['product', 'provider'])
+            $airtimeTransactions = Airtime2CashTransactions::with(['product', 'provider', 'wallets'])
                 ->where('customer_id', $customer)
                 ->latest()
                 ->paginate(10);
@@ -403,10 +416,19 @@ class CustomerController extends Controller
             'status' => 'required',
             'firstname' => 'required',
             'lastname' => 'required',
+            'can_access_w2bank' => ['nullable', 'in:0,1'],
+            'can_access_a2c' => ['nullable', 'in:0,1'],
         ]);
 
         $user = User::where('id', $id)->first();
-        $user->update($request->except(['_token', 'ip', 'customerlevel']));
+        $user->update($request->except(['_token', 'ip', 'customerlevel', 'can_access_w2bank', 'can_access_a2c']));
+
+        if ($user?->customer) {
+            $user->customer->update([
+                'can_access_w2bank' => $request->boolean('can_access_w2bank'),
+                'can_access_a2c' => $request->boolean('can_access_a2c'),
+            ]);
+        }
 
         if(!empty($request->customerlevel)){
             $level = CustomerLevel::enabled()->where('id', $request->customerlevel)->first();

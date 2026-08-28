@@ -13,6 +13,7 @@ use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Throwable;
@@ -20,6 +21,19 @@ use Throwable;
 
 class AutoSyncService
 {
+    private function resolveBaseUrl(API $provider): string
+    {
+        $baseUrl = app()->environment(['local', 'testing'])
+            ? $provider->sandbox_base_url
+            : $provider->live_base_url;
+
+        if (blank($baseUrl)) {
+            throw new RuntimeException('The AutoSync provider endpoint is not configured.');
+        }
+
+        return rtrim($baseUrl, '/');
+    }
+
     public function initiate(Airtime2CashTransactions $transaction, API $provider): array
     {
         $productName = strtolower($transaction->product->name);
@@ -41,17 +55,7 @@ class AutoSyncService
             'sharePin' => request()->share_pin,
         ];
 
-        $baseUrl = app()->environment('local')
-            ? $provider->sandbox_base_url
-            : $provider->live_base_url;
-
-        if (blank($baseUrl)) {
-            throw new RuntimeException(
-                'The AutoShare provider endpoint is not configured.'
-            );
-        }
-
-        $endpoint = rtrim($baseUrl, '/').'/airtime/cash';
+        $endpoint = $this->resolveBaseUrl($provider).'/airtime/cash';
         $startedAt = microtime(true);
 
         $headers = [
@@ -158,13 +162,7 @@ class AutoSyncService
             throw new RuntimeException('The provider transaction reference is missing.');
         }
 
-        $baseUrl = env('ENT') === 'local' ? $provider->sandbox_base_url : $provider->live_base_url;
-
-        if (blank($baseUrl)) {
-            throw new RuntimeException('The AutoSync provider endpoint is not configured.');
-        }
-
-        $endpoint = rtrim($baseUrl, '/').'/airtime/cash/'.rawurlencode($transaction->provider_request_ref);
+        $endpoint = $this->resolveBaseUrl($provider).'/airtime/cash/'.rawurlencode($transaction->provider_request_ref);
         $payload = ['otp' => $otp];
         $headers = [
             'Accept' => 'application/json',
@@ -245,19 +243,91 @@ class AutoSyncService
         return $data;
     }
 
+    public function queryTransaction(Airtime2CashTransactions $transaction, API $provider): array
+    {
+        $reference = $transaction->provider_request_ref ?: $transaction->transaction_id;
+
+        if (blank($reference)) {
+            throw new RuntimeException('The provider transaction reference is missing.');
+        }
+
+        $endpoint = $this->resolveBaseUrl($provider).'/transaction/'.rawurlencode($reference);
+        $headers = [
+            'Accept' => 'application/json',
+            'Authorization' => 'Bearer '.$provider->api_key,
+        ];
+        $startedAt = microtime(true);
+
+        try {
+            $response = Http::withHeaders($headers)
+                ->asJson()
+                ->connectTimeout(10)
+                ->timeout(40)
+                ->get($endpoint);
+
+            $data = $response->json();
+
+            $this->writeLog(
+                'query_transaction',
+                $provider->id,
+                $endpoint,
+                $headers,
+                ['reference' => $reference],
+                $response,
+                is_array($data) ? $data : ['raw' => $response->body()],
+                [
+                    'customer_id' => $transaction->customer_id,
+                    'transaction_id' => $transaction->transaction_id,
+                ],
+                $startedAt,
+                null,
+                null,
+                'GET'
+            );
+        } catch (ConnectionException $exception) {
+            $this->writeLog(
+                'query_transaction',
+                $provider->id,
+                $endpoint,
+                $headers,
+                ['reference' => $reference],
+                null,
+                null,
+                [
+                    'customer_id' => $transaction->customer_id,
+                    'transaction_id' => $transaction->transaction_id,
+                ],
+                $startedAt,
+                $exception->getMessage(),
+                null,
+                'GET'
+            );
+
+            throw new RuntimeException('AutoSync could not be reached. Please try again.', 0, $exception);
+        }
+
+        if (! is_array($data)) {
+            throw new RuntimeException('AutoSync returned an invalid response.');
+        }
+
+        if (! $response->successful()) {
+            throw new RuntimeException(
+                $data['message']
+                    ?? $data['error']
+                    ?? 'AutoSync transaction lookup failed.'
+            );
+        }
+
+        return $data;
+    }
+
     public function resendOtp(Airtime2CashTransactions $transaction, API $provider, array $context = []): array
     {
         if (blank($transaction->provider_request_ref)) {
             throw new RuntimeException('The provider transaction reference is missing.');
         }
 
-        $baseUrl = env('ENT') == 'local' ? $provider->sandbox_base_url : $provider->live_base_url;
-
-        if (blank($baseUrl)) {
-            throw new RuntimeException('The AutoSync provider endpoint is not configured.');
-        }
-
-        $endpoint = rtrim($baseUrl, '/').'/airtime/cash/'.rawurlencode($transaction->provider_request_ref).'/resend-otp';
+        $endpoint = $this->resolveBaseUrl($provider).'/airtime/cash/'.rawurlencode($transaction->provider_request_ref).'/resend-otp';
         $headers = [
             'Accept' => 'application/json',
             'Authorization' => 'Bearer '.$provider->api_key,
@@ -343,14 +413,19 @@ class AutoSyncService
         array $context,
         float $startedAt,
         ?string $error = null,
-        ?int $fallbackStatus = null
+        ?int $fallbackStatus = null,
+        string $method = 'POST'
     ): void {
+        if (! Schema::hasTable('api_request_logs')) {
+            return;
+        }
+
         ApiRequestLog::create([
             'api_id' => $apiId ?? null,
             'customer_id' => $context['customer_id'] ?? null,
             'transaction_id' => $context['transaction_id'] ?? null,
             'operation' => $operation,
-            'method' => 'POST',
+            'method' => $method,
             'endpoint' => $endpoint,
             'request_headers' => $headers,
             'request_payload' => $this->redact($payload),

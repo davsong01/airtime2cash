@@ -14,6 +14,7 @@
                 <th>Product</th>
                 <th>Amount Charged</th>
                 <th>Amount Paid</th>
+                <th>Wallet</th>
                 <th>Method</th>
                 <th>Status</th>
                 <th>Reference</th>
@@ -24,13 +25,16 @@
                 @php
                     $status = strtolower((string) ($transaction->status ?? 'pending'));
                     $statusClass = match ($status) {
-                        'approved', 'successful', 'success' => 'badge-light-success',
+                        'approved', 'successful', 'success', 'completed' => 'badge-light-success',
                         'pending' => 'badge-light-warning',
                         'declined', 'failed' => 'badge-light-danger',
                         default => 'badge-light-secondary',
                     };
                     $statusLabel = str_replace('-', ' ', $status);
                     $methodLabel = $transaction->transfer_mode === 'auto_share' ? 'Auto Share' : 'Manual';
+                    $walletTrail = $transaction->wallets ?? collect();
+                    $walletBefore = $walletTrail->first()?->balance_before;
+                    $walletAfter = $walletTrail->last()?->balance_after;
                 @endphp
                 <tr>
                     <td class="text-muted">{{ $airtimeTransactions->firstItem() + $loop->index }}</td>
@@ -40,13 +44,20 @@
                     </td>
                     <td>{!! getSettings()->currency !!}{{ number_format((float) $transaction->amount_charged, 2) }}</td>
                     <td>{!! getSettings()->currency !!}{{ number_format((float) $transaction->amount_paid, 2) }}</td>
+                    <td>
+                        @if($walletTrail->count())
+                            <strong>{{ getSettings()->currency }}{{ number_format((float) ($walletBefore ?? 0), 2) }} → {{ getSettings()->currency }}{{ number_format((float) ($walletAfter ?? 0), 2) }}</strong>
+                        @else
+                            <span class="text-muted">No wallet trail</span>
+                        @endif
+                    </td>
                     <td>{{ $methodLabel }}</td>
                     <td><span class="badge {{ $statusClass }}">{{ ucfirst($statusLabel) }}</span></td>
                     <td><a href="{{ route('admin.single.airtime2cash.transaction.view', $transaction->id) }}" class="font-weight-bold">{{ $transaction->transaction_id }}</a></td>
                 </tr>
             @empty
                 <tr>
-                    <td colspan="7">
+                    <td colspan="8">
                         <div class="customer-empty-state">
                             <i class="bx bx-phone-call"></i>
                             No airtime to cash transactions have been recorded for this customer.

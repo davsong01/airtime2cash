@@ -12,6 +12,11 @@
         ? 'is-success'
         : (strtolower((string) ($transaction->status ?? 'pending')) === 'pending' ? 'is-warning' : 'is-danger');
 ?>
+@php
+    $product = $transaction->product;
+    $productName = $product->name ?? 'Airtime to Cash';
+    $productImage = $product->image ?? 'site/upgrade.jpg';
+@endphp
 @extends('layouts.app')
 @section('title', 'Transction Details')
 
@@ -71,7 +76,7 @@
                             <div class="row align-items-center">
                                 <div class="col-lg-8">
                                     <span class="ops-kicker"><i class="bx bx-transfer-alt"></i> Airtime to cash review</span>
-                                    <h2>{{ $transaction->product->name }}</h2>
+                                    <h2>{{ $productName }}</h2>
                                     <p>Track the conversion request, confirm payout status, and review the completion trail in one dashboard view.</p>
                                 </div>
                                 <div class="col-lg-4 text-lg-right mt-2 mt-lg-0">
@@ -145,12 +150,12 @@
                                                                 <img id="product-image" width="60" height="60" src="{{ asset('site/upgrade.jpg') }}" alt="" class="product-image" style="margin:5px; box-shadow: rgba(0, 0, 0, 0.24) 0px 3px 8px;">
                                                                 @else
                                                                 
-                                                                <img id="product-image" width="60" height="60" src="{{ asset($transaction->product->image) }}" alt="" class="product-image" style="margin:5px; box-shadow: rgba(0, 0, 0, 0.24) 0px 3px 8px;">
+                                                                <img id="product-image" width="60" height="60" src="{{ asset($productImage) }}" alt="" class="product-image" style="margin:5px; box-shadow: rgba(0, 0, 0, 0.24) 0px 3px 8px;">
                                                                 @endif
 
                                                             </div>
                                                             <div class="col-md-5">
-                                                                <h5 style="color:black"><strong>{{ $transaction->product->name }}</strong></h5>
+                                                                <h5 style="color:black"><strong>{{ $productName }}</strong></h5>
                                                                 <h5 class="mb-1">
                                                                     {{ $transaction->transaction_id }}</h5> <br>
 
@@ -170,7 +175,7 @@
                                                                 <br>
                                                                 
                                                                 @if($transaction->status == 'pending')
-                                                                    <a onclick="return confirm('You are about to approve this transaction. Customer will be credited')" href="{{ route('admin.approve.airtime2cash.transaction', $transaction->id) }}" class="btn btn-success btn-sm" id="approve"> Approve</a>
+                                                                    <a onclick="return confirm('You are about to approve this transaction. Customer will be credited')" href="{{ url('/admin/approve-airtime2cash-transaction/'.$transaction->id) }}" class="btn btn-success btn-sm" id="approve"> Approve</a>
 
                                                                     <a data-target="#decline" class="btn btn-danger btn-sm" data-toggle="modal" class="MainNavText" id="MainNavHelp" href="#decline">Decline</a>
                                                                     @if($transaction->status != 'approved')
@@ -181,6 +186,56 @@
                                                         </div>
                                                         <hr>
                                                         <div class="row">
+                                                            <div class="col-md-4">
+                                                                <strong class="heads">Wallet Trail:</strong> <br>
+                                                                @php
+                                                                    $walletTrail = $transaction->wallets ?? collect();
+                                                                    $snapshotTrail = $walletTrail->isEmpty() && $transaction->transactionLog
+                                                                        ? collect([$transaction->transactionLog])
+                                                                        : collect();
+                                                                    $trail = $walletTrail->isNotEmpty() ? $walletTrail : $snapshotTrail;
+                                                                    $initialBalance = $trail->first()?->balance_before;
+                                                                    $finalBalance = $trail->last()?->balance_after;
+                                                                @endphp
+                                                                @if($trail->count())
+                                                                    <strong>Initial Balance:</strong> {!! getSettings()->currency !!}{{ number_format((float) ($initialBalance ?? 0), 2) }} <br>
+                                                                    <strong>Final Balance:</strong> {!! getSettings()->currency !!}{{ number_format((float) ($finalBalance ?? 0), 2) }} <br><br>
+                                                                    @if($walletTrail->isEmpty() && $transaction->transactionLog)
+                                                                        <small class="text-muted d-block mb-1">
+                                                                            Showing transaction log snapshot while wallet rows are unavailable.
+                                                                        </small>
+                                                                    @endif
+                                                                @endif
+                                                                @forelse($trail as $wallet)
+                                                                    @php
+                                                                        $isSnapshot = $wallet instanceof \App\Models\TransactionLog;
+                                                                        $trailType = $isSnapshot ? 'Snapshot' : strtoupper($wallet->type);
+                                                                        $trailAmount = $wallet->amount ?? $wallet->total_amount ?? $transaction->amount_paid;
+                                                                        $trailColor = $isSnapshot
+                                                                            ? (($wallet->status ?? $transaction->status) === 'failed' ? 'red' : '#FDAC41')
+                                                                            : ($wallet->type === 'credit' ? 'green' : 'red');
+                                                                    @endphp
+                                                                    <span style="color:{{ $trailColor }}">
+                                                                        <strong>{{ $trailType }}:</strong>
+                                                                        {{ $wallet->created_at ?? $transaction->created_at }}
+                                                                        ({!! getSettings()->currency . number_format((float) $trailAmount, 2) !!})
+                                                                        <br>
+                                                                        @if(! is_null($wallet->balance_before) || ! is_null($wallet->balance_after))
+                                                                            <small>
+                                                                                Balance {{ $wallet->balance_before !== null ? number_format((float) $wallet->balance_before, 2) : 'n/a' }}
+                                                                                &rarr;
+                                                                                {{ $wallet->balance_after !== null ? number_format((float) $wallet->balance_after, 2) : 'n/a' }}
+                                                                            </small>
+                                                                        @endif
+                                                                        @if($isSnapshot && ! empty($wallet->status))
+                                                                            <br><small>Status: {{ ucfirst($wallet->status) }}</small>
+                                                                        @endif
+                                                                    </span>
+                                                                    <br>
+                                                                @empty
+                                                                    <span class="text-muted">No wallet trail or snapshot recorded for this airtime-to-cash transaction.</span>
+                                                                @endforelse
+                                                            </div>
                                                             <div class="col-md-4">
                                                                 <strong class="heads">Trail:</strong> <br>
                                                                 <span class="text warning"><strong>Requested: </strong> {{ $transaction->created_at}} <br>
@@ -219,6 +274,20 @@
                                                                 <strong>Account Name: </strong>{{ $transaction->account_name }}<br>
                                                                 <strong>Account Number: </strong>{{ $transaction->account_number }} <br>
                                                                 @endif
+                                                            </div>
+
+                                                            <div class="col-md-4">
+                                                                <strong class="heads" style="color:green">Provider Status</strong>  <br>
+                                                                <strong>Provider: </strong>{{ $transaction->provider->name ?? 'Unknown' }} <br>
+                                                                <strong>Current Status: </strong>
+                                                                <span id="airtime-provider-status">{{ ucfirst($transaction->provider_status ?? $transaction->status) }}</span><br>
+                                                                <button type="button" class="btn btn-primary btn-sm mt-2" id="query-airtime-status" onclick="queryAirtimeStatus()">
+                                                                    Query Provider Status
+                                                                </button>
+                                                                <div class="well mt-2" id="airtime-status-container" style="display:none;">
+                                                                    <img src="{{url('/')}}/site/loading.gif" height="70" style="display:none; margin-left: auto; margin-right:auto;height:initial;" id="airtime-status-loading">
+                                                                    <div id="airtime-status-response" style="max-height:300px;overflow:scroll;word-wrap: break-word"></div>
+                                                                </div>
                                                             </div>
                                                             
                                                         </div>
@@ -276,7 +345,7 @@
                     <i class="bx bx-x"></i>
                 </button>
             </div>
-            <form action="{{route('admin.decline.airtime2cash.transaction', $transaction->id)}}" method="POST">
+            <form action="{{url('/admin/decline-airtime2cash-transaction/'.$transaction->id)}}" method="POST">
                 @csrf
                 <div class="modal-body">
                     <div class="row">
@@ -309,7 +378,7 @@
                     <i class="bx bx-x"></i>
                 </button>
             </div>
-            <form action="{{route('admin.changetransactionmethod', $transaction->id)}}" method="POST">
+            <form action="{{url('/admin/change-transaction-method/'.$transaction->id)}}" method="POST">
                 @csrf
                 <div class="modal-body">
                     @php
@@ -376,6 +445,28 @@
 @section('page-script')
 <script src="{{ asset('app-assets/js/scripts/pages/dashboard-analytics.js') }}"></script>
 <script>
+    function renderPrettyJsonPanel(payload, title, subtitle) {
+        let parsed = payload;
+
+        if (typeof parsed === 'string') {
+            try {
+                parsed = JSON.parse(parsed);
+            } catch (error) {
+                parsed = { raw: payload };
+            }
+        }
+
+        const pretty = JSON.stringify(parsed ?? {}, null, 2);
+
+        return `
+            <div class="validate-div mb-0">
+                <div class="small text-uppercase text-muted font-weight-bold mb-2">${escapeHtml(title || 'Provider status')}</div>
+                <div class="text-muted mb-2">${escapeHtml(subtitle || '')}</div>
+                <pre class="mb-0 bg-transparent border-0 p-0" style="white-space:pre-wrap;max-height:260px;overflow:auto;">${escapeHtml(pretty)}</pre>
+            </div>
+        `;
+    }
+
     function escapeHtml(value) {
         return String(value ?? '')
             .replace(/&/g, '&amp;')
@@ -425,6 +516,33 @@
 		});
 		e.preventDefault();
 	}
+
+    function queryAirtimeStatus() {
+        const url = '{{ url('/admin/single-airtime2cash-transaction-view/'.$transaction->id.'/requery') }}';
+
+        $.ajax({
+            url: url,
+            type: 'GET',
+            beforeSend: function () {
+                $('#airtime-status-container').show();
+                $('#airtime-status-loading').show();
+                $('#airtime-status-response').hide();
+                $('#query-airtime-status').prop('disabled', true).text('Querying...');
+            },
+            success: function (data) {
+                $('#airtime-provider-status').text((data?.provider_status ?? 'unknown').toString().replace(/^./, function (char) { return char.toUpperCase(); }));
+                $('#airtime-status-loading').hide();
+                $('#airtime-status-response').show().html(renderPrettyJsonPanel(data, 'Provider status response', 'Airtime-to-cash lookup result'));
+                $('#query-airtime-status').prop('disabled', false).text('Query Provider Status');
+            },
+            error: function (xhr) {
+                const payload = xhr.responseJSON ?? { status: false, message: 'Unable to query provider status.' };
+                $('#airtime-status-loading').hide();
+                $('#airtime-status-response').show().html(renderPrettyJsonPanel(payload, 'Provider status response', 'Airtime-to-cash lookup result'));
+                $('#query-airtime-status').prop('disabled', false).text('Query Provider Status');
+            }
+        });
+    }
 
     $('#payment_method').on('change', function () {
         if($('#payment_method').val() == 'Transfer to Bank Account'){

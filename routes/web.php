@@ -211,6 +211,7 @@ Route::middleware(['auth', 'verified', 'admin', 'ipcheck', 'adminRoute'])->prefi
     Route::get('single-transaction-view/{transaction}', [TransactionController::class, 'singleTransactionView'])->name('admin.single.transaction.view');
     Route::post('single-transaction-view/{transaction}/resolve', [TransactionController::class, 'resolvePendingTransactionAction'])->name('admin.single.transaction.resolve');
     Route::get('single-airtime2cash-transaction-view/{transaction}', [TransactionController::class, 'singleAirtimeTransactionView'])->name('admin.single.airtime2cash.transaction.view');
+    Route::get('single-airtime2cash-transaction-view/{transaction}/requery', [TransactionController::class, 'requeryAirtimeTransaction'])->name('admin.requery.airtime2cash.transaction');
     Route::get('query-wallet/{transactionlog?}', [TransactionController::class, 'queryWallet'])->name('admin.query.wallet');
     Route::get('requery-transaction/{transactionlog?}', [TransactionController::class, 'requery'])->name('admin.requery.transaction');
     Route::get('requery-callback-analysis/{reference}', [TransactionController::class, 'requeryCallback'])->name('admin.requery.callback');

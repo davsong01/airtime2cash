@@ -16,7 +16,11 @@ return new class extends Migration
         }
 
         if (Schema::hasTable('discounts') && Schema::hasColumn('discounts', 'price')) {
-            DB::statement('ALTER TABLE discounts MODIFY price DOUBLE NULL');
+            $driver = DB::getDriverName();
+
+            if (in_array($driver, ['mysql', 'mariadb'], true)) {
+                DB::statement('ALTER TABLE discounts MODIFY price DOUBLE NULL');
+            }
         }
 
         if (Schema::hasTable('discounts') && Schema::hasTable('products')) {
@@ -43,7 +47,11 @@ return new class extends Migration
         }
 
         if (Schema::hasTable('discounts') && Schema::hasColumn('discounts', 'price')) {
-            DB::statement('ALTER TABLE discounts MODIFY price DOUBLE NOT NULL');
+            $driver = DB::getDriverName();
+
+            if (in_array($driver, ['mysql', 'mariadb'], true)) {
+                DB::statement('ALTER TABLE discounts MODIFY price DOUBLE NOT NULL');
+            }
         }
     }
 };
