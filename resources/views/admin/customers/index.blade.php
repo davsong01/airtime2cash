@@ -85,19 +85,23 @@
                 <section class="card ops-panel">
                     <div class="card-header d-flex align-items-center justify-content-between flex-wrap">
                         <div class="mb-1 mb-sm-0"><span class="ops-section-kicker">Account directory</span><h5 class="mb-0">{{ number_format($customers->total()) }} matching customers</h5></div>
-                        <div class="d-flex align-items-center flex-wrap" style="gap: .5rem;">
-                            <span class="badge badge-light-primary px-1 py-50">Newest first</span>
-                            @if($canEditCustomers)
-                                <select class="form-control form-control-sm" id="bulkActionSelect" style="min-width: 180px;">
-                                    <option value="">Bulk action</option>
-                                    <option value="deactivate">Deactivate</option>
-                                    <option value="activate">Activate</option>
-                                    <option value="suspend">Suspend</option>
-                                    <option value="delete">Delete</option>
-                                    <option value="move_level">Move to level</option>
-                                </select>
-                                <button type="button" class="btn btn-sm btn-secondary" id="bulkActionApplyBtn">Apply</button>
-                            @endif
+                                <div class="d-flex align-items-center flex-wrap" style="gap: .5rem;">
+                                    <span class="badge badge-light-primary px-1 py-50">Newest first</span>
+                                    @if($canEditCustomers)
+                                        <select class="form-control form-control-sm" id="bulkActionSelect" style="min-width: 180px;">
+                                            <option value="">Bulk action</option>
+                                            <option value="deactivate">Deactivate</option>
+                                            <option value="activate">Activate</option>
+                                            <option value="suspend">Suspend</option>
+                                            <option value="delete">Delete</option>
+                                            <option value="enable_w2bank_access">Enable Wallet 2 Bank</option>
+                                            <option value="disable_w2bank_access">Disable Wallet 2 Bank</option>
+                                            <option value="enable_a2c_access">Enable Airtime 2 Cash</option>
+                                            <option value="disable_a2c_access">Disable Airtime 2 Cash</option>
+                                            <option value="move_level">Move to level</option>
+                                        </select>
+                                        <button type="button" class="btn btn-sm btn-secondary" id="bulkActionApplyBtn">Apply</button>
+                                    @endif
                         </div>
                     </div>
                     <div class="table-responsive">
@@ -106,18 +110,18 @@
                             <input type="hidden" name="action" id="bulkActionValue">
                             <input type="hidden" name="customer_ids" id="bulkCustomerIds">
                         </form>
-                        <table class="table table-hover mb-0 ops-table ops-customer-table">
+                        <table class="table table-hover mb-0 ops-table">
                             <thead>
                                 <tr>
                                     @if($canEditCustomers)
-                                        <th style="width: 44px;">
+                                        <th style="width: 34px; padding-left: .5rem; padding-right: .5rem;">
                                             <div class="custom-control custom-checkbox">
                                                 <input type="checkbox" class="custom-control-input" id="selectAllCustomers">
                                                 <label class="custom-control-label" for="selectAllCustomers"></label>
                                             </div>
                                         </th>
                                     @endif
-                                    <th>S/N</th><th>Customer</th><th>Account</th><th>Verification</th><th>Balances</th><th>Joined</th>@if($canEditCustomers)<th class="text-right">Action</th>@endif
+                                    <th style="white-space: nowrap;">S/N</th><th>Account</th><th>Access</th><th>Balances</th><th>Joined</th>@if($canEditCustomers)<th class="text-right">Action</th>@endif
                                 </tr>
                             </thead>
                             <tbody>
@@ -127,6 +131,8 @@
                                         $status = strtolower($user->status ?: 'unknown');
                                         $statusColor = $status === 'active' ? 'success' : ($status === 'suspended' || $status === 'delete' ? 'danger' : 'warning');
                                         $kycVerified = $user->customer?->kyc_status === 'verified';
+                                        $walletAccess = (bool) ($user->customer?->can_access_w2bank ?? false);
+                                        $a2cAccess = (bool) ($user->customer?->can_access_a2c ?? false);
                                     @endphp
                                     <tr>
                                         @if($canEditCustomers)
@@ -137,16 +143,38 @@
                                                 </div>
                                             </td>
                                         @endif
-                                        <td class="text-muted">{{ $customers->firstItem() + $loop->index }}</td>
-                                        <td><div class="d-flex align-items-center"><span class="ops-customer-mark">{{ str($name)->substr(0, 1)->upper() }}</span><div class="min-width-0"><a href="{{ route('customers.edit', $user->id) }}" class="d-block font-weight-bold text-truncate">{{ $name }}</a><small class="d-block text-muted text-truncate">{{ $user->email }}</small><small class="d-block text-muted">{{ $user->phone ?: 'No phone number' }}</small></div></div></td>
-                                        <td><strong class="d-block">{{ '@' . ($user->username ?: 'not-set') }}</strong><span class="badge badge-light-{{ $statusColor }} mt-50">{{ ucfirst(str_replace('-', ' ', $status)) }}</span><small class="d-block text-muted mt-50">{{ $user->customer?->level?->name ?: 'No level assigned' }}</small></td>
-                                        <td><span class="ops-verification {{ $kycVerified ? 'is-verified' : 'is-pending' }}"><i class="bx {{ $kycVerified ? 'bx-check-shield' : 'bx-time-five' }}"></i> {{ $kycVerified ? 'KYC verified' : 'KYC pending' }}</span><small class="d-block text-muted mt-50">Email {{ $user->email_verified_at ? 'verified' : 'unverified' }}</small></td>
+                                        <td class="text-muted" style="width: 52px; white-space: nowrap;">{{ $customers->firstItem() + $loop->index }}</td>
+                                        <td>
+                                            <div class="min-width-0">
+                                                <a href="{{ route('customers.edit', $user->id) }}" class="d-block font-weight-bold text-truncate">{{ $name }}</a>
+                                                <small class="d-block text-muted text-truncate">{{ $user->email }}</small>
+                                                <small class="d-block text-muted">{{ $user->phone ?: 'No phone number' }}</small>
+                                                <strong class="d-block mt-50">{{ '@' . ($user->username ?: 'not-set') }}</strong>
+                                                <span class="badge badge-light-{{ $statusColor }} mt-50">{{ ucfirst(str_replace('-', ' ', $status)) }}</span>
+                                                <small class="d-block text-muted mt-50">{{ $user->customer?->level?->name ?: 'No level assigned' }}</small>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span class="badge badge-light-{{ $walletAccess ? 'success' : 'danger' }} d-inline-flex align-items-center mb-50">
+                                                <i class="bx {{ $walletAccess ? 'bx-check-circle' : 'bx-x-circle' }} mr-25"></i>
+                                                Wallet 2 Bank {{ $walletAccess ? 'Enabled' : 'Disabled' }}
+                                            </span>
+                                            <span class="badge badge-light-{{ $a2cAccess ? 'success' : 'danger' }} d-inline-flex align-items-center">
+                                                <i class="bx {{ $a2cAccess ? 'bx-check-circle' : 'bx-x-circle' }} mr-25"></i>
+                                                Airtime 2 Cash {{ $a2cAccess ? 'Enabled' : 'Disabled' }}
+                                            </span>
+                                            <small class="d-block mt-50 {{ $kycVerified ? 'text-success font-weight-bold' : 'text-muted' }}">
+                                                <i class="bx {{ $kycVerified ? 'bx-check-shield' : 'bx-time-five' }} mr-25"></i>
+                                                {{ $kycVerified ? 'KYC verified' : 'KYC pending' }}
+                                            </small>
+                                            <small class="d-block {{ $user->email_verified_at ? 'text-success font-weight-bold' : 'text-muted' }}"><i class="bx bx-envelope mr-25"></i>Email {{ $user->email_verified_at ? 'verified' : 'unverified' }}</small>
+                                        </td>
                                         <td><strong class="d-block">{{ $currency }}{{ number_format((float) ($user->customer?->wallet ?? 0), 2) }}</strong><small class="d-block text-muted">Referral {{ $currency }}{{ number_format((float) ($user->customer?->referal_wallet ?? 0), 2) }}</small><small class="d-block text-muted">A2Cash {{ $currency }}{{ number_format((float) ($user->customer?->a2cashwallet ?? 0), 2) }}</small></td>
                                         <td><strong class="d-block">{{ $user->created_at->format('M j, Y') }}</strong><small class="text-muted">{{ $user->created_at->format('g:i A') }}</small></td>
                                         @if($canEditCustomers)<td class="text-right"><a href="{{ route('customers.edit', $user->id) }}" class="btn btn-sm btn-primary"><i class="bx bx-user mr-25"></i> Open</a></td>@endif
                                     </tr>
                                 @empty
-                                    <tr><td colspan="{{ $canEditCustomers ? 8 : 7 }}" class="text-center py-3"><i class="bx bx-user-x d-block font-large-1 text-muted mb-1"></i><strong>No customers found</strong><p class="text-muted mb-0">Try clearing or adjusting the filters.</p></td></tr>
+                                    <tr><td colspan="{{ $canEditCustomers ? 7 : 6 }}" class="text-center py-3"><i class="bx bx-user-x d-block font-large-1 text-muted mb-1"></i><strong>No customers found</strong><p class="text-muted mb-0">Try clearing or adjusting the filters.</p></td></tr>
                                 @endforelse
                             </tbody>
                         </table>
@@ -222,6 +250,10 @@
                 deactivate: 'Deactivate the selected customer(s)?',
                 suspend: 'Suspend the selected customer(s)?',
                 delete: 'Delete the selected customer(s)? This will mark them as deleted.',
+                enable_w2bank_access: 'Enable Wallet 2 Bank access for the selected customer(s)?',
+                disable_w2bank_access: 'Disable Wallet 2 Bank access for the selected customer(s)?',
+                enable_a2c_access: 'Enable Airtime 2 Cash access for the selected customer(s)?',
+                disable_a2c_access: 'Disable Airtime 2 Cash access for the selected customer(s)?',
             };
 
             if (!window.confirm(messages[action] || 'Apply this action to the selected customer(s)?')) {

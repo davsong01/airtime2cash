@@ -163,6 +163,7 @@
                                     <th>Transfer</th>
                                     <th>Financials</th>
                                     <th>Payout</th>
+                                    <th>Wallet</th>
                                     <th>Status</th>
                                     <th class="text-right">Action</th>
                                 </tr>
@@ -172,8 +173,21 @@
                                     @php
                                         $user = $transaction->customer?->user;
                                         $name = trim(collect([$user?->firstname, $user?->middlename, $user?->lastname])->filter()->implode(' ')) ?: 'Unknown customer';
-                                        $statusColor = $transaction->status === 'approved' ? 'success' : ($transaction->status === 'declined' ? 'danger' : 'warning');
+                                        $status = strtolower((string) ($transaction->status ?? 'pending'));
+                                        $statusColor = in_array($status, ['approved', 'successful', 'success', 'completed'], true)
+                                            ? 'success'
+                                            : ($status === 'declined' ? 'danger' : 'warning');
                                         $productName = $transaction->product?->display_name ?: $transaction->product?->name ?: 'Unknown network';
+                                        $walletTrail = $transaction->wallets ?? collect();
+                                        $hasWalletBalances = $walletTrail->contains(fn ($wallet) => ! is_null($wallet->balance_before) || ! is_null($wallet->balance_after));
+                                        $transactionSnapshot = $transaction->transactionLog ?? null;
+                                        $displayTrail = $hasWalletBalances
+                                            ? $walletTrail
+                                            : ($walletTrail->isEmpty() && $transactionSnapshot
+                                                ? collect([$transactionSnapshot])
+                                                : $walletTrail);
+                                        $walletBefore = $displayTrail->first()?->balance_before;
+                                        $walletAfter = $displayTrail->last()?->balance_after;
                                     @endphp
                                     <tr>
                                         <td class="text-muted">{{ $transactions->firstItem() + $loop->index }}</td>
@@ -207,6 +221,20 @@
                                             @endif
                                         </td>
                                         <td>
+                                            @if($displayTrail->count())
+                                                <strong class="d-block">
+                                                    {{ ! is_null($walletBefore) ? $currency . number_format((float) $walletBefore, 2) : 'n/a' }}
+                                                    →
+                                                    {{ ! is_null($walletAfter) ? $currency . number_format((float) $walletAfter, 2) : 'n/a' }}
+                                                </strong>
+                                                <small class="d-block text-muted">
+                                                    {{ $hasWalletBalances ? 'Initial / final wallet balance' : 'Snapshot from transaction log' }}
+                                                </small>
+                                            @else
+                                                <small class="text-muted">No wallet trail</small>
+                                            @endif
+                                        </td>
+                                        <td>
                                             <span class="badge badge-light-{{ $statusColor }} px-75 py-50">{{ ucfirst($transaction->status) }}</span>
                                             <small class="d-block text-muted mt-50">{{ $transaction->created_at->format('M j, Y') }}</small>
                                             <small class="d-block text-muted">{{ $transaction->created_at->format('g:i A') }}</small>
@@ -218,7 +246,7 @@
                                         </td>
                                     </tr>
                                 @empty
-                                    <tr><td colspan="7" class="text-center py-3"><i class="bx bx-search-alt d-block font-large-1 text-muted mb-1"></i><strong>No transactions found</strong><p class="text-muted mb-0">Try clearing or adjusting the filters.</p></td></tr>
+                                    <tr><td colspan="8" class="text-center py-3"><i class="bx bx-search-alt d-block font-large-1 text-muted mb-1"></i><strong>No transactions found</strong><p class="text-muted mb-0">Try clearing or adjusting the filters.</p></td></tr>
                                 @endforelse
                             </tbody>
                         </table>

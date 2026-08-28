@@ -13,6 +13,10 @@ class Customer extends Model
 {
     use HasFactory;
     protected $guarded = [];
+    protected $casts = [
+        'can_access_w2bank' => 'boolean',
+        'can_access_a2c' => 'boolean',
+    ];
 
     public function level()
     {
