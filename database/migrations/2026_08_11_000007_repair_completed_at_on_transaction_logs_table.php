@@ -20,7 +20,7 @@ return new class extends Migration
             ->whereNull('completed_at')
             ->whereRaw("LOWER(TRIM(COALESCE(status, ''))) IN ('success', 'successful', 'completed', 'approved', 'delivered', 'failed', 'declined', 'rejected', 'cancelled', 'canceled')")
             ->update([
-                'completed_at' => DB::raw('COALESCE(updated_at, created_at, NOW())'),
+                'completed_at' => DB::raw('COALESCE(updated_at, created_at, CURRENT_TIMESTAMP)'),
             ]);
     }
 

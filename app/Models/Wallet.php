@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 class Wallet extends Model
 {
     use HasFactory;
-    protected $fillable = ['customer_id','amount','type','transaction_id','reason'];
+    protected $fillable = ['customer_id','amount','balance_before','balance_after','type','transaction_id','reason','payment_method'];
 
     public function transaction_log(){
         return $this->hasOne(TransactionLog::class, 'transaction_id','transaction_id');

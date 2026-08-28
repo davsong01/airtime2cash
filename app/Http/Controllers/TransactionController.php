@@ -8,6 +8,7 @@ use App\Http\Controllers\Providers\AutoSyncController;
 use App\Http\Controllers\WalletController;
 use App\Models\Airtime2CashTransactions;
 use App\Models\API;
+use App\Models\Customer;
 use App\Models\Bank;
 use App\Models\BillerLog;
 use App\Models\BlackList;
@@ -676,27 +677,37 @@ class TransactionController extends Controller
         $wallet = new WalletController();
 
         try {
-            DB::beginTransaction();
+            DB::transaction(function () use (&$transaction, $wallet, $request) {
+                $customer = Customer::query()
+                    ->whereKey(auth()->user()->customer->id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
 
-            $request['balance_after'] = $request['balance_before'] - $request['total_amount'];
-            $request['status'] = 'pending';
-            $request['user_status'] = 'pending';
-            $request['descr'] = $request['transfer_mode'] === 'manual'
-                ? 'Wallet to Bank Transfer initiated for manual processing.'
-                : 'Wallet to Bank Transfer initiated.';
+                $balance = (float) ($customer->wallet ?? 0);
 
-            $transaction = $this->logTransaction($request->all());
+                if ($balance < (float) $request['total_amount']) {
+                    throw new RuntimeException('Insufficient wallet balance. This transfer will debit ₦' . number_format((float) $request['total_amount'], 2));
+                }
 
-            $wallet->logWallet($request->all());
-            $wallet->updateCustomerWallet(auth()->user(), $request['total_amount'], $request['type']);
+                $request['balance_before'] = $balance;
+                $request['balance_after'] = $balance - (float) $request['total_amount'];
+                $request['status'] = 'pending';
+                $request['user_status'] = 'pending';
+                $request['descr'] = $request['transfer_mode'] === 'manual'
+                    ? 'Wallet to Bank Transfer initiated for manual processing.'
+                    : 'Wallet to Bank Transfer initiated.';
 
-            DB::commit();
+                $transaction = $this->logTransaction($request->all());
+
+                $wallet->logWallet($request->all());
+                $wallet->applyCustomerBalanceChange($customer, 'wallet', (float) $request['total_amount'], $request['type']);
+            });
         } catch (\Throwable $th) {
-            if (DB::transactionLevel() > 0) {
-                DB::rollBack();
-            }
-
             Log::error(['Transaction Error' => 'Message: ' . $th->getMessage() . ' File: ' . $th->getFile() . ' Line: ' . $th->getLine()]);
+
+            if ($th instanceof RuntimeException && str_contains($th->getMessage(), 'Insufficient wallet balance')) {
+                return back()->with('error', $th->getMessage());
+            }
 
             return back()->with('error', 'An error occured, please try again later');
         }
@@ -1041,9 +1052,12 @@ class TransactionController extends Controller
             $alreadySettled = $transaction->status === 'successful';
 
             if ($statusCode === 1 && ! $alreadySettled && (float) $transaction->amount_paid > 0) {
-                $user = $transaction->customer->user;
                 $wallet = new WalletController();
-                $balanceBefore = (float) $user->fresh()->customer->wallet_balance;
+                $customer = Customer::query()
+                    ->whereKey($transaction->customer_id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
+                $balanceBefore = (float) ($customer->wallet ?? 0);
                 $balanceAfter = $balanceBefore + (float) $transaction->amount_paid;
 
                 $wallet->logWallet([
@@ -1052,14 +1066,11 @@ class TransactionController extends Controller
                     'total_amount' => (float) $transaction->amount_paid,
                     'transaction_id' => $transaction->transaction_id,
                     'reason' => 'Airtime-to-cash conversion',
+                    'balance_before' => $balanceBefore,
                     'balance_after' => $balanceAfter,
                 ]);
 
-                $wallet->updateCustomerWallet(
-                    $user,
-                    (float) $transaction->amount_paid,
-                    'credit'
-                );
+                $wallet->applyCustomerBalanceChange($customer, 'wallet', (float) $transaction->amount_paid, 'credit');
             }
 
             $transaction->update([
