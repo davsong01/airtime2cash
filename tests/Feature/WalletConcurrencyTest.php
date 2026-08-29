@@ -430,6 +430,7 @@ class WalletConcurrencyTest extends TestCase
         $response->assertSee('Wallet to Bank');
         $response->assertDontSee('value="credit_customer"');
         $response->assertDontSee('value="process"');
+        $response->assertDontSee('id="qw-transaction"');
     }
 
     public function test_wallet_to_bank_failed_resolution_refunds_the_customer_wallet(): void
