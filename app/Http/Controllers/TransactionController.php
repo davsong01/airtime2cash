@@ -898,7 +898,6 @@ class TransactionController extends Controller
         $customer = $customerId
             ? Customer::query()->select(['id', 'can_access_w2bank', 'can_access_a2c'])->whereKey($customerId)->first()
             : null;
-        dd($customer);
         if (! $customer) {
             return false;
         }
