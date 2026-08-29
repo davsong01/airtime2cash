@@ -3,12 +3,23 @@
     $verifiable = verifiableUniqueElements();
     $wallet2bankAutoEnabled = (($settings->wallet_to_bank_transfer_auto_status ?? 'enabled') === 'enabled');
     $wallet2bankManualEnabled = (($settings->wallet_to_bank_transfer_manual_status ?? 'enabled') === 'enabled');
-    $availableTransferModes = array_values(array_filter([
+    $wallet2bankAutoAccess = (bool) (auth()->user()?->customer?->can_access_w2bank_auto ?? false);
+    $wallet2bankManualAccess = (bool) (auth()->user()?->customer?->can_access_w2bank ?? true);
+    $visibleTransferModes = array_values(array_filter([
         $wallet2bankAutoEnabled ? 'auto_share' : null,
         $wallet2bankManualEnabled ? 'manual' : null,
     ]));
-    $defaultTransferMode = old('transfer_mode', $availableTransferModes[0] ?? 'auto_share');
+    $availableTransferModes = array_values(array_filter([
+        ($wallet2bankAutoEnabled && $wallet2bankAutoAccess) ? 'auto_share' : null,
+        ($wallet2bankManualEnabled && $wallet2bankManualAccess) ? 'manual' : null,
+    ]));
+    $hasSelectableTransferMode = ! empty($availableTransferModes);
+    $defaultTransferMode = old('transfer_mode', $availableTransferModes[0] ?? ($visibleTransferModes[0] ?? 'auto_share'));
     $showProviderStatus = (bool) ($settings->show_provider_status_on_customer_pages ?? true);
+    $adminWhatsappNumber = preg_replace('/\D+/', '', (string) ($settings->whatsapp_number ?? ''));
+    $adminWhatsappLink = filled($adminWhatsappNumber)
+        ? 'https://api.whatsapp.com/send?phone=' . $adminWhatsappNumber . '&text=' . urlencode('Wallet to Bank access request from ' . (auth()->user()?->email ?? 'customer') . '. Please enable this service for my account.')
+        : null;
 ?>
 @extends('layouts.app')
 @section('title', $category->seo_title ?? getSettings()->seo_title)
@@ -179,6 +190,25 @@
         line-height: 1.45;
     }
 
+    .transfer-mode-locked-copy {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: .15rem;
+    }
+
+    .transfer-mode-option--locked {
+        cursor: not-allowed;
+        border-style: dashed;
+        opacity: .84;
+    }
+
+    .transfer-mode-option--locked:hover {
+        transform: none;
+        box-shadow: none;
+        border-color: rgba(148, 163, 184, .24);
+    }
+
     .manual-resolution-note {
         padding: .9rem 1rem;
         border: 1px solid rgba(245, 158, 11, .28);
@@ -249,49 +279,83 @@
                                                                 </div>
                                                                 <div class="col-md-12 mb-2">
                                                                     <label class="d-block mb-2">Transfer Method</label>
-                                                                    @if(empty($availableTransferModes))
+                                                                    @if(empty($visibleTransferModes))
                                                                         <div class="alert alert-warning mb-0">
                                                                             Wallet to bank transfer is currently unavailable. Please try again later.
                                                                         </div>
-                                                                    @elseif(count($availableTransferModes) > 1)
+                                                                    @else
                                                                         <div class="transfer-mode-grid">
                                                                             @if($wallet2bankAutoEnabled)
                                                                                 <div>
-                                                                                    <input class="transfer-mode-input" type="radio" name="transfer_mode" id="transfer-mode-auto" value="auto_share" @checked($defaultTransferMode === 'auto_share')>
-                                                                                    <label class="transfer-mode-option" for="transfer-mode-auto">
-                                                                                        <span class="transfer-mode-badge"><i class="bx bx-bolt-circle"></i></span>
-                                                                                        <span>
-                                                                                            <strong>Auto Transfer</strong>
-                                                                                            <small>Use the active transfer provider for a faster settlement.</small>
-                                                                                        </span>
-                                                                                    </label>
+                                                                                    @if($wallet2bankAutoAccess)
+                                                                                        <input class="transfer-mode-input" type="radio" name="transfer_mode" id="transfer-mode-auto" value="auto_share" @checked($defaultTransferMode === 'auto_share')>
+                                                                                        <label class="transfer-mode-option" for="transfer-mode-auto">
+                                                                                            <span class="transfer-mode-badge"><i class="bx bx-bolt-circle"></i></span>
+                                                                                            <span>
+                                                                                                <strong>Auto Transfer</strong>
+                                                                                                <small>Use the active transfer provider for a faster settlement.</small>
+                                                                                            </span>
+                                                                                        </label>
+                                                                                    @else
+                                                                                        <div class="transfer-mode-option transfer-mode-option--locked">
+                                                                                            <span class="transfer-mode-badge"><i class="bx bx-lock-alt"></i></span>
+                                                                                            <span class="transfer-mode-locked-copy">
+                                                                                                <strong>Auto Transfer</strong>
+                                                                                                <small>This transfer mode is currently unavailable for your account.</small>
+                                                                                                @if($adminWhatsappLink)
+                                                                                                    <a class="btn btn-sm btn-outline-success mt-2 align-self-start transfer-mode-locked-cta" href="{{ $adminWhatsappLink }}" target="_blank" rel="noopener">Click here to contact admin on WhatsApp</a>
+                                                                                                @endif
+                                                                                            </span>
+                                                                                        </div>
+                                                                                    @endif
                                                                                 </div>
                                                                             @endif
                                                                             @if($wallet2bankManualEnabled)
                                                                                 <div>
-                                                                                    <input class="transfer-mode-input" type="radio" name="transfer_mode" id="transfer-mode-manual" value="manual" @checked($defaultTransferMode === 'manual')>
-                                                                                    <label class="transfer-mode-option" for="transfer-mode-manual">
-                                                                                        <span class="transfer-mode-badge"><i class="bx bx-hand"></i></span>
-                                                                                        <span>
-                                                                                            <strong>Manual Transfer</strong>
-                                                                                            <small>Queued for admin review and sent to WhatsApp for manual processing.</small>
-                                                                                        </span>
-                                                                                    </label>
+                                                                                    @if($wallet2bankManualAccess)
+                                                                                        <input class="transfer-mode-input" type="radio" name="transfer_mode" id="transfer-mode-manual" value="manual" @checked($defaultTransferMode === 'manual')>
+                                                                                        <label class="transfer-mode-option" for="transfer-mode-manual">
+                                                                                            <span class="transfer-mode-badge"><i class="bx bx-hand"></i></span>
+                                                                                            <span>
+                                                                                                <strong>Manual Transfer</strong>
+                                                                                                <small>Queued for admin review and sent to WhatsApp for manual processing.</small>
+                                                                                            </span>
+                                                                                        </label>
+                                                                                    @else
+                                                                                        <div class="transfer-mode-option transfer-mode-option--locked">
+                                                                                            <span class="transfer-mode-badge"><i class="bx bx-lock-alt"></i></span>
+                                                                                            <span class="transfer-mode-locked-copy">
+                                                                                                <strong>Manual Transfer</strong>
+                                                                                                <small>This transfer mode is currently unavailable for your account.</small>
+                                                                                                @if($adminWhatsappLink)
+                                                                                                    <a class="btn btn-sm btn-outline-success mt-2 align-self-start transfer-mode-locked-cta" href="{{ $adminWhatsappLink }}" target="_blank" rel="noopener">Click here to contact admin on WhatsApp</a>
+                                                                                                @endif
+                                                                                            </span>
+                                                                                        </div>
+                                                                                    @endif
                                                                                 </div>
                                                                             @endif
                                                                         </div>
-                                                                        <div class="manual-resolution-note mt-3" id="manual-resolution-note" style="display:none">
-                                                                            Manual transfers depend on an admin being online and may take a while during busy periods.
-                                                                        </div>
-                                                                    @else
-                                                                        <input type="hidden" name="transfer_mode" value="{{ $defaultTransferMode }}">
-                                                                        <div class="alert alert-info mb-0">
-                                                                            @if($defaultTransferMode === 'manual')
-                                                                                Manual Transfer is available for this wallet-to-bank request. Manual resolution depends on an admin being online and may take a while during busy periods.
+                                                                        @if($hasSelectableTransferMode)
+                                                                            @if(count($availableTransferModes) > 1)
+                                                                                <div class="manual-resolution-note mt-3" id="manual-resolution-note" style="display:none">
+                                                                                    Manual transfers depend on an admin being online and may take a while during busy periods.
+                                                                                </div>
                                                                             @else
-                                                                                Auto Transfer is available for this wallet-to-bank request.
+                                                                                <input type="hidden" name="transfer_mode" value="{{ $defaultTransferMode }}">
+                                                                                <div class="alert alert-info mb-0">
+                                                                                    @if($defaultTransferMode === 'manual')
+                                                                                        Manual resolution depends on an admin being online and may take a while during busy periods.
+                                                                                    @else
+                                                                                        {{-- Auto Transfer is available for this wallet-to-bank request. --}}
+                                                                                    @endif
+                                                                                </div>
                                                                             @endif
-                                                                        </div>
+                                                                        @else
+                                                                            <div class="alert alert-warning mt-3 mb-0">
+                                                                                Wallet to bank access is partially available on this page, but none of the available modes are enabled for your account. Please contact admin to request access.
+                                                                            </div>
+                                                                        @endif
                                                                     @endif
                                                                 </div>
                                                                 <div class="col-md-12">
@@ -608,8 +672,8 @@
                                                                     </div>
                                                                 </div>
                                                                 <div class="col-md-12">
-                                                                            <button style="margin-top:4px" class="btn btn-primary" id="transfer-submit" type="submit" @disabled(!$canWithdraw || empty($availableTransferModes))>PROCEED </button>
-                                                                </div>
+                                                                        <button style="margin-top:4px" class="btn btn-primary" id="transfer-submit" type="submit" @disabled(!$canWithdraw || ! $hasSelectableTransferMode)>PROCEED </button>
+                                                                    </div>
 
                                                             </div>
                                                         </form>

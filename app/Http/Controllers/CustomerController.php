@@ -105,7 +105,7 @@ class CustomerController extends Controller
     public function bulkActions(Request $request)
     {
         $this->validate($request, [
-            'action' => ['required', 'in:activate,deactivate,suspend,delete,move_level,enable_w2bank_access,disable_w2bank_access,enable_a2c_access,disable_a2c_access'],
+            'action' => ['required', 'in:activate,deactivate,suspend,delete,move_level,enable_w2bank_manual_access,disable_w2bank_manual_access,enable_w2bank_auto_access,disable_w2bank_auto_access,enable_a2c_access,disable_a2c_access'],
             'customer_ids' => ['required', 'string'],
             'level_id' => ['nullable', 'integer'],
         ]);
@@ -139,10 +139,19 @@ class CustomerController extends Controller
             return back()->with('message', 'Selected customers moved to ' . $level->name . ' successfully');
         }
 
-        if (in_array($request->action, ['enable_w2bank_access', 'disable_w2bank_access', 'enable_a2c_access', 'disable_a2c_access'], true)) {
+        if (in_array($request->action, [
+            'enable_w2bank_manual_access',
+            'disable_w2bank_manual_access',
+            'enable_w2bank_auto_access',
+            'disable_w2bank_auto_access',
+            'enable_a2c_access',
+            'disable_a2c_access',
+        ], true)) {
             $updates = match ($request->action) {
-                'enable_w2bank_access' => ['can_access_w2bank' => 1],
-                'disable_w2bank_access' => ['can_access_w2bank' => 0],
+                'enable_w2bank_manual_access' => ['can_access_w2bank' => 1],
+                'disable_w2bank_manual_access' => ['can_access_w2bank' => 0],
+                'enable_w2bank_auto_access' => ['can_access_w2bank_auto' => 1],
+                'disable_w2bank_auto_access' => ['can_access_w2bank_auto' => 0],
                 'enable_a2c_access' => ['can_access_a2c' => 1],
                 'disable_a2c_access' => ['can_access_a2c' => 0],
             };
@@ -417,6 +426,7 @@ class CustomerController extends Controller
             'firstname' => 'required',
             'lastname' => 'required',
             'can_access_w2bank' => ['nullable', 'in:0,1'],
+            'can_access_w2bank_auto' => ['nullable', 'in:0,1'],
             'can_access_a2c' => ['nullable', 'in:0,1'],
         ]);
 
@@ -434,11 +444,12 @@ class CustomerController extends Controller
             $user = User::query()->findOrFail($id);
             $customer = Customer::query()->where('user_id', $user->id)->lockForUpdate()->first();
 
-            $user->update($request->except(['_token', 'ip', 'customerlevel', 'can_access_w2bank', 'can_access_a2c']));
+            $user->update($request->except(['_token', 'ip', 'customerlevel', 'can_access_w2bank', 'can_access_w2bank_auto', 'can_access_a2c']));
 
             if ($customer) {
                 $customer->forceFill([
                     'can_access_w2bank' => (int) ($validated['can_access_w2bank'] ?? 0),
+                    'can_access_w2bank_auto' => (int) ($validated['can_access_w2bank_auto'] ?? 0),
                     'can_access_a2c' => (int) ($validated['can_access_a2c'] ?? 0),
                 ])->save();
             }

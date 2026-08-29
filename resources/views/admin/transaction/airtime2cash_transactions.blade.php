@@ -1,5 +1,12 @@
 @php
     $currency = getSettings()?->currency ?? 'NGN';
+    $transferModeClass = static function ($transaction) {
+        return match (strtolower((string) ($transaction->transfer_mode ?? ''))) {
+            'manual' => 'text-warning',
+            'auto_share' => 'text-success',
+            default => 'text-muted',
+        };
+    };
 @endphp
 
 @extends('layouts.app')
@@ -205,7 +212,7 @@
                                         </td>
                                         <td>
                                             <strong class="d-block a2c-reference">{{ $transaction->transaction_id }}</strong>
-                                            <span class="badge badge-light-info mt-50">{{ $transaction->transfer_mode === 'auto_share' ? 'Auto Transfer' : 'Manual Transfer' }}</span>
+                                            <span class="{{ $transferModeClass($transaction) }} font-weight-600 mt-50">{{ $transaction->transfer_mode === 'auto_share' ? 'Auto Transfer' : 'Manual Transfer' }}</span>
                                             <small class="d-block text-muted mt-50">{{ $transaction->phone_numbers ?: 'No sending number' }}</small>
                                         </td>
                                         <td>

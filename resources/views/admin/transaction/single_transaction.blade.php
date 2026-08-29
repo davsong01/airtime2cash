@@ -230,7 +230,12 @@
                                                 <div class="card-content">
                                                     <div class="card-body">
                                                         @php
-                                                            $isWalletToBank = strtolower((string) ($transaction->reason ?? '')) === 'wallet to bank transfer';
+                                                            $transactionType = strtolower((string) ($transaction->product?->type ?? ''));
+                                                            $isWalletToBank = $transactionType === 'wallet2bank';
+                                                            $isAirtimeToCash = $transactionType === 'airtime2cash';
+                                                            $transactionModeLabel = $isWalletToBank
+                                                                ? 'Wallet to Bank'
+                                                                : ($isAirtimeToCash ? 'Airtime 2 Cash' : null);
                                                             $chargeBreakdown = collect(normalizeChargeBreakdown($transaction->charge_breakdown ?? []))->filter(fn ($charge) => is_array($charge));
                                                             $baseTransferCharge = $chargeBreakdown->whereIn('type', ['provider_fee', 'our_charge'])->sum(fn ($charge) => (float) ($charge['amount'] ?? 0));
                                                             $bandExtraCharges = $chargeBreakdown->where('type', 'band_extra_charge')->values();
@@ -293,7 +298,7 @@
                                                                 @if(in_array($transaction->reason, ['LEVEL-UPGRADE','WALLET-FUNDING','ADMIN-DEBIT','ADMIN-CREDIT']))
                                                                 <img id="product-image" width="60" height="60" src="{{ asset('site/upgrade.jpg') }}" alt="" class="product-image" style="margin:5px; box-shadow: rgba(0, 0, 0, 0.24) 0px 3px 8px;">
                                                                 @else
-                                                                <img id="product-image" width="60" height="60" src="{{ asset($transaction->product->image) }}" alt="" class="product-image" style="margin:5px; box-shadow: rgba(0, 0, 0, 0.24) 0px 3px 8px;">
+                                                                <img id="product-image" width="60" height="60" src="{{ asset($transaction->product?->image ?? 'site/upgrade.jpg') }}" alt="" class="product-image" style="margin:5px; box-shadow: rgba(0, 0, 0, 0.24) 0px 3px 8px;">
                                                                 @endif
 
                                                             </div>
@@ -301,9 +306,12 @@
                                                                     <h5 style="color:black"><strong>{{ $transaction->product_name }}</strong></h5>
                                                                     <h5 class="mb-1">
                                                                         {{ $transaction->transaction_id }}</h5> <br>
+                                                                    @if($transactionModeLabel)
+                                                                        <span class="badge badge-light-info mb-1">{{ $transactionModeLabel }}</span> <br>
+                                                                    @endif
 
                                                                     {{ $transaction->created_at }}
-                                                                    @if(!in_array($transaction->reason, ['LEVEL-UPGRADE','WALLET-FUNDING']))
+                                                                    @if(filled($transaction->id) && !in_array($transaction->reason, ['LEVEL-UPGRADE','WALLET-FUNDING']))
                                                                      <br>
                                                                      <a href="{{ route('transaction.receipt.download', $transaction->id)}}" target="_blank" class="btn btn-primary btn-sm" style="color:#fff;"><i class="fa fa-download"></i> Download Receipt</a> <br>
                                                                     @endif
@@ -442,7 +450,7 @@
                                                                                 @if(in_array($transaction->reason, ['LEVEL-UPGRADE','WALLET-FUNDING','ADMIN-DEBIT','ADMIN-CREDIT']))
                                                                                     {{ ucfirst(str_replace("-"," ",$transaction->reason))}}
                                                                                 @else
-                                                                                {{ $transaction->product->name }}@if(!empty($transaction->variation->system_name)) <strong> | {{$transaction->variation->system_name}} </strong> @endif
+                                                                                {{ $transaction->product?->name ?? $transaction->product_name ?? 'Wallet to Bank Transfer' }}@if(!empty($transaction->variation?->system_name)) <strong> | {{$transaction->variation?->system_name}} </strong> @endif
                                                                                 @endif
                                                                             </td>
                                                                             @if($isWalletToBank)
@@ -504,12 +512,12 @@
                                                                                 </td>
                                                                                 <td>{{ $transaction->unique_element }}
                                                                                     <?php
-                                                                                        if (isset($transaction->variation) && in_array($transaction->category->unique_element, verifiableUniqueElements()))
+                                                                                        if (isset($transaction->variation) && !empty($transaction->category?->unique_element) && in_array($transaction->category?->unique_element, verifiableUniqueElements()))
                                                                                         {
-                                                                                            $element = $transaction->category->unique_element;
-                                                                                        } elseif (isset($transaction->variation) && in_array($transaction->variation->slug, verifiableUniqueElements()))
+                                                                                            $element = $transaction->category?->unique_element;
+                                                                                        } elseif (isset($transaction->variation) && in_array($transaction->variation?->slug, verifiableUniqueElements()))
                                                                                         {
-                                                                                            $element = specialVerifiableVariations()[$transaction->variation->slug];
+                                                                                            $element = specialVerifiableVariations()[$transaction->variation?->slug];
                                                                                         } else {
                                                                                             $element = null;
                                                                                         }
@@ -664,34 +672,36 @@
                                                                 @endif
 
                                                                 <div class="row">
-                                                                    <div class="col-lg-6 mb-3">
-                                                                        <div class="border rounded p-3 h-100">
-                                                                            <h6 class="mb-1">Credit Customer</h6>
-                                                                            <p class="text-muted mb-3">Use this to refund the customer wallet and close the transaction.</p>
-                                                                            <form method="POST" action="{{ route('admin.single.transaction.resolve', $transaction->id) }}">
-                                                                                @csrf
-                                                                                <input type="hidden" name="action" value="credit_customer">
-                                                                                <div class="form-group">
-                                                                                    <label for="credit_email">Customer Email</label>
-                                                                                    <input type="email" id="credit_email" class="form-control" value="{{ $transaction->customer_email }}" readonly>
-                                                                                </div>
-                                                                                <div class="form-group">
-                                                                                    <label for="credit_amount">Amount</label>
-                                                                                    <input type="number" step="0.01" min="0" id="credit_amount" name="amount" class="form-control" value="{{ old('amount', $transaction->total_amount ?? $transaction->amount ?? 0) }}" required>
-                                                                                </div>
-                                                                                <div class="form-group mb-3">
-                                                                                    <label for="credit_reason">Reason</label>
-                                                                                    <textarea id="credit_reason" name="reason" class="form-control" rows="3" placeholder="Explain why this wallet credit is being done">{{ old('reason', 'Refund for pending transaction ' . $transaction->transaction_id) }}</textarea>
-                                                                                </div>
-                                                                                <button type="submit" class="btn btn-primary btn-block" onclick="return confirm('Credit this customer and close the transaction?')">Credit Customer</button>
-                                                                            </form>
+                                                                    @unless($isWalletToBank)
+                                                                        <div class="col-lg-6 mb-3">
+                                                                            <div class="border rounded p-3 h-100">
+                                                                                <h6 class="mb-1">Credit Customer</h6>
+                                                                                <p class="text-muted mb-3">Use this to refund the customer wallet and close the transaction.</p>
+                                                                                <form method="POST" action="{{ route('admin.single.transaction.resolve', $transaction->id) }}">
+                                                                                    @csrf
+                                                                                    <input type="hidden" name="action" value="credit_customer">
+                                                                                    <div class="form-group">
+                                                                                        <label for="credit_email">Customer Email</label>
+                                                                                        <input type="email" id="credit_email" class="form-control" value="{{ $transaction->customer_email }}" readonly>
+                                                                                    </div>
+                                                                                    <div class="form-group">
+                                                                                        <label for="credit_amount">Amount</label>
+                                                                                        <input type="number" step="0.01" min="0" id="credit_amount" name="amount" class="form-control" value="{{ old('amount', $transaction->total_amount ?? $transaction->amount ?? 0) }}" required>
+                                                                                    </div>
+                                                                                    <div class="form-group mb-3">
+                                                                                        <label for="credit_reason">Reason</label>
+                                                                                        <textarea id="credit_reason" name="reason" class="form-control" rows="3" placeholder="Explain why this wallet credit is being done">{{ old('reason', 'Refund for pending transaction ' . $transaction->transaction_id) }}</textarea>
+                                                                                    </div>
+                                                                                    <button type="submit" class="btn btn-primary btn-block" onclick="return confirm('Credit this customer and close the transaction?')">Credit Customer</button>
+                                                                                </form>
+                                                                            </div>
                                                                         </div>
-                                                                    </div>
+                                                                    @endunless
 
-                                                                    <div class="col-lg-6 mb-3">
+                                                                    <div class="{{ $isWalletToBank ? 'col-lg-12' : 'col-lg-6' }} mb-3">
                                                                         <div class="border rounded p-3 h-100">
                                                                             <h6 class="mb-1">Quick Status Actions</h6>
-                                                                            <p class="text-muted mb-3">Mark the transaction closed without wallet movement, or ask the provider to be checked again.</p>
+                                                                            <p class="text-muted mb-3">{{ $isWalletToBank ? 'Mark the wallet-to-bank transaction as resolved.' : 'Mark the transaction closed without wallet movement, or ask the provider to be checked again.' }}</p>
 
                                                                             <form method="POST" action="{{ route('admin.single.transaction.resolve', $transaction->id) }}" class="mb-2">
                                                                                 @csrf
@@ -707,12 +717,14 @@
                                                                                 <button type="submit" class="btn btn-danger btn-block" onclick="return confirm('Mark this transaction as failed?')">Mark as Failed</button>
                                                                             </form>
 
-                                                                            <form method="POST" action="{{ route('admin.single.transaction.resolve', $transaction->id) }}">
-                                                                                @csrf
-                                                                                <input type="hidden" name="action" value="process">
-                                                                                <input type="hidden" name="reason" value="Reprocess pending transaction after provider verification">
-                                                                                <button type="submit" class="btn btn-info btn-block" onclick="return confirm('Requery and process this transaction based on provider response?')">Process</button>
-                                                                            </form>
+                                                                            @unless($isWalletToBank)
+                                                                                <form method="POST" action="{{ route('admin.single.transaction.resolve', $transaction->id) }}">
+                                                                                    @csrf
+                                                                                    <input type="hidden" name="action" value="process">
+                                                                                    <input type="hidden" name="reason" value="Reprocess pending transaction after provider verification">
+                                                                                    <button type="submit" class="btn btn-info btn-block" onclick="return confirm('Requery and process this transaction based on provider response?')">Process</button>
+                                                                                </form>
+                                                                            @endunless
                                                                         </div>
                                                                     </div>
                                                                 </div>
@@ -756,6 +768,26 @@
                     </div>
                 </div>
                 <pre class="txn-json-card__body mb-0">${escapeHtml(JSON.stringify(raw, null, 2))}</pre>
+            </div>
+        `;
+    }
+
+    function renderHtmlResponsePanel(payload, title, subtitle) {
+        const message = payload?.message ?? payload?.response?.message ?? '';
+        const status = String(payload?.status ?? payload?.response?.status ?? 'success').toLowerCase();
+
+        return `
+            <div class="txn-json-card">
+                <div class="txn-json-card__head">
+                    <div>
+                        <div class="txn-json-card__title">${escapeHtml(title || 'Response')}</div>
+                        ${subtitle ? `<div class="text-muted small">${escapeHtml(subtitle)}</div>` : ''}
+                    </div>
+                    <span class="badge badge-${status === 'success' ? 'success' : (status === 'failed' ? 'danger' : 'warning')} text-uppercase px-3 py-2">${escapeHtml(status)}</span>
+                </div>
+                <div class="txn-json-card__body" style="white-space: normal;">
+                    ${message || '<em class="text-muted">No response content available.</em>'}
+                </div>
             </div>
         `;
     }
@@ -818,7 +850,7 @@
 				$('#qw_debit').html('Query '+type+' <i class="fa fa-check"></i>');
 				$('#img_loading').hide();
 				$('#q_res').show();
-				$('#q_res').html(renderPrettyJsonPanel(data, 'Query ' + type + ' response', 'Wallet query result'));
+				$('#q_res').html(renderHtmlResponsePanel(data, 'Query ' + type + ' response', 'Wallet query result'));
 			}
 		});
 		e.preventDefault();

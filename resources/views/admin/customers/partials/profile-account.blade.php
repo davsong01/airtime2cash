@@ -46,17 +46,24 @@
             </select>
         </div>
         <div class="col-md-6 form-group">
-            <label for="can_access_w2bank">Wallet 2 Bank access</label>
-            <select name="can_access_w2bank" class="form-control" id="can_access_w2bank">
-                <option value="0" @selected(! (bool) old('can_access_w2bank', $customer->can_access_w2bank ?? false))>Disabled</option>
-                <option value="1" @selected((bool) old('can_access_w2bank', $customer->can_access_w2bank ?? false))>Enabled</option>
-            </select>
-        </div>
-        <div class="col-md-6 form-group">
             <label for="can_access_a2c">Airtime 2 Cash access</label>
             <select name="can_access_a2c" class="form-control" id="can_access_a2c">
                 <option value="0" @selected(! (bool) old('can_access_a2c', $customer->can_access_a2c ?? false))>Disabled</option>
                 <option value="1" @selected((bool) old('can_access_a2c', $customer->can_access_a2c ?? false))>Enabled</option>
+            </select>
+        </div>
+        <div class="col-md-6 form-group">
+            <label for="can_access_w2bank_auto">Auto Wallet 2 Bank access</label>
+            <select name="can_access_w2bank_auto" class="form-control" id="can_access_w2bank_auto">
+                <option value="0" @selected(! (bool) old('can_access_w2bank_auto', $customer->can_access_w2bank_auto ?? false))>Disabled</option>
+                <option value="1" @selected((bool) old('can_access_w2bank_auto', $customer->can_access_w2bank_auto ?? false))>Enabled</option>
+            </select>
+        </div>
+        <div class="col-md-6 form-group">
+            <label for="can_access_w2bank">Manual Wallet 2 Bank access</label>
+            <select name="can_access_w2bank" class="form-control" id="can_access_w2bank">
+                <option value="0" @selected(! (bool) old('can_access_w2bank', $customer->can_access_w2bank ?? true))>Disabled</option>
+                <option value="1" @selected((bool) old('can_access_w2bank', $customer->can_access_w2bank ?? true))>Enabled</option>
             </select>
         </div>
         <div class="col-md-6 d-flex align-items-end justify-content-md-end">

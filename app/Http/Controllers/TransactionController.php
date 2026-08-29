@@ -118,7 +118,7 @@ class TransactionController extends Controller
 
     public function walletToBank($slug)
     {
-        if (! $this->customerCanAccessService('wallet2bank')) {
+        if (! $this->customerCanAccessService('wallet2bank_any')) {
             return $this->serviceUnavailableResponse('Wallet 2 Bank', 'wallet2bank');
         }
 
@@ -591,7 +591,7 @@ class TransactionController extends Controller
 
     public function initializeWalletToBankTransaction(Request $request, Product $product)
     {
-        if (! $this->customerCanAccessService('wallet2bank')) {
+        if (! $this->customerCanAccessService('wallet2bank_any')) {
             return $this->serviceUnavailableResponse('Wallet 2 Bank', 'wallet2bank');
         }
 
@@ -601,12 +601,12 @@ class TransactionController extends Controller
 
         $settings = getSettings();
         $availableTransferModes = array_values(array_filter([
-            (($settings->wallet_to_bank_transfer_auto_status ?? 'enabled') === 'enabled') ? 'auto_share' : null,
-            (($settings->wallet_to_bank_transfer_manual_status ?? 'enabled') === 'enabled') ? 'manual' : null,
+            (($settings->wallet_to_bank_transfer_auto_status ?? 'enabled') === 'enabled') && $this->customerCanAccessService('wallet2bank_auto') ? 'auto_share' : null,
+            (($settings->wallet_to_bank_transfer_manual_status ?? 'enabled') === 'enabled') && $this->customerCanAccessService('wallet2bank_manual') ? 'manual' : null,
         ]));
 
         if (empty($availableTransferModes)) {
-            return back()->with('error', 'Wallet to bank transfer is currently unavailable. Please try again later.');
+            return $this->serviceUnavailableResponse('Wallet 2 Bank', 'wallet2bank');
         }
 
         $request->validate([
@@ -693,11 +693,18 @@ class TransactionController extends Controller
         $request['reason'] = 'Wallet to Bank Transfer';
         $request['unique_element'] = 'Wallet2Bank';
         $request['discount'] = 0;
-        $request['api_id'] = $chargeDetails['provider_id'] ?? getSettings()->bank_transfer_provider_id ?? null;
         $request['transfer_mode'] = $request->input('transfer_mode', $availableTransferModes[0]);
 
+        $request['api_id'] = $request['transfer_mode'] === 'manual'
+            ? null
+            : ($chargeDetails['provider_id'] ?? getSettings()->bank_transfer_provider_id ?? null);
+
         if (! in_array($request['transfer_mode'], $availableTransferModes, true)) {
-            return back()->with('error', 'The selected transfer method is currently unavailable.');
+            return match ($request['transfer_mode']) {
+                'auto_share' => $this->serviceUnavailableResponse('Auto Wallet 2 Bank', 'wallet2bank_auto'),
+                'manual' => $this->serviceUnavailableResponse('Manual Wallet 2 Bank', 'wallet2bank_manual'),
+                default => back()->with('error', 'The selected transfer method is currently unavailable.'),
+            };
         }
 
         $wallet = new WalletController();
@@ -728,8 +735,8 @@ class TransactionController extends Controller
                 $request['status'] = 'pending';
                 $request['user_status'] = 'pending';
                 $request['descr'] = $request['transfer_mode'] === 'manual'
-                    ? 'Wallet to Bank Transfer initiated for manual processing.'
-                    : 'Wallet to Bank Transfer initiated.';
+                    ? 'Manual Wallet to Bank Transfer initiated for manual processing.'
+                    : 'Auto Wallet to Bank Transfer initiated.';
 
                 $transaction = $this->logTransaction($request->all());
 
@@ -896,14 +903,17 @@ class TransactionController extends Controller
     {
         $customerId = auth()->user()?->customer?->id;
         $customer = $customerId
-            ? Customer::query()->select(['id', 'can_access_w2bank', 'can_access_a2c'])->whereKey($customerId)->first()
+            ? Customer::query()->select(['id', 'can_access_w2bank', 'can_access_w2bank_auto', 'can_access_a2c'])->whereKey($customerId)->first()
             : null;
         if (! $customer) {
             return false;
         }
 
         return match ($service) {
-            'wallet2bank' => (bool) ($customer->can_access_w2bank ?? false),
+            'wallet2bank_any' => (bool) (($customer->can_access_w2bank ?? false) || ($customer->can_access_w2bank_auto ?? false)),
+            'wallet2bank_manual' => (bool) ($customer->can_access_w2bank ?? false),
+            'wallet2bank_auto' => (bool) ($customer->can_access_w2bank_auto ?? false),
+            'wallet2bank' => (bool) (($customer->can_access_w2bank ?? false) || ($customer->can_access_w2bank_auto ?? false)),
             'a2c' => (bool) ($customer->can_access_a2c ?? false),
             default => true,
         };
@@ -1498,6 +1508,7 @@ class TransactionController extends Controller
             'reason' => $data['reason'] ?? null,
             'provider_charge' => $data['provider_charge'] ?? null,
             'charge_breakdown' => $data['charge_breakdown'] ?? null,
+            'transfer_mode' => $data['transfer_mode'] ?? null,
             'bank_id' => $data['bank_id'] ?? null,
             'account_name' => $data['account_name'] ?? null,
             'account_number' => $data['account_number'] ?? null,
@@ -2334,8 +2345,10 @@ class TransactionController extends Controller
                 ),
                 'failed' => $this->resolvePendingTransactionByStatus(
                     $transaction,
-                    'failed',
-                    $validated['reason'] ?? 'Manually marked as failed by ADMIN'
+                    $this->shouldRefundOnPendingFailure($transaction) ? 'failed' : 'failed',
+                    $validated['reason'] ?? ($this->shouldRefundOnPendingFailure($transaction)
+                        ? 'Wallet to Bank Transfer declined by ADMIN'
+                        : 'Manually marked as failed by ADMIN')
                 ),
                 'successful' => $this->resolvePendingTransactionByStatus(
                     $transaction,
@@ -2387,7 +2400,7 @@ class TransactionController extends Controller
             'failed',
             $reason,
             $reason,
-            $balanceBefore + $amount,
+            $transaction->balance_after,
         );
 
         return back()->with('message', 'Customer has been credited and the transaction was closed.');
@@ -2395,6 +2408,14 @@ class TransactionController extends Controller
 
     private function resolvePendingTransactionByStatus(TransactionLog $transaction, string $status, string $reason)
     {
+        if ($status === 'failed' && $this->shouldRefundOnPendingFailure($transaction)) {
+            return $this->resolvePendingTransactionByCredit(
+                $transaction,
+                (float) ($transaction->total_amount ?? $transaction->amount ?? 0),
+                $reason
+            );
+        }
+
         $this->markTransactionResolved(
             $transaction,
             $status,
@@ -2404,6 +2425,13 @@ class TransactionController extends Controller
         );
 
         return back()->with('message', 'Transaction updated successfully.');
+    }
+
+    private function shouldRefundOnPendingFailure(TransactionLog $transaction): bool
+    {
+        $transactionType = strtolower((string) ($transaction->product?->type ?? $transaction->unique_element ?? $transaction->reason ?? ''));
+
+        return $transactionType === 'wallet2bank' || str_contains($transactionType, 'wallet to bank');
     }
 
     private function resolveTransactionProvider(TransactionLog $transaction, bool $allowFallback = true): ?API

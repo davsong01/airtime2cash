@@ -94,8 +94,10 @@
                                             <option value="activate">Activate</option>
                                             <option value="suspend">Suspend</option>
                                             <option value="delete">Delete</option>
-                                            <option value="enable_w2bank_access">Enable Wallet 2 Bank</option>
-                                            <option value="disable_w2bank_access">Disable Wallet 2 Bank</option>
+                                            <option value="enable_w2bank_manual_access">Enable Manual Wallet 2 Bank</option>
+                                            <option value="disable_w2bank_manual_access">Disable Manual Wallet 2 Bank</option>
+                                            <option value="enable_w2bank_auto_access">Enable Auto Wallet 2 Bank</option>
+                                            <option value="disable_w2bank_auto_access">Disable Auto Wallet 2 Bank</option>
                                             <option value="enable_a2c_access">Enable Airtime 2 Cash</option>
                                             <option value="disable_a2c_access">Disable Airtime 2 Cash</option>
                                             <option value="move_level">Move to level</option>
@@ -131,7 +133,8 @@
                                         $status = strtolower($user->status ?: 'unknown');
                                         $statusColor = $status === 'active' ? 'success' : ($status === 'suspended' || $status === 'delete' ? 'danger' : 'warning');
                                         $kycVerified = $user->customer?->kyc_status === 'verified';
-                                        $walletAccess = (bool) ($user->customer?->can_access_w2bank ?? false);
+                                        $walletAccess = (bool) ($user->customer?->can_access_w2bank ?? true);
+                                        $walletAutoAccess = (bool) ($user->customer?->can_access_w2bank_auto ?? false);
                                         $a2cAccess = (bool) ($user->customer?->can_access_a2c ?? false);
                                     @endphp
                                     <tr>
@@ -157,7 +160,11 @@
                                         <td>
                                             <span class="badge badge-light-{{ $walletAccess ? 'success' : 'danger' }} d-inline-flex align-items-center mb-50">
                                                 <i class="bx {{ $walletAccess ? 'bx-check-circle' : 'bx-x-circle' }} mr-25"></i>
-                                                Wallet 2 Bank {{ $walletAccess ? 'Enabled' : 'Disabled' }}
+                                                Manual Wallet 2 Bank {{ $walletAccess ? 'Enabled' : 'Disabled' }}
+                                            </span>
+                                            <span class="badge badge-light-{{ $walletAutoAccess ? 'success' : 'danger' }} d-inline-flex align-items-center mb-50">
+                                                <i class="bx {{ $walletAutoAccess ? 'bx-check-circle' : 'bx-x-circle' }} mr-25"></i>
+                                                Auto Wallet 2 Bank {{ $walletAutoAccess ? 'Enabled' : 'Disabled' }}
                                             </span>
                                             <span class="badge badge-light-{{ $a2cAccess ? 'success' : 'danger' }} d-inline-flex align-items-center">
                                                 <i class="bx {{ $a2cAccess ? 'bx-check-circle' : 'bx-x-circle' }} mr-25"></i>
@@ -250,8 +257,10 @@
                 deactivate: 'Deactivate the selected customer(s)?',
                 suspend: 'Suspend the selected customer(s)?',
                 delete: 'Delete the selected customer(s)? This will mark them as deleted.',
-                enable_w2bank_access: 'Enable Wallet 2 Bank access for the selected customer(s)?',
-                disable_w2bank_access: 'Disable Wallet 2 Bank access for the selected customer(s)?',
+                enable_w2bank_manual_access: 'Enable Manual Wallet 2 Bank access for the selected customer(s)?',
+                disable_w2bank_manual_access: 'Disable Manual Wallet 2 Bank access for the selected customer(s)?',
+                enable_w2bank_auto_access: 'Enable Auto Wallet 2 Bank access for the selected customer(s)?',
+                disable_w2bank_auto_access: 'Disable Auto Wallet 2 Bank access for the selected customer(s)?',
                 enable_a2c_access: 'Enable Airtime 2 Cash access for the selected customer(s)?',
                 disable_a2c_access: 'Disable Airtime 2 Cash access for the selected customer(s)?',
             };

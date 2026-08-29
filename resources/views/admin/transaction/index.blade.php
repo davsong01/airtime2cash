@@ -1,4 +1,27 @@
 @php $currency = getSettings()?->currency ?? 'NGN'; @endphp
+@php
+    $transactionModeLabel = static function ($transaction) {
+        $productType = strtolower((string) ($transaction->product?->type ?? ''));
+
+        if (! in_array($productType, ['wallet2bank', 'airtime2cash'], true)) {
+            return null;
+        }
+
+        return match (strtolower((string) ($transaction->transfer_mode ?? ''))) {
+            'manual' => 'Manual',
+            'auto_share' => 'Auto',
+            default => null,
+        };
+    };
+
+    $transactionModeClass = static function ($transaction) {
+        return match (strtolower((string) ($transaction->transfer_mode ?? ''))) {
+            'manual' => 'text-warning',
+            'auto_share' => 'text-success',
+            default => 'text-muted',
+        };
+    };
+@endphp
 
 @extends('layouts.app')
 @section('title', 'Transaction Log')
@@ -214,6 +237,9 @@
                                                     @if($transaction->variation)
                                                     <strong>Variation: </strong>{{ $transaction->variation->system_name ?? 'null'}} <br>
                                                     @endif
+                                                    @if($transactionModeLabel($transaction))
+                                                    <strong>Mode: </strong><span class="{{ $transactionModeClass($transaction) }} font-weight-600">{{ $transactionModeLabel($transaction) }}</span> <br>
+                                                    @endif
                                                     @if(!empty($transaction->api))
                                                     <strong>Provider: </strong>{{ $transaction->api->name }} <br>
                                                     @endif
@@ -227,7 +253,7 @@
 
                                                 @if(hasAccess('admin.single.transaction.view'))
                                                 <td>
-                                                    @if($transaction->reason == 'Airtime2Cash Payment')
+                                                    @if(($transaction->product?->type ?? null) === 'airtime2cash')
                                                     <a class="btn btn-primary btn-sm mr-1 mb-1" href="{{ route('admin.single.airtime2cash.transaction.view', $transaction->airtime2cash->id) }}">
                                                         <i class="fa fa-eye"></i><span class="align-middle ml-25">View</span>
                                                     </a>

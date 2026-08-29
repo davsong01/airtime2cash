@@ -13,8 +13,14 @@ class Customer extends Model
 {
     use HasFactory;
     protected $guarded = [];
+    protected $attributes = [
+        'can_access_w2bank' => 1,
+        'can_access_w2bank_auto' => 0,
+        'can_access_a2c' => 0,
+    ];
     protected $casts = [
         'can_access_w2bank' => 'boolean',
+        'can_access_w2bank_auto' => 'boolean',
         'can_access_a2c' => 'boolean',
     ];
 

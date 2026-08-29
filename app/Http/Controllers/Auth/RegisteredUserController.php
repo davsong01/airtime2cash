@@ -126,6 +126,9 @@ class RegisteredUserController extends Controller
             'wallet' => 0,
             'referal_wallet' => 0,
             'customer_level' => env('DEFAULT_CUSTOMER_LEVEL_ID') ?? 1,
+            'can_access_w2bank' => 1,
+            'can_access_w2bank_auto' => 0,
+            'can_access_a2c' => 0,
         ]);
 
         KycData::create([

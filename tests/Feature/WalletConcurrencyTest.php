@@ -12,12 +12,14 @@ use App\Http\Middleware\AdminMiddleware;
 use App\Http\Middleware\CheckIpMiddleware;
 use App\Http\Middleware\RouteProtectionMiddleware;
 use App\Models\Customer;
+use App\Models\Admin;
 use App\Models\TransactionLog;
 use App\Models\Wallet;
 use App\Services\AutoSyncService;
 use App\Services\WalletSnapshotBackfillService;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -112,6 +114,7 @@ class WalletConcurrencyTest extends TestCase
             'referal_wallet' => 0,
             'a2cashwallet' => 0,
             'can_access_w2bank' => 1,
+            'can_access_w2bank_auto' => 1,
             'can_access_a2c' => 0,
         ]);
 
@@ -210,6 +213,316 @@ class WalletConcurrencyTest extends TestCase
 
         $this->assertSame(50000.0, (float) $user->fresh()->customer->wallet);
         $this->assertDatabaseCount('transaction_logs', 1);
+    }
+
+    public function test_manual_wallet_to_bank_requests_do_not_store_provider_linkage(): void
+    {
+        $user = User::factory()->create([
+            'firstname' => 'Manual',
+            'lastname' => 'Request',
+            'email' => 'manual.request@example.com',
+            'phone' => '08040000002',
+            'email_verified_at' => now(),
+            'status' => 'active',
+        ]);
+
+        Customer::create([
+            'user_id' => $user->id,
+            'wallet' => 50000,
+            'referal_wallet' => 0,
+            'a2cashwallet' => 0,
+            'can_access_w2bank' => 1,
+            'can_access_w2bank_auto' => 0,
+            'can_access_a2c' => 0,
+            'kyc_status' => 'verified',
+        ]);
+
+        $provider = API::create([
+            'name' => 'Manual Transfer Provider',
+            'slug' => 'manual-transfer-provider',
+            'status' => 'active',
+            'pricing_data_status' => true,
+            'pricing_data' => json_encode([
+                [
+                    'min_amount' => 1000,
+                    'max_amount' => 10000,
+                    'provider_fee' => 50,
+                    'extra_charge' => 0,
+                ],
+            ]),
+            'extra_charges' => json_encode([]),
+        ]);
+
+        DB::table('settings')->insert([
+            'currency' => '₦',
+            'logo' => 'site/upgrade.jpg',
+            'dashboard_logo' => 'site/upgrade.jpg',
+            'favicon' => 'site/upgrade.jpg',
+            'bank_transfer_provider_id' => $provider->id,
+            'wallet_to_bank_transfer_manual_status' => 'enabled',
+            'wallet_to_bank_transfer_auto_status' => 'enabled',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $bank = Bank::create([
+            'bank_name' => 'Manual Bank',
+            'cbn_code' => '999',
+            'status' => 'active',
+        ]);
+
+        $category = Category::create([
+            'name' => 'Wallet Transfer Manual',
+            'slug' => 'wallet-transfer-manual-category',
+            'type' => 'wallet2bank',
+            'status' => 'active',
+        ]);
+
+        $product = Product::create([
+            'name' => 'Wallet to Bank Manual',
+            'slug' => 'wallet-to-bank-manual-product',
+            'type' => 'wallet2bank',
+            'category_id' => $category->id,
+            'status' => 'active',
+            'api_id' => $provider->id,
+        ]);
+
+        $response = $this->withoutMiddleware()
+            ->actingAs($user)
+            ->post(route('initialize.wallet2banktransaction', $product->id), [
+                'amount' => '₦8,000.00',
+                'bank' => $bank->cbn_code,
+                'account_name' => 'Manual Receiver',
+                'account_number' => '1234567890',
+                'transfer_mode' => 'manual',
+            ]);
+
+        $response->assertRedirect();
+
+        $transaction = TransactionLog::query()
+            ->where('customer_id', $user->customer->id)
+            ->where('reason', 'Wallet to Bank Transfer')
+            ->latest('id')
+            ->firstOrFail();
+
+        $this->assertSame('manual', $transaction->transfer_mode);
+        $this->assertNull($transaction->api_id);
+        $this->assertDatabaseHas('transaction_logs', [
+            'id' => $transaction->id,
+            'transfer_mode' => 'manual',
+        ]);
+    }
+
+    public function test_wallet_to_bank_resolution_modal_hides_credit_and_process_actions(): void
+    {
+        $admin = User::factory()->create([
+            'firstname' => 'Admin',
+            'lastname' => 'Viewer',
+            'email_verified_at' => now(),
+            'status' => 'active',
+        ]);
+
+        \App\Models\Admin::create([
+            'user_id' => $admin->id,
+            'permissions' => '',
+        ]);
+
+        $user = User::factory()->create([
+            'firstname' => 'Wallet',
+            'lastname' => 'Viewer',
+            'email' => 'wallet.viewer@example.com',
+            'phone' => '08040000003',
+            'status' => 'active',
+        ]);
+
+        $customer = Customer::create([
+            'user_id' => $user->id,
+            'wallet' => 41950,
+            'referal_wallet' => 0,
+            'a2cashwallet' => 0,
+        ]);
+
+        $provider = API::create([
+            'name' => 'Wallet View Provider',
+            'slug' => 'wallet-view-provider',
+            'status' => 'active',
+            'pricing_data_status' => true,
+            'pricing_data' => json_encode([
+                [
+                    'min_amount' => 1000,
+                    'max_amount' => 10000,
+                    'provider_fee' => 50,
+                    'extra_charge' => 0,
+                ],
+            ]),
+            'extra_charges' => json_encode([]),
+        ]);
+
+        DB::table('settings')->insert([
+            'currency' => '₦',
+            'logo' => 'site/upgrade.jpg',
+            'dashboard_logo' => 'site/upgrade.jpg',
+            'favicon' => 'site/upgrade.jpg',
+            'bank_transfer_provider_id' => $provider->id,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $bank = Bank::create([
+            'bank_name' => 'Viewer Bank',
+            'cbn_code' => '999',
+            'status' => 'active',
+        ]);
+
+        $category = Category::create([
+            'name' => 'Wallet Transfer View',
+            'slug' => 'wallet-transfer-view-category',
+            'type' => 'wallet2bank',
+            'status' => 'active',
+        ]);
+
+        $product = Product::create([
+            'name' => 'Wallet to Bank View',
+            'slug' => 'wallet-to-bank-view-product',
+            'type' => 'wallet2bank',
+            'category_id' => $category->id,
+            'status' => 'active',
+            'image' => 'site/upgrade.jpg',
+            'api_id' => $provider->id,
+        ]);
+
+        $transaction = TransactionLog::create([
+            'status' => 'pending',
+            'reference_id' => 'W2B-VIEW-001',
+            'transaction_id' => 'W2B-VIEW-001',
+            'payment_method' => 'wallet',
+            'customer_id' => $customer->id,
+            'customer_email' => $user->email,
+            'customer_name' => $user->firstname,
+            'customer_phone' => $user->phone,
+            'discount' => 0,
+            'unit_price' => 8000,
+            'amount' => 8000,
+            'total_amount' => 8050,
+            'balance_before' => 50000,
+            'balance_after' => 41950,
+            'quantity' => 1,
+            'product_id' => $product->id,
+            'product_name' => $product->name,
+            'category_id' => $category->id,
+            'unique_element' => 'wallet2bank',
+            'reason' => 'Wallet to Bank Transfer',
+            'descr' => 'Wallet to Bank Transfer initiated for manual processing.',
+            'api_id' => $provider->id,
+            'bank_id' => $bank->id,
+            'bank_code' => $bank->cbn_code,
+            'account_name' => 'Viewer Receiver',
+            'account_number' => '1234567890',
+            'transfer_mode' => 'manual',
+        ]);
+
+        $response = $this->withoutMiddleware()
+            ->withViewErrors([])
+            ->actingAs($admin)
+            ->get(route('admin.single.transaction.view', $transaction->id));
+
+        $response->assertOk();
+        $response->assertSee('Wallet to Bank');
+        $response->assertDontSee('value="credit_customer"');
+        $response->assertDontSee('value="process"');
+    }
+
+    public function test_wallet_to_bank_failed_resolution_refunds_the_customer_wallet(): void
+    {
+        $admin = User::factory()->create([
+            'firstname' => 'Admin',
+            'lastname' => 'Resolver',
+            'email_verified_at' => now(),
+            'status' => 'active',
+        ]);
+
+        \App\Models\Admin::create([
+            'user_id' => $admin->id,
+            'permissions' => '',
+        ]);
+
+        $user = User::factory()->create([
+            'firstname' => 'Wallet',
+            'lastname' => 'Refund',
+            'email' => 'wallet.refund@example.com',
+            'phone' => '08040000001',
+            'status' => 'active',
+        ]);
+
+        $customer = Customer::create([
+            'user_id' => $user->id,
+            'wallet' => 41950,
+            'referal_wallet' => 0,
+            'a2cashwallet' => 0,
+            'can_access_w2bank' => 1,
+            'can_access_w2bank_auto' => 1,
+            'can_access_a2c' => 0,
+        ]);
+
+        $transaction = TransactionLog::create([
+            'status' => 'pending',
+            'reference_id' => 'W2B-REFUND-001',
+            'transaction_id' => 'W2B-REFUND-001',
+            'payment_method' => 'wallet',
+            'customer_id' => $customer->id,
+            'customer_email' => $user->email,
+            'customer_name' => $user->name,
+            'customer_phone' => $user->phone,
+            'unique_element' => 'wallet2bank',
+            'discount' => 0,
+            'unit_price' => 8000,
+            'amount' => 8000,
+            'total_amount' => 8050,
+            'balance_before' => 50000,
+            'balance_after' => 41950,
+            'quantity' => 1,
+            'reason' => 'Wallet to Bank Transfer',
+            'descr' => 'Wallet to Bank Transfer initiated for manual processing.',
+            'ip_address' => '127.0.0.1',
+            'domain_name' => 'localhost',
+        ]);
+
+        Wallet::create([
+            'customer_id' => $customer->id,
+            'type' => 'debit',
+            'amount' => 8050,
+            'balance_before' => 50000,
+            'balance_after' => 41950,
+            'transaction_id' => 'W2B-REFUND-001',
+            'reason' => 'Wallet to Bank Transfer',
+            'payment_method' => 'wallet',
+        ]);
+
+        $this->actingAs($admin);
+
+        $request = Request::create('/', 'POST', [
+            'action' => 'failed',
+            'reason' => 'Manual decline by admin',
+        ]);
+
+        $response = app(\App\Http\Controllers\TransactionController::class)->resolvePendingTransactionAction($request, $transaction);
+
+        $this->assertTrue(method_exists($response, 'getSession'));
+        $this->assertSame('Customer has been credited and the transaction was closed.', $response->getSession()->get('message'));
+        $this->assertSame(50000.0, (float) $customer->fresh()->wallet);
+
+        $this->assertDatabaseHas('transaction_logs', [
+            'id' => $transaction->id,
+            'status' => 'failed',
+            'balance_after' => 41950,
+        ]);
+
+        $this->assertDatabaseHas('wallets', [
+            'transaction_id' => 'W2B-REFUND-001',
+            'type' => 'credit',
+            'amount' => 8050,
+            'payment_method' => 'ADMIN-REFUND',
+        ]);
     }
 
     public function test_airtime_to_cash_detail_view_shows_wallet_trail(): void
@@ -633,5 +946,151 @@ class WalletConcurrencyTest extends TestCase
             return $request->method() === 'GET'
                 && $request->url() === 'https://autosync.test/api/transaction/ASNA2C20260828082539QHJE6M';
         });
+    }
+
+    public function test_admin_transactions_index_shows_wallet_to_bank_and_airtime_to_cash_modes(): void
+    {
+        $admin = $this->createAdminUser();
+        $user = User::factory()->create([
+            'firstname' => 'Mode',
+            'lastname' => 'Tester',
+            'email' => 'mode.tester@example.com',
+            'phone' => '08030000099',
+            'status' => 'active',
+        ]);
+
+        $customer = Customer::create([
+            'user_id' => $user->id,
+            'wallet' => 50000,
+            'referal_wallet' => 0,
+            'a2cashwallet' => 0,
+        ]);
+
+        DB::table('settings')->insert([
+            'currency' => '₦',
+            'logo' => 'site/upgrade.jpg',
+            'dashboard_logo' => 'site/upgrade.jpg',
+            'favicon' => 'site/upgrade.jpg',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $walletCategory = Category::create([
+            'name' => 'Mode Tests W2B',
+            'slug' => 'mode-tests-w2b',
+            'type' => 'wallet2bank',
+            'status' => 'active',
+        ]);
+
+        $airtimeCategory = Category::create([
+            'name' => 'Mode Tests A2C',
+            'slug' => 'mode-tests-a2c',
+            'type' => 'airtime2cash',
+            'status' => 'active',
+        ]);
+
+        $provider = API::create([
+            'name' => 'Mode Provider',
+            'slug' => 'mode-provider',
+            'status' => 'active',
+        ]);
+
+        $walletProduct = Product::create([
+            'name' => 'Mode Wallet Product',
+            'slug' => 'mode-wallet-product',
+            'display_name' => 'Mode Wallet Product',
+            'type' => 'wallet2bank',
+            'category_id' => $walletCategory->id,
+            'status' => 'active',
+            'api_id' => $provider->id,
+        ]);
+
+        $airtimeProduct = Product::create([
+            'name' => 'Mode Airtime Product',
+            'slug' => 'mode-airtime-product',
+            'display_name' => 'Mode Airtime Product',
+            'type' => 'airtime2cash',
+            'category_id' => $airtimeCategory->id,
+            'status' => 'active',
+            'api_id' => $provider->id,
+        ]);
+
+        TransactionLog::create([
+            'status' => 'success',
+            'reference_id' => 'W2B-MODE-001',
+            'transaction_id' => 'W2B-MODE-001',
+            'payment_method' => 'wallet',
+            'customer_id' => $customer->id,
+            'customer_email' => $user->email,
+            'customer_name' => $user->firstname,
+            'customer_phone' => $user->phone,
+            'discount' => 0,
+            'unit_price' => 5000,
+            'amount' => 5000,
+            'total_amount' => 5050,
+            'balance_before' => 20000,
+            'balance_after' => 14950,
+            'quantity' => 1,
+            'product_id' => $walletProduct->id,
+            'product_name' => $walletProduct->name,
+            'category_id' => $walletCategory->id,
+            'api_id' => $provider->id,
+            'unique_element' => 'Wallet2Bank',
+            'transfer_mode' => 'manual',
+        ]);
+
+        TransactionLog::create([
+            'status' => 'success',
+            'reference_id' => 'A2C-MODE-001',
+            'transaction_id' => 'A2C-MODE-001',
+            'payment_method' => 'wallet',
+            'customer_id' => $customer->id,
+            'customer_email' => $user->email,
+            'customer_name' => $user->firstname,
+            'customer_phone' => $user->phone,
+            'discount' => 0,
+            'unit_price' => 5000,
+            'amount' => 5000,
+            'total_amount' => 5050,
+            'balance_before' => 20000,
+            'balance_after' => 20000,
+            'quantity' => 1,
+            'product_id' => $airtimeProduct->id,
+            'product_name' => $airtimeProduct->name,
+            'category_id' => $airtimeCategory->id,
+            'api_id' => $provider->id,
+            'unique_element' => 'Airtime2Cash',
+            'transfer_mode' => 'auto_share',
+        ]);
+
+        $response = $this->withoutMiddleware([
+                AdminMiddleware::class,
+                CheckIpMiddleware::class,
+                RouteProtectionMiddleware::class,
+            ])
+            ->actingAs($admin)
+            ->get(route('admin.trans'));
+
+        $response->assertOk();
+        $response->assertSee('Mode:');
+        $response->assertSee('Manual');
+        $response->assertSee('Auto');
+    }
+
+    private function createAdminUser(): User
+    {
+        $user = User::factory()->create([
+            'firstname' => 'Admin',
+            'lastname' => 'User',
+            'email_verified_at' => now(),
+            'status' => 'active',
+        ]);
+
+        Admin::create([
+            'user_id' => $user->id,
+            'permissions' => '',
+        ]);
+
+        return $user;
     }
 }
