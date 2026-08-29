@@ -412,7 +412,7 @@ class CustomerController extends Controller
 
     function updateCustomer(Request $request, $id = null)
     {
-        $val = $request->validate([
+        $validated = $request->validate([
             'status' => 'required',
             'firstname' => 'required',
             'lastname' => 'required',
@@ -420,34 +420,46 @@ class CustomerController extends Controller
             'can_access_a2c' => ['nullable', 'in:0,1'],
         ]);
 
-        $user = User::where('id', $id)->first();
-        $user->update($request->except(['_token', 'ip', 'customerlevel', 'can_access_w2bank', 'can_access_a2c']));
+        $level = null;
 
-        if ($user?->customer) {
-            $user->customer->update([
-                'can_access_w2bank' => $request->boolean('can_access_w2bank'),
-                'can_access_a2c' => $request->boolean('can_access_a2c'),
-            ]);
-        }
-
-        if(!empty($request->customerlevel)){
+        if (! empty($request->customerlevel)) {
             $level = CustomerLevel::enabled()->where('id', $request->customerlevel)->first();
 
-            if (!$level) {
+            if (! $level) {
                 return back()->with('error', 'Please select an enabled customer level');
             }
-
-            $user->customer->customer_level = $level->id;
-
-            if(!empty($level->transaction)){
-                $level->transaction->update([
-                    'status' => 'success',
-                    'descr' => 'Level Upgrade from ' . $user->customer->level->name . ' to ' . $level->name . ' was successful',
-                ]);
-                $user->customer->api_access = 'active';
-            }
-            $user->customer->save();
         }
+
+        DB::transaction(function () use ($request, $id, $validated, $level) {
+            $user = User::query()->findOrFail($id);
+            $customer = Customer::query()->where('user_id', $user->id)->lockForUpdate()->first();
+
+            $user->update($request->except(['_token', 'ip', 'customerlevel', 'can_access_w2bank', 'can_access_a2c']));
+
+            if ($customer) {
+                $customer->forceFill([
+                    'can_access_w2bank' => (int) ($validated['can_access_w2bank'] ?? 0),
+                    'can_access_a2c' => (int) ($validated['can_access_a2c'] ?? 0),
+                ])->save();
+            }
+
+            if ($level && $customer) {
+                $previousLevelName = $customer->level?->name ?? 'Unassigned';
+
+                $customer->customer_level = $level->id;
+
+                if (!empty($level->transaction)) {
+                    $level->transaction->update([
+                        'status' => 'success',
+                        'descr' => 'Level Upgrade from ' . $previousLevelName . ' to ' . $level->name . ' was successful',
+                    ]);
+                    $customer->api_access = 'active';
+                }
+
+                $customer->save();
+            }
+        });
+
         return back()->with('message', 'Update successful!');
 
     }

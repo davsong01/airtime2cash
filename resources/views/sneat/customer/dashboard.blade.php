@@ -19,6 +19,7 @@
             --dashboard-glass-shadow: 0 1.35rem 3rem rgba(34, 48, 62, .09),
                 0 .3rem .85rem rgba(34, 48, 62, .055);
             position: relative;
+            overflow-x: clip;
             isolation: isolate;
         }
 

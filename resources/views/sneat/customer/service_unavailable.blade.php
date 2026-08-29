@@ -102,7 +102,7 @@
                                 @if(!empty($adminWhatsappLink))
                                     <a class="btn btn-success locked-service-cta" href="{{ $adminWhatsappLink }}" target="_blank" rel="noopener">
                                         <i class="bx bxl-whatsapp"></i>
-                                        Contact Admin on WhatsApp
+                                        Click to contact admin on WhatsApp
                                     </a>
                                     {{-- <small class="d-block text-muted mt-1">Admin WhatsApp: {{ $adminWhatsappNumber }}</small> --}}
                                 @else

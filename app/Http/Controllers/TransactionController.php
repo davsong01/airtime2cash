@@ -894,8 +894,10 @@ class TransactionController extends Controller
 
     private function customerCanAccessService(string $service): bool
     {
-        $customer = auth()->user()?->customer;
-
+        $customerId = auth()->user()?->customer?->id;
+        $customer = $customerId
+            ? Customer::query()->select(['id', 'can_access_w2bank', 'can_access_a2c'])->whereKey($customerId)->first()
+            : null;
         if (! $customer) {
             return false;
         }
