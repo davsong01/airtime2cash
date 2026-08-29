@@ -4,13 +4,18 @@ namespace Tests\Feature;
 
 use App\Http\Middleware\AdminMiddleware;
 use App\Http\Middleware\CheckIpMiddleware;
+use App\Http\Middleware\ReservedAccountCreationMiddleware;
+use App\Http\Middleware\TransactionPinMiddleware;
 use App\Http\Middleware\RouteProtectionMiddleware;
 use App\Models\API;
 use App\Models\Admin;
 use App\Models\Category;
 use App\Models\Customer;
+use App\Models\Bank;
 use App\Models\Product;
+use App\Models\TransactionLog;
 use App\Models\User;
+use App\Http\Controllers\Providers\MonnifyController;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\ViewErrorBag;
@@ -300,6 +305,432 @@ class CustomerAccessControlsTest extends TestCase
         ]);
     }
 
+    public function test_customer_can_save_a_verified_locked_wallet_bank_account(): void
+    {
+        $user = $this->createCustomerUser('John', 'Doe');
+        $provider = API::create([
+            'name' => 'Monnify',
+            'slug' => 'monnify',
+            'status' => 'active',
+        ]);
+
+        Bank::create([
+            'bank_name' => 'Access Bank',
+            'cbn_code' => '044',
+            'status' => 'active',
+        ]);
+
+        DB::table('settings')->insert([
+            'currency' => '₦',
+            'bank_verification_provider_id' => $provider->id,
+            'logo' => 'site/upgrade.jpg',
+            'dashboard_logo' => 'site/upgrade.jpg',
+            'favicon' => 'site/upgrade.jpg',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->app->instance(MonnifyController::class, new class extends MonnifyController {
+            public function verifyBankDetails(array $data)
+            {
+                return response()->json([
+                    'status' => true,
+                    'message' => 'Bank details verified successfully.',
+                    'data' => [
+                        'account_name' => 'John Doe',
+                        'account_number' => $data['account_number'] ?? null,
+                        'bank_name' => 'Access Bank',
+                    ],
+                ]);
+            }
+        });
+
+        $this->withoutMiddleware()
+            ->actingAs($user)
+            ->post(route('profile.wallet-bank-account.store'), [
+                'bank' => '044',
+                'account_number' => '1234567890',
+            ])
+            ->assertRedirect();
+
+        $customer = $user->fresh('customer')->customer;
+
+        $this->assertNotNull($customer?->wallet_bank_account);
+        $this->assertSame('Access Bank', data_get($customer->wallet_bank_account, 'bank_name'));
+        $this->assertSame('John Doe', data_get($customer->wallet_bank_account, 'account_name'));
+        $this->assertSame('1234567890', data_get($customer->wallet_bank_account, 'account_number'));
+    }
+
+    public function test_receipt_download_does_not_crash_when_authenticated_user_has_no_customer_profile(): void
+    {
+        $user = User::factory()->create([
+            'type' => 'customer',
+            'email_verified_at' => now(),
+            'transaction_pin' => null,
+        ]);
+
+        DB::table('settings')->insert([
+            'currency' => '₦',
+            'logo' => 'site/upgrade.jpg',
+            'dashboard_logo' => 'site/upgrade.jpg',
+            'favicon' => 'site/upgrade.jpg',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $transaction = TransactionLog::create([
+            'status' => 'pending',
+            'reference_id' => 'W2B-TEST-NO-CUSTOMER-001',
+            'transaction_id' => 'W2B-TEST-NO-CUSTOMER-001',
+            'payment_method' => 'wallet',
+            'customer_id' => 1,
+            'customer_email' => 'missing.customer@example.com',
+            'customer_phone' => '08000000000',
+            'customer_name' => 'Missing Customer',
+            'discount' => 0,
+            'unit_price' => 1000,
+            'quantity' => 1,
+            'total_amount' => 1020,
+            'amount' => 1000,
+            'balance_before' => 5000,
+            'balance_after' => 3980,
+            'descr' => 'Wallet to Bank Transfer',
+            'product_name' => 'Wallet to Bank',
+            'unique_element' => 'Wallet2Bank',
+            'reason' => 'Wallet to Bank Transfer',
+            'transfer_mode' => 'manual',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->withoutMiddleware([
+                CheckIpMiddleware::class,
+                TransactionPinMiddleware::class,
+                ReservedAccountCreationMiddleware::class,
+            ])
+            ->actingAs($user)
+            ->get(route('transaction.receipt.download', $transaction->id));
+
+        $response->assertStatus(403);
+    }
+
+    public function test_admin_can_download_receipt_without_customer_profile(): void
+    {
+        $admin = $this->createAdminUser();
+        $customer = $this->createCustomerUser('Receipt', 'Owner', [
+            'kyc_status' => 'verified',
+        ]);
+        $bank = Bank::create([
+            'bank_name' => 'Access Bank',
+            'cbn_code' => '044',
+            'status' => 'active',
+        ]);
+
+        DB::table('settings')->insert([
+            'currency' => '₦',
+            'logo' => 'site/upgrade.jpg',
+            'dashboard_logo' => 'site/upgrade.jpg',
+            'favicon' => 'site/upgrade.jpg',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $transaction = TransactionLog::create([
+            'status' => 'success',
+            'reference_id' => 'W2B-TEST-RECEIPT-001',
+            'transaction_id' => 'W2B-TEST-RECEIPT-001',
+            'payment_method' => 'wallet',
+            'customer_id' => $customer->customer->id,
+            'customer_email' => $customer->email,
+            'customer_phone' => $customer->phone,
+            'customer_name' => $customer->name,
+            'discount' => 0,
+            'unit_price' => 1000,
+            'quantity' => 1,
+            'total_amount' => 1020,
+            'amount' => 1000,
+            'balance_before' => 5000,
+            'balance_after' => 3980,
+            'descr' => 'Wallet to Bank Transfer',
+            'product_name' => 'Wallet to Bank',
+            'unique_element' => 'Wallet2Bank',
+            'reason' => 'Wallet to Bank Transfer',
+            'bank_id' => $bank->id,
+            'bank_code' => $bank->cbn_code,
+            'account_name' => 'Receipt Receiver',
+            'account_number' => '1234567890',
+            'transfer_mode' => 'manual',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->withoutMiddleware([
+                CheckIpMiddleware::class,
+                TransactionPinMiddleware::class,
+                ReservedAccountCreationMiddleware::class,
+            ])
+            ->actingAs($admin)
+            ->get(route('transaction.receipt.download', $transaction->id));
+
+        $response->assertOk();
+    }
+
+    public function test_admin_can_edit_customer_wallet_bank_account_details(): void
+    {
+        $admin = $this->createAdminUser();
+        $user = $this->createCustomerUser('Editable', 'Customer');
+        $customer = $user->customer;
+        $provider = API::create([
+            'name' => 'Monnify',
+            'slug' => 'monnify',
+            'status' => 'active',
+        ]);
+
+        $bank = Bank::create([
+            'bank_name' => 'Access Bank',
+            'cbn_code' => '044',
+            'status' => 'active',
+        ]);
+
+        DB::table('settings')->insert([
+            'currency' => '₦',
+            'bank_verification_provider_id' => $provider->id,
+            'bank_transfer_provider_id' => $provider->id,
+            'logo' => 'site/upgrade.jpg',
+            'dashboard_logo' => 'site/upgrade.jpg',
+            'favicon' => 'site/upgrade.jpg',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->app->instance(MonnifyController::class, new class extends MonnifyController {
+            public function verifyBankDetails(array $data)
+            {
+                return response()->json([
+                    'status' => true,
+                    'message' => 'Bank details verified successfully.',
+                    'data' => [
+                        'account_name' => 'Editable Customer',
+                        'account_number' => $data['account_number'] ?? null,
+                        'bank_name' => 'Access Bank',
+                    ],
+                ]);
+            }
+        });
+
+        $customer->forceFill([
+            'wallet_bank_account' => [
+                'bank_id' => '1',
+                'bank_code' => '000',
+                'bank_name' => 'Old Bank',
+                'account_number' => '0000000000',
+                'account_name' => 'Old Name',
+                'profile_name' => 'Editable Customer',
+                'verified_name' => 'Old Name',
+                'verified_at' => '2026-08-29 10:00:00',
+                'verification_response' => ['status' => 'old'],
+            ],
+        ])->save();
+
+        $this->withoutMiddleware([
+                AdminMiddleware::class,
+                CheckIpMiddleware::class,
+                RouteProtectionMiddleware::class,
+            ])
+            ->actingAs($admin)
+            ->post(route('customers.wallet-bank-account.update', $customer->id), [
+                'wallet_bank_bank' => '044',
+                'wallet_bank_account_name' => 'Editable Customer',
+                'wallet_bank_account_number' => '1234567890',
+                'wallet_bank_profile_name' => 'Editable Customer',
+                'wallet_bank_verified_name' => 'Editable Customer',
+                'wallet_bank_verified_at' => '2026-08-29T17:30',
+                'wallet_bank_verification_response' => json_encode([
+                    'status' => true,
+                    'message' => 'Updated',
+                ]),
+            ])
+            ->assertRedirect();
+
+        $customer->refresh();
+
+        $this->assertSame($bank->id, data_get($customer->wallet_bank_account, 'bank_id'));
+        $this->assertSame('Access Bank', data_get($customer->wallet_bank_account, 'bank_name'));
+        $this->assertSame('044', data_get($customer->wallet_bank_account, 'bank_code'));
+        $this->assertSame('1234567890', data_get($customer->wallet_bank_account, 'account_number'));
+        $this->assertSame('Editable Customer', data_get($customer->wallet_bank_account, 'verified_name'));
+        $this->assertSame('2026-08-29 17:30:00', data_get($customer->wallet_bank_account, 'verified_at'));
+        $this->assertSame('Updated', data_get($customer->wallet_bank_account, 'verification_response.message'));
+    }
+
+    public function test_customer_can_save_wallet_bank_account_when_verified_name_matches_even_if_order_differs(): void
+    {
+        $user = $this->createCustomerUser('David', 'Oghi', [], [
+            'middlename' => 'Oghenerume',
+        ]);
+        $provider = API::create([
+            'name' => 'Monnify',
+            'slug' => 'monnify',
+            'status' => 'active',
+        ]);
+
+        Bank::create([
+            'bank_name' => 'Access Bank',
+            'cbn_code' => '044',
+            'status' => 'active',
+        ]);
+
+        DB::table('settings')->insert([
+            'currency' => '₦',
+            'bank_verification_provider_id' => $provider->id,
+            'logo' => 'site/upgrade.jpg',
+            'dashboard_logo' => 'site/upgrade.jpg',
+            'favicon' => 'site/upgrade.jpg',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->app->instance(MonnifyController::class, new class extends MonnifyController {
+            public function verifyBankDetails(array $data)
+            {
+                return response()->json([
+                    'status' => true,
+                    'message' => 'Bank details verified successfully.',
+                    'data' => [
+                        'account_name' => 'OGHI DAVID OGHENERUME',
+                        'account_number' => $data['account_number'] ?? null,
+                        'bank_name' => 'Access Bank',
+                    ],
+                ]);
+            }
+        });
+
+        $this->withoutMiddleware()
+            ->actingAs($user)
+            ->post(route('profile.wallet-bank-account.store'), [
+                'bank' => '044',
+                'account_number' => '1234567890',
+            ])
+            ->assertRedirect();
+
+        $customer = $user->fresh('customer')->customer;
+
+        $this->assertNotNull($customer?->wallet_bank_account);
+        $this->assertSame('Access Bank', data_get($customer->wallet_bank_account, 'bank_name'));
+        $this->assertSame('OGHI DAVID OGHENERUME', data_get($customer->wallet_bank_account, 'account_name'));
+    }
+
+    public function test_customer_cannot_save_wallet_bank_account_when_verified_name_does_not_match_profile(): void
+    {
+        $user = $this->createCustomerUser('John', 'Doe');
+        $provider = API::create([
+            'name' => 'Monnify',
+            'slug' => 'monnify',
+            'status' => 'active',
+        ]);
+
+        Bank::create([
+            'bank_name' => 'Access Bank',
+            'cbn_code' => '044',
+            'status' => 'active',
+        ]);
+
+        DB::table('settings')->insert([
+            'currency' => '₦',
+            'bank_verification_provider_id' => $provider->id,
+            'logo' => 'site/upgrade.jpg',
+            'dashboard_logo' => 'site/upgrade.jpg',
+            'favicon' => 'site/upgrade.jpg',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->app->instance(MonnifyController::class, new class extends MonnifyController {
+            public function verifyBankDetails(array $data)
+            {
+                return response()->json([
+                    'status' => true,
+                    'message' => 'Bank details verified successfully.',
+                    'data' => [
+                        'account_name' => 'Jane Doe',
+                        'account_number' => $data['account_number'] ?? null,
+                        'bank_name' => 'Access Bank',
+                    ],
+                ]);
+            }
+        });
+
+        $this->withoutMiddleware()
+            ->actingAs($user)
+            ->post(route('profile.wallet-bank-account.store'), [
+                'bank' => '044',
+                'account_number' => '1234567890',
+            ])
+            ->assertSessionHas('error');
+
+        $customer = $user->fresh('customer')->customer;
+        $this->assertEmpty($customer?->wallet_bank_account);
+    }
+
+    public function test_wallet_to_bank_page_prompts_for_locked_bank_account_when_missing(): void
+    {
+        $user = $this->createCustomerUser('Page', 'Tester', [
+            'kyc_status' => 'verified',
+        ]);
+
+        $provider = API::create([
+            'name' => 'Wallet Provider',
+            'slug' => 'monnify',
+            'status' => 'active',
+            'pricing_data_status' => true,
+            'pricing_data' => json_encode([
+                [
+                    'min_amount' => 100,
+                    'max_amount' => 10000,
+                    'provider_fee' => 50,
+                    'extra_charge' => 0,
+                ],
+            ]),
+            'extra_charges' => json_encode([]),
+        ]);
+
+        $category = Category::create([
+            'name' => 'Wallet Transfer',
+            'slug' => 'wallet-transfer-profile-test',
+            'type' => 'wallet2bank',
+            'status' => 'active',
+        ]);
+
+        Product::create([
+            'name' => 'Wallet to Bank',
+            'slug' => 'wallet-to-bank-profile-test',
+            'type' => 'wallet2bank',
+            'category_id' => $category->id,
+            'status' => 'active',
+            'api_id' => $provider->id,
+        ]);
+
+        DB::table('settings')->insert([
+            'currency' => '₦',
+            'bank_transfer_provider_id' => $provider->id,
+            'bank_verification_provider_id' => $provider->id,
+            'logo' => 'site/upgrade.jpg',
+            'dashboard_logo' => 'site/upgrade.jpg',
+            'favicon' => 'site/upgrade.jpg',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->withoutMiddleware()
+            ->actingAs($user)
+            ->get(route('wallet-to-bank', 'wallet-to-bank-profile-test'));
+
+        $response->assertOk();
+        $response->assertSee('You have not set up your wallet to bank account details yet.');
+        $response->assertSee('id="transfer-submit"', false);
+        $response->assertSee('disabled', false);
+    }
+
     private function createAdminUser(): User
     {
         $user = User::factory()->create([
@@ -317,14 +748,14 @@ class CustomerAccessControlsTest extends TestCase
         return $user;
     }
 
-    private function createCustomerUser(string $firstName, string $lastName, array $customerAttributes = []): User
+    private function createCustomerUser(string $firstName, string $lastName, array $customerAttributes = [], array $userAttributes = []): User
     {
-        $user = User::factory()->create([
+        $user = User::factory()->create(array_merge([
             'firstname' => $firstName,
             'lastname' => $lastName,
             'email_verified_at' => now(),
             'status' => 'active',
-        ]);
+        ], $userAttributes));
 
         Customer::create(array_merge([
             'user_id' => $user->id,

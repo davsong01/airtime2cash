@@ -272,6 +272,12 @@
                                                                 ?: data_get($requestData, 'bank_code')
                                                                 ?: data_get($requestData, 'bank')
                                                                 ?: $legacyBankCode;
+                                                            $displayAccountName = filled($transaction->account_name)
+                                                                ? $transaction->account_name
+                                                                : data_get($requestData, 'account_name');
+                                                            $displayAccountNumber = filled($transaction->account_number)
+                                                                ? $transaction->account_number
+                                                                : data_get($requestData, 'account_number');
                                                             $transactionProviderSlug = strtolower((string) ($transaction->api?->slug ?? ''));
                                                             $transactionProviderStatus = strtolower((string) (
                                                                 data_get($apiResponseData, 'responseBody.status')
@@ -542,16 +548,24 @@
                                                                             <span>Bank Name</span>
                                                                             <strong>{{ $bankName }}</strong>
                                                                                         </div>
-                                                                                        <div class="txn-breakdown-row">
-                                                                                            <span>Account Name</span>
-                                                                                            <strong>{{ $transaction->account_name ?: 'N/A' }}</strong>
-                                                                                        </div>
-                                                                        <div class="txn-breakdown-row mb-0">
-                                                                            <span>Account Number</span>
-                                                                            <strong>{{ $transaction->account_number ?: 'N/A' }}</strong>
-                                                                        </div>
+                                                                        @if(filled($displayAccountName) || filled($displayAccountNumber))
+                                                                            <div class="txn-breakdown-row">
+                                                                                <span>Account Name</span>
+                                                                                <strong>{{ filled($displayAccountName) ? $displayAccountName : 'Not captured' }}</strong>
+                                                                            </div>
+                                                                            <div class="txn-breakdown-row mb-0">
+                                                                                <span>Account Number</span>
+                                                                                <strong>{{ filled($displayAccountNumber) ? $displayAccountNumber : 'Not captured' }}</strong>
+                                                                            </div>
+                                                                        @else
+                                                                            <div class="txn-breakdown-section">
+                                                                                <div class="alert alert-light-warning mb-0">
+                                                                                    Account details were not captured for this transaction.
+                                                                                </div>
+                                                                            </div>
+                                                                        @endif
                                                                     </div>
-                                                                    @if($isWalletToBank && filled($transaction->account_number))
+                                                                    @if($isWalletToBank && filled($displayAccountNumber))
                                                                         <div class="mt-2">
                                                                             <button
                                                                                 type="button"

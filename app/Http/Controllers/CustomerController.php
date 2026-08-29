@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use Carbon\Carbon;
 use App\Models\User;
+use App\Models\API;
 use App\Models\Customer;
 use App\Models\BlackList;
+use App\Models\Bank;
 use Illuminate\Http\Request;
 use App\Models\CustomerLevel;
 use App\Models\KycData;
@@ -14,6 +16,7 @@ use App\Models\Airtime2CashTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use App\Models\ReservedAccountNumber;
+use Illuminate\Http\JsonResponse;
 
 class CustomerController extends Controller
 {
@@ -346,6 +349,7 @@ class CustomerController extends Controller
         $downlines = collect();
         $reservedAccount = collect();
         $availableReservedBanks = collect();
+        $banks = collect();
         $transactions = null;
         $airtimeTransactions = null;
         $kycData = collect();
@@ -354,6 +358,7 @@ class CustomerController extends Controller
 
         if ($activeTab === 'account') {
             $customerLevels = CustomerLevel::enabled()->orderBy('order', 'ASC')->get();
+            $banks = Bank::active()->orderBy('bank_name')->get();
         } elseif ($activeTab === 'transactions') {
             $transactions = $user->customer->transactions()->latest()->paginate(10);
         } elseif ($activeTab === 'airtime2cash-transactions') {
@@ -415,6 +420,7 @@ class CustomerController extends Controller
                 'blacklists' => $blacklists,
                 'activeTab' => $activeTab,
                 'availableReservedBanks' => $availableReservedBanks,
+                'banks' => $banks,
             ]
         );
     }
@@ -473,6 +479,194 @@ class CustomerController extends Controller
 
         return back()->with('message', 'Update successful!');
 
+    }
+
+    public function updateWalletBankAccount(Request $request, Customer $customer)
+    {
+        $validated = $request->validate([
+            'wallet_bank_bank' => ['required', 'string', 'max:50'],
+            'wallet_bank_account_name' => ['nullable', 'string', 'max:255'],
+            'wallet_bank_account_number' => ['nullable', 'string', 'max:50'],
+            'wallet_bank_profile_name' => ['nullable', 'string', 'max:255'],
+            'wallet_bank_verified_name' => ['nullable', 'string', 'max:255'],
+            'wallet_bank_verified_at' => ['nullable', 'date'],
+            'wallet_bank_verification_response' => ['nullable', 'string'],
+        ]);
+
+        $existing = is_array($customer->wallet_bank_account) ? $customer->wallet_bank_account : [];
+        $bankReference = trim((string) $validated['wallet_bank_bank']);
+        $bank = Bank::active()->where(function ($query) use ($bankReference) {
+            $query->where('cbn_code', $bankReference)
+                ->orWhere('bank_name', $bankReference);
+
+            if (is_numeric($bankReference)) {
+                $query->orWhere('id', (int) $bankReference);
+            }
+        })->first();
+
+        if (! $bank) {
+            return back()->with('error', 'Please select a valid active bank.');
+        }
+
+        $accountNumber = trim((string) ($validated['wallet_bank_account_number'] ?? data_get($existing, 'account_number', '')));
+        if ($accountNumber === '') {
+            return back()->with('error', 'Please provide an account number.');
+        }
+
+        $verification = $this->verifyWalletBankDetails([
+            'bank_code' => $bank->cbn_code,
+            'account_number' => $accountNumber,
+        ]);
+
+        if (! (bool) data_get($verification, 'status', false)) {
+            return back()->with('error', data_get($verification, 'message', 'Unable to verify bank details right now.'));
+        }
+
+        $providerResponse = data_get($verification, 'raw_response')
+            ?? data_get($verification, 'data')
+            ?? $verification;
+        $verifiedAccountName = $this->extractVerifiedAccountName($providerResponse);
+
+        if (blank($verifiedAccountName)) {
+            return back()->with('error', 'The verification provider did not return an account name. Please try another bank account.');
+        }
+
+        $submittedAccountName = trim((string) ($validated['wallet_bank_account_name'] ?? ''));
+        if (filled($submittedAccountName) && ! $this->namesMatch($submittedAccountName, $verifiedAccountName)) {
+            return back()->with('error', 'The account name does not match the verified bank details. Please correct it and try again.');
+        }
+
+        $profileName = filled($validated['wallet_bank_profile_name'] ?? null)
+            ? trim((string) $validated['wallet_bank_profile_name'])
+            : data_get($existing, 'profile_name');
+
+        $next = [
+            'bank_id' => $bank->id,
+            'bank_name' => $bank->bank_name,
+            'bank_code' => $bank->cbn_code,
+            'account_name' => filled($submittedAccountName) ? $submittedAccountName : $verifiedAccountName,
+            'account_number' => $accountNumber,
+            'profile_name' => $profileName,
+            'verified_name' => filled($validated['wallet_bank_verified_name'] ?? null)
+                ? $validated['wallet_bank_verified_name']
+                : $verifiedAccountName,
+            'verified_at' => filled($validated['wallet_bank_verified_at'] ?? null)
+                ? Carbon::parse($validated['wallet_bank_verified_at'])->toDateTimeString()
+                : now()->toDateTimeString(),
+        ];
+
+        $verificationResponse = $validated['wallet_bank_verification_response'] ?? null;
+        if (filled($verificationResponse)) {
+            $decoded = json_decode($verificationResponse, true);
+            $next['verification_response'] = json_last_error() === JSON_ERROR_NONE
+                ? $decoded
+                : $verificationResponse;
+        } elseif (array_key_exists('verification_response', $existing)) {
+            $next['verification_response'] = $existing['verification_response'];
+        } else {
+            $next['verification_response'] = $providerResponse;
+        }
+
+        $customer->forceFill([
+            'wallet_bank_account' => array_filter($next, static fn ($value) => ! is_null($value) && $value !== ''),
+        ])->save();
+
+        return back()->with('message', 'Wallet to bank account details updated successfully.');
+    }
+
+    public function deleteWalletBankAccount(Customer $customer)
+    {
+        $customer->forceFill([
+            'wallet_bank_account' => null,
+        ])->save();
+
+        return back()->with('message', 'Wallet to bank account details deleted successfully.');
+    }
+
+    private function verifyWalletBankDetails(array $data): array
+    {
+        $providerId = getSettings()->bank_verification_provider_id ?: getSettings()->bank_transfer_provider_id;
+        $provider = API::where('id', $providerId)->where('status', 'active')->first();
+
+        if (! $provider) {
+            return [
+                'status' => false,
+                'message' => 'No active bank verification provider configured.',
+            ];
+        }
+
+        $controller = resolveProviderController($provider);
+
+        if (! $controller || ! method_exists($controller, 'verifyBankDetails')) {
+            return [
+                'status' => false,
+                'message' => "Bank verification is not supported for {$provider->slug}.",
+            ];
+        }
+
+        $response = $controller->verifyBankDetails($data);
+
+        return $response instanceof JsonResponse
+            ? $response->getData(true)
+            : (is_array($response) ? $response : []);
+    }
+
+    private function extractVerifiedAccountName(array $response): string
+    {
+        $candidates = [
+            data_get($response, 'data.account_name'),
+            data_get($response, 'data.accountName'),
+            data_get($response, 'responseBody.accountName'),
+            data_get($response, 'responseBody.account_name'),
+            data_get($response, 'account_name'),
+            data_get($response, 'accountName'),
+            data_get($response, 'data.data.account_name'),
+            data_get($response, 'data.data.accountName'),
+        ];
+
+        foreach ($candidates as $candidate) {
+            $candidate = trim((string) $candidate);
+
+            if ($candidate !== '') {
+                return $candidate;
+            }
+        }
+
+        return '';
+    }
+
+    private function normalizeBankAccountName(?string $value): string
+    {
+        $value = strtolower(trim((string) $value));
+
+        return trim((string) preg_replace('/[^a-z0-9]+/i', '', $value));
+    }
+
+    private function sortedNameTokens(string $value): array
+    {
+        $tokens = preg_split('/\s+/', trim(mb_strtolower((string) $value))) ?: [];
+
+        $tokens = array_values(array_filter(array_map(function ($token) {
+            $token = preg_replace('/[^a-z0-9]+/i', '', $token);
+
+            return trim((string) $token);
+        }, $tokens), fn ($token) => $token !== ''));
+
+        sort($tokens);
+
+        return $tokens;
+    }
+
+    private function namesMatch(string $left, string $right): bool
+    {
+        $normalizedLeft = $this->normalizeBankAccountName($left);
+        $normalizedRight = $this->normalizeBankAccountName($right);
+
+        if ($normalizedLeft === $normalizedRight) {
+            return true;
+        }
+
+        return $this->sortedNameTokens($left) === $this->sortedNameTokens($right);
     }
 
     function filterEmail(Request $request)

@@ -144,7 +144,7 @@
 									@if(in_array($transaction['reason'], ['LEVEL-UPGRADE','WALLET-FUNDING']))
 										{{ ucfirst(str_replace("-"," ",$transaction['reason']))}}
 									@else
-									 <strong>{{ $transaction['product']['name']}}</strong>@if(!empty($transaction['variation']['system_name'])) {{ " | ". $transaction['variation']['system_name'] }}@endif
+									 <strong>{{ data_get($transaction, 'product.name', $transaction['product_name'] ?? 'Transaction') }}</strong>@if(!empty(data_get($transaction, 'variation.system_name'))) {{ ' | ' . data_get($transaction, 'variation.system_name') }}@endif
 									@endif
 								</td>
 
@@ -200,7 +200,7 @@
 						@if(in_array($transaction['reason'], ['LEVEL-UPGRADE','WALLET-FUNDING']))
 							{{ ucfirst(str_replace("-"," ",$transaction['reason']))}}
 						@else
-						{{$transaction['product']['display_name']}} @if(!empty($transaction['variation']['system_name'])) ({{$transaction['variation']['system_name']}})@endif
+						{{ data_get($transaction, 'product.display_name', $transaction['product_name'] ?? 'Transaction') }} @if(!empty(data_get($transaction, 'variation.system_name'))) ({{ data_get($transaction, 'variation.system_name') }})@endif
 						@endif
 					</td>
 				</tr>

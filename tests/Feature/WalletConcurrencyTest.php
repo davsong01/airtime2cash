@@ -150,6 +150,17 @@ class WalletConcurrencyTest extends TestCase
             'status' => 'active',
         ]);
 
+        $customer->forceFill([
+            'wallet_bank_account' => [
+                'bank_id' => $bank->id,
+                'bank_code' => $bank->cbn_code,
+                'bank_name' => $bank->bank_name,
+                'account_name' => 'Guard Receiver',
+                'account_number' => '1234567890',
+                'verified_at' => now()->toDateTimeString(),
+            ],
+        ])->save();
+
         $category = Category::create([
             'name' => 'Wallet Transfer',
             'slug' => 'wallet-transfer-guard-category',
@@ -226,7 +237,7 @@ class WalletConcurrencyTest extends TestCase
             'status' => 'active',
         ]);
 
-        Customer::create([
+        $customer = Customer::create([
             'user_id' => $user->id,
             'wallet' => 50000,
             'referal_wallet' => 0,
@@ -271,6 +282,17 @@ class WalletConcurrencyTest extends TestCase
             'status' => 'active',
         ]);
 
+        $customer->forceFill([
+            'wallet_bank_account' => [
+                'bank_id' => $bank->id,
+                'bank_code' => $bank->cbn_code,
+                'bank_name' => $bank->bank_name,
+                'account_name' => 'Manual Receiver',
+                'account_number' => '1234567890',
+                'verified_at' => now()->toDateTimeString(),
+            ],
+        ])->save();
+
         $category = Category::create([
             'name' => 'Wallet Transfer Manual',
             'slug' => 'wallet-transfer-manual-category',
@@ -307,6 +329,16 @@ class WalletConcurrencyTest extends TestCase
 
         $this->assertSame('manual', $transaction->transfer_mode);
         $this->assertNull($transaction->api_id);
+        $this->assertSame($bank->id, $transaction->bank_id);
+        $this->assertSame($bank->cbn_code, $transaction->bank_code);
+        $this->assertSame($bank->bank_name, $transaction->bank?->bank_name);
+        $this->assertSame('Manual Receiver', $transaction->account_name);
+        $this->assertSame('1234567890', $transaction->account_number);
+        $requestData = json_decode((string) $transaction->request_data, true);
+        $this->assertSame($bank->cbn_code, data_get($requestData, 'bank_code'));
+        $this->assertSame($bank->bank_name, data_get($requestData, 'bank_name'));
+        $this->assertSame('Manual Receiver', data_get($requestData, 'account_name'));
+        $this->assertSame('1234567890', data_get($requestData, 'account_number'));
         $this->assertDatabaseHas('transaction_logs', [
             'id' => $transaction->id,
             'transfer_mode' => 'manual',

@@ -2,7 +2,7 @@
 <html>
 	<head>
 		<meta charset="utf-8" />
-		<title>{{ $transaction['product']['name']}}</title>
+		<title>{{ data_get($transaction, 'product.name', $transaction['product_name'] ?? 'Transaction') }}</title>
 
 		<style>
 			.invoice-box {
@@ -117,7 +117,7 @@
 							<tr>
 								<td class="title">
 									<?php 
-										$image = $transaction['product']['image'];
+										$image = data_get($transaction, 'product.image', 'site/upgrade.jpg');
 									?>
 									<img src="{{ url('/').'/'.getSettings()['logo']}}" style="width: 20%; max-width: 500px"/>
 									<img src="{{ url('/').'/'.$image  }}" style="width: 20%; max-width: 500px"/>
@@ -138,7 +138,7 @@
 									@if(!empty($transaction->decline_reason))
 										{!! $transactiondecline_reason !!}
 									@else
-									<strong>{{ $transaction['product']['name']}}</strong>
+									<strong>{{ data_get($transaction, 'product.name', $transaction['product_name'] ?? 'Transaction') }}</strong>
 									@endif
 								</td>
 							</tr>

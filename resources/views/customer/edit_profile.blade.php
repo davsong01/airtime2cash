@@ -136,14 +136,14 @@
                                                                                 value="{{ auth()->user()->email }}">
                                                                         </fieldset>
                                                                     </div>
-                                                                    
+
                                                                     <div class="col-md-6">
                                                                         <fieldset class="form-group">
                                                                             <label for="new_transaction_pin">New Transaction PIN</label>
                                                                             <input type="text" class="form-control" name="new_transaction_pin">
                                                                         </fieldset>
                                                                     </div>
-                                                                
+
                                                                     @if (auth()->user()->type == 'customer')
                                                                         <div class="col-md-6">
                                                                             <fieldset class="form-group">
@@ -171,6 +171,86 @@
                                                         </div>
                                                     </div>
                                                 </div>
+                                                <div class="col-md-12 mt-3">
+                                                    <div class="card">
+                                                        <div class="card-header d-flex justify-content-between align-items-center">
+                                                            <div>
+                                                                <h4 class="card-title mb-0">Wallet to Bank Account</h4>
+                                                                <small class="text-muted">This account is locked after verification and can only be changed by admin deletion.</small>
+                                                            </div>
+                                                            @if(!empty($walletBankAccount) && $walletBankAccountMatchesProfile)
+                                                                <span class="badge badge-success">Locked</span>
+                                                            @else
+                                                                <span class="badge badge-warning">Setup required</span>
+                                                            @endif
+                                                        </div>
+                                                        <div class="card-body">
+                                                            <div class="alert alert-warning">
+                                                                Any name you use to register is the name we will pay to, and it must match the name on your profile.
+                                                            </div>
+
+                                                            @if(!empty($walletBankAccount) && $walletBankAccountMatchesProfile)
+                                                                <div class="row">
+                                                                    <div class="col-md-4">
+                                                                        <fieldset class="form-group">
+                                                                            <label>Bank</label>
+                                                                            <input type="text" class="form-control" value="{{ data_get($walletBankAccount, 'bank_name', 'Not set') }}" disabled>
+                                                                        </fieldset>
+                                                                    </div>
+                                                                    <div class="col-md-4">
+                                                                        <fieldset class="form-group">
+                                                                            <label>Account name</label>
+                                                                            <input type="text" class="form-control" value="{{ data_get($walletBankAccount, 'account_name', 'Not set') }}" disabled>
+                                                                        </fieldset>
+                                                                    </div>
+                                                                    <div class="col-md-4">
+                                                                        <fieldset class="form-group">
+                                                                            <label>Account number</label>
+                                                                            <input type="text" class="form-control" value="{{ data_get($walletBankAccount, 'account_number', 'Not set') }}" disabled>
+                                                                        </fieldset>
+                                                                    </div>
+                                                                </div>
+                                                                <small class="text-muted d-block">Profile name: <strong>{{ data_get($walletBankAccount, 'profile_name', auth()->user()->name) }}</strong></small>
+                                                            @elseif(!empty($walletBankAccount) && ! $walletBankAccountMatchesProfile)
+                                                                <div class="alert alert-danger">
+                                                                    Your saved bank account no longer matches your current profile name. Please contact admin to delete it before you add a new one.
+                                                                    @if($adminWhatsappLink)
+                                                                        <div class="mt-2">
+                                                                            <a class="btn btn-success" href="{{ $adminWhatsappLink }}" target="_blank" rel="noopener">Click to contact admin on WhatsApp</a>
+                                                                        </div>
+                                                                    @endif
+                                                                </div>
+                                                            @else
+                                                                <form action="{{ route('profile.wallet-bank-account.store') }}" method="POST" autocomplete="off">
+                                                                    @csrf
+                                                                    <div class="row">
+                                                                        <div class="col-md-6">
+                                                                            <fieldset class="form-group">
+                                                                                <label for="wallet_bank_bank">Select bank</label>
+                                                                                <select class="form-control" name="bank" id="wallet_bank_bank" required>
+                                                                                    <option value="">Select</option>
+                                                                                    @foreach($banks as $bank)
+                                                                                        <option value="{{ $bank->cbn_code }}">{{ $bank->bank_name }}</option>
+                                                                                    @endforeach
+                                                                                </select>
+                                                                            </fieldset>
+                                                                        </div>
+                                                                        <div class="col-md-6">
+                                                                            <fieldset class="form-group">
+                                                                                <label for="wallet_bank_account_number">Account number</label>
+                                                                                <input class="form-control" id="wallet_bank_account_number" name="account_number" type="text" maxlength="20" required>
+                                                                            </fieldset>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div class="alert alert-info">
+                                                                        We will verify the account number and only save it if it matches your profile name.
+                                                                    </div>
+                                                                    <button class="btn btn-success" type="submit">Verify and save bank details</button>
+                                                                </form>
+                                                            @endif
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
                                     </section>
@@ -178,7 +258,7 @@
                                 </div>
                             </div>
                         </div>
-                      
+
                     </div>
                 </section>
             </div>

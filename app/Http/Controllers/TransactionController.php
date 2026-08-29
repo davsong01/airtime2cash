@@ -129,6 +129,9 @@ class TransactionController extends Controller
         }
 
         $product = Product::where('slug', $slug)->first();
+        $customer = auth()->user()->customer;
+        $walletBankAccount = $this->customerWalletBankAccount($customer);
+        $walletBankAccountMatchesProfile = $this->walletBankAccountMatchesProfile($walletBankAccount, auth()->user());
         $verificationProviderId = getSettings()->bank_verification_provider_id ?: getSettings()->bank_transfer_provider_id;
         $verificationProvider = API::query()
             ->whereKey($verificationProviderId)
@@ -152,7 +155,7 @@ class TransactionController extends Controller
         $walletBalance = walletBalance(auth()->user());
 
         if (!empty($product) && $product->status == 'active') {
-            return view(themeView('customer', 'wallet2bank_transfer_page'), compact('product', 'banks', 'pricingProvider', 'activeProvider', 'pricingBands', 'pricingAmountRange', 'providerMin', 'minimumRequiredBalance', 'pricingEnabled', 'pricingAvailable', 'walletBalance'));
+            return view(themeView('customer', 'wallet2bank_transfer_page'), compact('product', 'banks', 'pricingProvider', 'activeProvider', 'pricingBands', 'pricingAmountRange', 'providerMin', 'minimumRequiredBalance', 'pricingEnabled', 'pricingAvailable', 'walletBalance', 'walletBankAccount', 'walletBankAccountMatchesProfile'));
         } else {
             return back();
         }
@@ -599,6 +602,17 @@ class TransactionController extends Controller
             return back()->with('error', 'The selected product/service does not seem to exist, kindly try again');
         }
 
+        $customer = auth()->user()->customer;
+        $walletBankAccount = $this->customerWalletBankAccount($customer);
+
+        if (! $walletBankAccount) {
+            return back()->with('error', 'Please add and verify your wallet to bank account details on your profile before continuing.');
+        }
+
+        if (! $this->walletBankAccountMatchesProfile($walletBankAccount, auth()->user())) {
+            return back()->with('error', 'Your saved wallet to bank account details no longer match your profile name. Please contact admin.');
+        }
+
         $settings = getSettings();
         $availableTransferModes = array_values(array_filter([
             (($settings->wallet_to_bank_transfer_auto_status ?? 'enabled') === 'enabled') && $this->customerCanAccessService('wallet2bank_auto') ? 'auto_share' : null,
@@ -645,16 +659,6 @@ class TransactionController extends Controller
 
         if ($walletBal < $totalDebit) {
             return back()->with('error', 'Insufficient wallet balance. This transfer will debit ₦' . number_format($totalDebit, 2));
-        }
-
-        $bank = Bank::active()->where('cbn_code', $request->bank)->first();
-
-        if (!empty($bank)) {
-            $bank_name = $bank->bank_name;
-            $request['bank_id'] = $bank->id;
-            $request['bank_code'] = $bank->cbn_code;
-        } else {
-            return back()->with('error', 'Invalid bank selected');
         }
 
         $request['quantity'] = 1;
@@ -706,6 +710,36 @@ class TransactionController extends Controller
                 default => back()->with('error', 'The selected transfer method is currently unavailable.'),
             };
         }
+
+        $bankId = data_get($walletBankAccount, 'bank_id');
+        $bankCode = trim((string) data_get($walletBankAccount, 'bank_code'));
+
+        $bank = null;
+
+        if (is_numeric($bankId)) {
+            $bank = Bank::active()->whereKey((int) $bankId)->first();
+        }
+
+        if (! $bank && filled($bankCode)) {
+            $bank = Bank::active()->where('cbn_code', $bankCode)->first();
+        }
+
+        if (! $bank) {
+            return back()->with('error', 'The bank linked to your profile is no longer available. Please contact admin.');
+        }
+
+        $accountNumber = trim((string) data_get($walletBankAccount, 'account_number'));
+        $accountName = trim((string) data_get($walletBankAccount, 'account_name'));
+
+        if (blank($accountNumber) || blank($accountName)) {
+            return back()->with('error', 'Your saved bank details are incomplete. Please contact admin.');
+        }
+
+        $request['bank_id'] = $bank->id;
+        $request['bank_code'] = $bank->cbn_code;
+        $request['bank_name'] = $bank->bank_name;
+        $request['account_number'] = $accountNumber;
+        $request['account_name'] = $accountName;
 
         $wallet = new WalletController();
 
@@ -767,8 +801,8 @@ class TransactionController extends Controller
                     "*Transfer Mode:* Manual Transfer\n" .
                     "*Transaction ID:* " . $transaction->transaction_id . "\n" .
                     "*Bank Name:* " . $bank->bank_name . "\n" .
-                    "*Account Name:* " . $request->account_name . "\n" .
-                    "*Account Number:* " . $request->account_number . "\n" .
+                    "*Account Name:* " . $accountName . "\n" .
+                    "*Account Number:* " . $accountNumber . "\n" .
                     "*Transaction Date:* " . date("M jS, Y g:iA", strtotime($transaction->created_at)) . "\n\n" .
                     "I am aware that manual resolution is subject to an admin being online and may take longer during busy periods.";
 
@@ -784,8 +818,8 @@ class TransactionController extends Controller
                     <strong>Transfer Method:</strong> Manual Transfer<br>
                     <strong>Transaction ID:</strong> ' . e($transaction->transaction_id) . '<br>
                     <strong>Bank Name:</strong> ' . e($bank->bank_name) . '<br>
-                    <strong>Account Name:</strong> ' . e($request->account_name) . '<br>
-                    <strong>Account Number:</strong> ' . e($request->account_number) . '<br>
+                    <strong>Account Name:</strong> ' . e($accountName) . '<br>
+                    <strong>Account Number:</strong> ' . e($accountNumber) . '<br>
                     <strong>Transaction Date:</strong> ' . date("M jS, Y g:iA", strtotime($transaction->created_at)) . '<br>';
                 $body .= '<br>Warm Regards,<br>' . e(config('app.name')) . '.</p>';
 
@@ -821,7 +855,7 @@ class TransactionController extends Controller
         }
 
         try {
-            $transfer = $this->transferToBankAccount($bank->cbn_code, $request->account_number, $request->account_name, $request['amount'], $transaction);
+            $transfer = $this->transferToBankAccount($bank->cbn_code, $accountNumber, $accountName, $request['amount'], $transaction);
             $providerStatus = strtolower((string) ($transfer['provider_status'] ?? $transfer['status'] ?? 'failed'));
             $transferStatus = strtolower((string) ($transfer['status'] ?? 'failed'));
 
@@ -984,10 +1018,15 @@ class TransactionController extends Controller
 
     public function transactionReceipt($transaction_id)
     {
-        $transaction = TransactionLog::with(['product', 'category', 'variation', 'bank'])
+        $transaction = TransactionLog::with(['product', 'category', 'variation', 'bank', 'customer'])
             ->where('id', $transaction_id)
             ->firstOrFail()
             ->toArray();
+
+        $user = auth()->user();
+        if (($user?->type ?? null) === 'customer' && (int) ($transaction['customer_id'] ?? 0) !== (int) ($user->customer?->id ?? 0)) {
+            abort(403, 'You are not allowed to download this receipt.');
+        }
 
         $receiptView = themeView('customer', 'receipts.transaction_receipt');
         $pdf = Pdf::loadView($receiptView, ['transaction' => $transaction])->setPaper('a4', 'portrait');
@@ -997,7 +1036,12 @@ class TransactionController extends Controller
 
     public function airtime2CashTransactionReceipt($transaction_id)
     {
-        $transaction = Airtime2CashTransactions::with(['product:id,name,image', 'customer'])->where('id', $transaction_id)->first()->toArray();
+        $transaction = Airtime2CashTransactions::with(['product:id,name,image', 'customer'])->where('id', $transaction_id)->firstOrFail()->toArray();
+
+        $user = auth()->user();
+        if (($user?->type ?? null) === 'customer' && (int) ($transaction['customer_id'] ?? 0) !== (int) ($user->customer?->id ?? 0)) {
+            abort(403, 'You are not allowed to download this receipt.');
+        }
 
         $pdf = Pdf::loadView('customer.receipts.airtime2cash_transaction_receipt', ['transaction' => $transaction])->setPaper('a4', 'portrait');
         return $pdf->download($transaction['transaction_id'] . '.pdf');
@@ -1478,6 +1522,11 @@ class TransactionController extends Controller
 
     public function logTransaction($data)
     {
+        if ($data instanceof Request) {
+            $data = $data->all();
+        }
+
+        $requestData = is_array($data) ? $data : [];
         $pre = [
             'status' => $data['status'] ?? 'initiated',
             'reference_id' => $data['request_id'],
@@ -1510,9 +1559,14 @@ class TransactionController extends Controller
             'charge_breakdown' => $data['charge_breakdown'] ?? null,
             'transfer_mode' => $data['transfer_mode'] ?? null,
             'bank_id' => $data['bank_id'] ?? null,
+            'bank_code' => $data['bank_code'] ?? null,
             'account_name' => $data['account_name'] ?? null,
             'account_number' => $data['account_number'] ?? null,
         ];
+
+        if (Schema::hasColumn('transaction_logs', 'request_data')) {
+            $pre['request_data'] = json_encode($requestData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        }
 
         $trans = TransactionLog::create($pre);
         return $trans;
@@ -2167,7 +2221,7 @@ class TransactionController extends Controller
 
     public function singleTransactionView(TransactionLog $transaction)
     {
-        $transaction->loadMissing(['bank', 'api']);
+        $transaction->loadMissing(['bank', 'api', 'customer']);
 
         return view('admin.transaction.single_transaction', compact('transaction'));
     }
@@ -3353,5 +3407,46 @@ class TransactionController extends Controller
         }
 
         return $response;
+    }
+
+    private function customerWalletBankAccount(?Customer $customer): ?array
+    {
+        $account = $customer?->wallet_bank_account;
+
+        if (! is_array($account) || empty($account)) {
+            return null;
+        }
+
+        return $account;
+    }
+
+    private function customerFullName(?User $user): string
+    {
+        return trim(collect([
+            $user?->firstname,
+            $user?->middlename,
+            $user?->lastname,
+        ])->filter()->implode(' '));
+    }
+
+    private function normalizeBankAccountName(?string $value): string
+    {
+        $value = strtolower(trim((string) $value));
+
+        return trim((string) preg_replace('/[^a-z0-9]+/i', '', $value));
+    }
+
+    private function walletBankAccountMatchesProfile(?array $walletBankAccount, ?User $user): bool
+    {
+        if (blank($walletBankAccount) || ! $user) {
+            return false;
+        }
+
+        $profileName = (string) data_get($walletBankAccount, 'profile_name', '');
+        if (blank($profileName)) {
+            $profileName = $this->customerFullName($user);
+        }
+
+        return $this->normalizeBankAccountName($profileName) === $this->normalizeBankAccountName($this->customerFullName($user));
     }
 }

@@ -20,6 +20,13 @@
     $adminWhatsappLink = filled($adminWhatsappNumber)
         ? 'https://api.whatsapp.com/send?phone=' . $adminWhatsappNumber . '&text=' . urlencode('Wallet to Bank access request from ' . (auth()->user()?->email ?? 'customer') . '. Please enable this service for my account.')
         : null;
+    $walletBankAccount = auth()->user()?->customer?->wallet_bank_account ?? null;
+    $walletBankAccountReady = (bool) (($walletBankAccountMatchesProfile ?? false) && ! empty($walletBankAccount));
+    $walletBankAccountProfileName = trim((string) data_get($walletBankAccount, 'profile_name', trim(collect([
+        auth()->user()?->firstname,
+        auth()->user()?->middlename,
+        auth()->user()?->lastname,
+    ])->filter()->implode(' '))));
 @endphp
 @extends('sneat.layouts.app')
 @section('title', $category->seo_title ?? 'Wallet to Bank Transfer')
@@ -323,6 +330,46 @@
                         @csrf
                         <div class="row g-3">
                             <div class="col-12">
+                                <div class="transfer-preview-card p-3">
+                                    <div class="d-flex align-items-start justify-content-between gap-3 flex-wrap">
+                                        <div>
+                                            <div class="transfer-preview-title">Locked bank account</div>
+                                            <div class="transfer-preview-muted">This verified account will be used for every wallet to bank transfer.</div>
+                                        </div>
+                                        @if($walletBankAccountReady)
+                                            <span class="badge bg-success">Verified</span>
+                                        @else
+                                            <span class="badge bg-warning text-dark">Not set</span>
+                                        @endif
+                                    </div>
+
+                                    @if($walletBankAccountReady)
+                                        <div class="transfer-preview-section transfer-preview-section--base mt-3">
+                                            <div class="transfer-preview-line">
+                                                <span>Bank</span>
+                                                <strong>{{ data_get($walletBankAccount, 'bank_name', 'Not set') }}</strong>
+                                            </div>
+                                            <div class="transfer-preview-line">
+                                                <span>Account name</span>
+                                                <strong>{{ data_get($walletBankAccount, 'account_name', 'Not set') }}</strong>
+                                            </div>
+                                            <div class="transfer-preview-line">
+                                                <span>Account number</span>
+                                                <strong>{{ data_get($walletBankAccount, 'account_number', 'Not set') }}</strong>
+                                            </div>
+                                        </div>
+                                        <small class="d-block mt-2 text-muted">Profile name: <strong>{{ $walletBankAccountProfileName ?: 'Not set' }}</strong></small>
+                                    @else
+                                        <div class="alert alert-warning mt-3 mb-0">
+                                            You have not set up your wallet to bank account details yet.
+                                            <div class="mt-2">
+                                                <a href="{{ route('profile.edit') }}#wallet-to-bank-account" class="btn btn-sm btn-outline-primary">Go to profile</a>
+                                            </div>
+                                        </div>
+                                    @endif
+                                </div>
+                            </div>
+                            <div class="col-12">
                                 <label class="form-label d-block mb-2">Transfer method</label>
                                 @if(empty($visibleTransferModes))
                                     <div class="alert alert-warning mb-0">
@@ -462,33 +509,9 @@
                                     </div>
                                 @endif
                             </div>
-                            <div class="col-md-4">
-                                <label for="bank" class="form-label">Bank</label>
-                                <select class="form-select modern-select2" name="bank" id="bank" data-placeholder="Search banks" required>
-                                    <option value="">Select</option>
-                                    @foreach($banks as $bank)
-                                        <option value="{{ $bank->cbn_code }}">{{ $bank->bank_name }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="col-md-4">
-                                <label for="account_number" class="form-label">Account number</label>
-                                <input class="form-control" id="account_number" name="account_number" type="text" maxlength="10" inputmode="numeric" required>
-                            </div>
-                            <div class="col-md-4">
-                                <label for="account_name" class="form-label">Account name</label>
-                                <input class="form-control" id="account_name" name="account_name" type="text" required>
-                            </div>
-                            <div class="col-12" id="verify-bank-section">
-                                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mt-2">
-                                    <small class="text-danger">Please ensure the bank details are correct before you proceed.</small>
-                                    <button type="button" class="btn btn-outline-info btn-sm" id="verify-bank-details-btn">Verify Bank Details</button>
-                                </div>
-                                <div class="mt-3 d-none" id="bank-verify-result"></div>
-                            </div>
                         </div>
                         <div class="mt-4">
-                            <button class="btn btn-primary customer-form-submit" id="transfer-submit" type="submit" @disabled(!$canWithdraw || ! $hasSelectableTransferMode)><i class="bx bx-right-arrow-alt me-1"></i> Proceed</button>
+                            <button class="btn btn-primary customer-form-submit" id="transfer-submit" type="submit" @disabled(!$canWithdraw || ! $hasSelectableTransferMode || ! $walletBankAccountReady)><i class="bx bx-right-arrow-alt me-1"></i> Proceed</button>
                         </div>
                     </form>
                 </div>
@@ -517,21 +540,16 @@ document.addEventListener('DOMContentLoaded', function () {
     const previewBandSection = document.getElementById('preview-band-section');
     const previewAdditionalSection = document.getElementById('preview-additional-section');
     const submitButton = document.getElementById('transfer-submit');
-    const verifyBankButton = document.getElementById('verify-bank-details-btn');
-    const verifyBankResult = document.getElementById('bank-verify-result');
-    const verifyBankSection = document.getElementById('verify-bank-section');
     const manualResolutionNote = document.getElementById('manual-resolution-note');
     const transferModes = document.querySelectorAll('input[name="transfer_mode"]');
     const transferModeFallback = document.querySelector('input[type="hidden"][name="transfer_mode"]');
+    const walletBankReady = @json($walletBankAccountReady);
     const updateTransferModeUi = () => {
         const selectedMode = document.querySelector('input[name="transfer_mode"]:checked')?.value
             || transferModeFallback?.value
             || 'auto_share';
         if (manualResolutionNote) {
             manualResolutionNote.style.display = selectedMode === 'manual' ? 'block' : 'none';
-        }
-        if (verifyBankSection) {
-            verifyBankSection.style.display = selectedMode === 'manual' ? 'none' : 'block';
         }
         if (submitButton) {
             submitButton.innerHTML = selectedMode === 'manual'
@@ -676,7 +694,7 @@ document.addEventListener('DOMContentLoaded', function () {
             previewCard.style.opacity = (amount > 0 && !isValid) ? '0.92' : '1';
         }
 
-        submitButton.disabled = !isValid;
+        submitButton.disabled = !isValid || !walletBankReady;
     });
 
     if (transferModes.length > 0) {
@@ -685,61 +703,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
     updateTransferModeUi();
-
-    if (verifyBankButton && verifyBankResult) {
-        verifyBankButton.addEventListener('click', async function () {
-            const bank = document.getElementById('bank');
-            const accountNumber = document.getElementById('account_number');
-            const accountName = document.getElementById('account_name');
-            const csrfToken = document.querySelector('input[name="_token"]')?.value || document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-
-            if (!bank || !accountNumber || !accountName) {
-                return;
-            }
-
-            verifyBankButton.disabled = true;
-            verifyBankButton.textContent = 'Verifying...';
-            verifyBankResult.classList.remove('d-none');
-            verifyBankResult.innerHTML = renderVerificationCard({
-                status: 'pending',
-                message: 'Verifying bank details...'
-            }, 'Bank verification');
-
-            try {
-                const response = await fetch('{{ route('customer.verify.bank.details') }}', {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': csrfToken,
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        bank_code: bank.value,
-                        account_number: accountNumber.value,
-                        account_name: accountName.value,
-                    }),
-                });
-
-                const payload = await response.json();
-
-                if (!response.ok || payload.status === false) {
-                    verifyBankResult.innerHTML = renderVerificationCard({
-                        status: 'failed',
-                    }, 'Bank details');
-                    return;
-                }
-
-                verifyBankResult.innerHTML = renderVerificationCard(payload, 'Bank details verified successfully');
-            } catch (error) {
-                verifyBankResult.innerHTML = renderVerificationCard({
-                    status: 'failed',
-                }, 'Bank details verification failed');
-            } finally {
-                verifyBankButton.disabled = false;
-                verifyBankButton.textContent = 'Verify Bank Details';
-            }
-        });
-    }
 
     submitButton.disabled = true;
     amountInput.dispatchEvent(new Event('input'));

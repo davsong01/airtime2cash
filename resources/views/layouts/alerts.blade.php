@@ -40,7 +40,7 @@
 </div>
 @endif
 
-@if($errors->any())
+@if(isset($errors) && $errors->any())
  <div class="alert alert-warning" role="alert">
       <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button>
       @foreach($errors->all() as $error)
@@ -68,12 +68,9 @@
 </div>
 @endif
 
-@if(isset(auth()->user()->permission))
-@if(auth()->user()->permission == 1 && auth()->user()->bank == NULL || auth()->user()->account_name == NULL || auth()->user()->account_number == NULL)
-<p style="display:none">{{ $bank_details=0 }}</p>
+@if(auth()->user()?->type === 'customer' && empty(auth()->user()?->customer?->wallet_bank_account))
 <div class="alert alert-danger" role="alert">
       <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-      Hi, you have not filled your bank details, <strong>click <a href="{{ route('profile.edit', auth()->user()->id) }}">HERE</a> to fill it now</strong></strong>
+      Hi, you have not filled your wallet to bank account details, <strong>click <a href="{{ route('profile.edit') }}">HERE</a> to fill it now</strong>
 </div>
-@endif
 @endif

@@ -22,6 +22,7 @@ class Customer extends Model
         'can_access_w2bank' => 'boolean',
         'can_access_w2bank_auto' => 'boolean',
         'can_access_a2c' => 'boolean',
+        'wallet_bank_account' => 'array',
     ];
 
     public function level()

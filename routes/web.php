@@ -140,6 +140,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/notifications/{notification}/read', [CustomerAnnouncementController::class, 'markAsRead'])->name('customer.notifications.read');
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::post('/profile/wallet-bank-account', [ProfileController::class, 'storeWalletBankAccount'])->name('profile.wallet-bank-account.store');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
     Route::get('/get-keys', [ProfileController::class, 'generateKeys'])->name('profile.keys');
 });
@@ -227,6 +228,8 @@ Route::middleware(['auth', 'verified', 'admin', 'ipcheck', 'adminRoute'])->prefi
     Route::get('customers-suspended/{status}', [CustomerController::class, 'customers'])->name('customers.suspended');
     Route::get('customer/edit/{id}', [CustomerController::class, 'singleCustomer'])->name('customers.edit');
     Route::post('customer/update/{id}', [CustomerController::class, 'updateCustomer'])->name('customers.update');
+    Route::post('customer/{customer}/wallet-bank-account', [CustomerController::class, 'updateWalletBankAccount'])->name('customers.wallet-bank-account.update');
+    Route::delete('customer/{customer}/wallet-bank-account', [CustomerController::class, 'deleteWalletBankAccount'])->name('customers.wallet-bank-account.delete');
     Route::post('customers/bulk-actions', [CustomerController::class, 'bulkActions'])->name('customers.bulk-actions');
     Route::resource('customerlevel', CustomerLevelController::class);
     Route::get('customers-unverified', [CustomerController::class, 'unverifiedCustomers'])->name('customers.unverified');
