@@ -8,6 +8,7 @@ use App\Models\API;
 use App\Models\Product;
 use App\Models\Bank;
 use App\Http\Controllers\WalletController;
+use App\Http\Controllers\Providers\MonnifyController;
 use App\Http\Middleware\AdminMiddleware;
 use App\Http\Middleware\CheckIpMiddleware;
 use App\Http\Middleware\RouteProtectionMiddleware;
@@ -148,6 +149,9 @@ class WalletConcurrencyTest extends TestCase
             'bank_name' => 'Guard Bank',
             'cbn_code' => '999',
             'status' => 'active',
+            'provider_codes' => [
+                'duplicate-transfer-provider' => '999',
+            ],
         ]);
 
         $customer->forceFill([
@@ -280,6 +284,9 @@ class WalletConcurrencyTest extends TestCase
             'bank_name' => 'Manual Bank',
             'cbn_code' => '999',
             'status' => 'active',
+            'provider_codes' => [
+                'manual-transfer-provider' => '999',
+            ],
         ]);
 
         $customer->forceFill([
@@ -345,6 +352,121 @@ class WalletConcurrencyTest extends TestCase
         ]);
     }
 
+    public function test_wallet_to_bank_initiation_uses_saved_account_without_reverification(): void
+    {
+        $user = User::factory()->create([
+            'firstname' => 'No',
+            'lastname' => 'Reverify',
+            'email' => 'no.reverify@example.com',
+            'phone' => '08040000004',
+            'email_verified_at' => now(),
+            'status' => 'active',
+        ]);
+
+        $customer = Customer::create([
+            'user_id' => $user->id,
+            'wallet' => 50000,
+            'referal_wallet' => 0,
+            'a2cashwallet' => 0,
+            'can_access_w2bank' => 1,
+            'can_access_w2bank_auto' => 1,
+            'can_access_a2c' => 0,
+            'kyc_status' => 'verified',
+        ]);
+
+        $provider = API::create([
+            'name' => 'Wallet Provider',
+            'slug' => 'monnify',
+            'status' => 'active',
+            'pricing_data_status' => true,
+            'pricing_data' => json_encode([
+                [
+                    'min_amount' => 1000,
+                    'max_amount' => 10000,
+                    'provider_fee' => 50,
+                    'extra_charge' => 0,
+                ],
+            ]),
+            'extra_charges' => json_encode([]),
+        ]);
+
+        DB::table('settings')->insert([
+            'currency' => '₦',
+            'logo' => 'site/upgrade.jpg',
+            'dashboard_logo' => 'site/upgrade.jpg',
+            'favicon' => 'site/upgrade.jpg',
+            'bank_verification_provider_id' => $provider->id,
+            'bank_transfer_provider_id' => $provider->id,
+            'wallet_to_bank_transfer_manual_status' => 'enabled',
+            'wallet_to_bank_transfer_auto_status' => 'enabled',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $bank = Bank::create([
+            'bank_name' => 'Reverify Bank',
+            'cbn_code' => '123',
+            'status' => 'active',
+            'provider_codes' => [
+                'monnify' => '123',
+            ],
+        ]);
+
+        $customer->forceFill([
+            'wallet_bank_account' => [
+                'bank_id' => $bank->id,
+                'bank_code' => $bank->cbn_code,
+                'bank_name' => $bank->bank_name,
+                'account_name' => 'Reverify Receiver',
+                'account_number' => '1234567890',
+                'verified_at' => now()->toDateTimeString(),
+            ],
+        ])->save();
+
+        $category = Category::create([
+            'name' => 'Wallet Transfer No Reverify',
+            'slug' => 'wallet-transfer-no-reverify-category',
+            'type' => 'wallet2bank',
+            'status' => 'active',
+        ]);
+
+        $product = Product::create([
+            'name' => 'Wallet to Bank No Reverify',
+            'slug' => 'wallet-to-bank-no-reverify-product',
+            'type' => 'wallet2bank',
+            'category_id' => $category->id,
+            'status' => 'active',
+            'api_id' => $provider->id,
+        ]);
+
+        $this->app->instance(MonnifyController::class, new class extends MonnifyController {
+            public function verifyBankDetails(array $data)
+            {
+                throw new \RuntimeException('verifyBankDetails should not be called during wallet-to-bank initiation.');
+            }
+        });
+
+        $response = $this->withoutMiddleware()
+            ->actingAs($user)
+            ->post(route('initialize.wallet2banktransaction', $product->id), [
+                'amount' => '₦8,000.00',
+                'bank' => $bank->cbn_code,
+                'account_name' => 'Reverify Receiver',
+                'account_number' => '1234567890',
+                'transfer_mode' => 'manual',
+            ]);
+
+        $response->assertRedirect();
+        $this->assertDatabaseHas('transaction_logs', [
+            'customer_id' => $customer->id,
+            'bank_id' => $bank->id,
+            'bank_code' => $bank->cbn_code,
+            'account_name' => 'Reverify Receiver',
+            'account_number' => '1234567890',
+            'transfer_mode' => 'manual',
+        ]);
+    }
+
     public function test_wallet_to_bank_resolution_modal_hides_credit_and_process_actions(): void
     {
         $admin = User::factory()->create([
@@ -404,6 +526,9 @@ class WalletConcurrencyTest extends TestCase
             'bank_name' => 'Viewer Bank',
             'cbn_code' => '999',
             'status' => 'active',
+            'provider_codes' => [
+                'wallet-view-provider' => '999',
+            ],
         ]);
 
         $category = Category::create([

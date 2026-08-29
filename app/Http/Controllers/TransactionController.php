@@ -103,7 +103,12 @@ class TransactionController extends Controller
             $product->auto_share_discounted_rate = ((float) ($autoShareRate ?? 0) >= 1) ? $autoShareRate : ($product->auto_share_rate ?? $product->rate);
         }
 
-        $banks = Bank::active()->orderBy('bank_name')->get();
+        $verificationProviderId = getSettings()?->bank_verification_provider_id ?: getSettings()?->bank_transfer_provider_id;
+        $verificationProvider = API::query()
+            ->whereKey($verificationProviderId)
+            ->where('status', 'active')
+            ->first();
+        $banks = getWalletToBankBanks($verificationProvider);
         $activeProvider = API::query()
             ->whereKey(getSettings()?->auto_share_provider_id)
             ->where('status', 'active')
@@ -351,7 +356,14 @@ class TransactionController extends Controller
         }
 
         $transaction_id = 'A2C-' . $this->generateRequestId();
-        $bank = Bank::active()->where('cbn_code', $request->bank)->first();
+        $verificationProviderId = getSettings()?->bank_verification_provider_id ?: getSettings()?->bank_transfer_provider_id;
+        $verificationProvider = API::query()
+            ->whereKey($verificationProviderId)
+            ->where('status', 'active')
+            ->first();
+        $bank = $verificationProvider ? getWalletToBankBanks($verificationProvider)->first(function (Bank $candidate) use ($request) {
+            return strcasecmp(trim((string) $candidate->cbn_code), trim((string) $request->bank)) === 0;
+        }) : null;
         if (!empty($bank)) {
             $bank_name = $bank->bank_name;
             $request['bank_id'] = $bank->id;
@@ -711,17 +723,25 @@ class TransactionController extends Controller
             };
         }
 
+        $verificationProviderId = $settings->bank_verification_provider_id ?: $settings->bank_transfer_provider_id;
+        $verificationProvider = API::query()
+            ->whereKey($verificationProviderId)
+            ->where('status', 'active')
+            ->first();
         $bankId = data_get($walletBankAccount, 'bank_id');
         $bankCode = trim((string) data_get($walletBankAccount, 'bank_code'));
 
         $bank = null;
+        $walletToBankBanks = getWalletToBankBanks($verificationProvider);
 
         if (is_numeric($bankId)) {
-            $bank = Bank::active()->whereKey((int) $bankId)->first();
+            $bank = $walletToBankBanks->firstWhere('id', (int) $bankId);
         }
 
         if (! $bank && filled($bankCode)) {
-            $bank = Bank::active()->where('cbn_code', $bankCode)->first();
+            $bank = $walletToBankBanks->first(function (Bank $candidate) use ($bankCode) {
+                return strcasecmp(trim((string) $candidate->cbn_code), trim((string) $bankCode)) === 0;
+            });
         }
 
         if (! $bank) {
@@ -3250,7 +3270,9 @@ class TransactionController extends Controller
             ];
         }
 
-        $bank = Bank::active()->where('cbn_code', $bankCode)->first();
+        $bank = getWalletToBankBanks($provider)->first(function (Bank $candidate) use ($bankCode) {
+            return strcasecmp(trim((string) $candidate->cbn_code), trim((string) $bankCode)) === 0;
+        });
 
         if (! $bank) {
             return [

@@ -16,6 +16,7 @@
     $walletVerificationResponseValue = is_array($walletVerificationResponseValue)
         ? json_encode($walletVerificationResponseValue, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
         : (string) $walletVerificationResponseValue;
+    $walletBankVerifyUrl = route('admin.verify.bank.details');
 @endphp
 
 <form action="{{ route('customers.update', $user->id) }}" method="POST" class="customer-form-panel">
@@ -122,11 +123,18 @@
             </div>
             
             <div class="col-12 d-flex align-items-center justify-content-between flex-wrap gap-3 mt-1">
-                <small class="text-muted">The selected bank is re-verified before saving.</small>
-                <button type="submit" class="btn btn-primary"><i class="bx bx-check-shield mr-25"></i> Verify &amp; save wallet account</button>
+                <small class="text-muted">Use the current draft values to verify the account before saving.</small>
+                <div class="d-flex align-items-center flex-wrap gap-2">
+                    <button type="button" class="btn btn-outline-info" id="verify-wallet-account-draft-btn" data-verify-url="{{ $walletBankVerifyUrl }}" data-customer-name="{{ trim($user->firstname . ' ' . $user->middlename . ' ' . $user->lastname) }}"><i class="bx bx-search-alt mr-25"></i> Verify account only</button>
+                    <button type="submit" class="btn btn-primary"><i class="bx bx-check-shield mr-25"></i> Save</button>
+                </div>
             </div>
         </div>
     </form>
+
+    <div class="px-3 pb-3">
+        <div id="wallet-bank-verify-result" class="mt-3" style="display:none;"></div>
+    </div>
 
     @if($walletBankAccountReady)
         <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mt-4 pt-3 border-top p-1">

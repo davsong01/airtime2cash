@@ -358,7 +358,7 @@ class CustomerController extends Controller
 
         if ($activeTab === 'account') {
             $customerLevels = CustomerLevel::enabled()->orderBy('order', 'ASC')->get();
-            $banks = Bank::active()->orderBy('bank_name')->get();
+            $banks = getWalletToBankBanks();
         } elseif ($activeTab === 'transactions') {
             $transactions = $user->customer->transactions()->latest()->paginate(10);
         } elseif ($activeTab === 'airtime2cash-transactions') {
@@ -495,14 +495,14 @@ class CustomerController extends Controller
 
         $existing = is_array($customer->wallet_bank_account) ? $customer->wallet_bank_account : [];
         $bankReference = trim((string) $validated['wallet_bank_bank']);
-        $bank = Bank::active()->where(function ($query) use ($bankReference) {
-            $query->where('cbn_code', $bankReference)
-                ->orWhere('bank_name', $bankReference);
-
-            if (is_numeric($bankReference)) {
-                $query->orWhere('id', (int) $bankReference);
+        $bank = getWalletToBankBanks()->first(function (Bank $bank) use ($bankReference) {
+            if (is_numeric($bankReference) && (int) $bankReference === (int) $bank->id) {
+                return true;
             }
-        })->first();
+
+            return strcasecmp(trim((string) $bank->cbn_code), $bankReference) === 0
+                || strcasecmp(trim((string) $bank->bank_name), $bankReference) === 0;
+        });
 
         if (! $bank) {
             return back()->with('error', 'Please select a valid active bank.');
@@ -513,28 +513,7 @@ class CustomerController extends Controller
             return back()->with('error', 'Please provide an account number.');
         }
 
-        $verification = $this->verifyWalletBankDetails([
-            'bank_code' => $bank->cbn_code,
-            'account_number' => $accountNumber,
-        ]);
-
-        if (! (bool) data_get($verification, 'status', false)) {
-            return back()->with('error', data_get($verification, 'message', 'Unable to verify bank details right now.'));
-        }
-
-        $providerResponse = data_get($verification, 'raw_response')
-            ?? data_get($verification, 'data')
-            ?? $verification;
-        $verifiedAccountName = $this->extractVerifiedAccountName($providerResponse);
-
-        if (blank($verifiedAccountName)) {
-            return back()->with('error', 'The verification provider did not return an account name. Please try another bank account.');
-        }
-
         $submittedAccountName = trim((string) ($validated['wallet_bank_account_name'] ?? ''));
-        if (filled($submittedAccountName) && ! $this->namesMatch($submittedAccountName, $verifiedAccountName)) {
-            return back()->with('error', 'The account name does not match the verified bank details. Please correct it and try again.');
-        }
 
         $profileName = filled($validated['wallet_bank_profile_name'] ?? null)
             ? trim((string) $validated['wallet_bank_profile_name'])
@@ -544,15 +523,15 @@ class CustomerController extends Controller
             'bank_id' => $bank->id,
             'bank_name' => $bank->bank_name,
             'bank_code' => $bank->cbn_code,
-            'account_name' => filled($submittedAccountName) ? $submittedAccountName : $verifiedAccountName,
+            'account_name' => filled($submittedAccountName) ? $submittedAccountName : data_get($existing, 'account_name'),
             'account_number' => $accountNumber,
             'profile_name' => $profileName,
             'verified_name' => filled($validated['wallet_bank_verified_name'] ?? null)
                 ? $validated['wallet_bank_verified_name']
-                : $verifiedAccountName,
+                : data_get($existing, 'verified_name'),
             'verified_at' => filled($validated['wallet_bank_verified_at'] ?? null)
                 ? Carbon::parse($validated['wallet_bank_verified_at'])->toDateTimeString()
-                : now()->toDateTimeString(),
+                : data_get($existing, 'verified_at', now()->toDateTimeString()),
         ];
 
         $verificationResponse = $validated['wallet_bank_verification_response'] ?? null;
@@ -563,8 +542,6 @@ class CustomerController extends Controller
                 : $verificationResponse;
         } elseif (array_key_exists('verification_response', $existing)) {
             $next['verification_response'] = $existing['verification_response'];
-        } else {
-            $next['verification_response'] = $providerResponse;
         }
 
         $customer->forceFill([

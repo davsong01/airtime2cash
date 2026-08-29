@@ -278,6 +278,7 @@ class CustomerAccessControlsTest extends TestCase
         $response->assertSee('Manual Wallet 2 Bank access');
         $response->assertSee('Auto Wallet 2 Bank access');
         $response->assertSee('Airtime 2 Cash access');
+        $response->assertSee('Verify account only');
 
         $this->withoutMiddleware([
                 AdminMiddleware::class,
@@ -305,6 +306,69 @@ class CustomerAccessControlsTest extends TestCase
         ]);
     }
 
+    public function test_wallet_bank_picklists_only_show_banks_supported_by_the_active_verification_provider(): void
+    {
+        $admin = $this->createAdminUser();
+        $user = $this->createCustomerUser('Filter', 'Tester', [
+            'kyc_status' => 'verified',
+        ]);
+
+        $provider = API::create([
+            'name' => 'Monnify',
+            'slug' => 'monnify',
+            'status' => 'active',
+        ]);
+
+        $supportedBank = Bank::create([
+            'bank_name' => 'Supported Bank',
+            'cbn_code' => '111',
+            'status' => 'active',
+            'provider_codes' => [
+                'monnify' => '111',
+            ],
+        ]);
+
+        $unsupportedBank = Bank::create([
+            'bank_name' => 'Unsupported Bank',
+            'cbn_code' => '222',
+            'status' => 'active',
+            'provider_codes' => [
+                'paystack' => '222',
+            ],
+        ]);
+
+        DB::table('settings')->insert([
+            'currency' => '₦',
+            'bank_verification_provider_id' => $provider->id,
+            'bank_transfer_provider_id' => $provider->id,
+            'logo' => 'site/upgrade.jpg',
+            'dashboard_logo' => 'site/upgrade.jpg',
+            'favicon' => 'site/upgrade.jpg',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $adminResponse = $this->withoutMiddleware([
+                AdminMiddleware::class,
+                CheckIpMiddleware::class,
+                RouteProtectionMiddleware::class,
+            ])
+            ->actingAs($admin)
+            ->get(route('customers.edit', ['id' => $user->id, 'tab' => 'account']));
+
+        $adminResponse->assertOk();
+        $adminResponse->assertSee($supportedBank->bank_name, false);
+        $adminResponse->assertDontSee($unsupportedBank->bank_name, false);
+
+        $profileResponse = $this->withoutMiddleware()
+            ->actingAs($user)
+            ->get(route('profile.edit'));
+
+        $profileResponse->assertOk();
+        $profileResponse->assertSee($supportedBank->bank_name, false);
+        $profileResponse->assertDontSee($unsupportedBank->bank_name, false);
+    }
+
     public function test_customer_can_save_a_verified_locked_wallet_bank_account(): void
     {
         $user = $this->createCustomerUser('John', 'Doe');
@@ -318,6 +382,9 @@ class CustomerAccessControlsTest extends TestCase
             'bank_name' => 'Access Bank',
             'cbn_code' => '044',
             'status' => 'active',
+            'provider_codes' => [
+                'monnify' => '044',
+            ],
         ]);
 
         DB::table('settings')->insert([
@@ -424,6 +491,9 @@ class CustomerAccessControlsTest extends TestCase
             'bank_name' => 'Access Bank',
             'cbn_code' => '044',
             'status' => 'active',
+            'provider_codes' => [
+                'monnify' => '044',
+            ],
         ]);
 
         DB::table('settings')->insert([
@@ -490,6 +560,9 @@ class CustomerAccessControlsTest extends TestCase
             'bank_name' => 'Access Bank',
             'cbn_code' => '044',
             'status' => 'active',
+            'provider_codes' => [
+                'monnify' => '044',
+            ],
         ]);
 
         DB::table('settings')->insert([
@@ -563,6 +636,63 @@ class CustomerAccessControlsTest extends TestCase
         $this->assertSame('Updated', data_get($customer->wallet_bank_account, 'verification_response.message'));
     }
 
+    public function test_admin_can_override_wallet_bank_account_details_without_reverification(): void
+    {
+        $admin = $this->createAdminUser();
+        $user = $this->createCustomerUser('Override', 'Customer');
+        $customer = $user->customer;
+        $provider = API::create([
+            'name' => 'Monnify',
+            'slug' => 'monnify',
+            'status' => 'active',
+        ]);
+
+        $bank = Bank::create([
+            'bank_name' => 'Override Bank',
+            'cbn_code' => '055',
+            'status' => 'active',
+            'provider_codes' => [
+                'monnify' => '055',
+            ],
+        ]);
+
+        DB::table('settings')->insert([
+            'currency' => '₦',
+            'bank_verification_provider_id' => $provider->id,
+            'bank_transfer_provider_id' => $provider->id,
+            'logo' => 'site/upgrade.jpg',
+            'dashboard_logo' => 'site/upgrade.jpg',
+            'favicon' => 'site/upgrade.jpg',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->withoutMiddleware([
+                AdminMiddleware::class,
+                CheckIpMiddleware::class,
+                RouteProtectionMiddleware::class,
+            ])
+            ->actingAs($admin)
+            ->post(route('customers.wallet-bank-account.update', $customer->id), [
+                'wallet_bank_bank' => '055',
+                'wallet_bank_account_name' => 'Manual Override Name',
+                'wallet_bank_account_number' => '9876543210',
+                'wallet_bank_profile_name' => 'Override Customer',
+                'wallet_bank_verified_name' => 'Manual Override Name',
+                'wallet_bank_verified_at' => '2026-08-29T18:00',
+            ])
+            ->assertRedirect();
+
+        $customer->refresh();
+
+        $this->assertSame($bank->id, data_get($customer->wallet_bank_account, 'bank_id'));
+        $this->assertSame('Override Bank', data_get($customer->wallet_bank_account, 'bank_name'));
+        $this->assertSame('Manual Override Name', data_get($customer->wallet_bank_account, 'account_name'));
+        $this->assertSame('9876543210', data_get($customer->wallet_bank_account, 'account_number'));
+        $this->assertSame('Override Customer', data_get($customer->wallet_bank_account, 'profile_name'));
+        $this->assertSame('Manual Override Name', data_get($customer->wallet_bank_account, 'verified_name'));
+    }
+
     public function test_customer_can_save_wallet_bank_account_when_verified_name_matches_even_if_order_differs(): void
     {
         $user = $this->createCustomerUser('David', 'Oghi', [], [
@@ -578,6 +708,9 @@ class CustomerAccessControlsTest extends TestCase
             'bank_name' => 'Access Bank',
             'cbn_code' => '044',
             'status' => 'active',
+            'provider_codes' => [
+                'monnify' => '044',
+            ],
         ]);
 
         DB::table('settings')->insert([
@@ -633,6 +766,9 @@ class CustomerAccessControlsTest extends TestCase
             'bank_name' => 'Access Bank',
             'cbn_code' => '044',
             'status' => 'active',
+            'provider_codes' => [
+                'monnify' => '044',
+            ],
         ]);
 
         DB::table('settings')->insert([

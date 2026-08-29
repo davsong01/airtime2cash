@@ -34,7 +34,7 @@ class ProfileController extends Controller
                 );
             }
 
-            $banks = Bank::active()->orderBy('bank_name')->get();
+            $banks = getWalletToBankBanks();
             $adminWhatsappNumber = preg_replace('/\D+/', '', (string) (getSettings()->whatsapp_number ?? ''));
             $adminWhatsappLink = filled($adminWhatsappNumber)
                 ? 'https://api.whatsapp.com/send?phone=' . $adminWhatsappNumber . '&text=' . urlencode('Please help me delete my locked wallet to bank account details on ' . config('app.name') . '.')
@@ -88,14 +88,14 @@ class ProfileController extends Controller
         }
 
         $bankReference = trim((string) $request->bank);
-        $bank = Bank::active()->where(function ($query) use ($bankReference) {
-            $query->where('cbn_code', $bankReference)
-                ->orWhere('bank_name', $bankReference);
-
-            if (is_numeric($bankReference)) {
-                $query->orWhere('id', (int) $bankReference);
+        $bank = getWalletToBankBanks()->first(function (Bank $bank) use ($bankReference) {
+            if (is_numeric($bankReference) && (int) $bankReference === (int) $bank->id) {
+                return true;
             }
-        })->first();
+
+            return strcasecmp(trim((string) $bank->cbn_code), $bankReference) === 0
+                || strcasecmp(trim((string) $bank->bank_name), $bankReference) === 0;
+        });
 
         if (! $bank) {
             return back()->with('error', 'Invalid bank selected.');

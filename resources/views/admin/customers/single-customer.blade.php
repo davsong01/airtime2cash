@@ -125,7 +125,7 @@
     <script>
         $(function () {
             $('.js-example-basic-single').select2({ width: '100%' });
-
+            bindWalletBankVerification();
         });
 
         function zoomImg(image) {
@@ -133,6 +133,165 @@
             const modalImage = document.getElementById('kyc-document-preview');
             modalImage.src = image.src;
             $(modal).modal('show');
+        }
+
+        function bindWalletBankVerification() {
+            const $button = $('#verify-wallet-account-draft-btn');
+            const $result = $('#wallet-bank-verify-result');
+
+            if (!$button.length) {
+                return;
+            }
+
+            const normalize = (value) => String(value ?? '').trim().toLowerCase();
+
+            const setWalletBankDraftField = (selector, value) => {
+                if (value === undefined || value === null || value === '') {
+                    return;
+                }
+
+                const $field = $(selector);
+                if ($field.length) {
+                    $field.val(value).trigger('change');
+                }
+            };
+
+            const extractVerifiedPayload = (payload) => {
+                const root = payload?.data ?? payload ?? {};
+                const response = root?.raw_response ?? root?.data ?? root?.responseBody ?? root;
+                const refined = root?.refined_data ?? response?.refined_data ?? {};
+
+                return {
+                    bankName: refined['Bank Name']
+                        ?? response?.bank_name
+                        ?? response?.bankName
+                        ?? response?.data?.bank_name
+                        ?? '',
+                    accountName: refined['Account Name']
+                        ?? response?.account_name
+                        ?? response?.accountName
+                        ?? response?.data?.account_name
+                        ?? '',
+                    accountNumber: refined['Account Number']
+                        ?? response?.account_number
+                        ?? response?.data?.account_number
+                        ?? '',
+                    rawResponse: response,
+                };
+            };
+
+            const applyVerifiedDraft = (payload) => {
+                const extracted = extractVerifiedPayload(payload);
+                const currentBankValue = String($('#wallet_bank_bank').val() || '').trim();
+                const currentBankText = String($('#wallet_bank_bank option:selected').text() || '').trim();
+                const targetBank = extracted.bankName || currentBankText;
+
+                if (targetBank) {
+                    const $matchedBank = $('#wallet_bank_bank option').filter(function () {
+                        const optionText = String($(this).text() || '').trim();
+                        return normalize(optionText).includes(normalize(targetBank))
+                            || normalize(String($(this).val() || '')).includes(normalize(targetBank));
+                    }).first();
+
+                    if ($matchedBank.length) {
+                        $('#wallet_bank_bank').val($matchedBank.val()).trigger('change');
+                    } else if (currentBankValue) {
+                        $('#wallet_bank_bank').val(currentBankValue).trigger('change');
+                    }
+                }
+
+                setWalletBankDraftField('#wallet_bank_account_number', extracted.accountNumber);
+                setWalletBankDraftField('#wallet_bank_account_name', extracted.accountName);
+                setWalletBankDraftField('#wallet_bank_verified_name', extracted.accountName);
+
+                if (!$('#wallet_bank_profile_name').val()) {
+                    setWalletBankDraftField('#wallet_bank_profile_name', $button.data('customer-name') || '');
+                }
+
+                const now = new Date();
+                const isoLocal = now.toISOString().slice(0, 16);
+                setWalletBankDraftField('#wallet_bank_verified_at', isoLocal);
+
+                return extracted.rawResponse;
+            };
+
+            const renderResult = (payload, isError = false) => {
+                const status = String(payload?.status ?? (isError ? false : true)).toLowerCase();
+                const title = payload?.message || (isError ? 'Unable to verify bank details right now.' : 'Verification complete.');
+                const response = payload?.raw_response ?? payload?.data ?? payload ?? {};
+                const cardClass = isError || status === 'false' || status === 'failed'
+                    ? 'alert-danger'
+                    : 'alert-success';
+
+                return `
+                    <div class="alert ${cardClass} mb-0">
+                        <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
+                            <div>
+                                <strong class="d-block mb-25">Bank verification result</strong>
+                                <div class="mb-50">${escapeHtml(title)}</div>
+                            </div>
+                            <span class="badge badge-light-${cardClass === 'alert-success' ? 'success' : 'danger'}">${cardClass === 'alert-success' ? 'Verified' : 'Failed'}</span>
+                        </div>
+                        <pre class="mb-0 mt-1" style="white-space: pre-wrap; word-break: break-word;">${escapeHtml(JSON.stringify(response, null, 2))}</pre>
+                    </div>
+                `;
+            };
+
+            $button.on('click', function () {
+                const verifyUrl = String($button.data('verify-url') || '');
+                const bankCode = String($('#wallet_bank_bank').val() || '').trim();
+                const accountNumber = String($('#wallet_bank_account_number').val() || '').trim();
+                const accountName = String($('#wallet_bank_account_name').val() || '').trim();
+                const profileName = String($('#wallet_bank_profile_name').val() || '').trim();
+                const verifiedName = String($('#wallet_bank_verified_name').val() || '').trim();
+                const verifiedAt = String($('#wallet_bank_verified_at').val() || '').trim();
+                const customerName = String($button.data('customer-name') || '').trim();
+
+                if (!bankCode || !accountNumber) {
+                    $result.html('<div class="alert alert-warning mb-0">Please choose a bank and enter an account number before verifying.</div>').show();
+                    return;
+                }
+
+                $.ajax({
+                    url: verifyUrl,
+                    method: 'POST',
+                    data: {
+                        _token: $('meta[name="csrf-token"]').attr('content'),
+                        bank: bankCode,
+                        bank_code: bankCode,
+                        account_number: accountNumber,
+                        account_name: accountName,
+                        profile_name: profileName,
+                        verified_name: verifiedName,
+                        verified_at: verifiedAt,
+                        customer_name: customerName,
+                    },
+                    beforeSend: function () {
+                        $button.prop('disabled', true).html('<span class="spinner-border spinner-border-sm mr-50" role="status" aria-hidden="true"></span> Verifying...');
+                        $result.html('<div class="alert alert-info mb-0">Verifying the current account draft...</div>').show();
+                    },
+                    success: function (response) {
+                        applyVerifiedDraft(response);
+                        $result.html(renderResult(response, false)).show();
+                    },
+                    error: function (xhr) {
+                        const payload = xhr.responseJSON || { status: false, message: 'Unable to verify bank details right now.' };
+                        $result.html(renderResult(payload, true)).show();
+                    },
+                    complete: function () {
+                        $button.prop('disabled', false).html('<i class="bx bx-search-alt mr-25"></i> Verify account only');
+                    }
+                });
+            });
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
         }
     </script>
 @endsection
