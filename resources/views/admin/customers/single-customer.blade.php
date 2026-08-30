@@ -376,6 +376,12 @@
                 const bvnField = String($currentButton.data('bvn-field') || '#BVN');
                 const bvn = String($(bvnField).val() || '').trim();
                 const bvnCharge = parseFloat(String($currentButton.data('bvn-charge') || '0')) || 0;
+
+                if (bvnCharge <= 0) {
+                    window.alert('BVN verification charge is not set. Please configure the charge in admin settings before verifying BVN.');
+                    return;
+                }
+
                 const confirmMessage = bvnCharge > 0
                     ? `This BVN verification may charge the customer's wallet with ${bvnCharge.toFixed(2)}. Continue?`
                     : 'This BVN verification may charge the customer\'s wallet. Continue?';

@@ -890,6 +890,13 @@ class CustomerController extends Controller
             ], 422);
         }
 
+        if ((float) ($settings?->bvn_verification_charge ?? 0) <= 0) {
+            return response()->json([
+                'status' => false,
+                'message' => 'BVN verification charge is not set. Please configure the charge in admin settings before verifying BVN.',
+            ], 422);
+        }
+
         $providerId = $settings?->bvn_verification_provider_id
             ?: $settings?->bank_verification_provider_id
             ?: $settings?->bank_transfer_provider_id;
