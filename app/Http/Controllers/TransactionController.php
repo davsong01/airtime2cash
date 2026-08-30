@@ -3143,21 +3143,26 @@ class TransactionController extends Controller
 
     public function approveAirtime2CashTransactions(Request $request, Airtime2CashTransactions $transaction)
     {
-        //Update wallet balance if payment method is Transfer to Wallet
-        if ($transaction->payment_method == 'Transfer to Wallet') {
-            try {
-                DB::transaction(function () use ($transaction): void {
-                    $wallet = new WalletController();
-                    $customer = Customer::query()
-                        ->whereKey($transaction->customer_id)
-                        ->lockForUpdate()
-                        ->firstOrFail();
+        try {
+            DB::transaction(function () use ($transaction): void {
+                $wallet = new WalletController();
+                $customer = Customer::query()
+                    ->whereKey($transaction->customer_id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
 
-                    $balanceBefore = (float) ($customer->wallet ?? 0);
-                    $amount = (float) $transaction->amount_paid;
+                $balanceBefore = (float) ($customer->wallet ?? 0);
+                $amount = (float) $transaction->amount_paid;
+                $balanceAfter = $balanceBefore;
+                $walletLogStatus = 'success';
+                $providerStatus = 'successful';
+                $description = $transaction->description ?? 'Airtime2Cash Request was approved and completed by ADMIN';
+
+                if ($transaction->payment_method == 'Transfer to Wallet') {
                     $balanceAfter = $balanceBefore + $amount;
+                    $walletLogStatus = 'success';
 
-                    $walletData = [
+                    $wallet->logWallet([
                         'type' => 'credit',
                         'customer_id' => $transaction->customer_id,
                         'transaction_id' => $transaction->transaction_id,
@@ -3173,7 +3178,7 @@ class TransactionController extends Controller
                         'category_id' => $transaction->product?->category?->id,
                         'discount' => 0,
                         'reason' => 'Airtime2Cash Payment',
-                        'status' => 'delivered',
+                        'status' => 'success',
                         'unit_price' => $amount,
                         'quantity' => 1,
                         'total_amount' => $amount,
@@ -3182,61 +3187,50 @@ class TransactionController extends Controller
                         'balance_after' => $balanceAfter,
                         'descr' => $transaction->description,
                         'api_id' => $transaction->provider_id,
-                    ];
-
-                    $this->upsertAirtime2CashTransactionLog($transaction, $customer, [
-                        'status' => 'delivered',
-                        'descr' => $transaction->description ?? 'Airtime2Cash Request was approved and completed by ADMIN',
-                        'balance_before' => $balanceBefore,
-                        'balance_after' => $balanceAfter,
-                        'provider_status' => 'successful',
                     ]);
 
-                    $wallet->logWallet($walletData);
                     $wallet->updateCustomerWallet($transaction->customer->user, $amount, 'credit');
-                });
+                }
 
-                $status = 'success';
-                $error = '';
-            } catch (\Throwable $th) {
-                Log::error('Airtime2Cash manual approval failed.', [
-                    'message' => $th->getMessage(),
-                    'file' => $th->getFile(),
-                    'line' => $th->getLine(),
-                    'transaction_id' => $transaction->transaction_id,
-                    'admin_id' => auth()->id(),
+                $this->upsertAirtime2CashTransactionLog($transaction, $customer, [
+                    'status' => $walletLogStatus,
+                    'descr' => $description,
+                    'balance_before' => $balanceBefore,
+                    'balance_after' => $balanceAfter,
+                    'provider_status' => $providerStatus,
                 ]);
+            });
+        } catch (\Throwable $th) {
+            Log::error('Airtime2Cash manual approval failed.', [
+                'message' => $th->getMessage(),
+                'file' => $th->getFile(),
+                'line' => $th->getLine(),
+                'transaction_id' => $transaction->transaction_id,
+                'admin_id' => auth()->id(),
+            ]);
 
-                return back()->with('error', 'An error occured when performing action: ' . $th->getMessage());
-            }
-        } else {
-            // Perform Transfer to bank actions
-            $status = 'success';
+            return back()->with('error', 'An error occured when performing action: ' . $th->getMessage());
         }
 
         try {
-            if ($status == 'success') {
-                $transaction->update([
-                    'status' => 'approved',
-                    'description' => 'Airtime2Cash Request was approved and completed by ADMIN',
-                    'approved_by' => auth()->user()->admin->id,
-                    'provider_id' => getSettings()->bank_transfer_provider_id ?? null,
-                    'completed_at' => now(),
-                    'provider_status' => 'successful',
-                ]);
+            $transaction->update([
+                'status' => 'approved',
+                'description' => 'Airtime2Cash Request was approved and completed by ADMIN',
+                'approved_by' => auth()->user()->admin->id,
+                'provider_id' => getSettings()->bank_transfer_provider_id ?? null,
+                'completed_at' => now(),
+                'provider_status' => 'successful',
+            ]);
 
-                $subject = "Airtime2Cash Transaction Update";
-                $body = '<p>Hello! ' . $transaction->customer->user->name . ',</p>';
-                $body .= '<p style="line-height: 2.0;">Your Transaction with transaction ID : <strong>' . $transaction->transaction_id . '</strong> has been updated to: ' . ucfirst($transaction->status) . '<br><strong>Date Updated:</strong> ' . date("M jS, Y g:iA", strtotime($transaction->updated_at)) . '<br><br>
-                Warm Regards. (' . config('app.name') . ')<br/>
-                </p>';
-                $email = $transaction->customer->user->email;
+            $subject = "Airtime2Cash Transaction Update";
+            $body = '<p>Hello! ' . $transaction->customer->user->name . ',</p>';
+            $body .= '<p style="line-height: 2.0;">Your Transaction with transaction ID : <strong>' . $transaction->transaction_id . '</strong> has been updated to: ' . ucfirst($transaction->status) . '<br><strong>Date Updated:</strong> ' . date("M jS, Y g:iA", strtotime($transaction->updated_at)) . '<br><br>
+            Warm Regards. (' . config('app.name') . ')<br/>
+            </p>';
+            $email = $transaction->customer->user->email;
 
-                logEmails($email, $subject, $body);
-                return back()->with('message', 'Operation successful');
-            } else {
-                return back()->with('error', 'An error occured when performing action: ' . $error);
-            }
+            logEmails($email, $subject, $body);
+            return back()->with('message', 'Operation successful');
         } catch (\Throwable $th) {
             return back()->with('error', 'An error occured when performing action: ' . $th->getMessage());
         }
@@ -3320,6 +3314,32 @@ class TransactionController extends Controller
 
     public function declineAirtime2CashTransactions(Request $request, Airtime2CashTransactions $transaction)
     {
+        try {
+            DB::transaction(function () use ($transaction, $request): void {
+                $customer = Customer::query()
+                    ->whereKey($transaction->customer_id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
+                $this->upsertAirtime2CashTransactionLog($transaction, $customer, [
+                    'status' => 'failed',
+                    'descr' => 'Airtime2Cash Request was declined by ADMIN',
+                    'balance_before' => (float) ($customer->wallet ?? 0),
+                    'balance_after' => (float) ($customer->wallet ?? 0),
+                    'provider_status' => 'declined',
+                    'request_data' => $request->all(),
+                ]);
+            });
+        } catch (\Throwable $th) {
+            Log::error('Airtime2Cash decline sync failed.', [
+                'message' => $th->getMessage(),
+                'file' => $th->getFile(),
+                'line' => $th->getLine(),
+                'transaction_id' => $transaction->transaction_id,
+                'admin_id' => auth()->id(),
+            ]);
+        }
+
         $transaction->update([
             'status' => 'declined',
             'description' => 'Airtime2Cash Request was declined by ADMIN',
