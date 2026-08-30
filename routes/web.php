@@ -230,6 +230,8 @@ Route::middleware(['auth', 'verified', 'admin', 'ipcheck', 'adminRoute'])->prefi
     Route::post('customer/update/{id}', [CustomerController::class, 'updateCustomer'])->name('customers.update');
     Route::post('customer/{customer}/wallet-bank-account', [CustomerController::class, 'updateWalletBankAccount'])->name('customers.wallet-bank-account.update');
     Route::delete('customer/{customer}/wallet-bank-account', [CustomerController::class, 'deleteWalletBankAccount'])->name('customers.wallet-bank-account.delete');
+    Route::post('customer/{customer}/kyc-field-review', [CustomerController::class, 'reviewCustomerKycField'])->name('customers.kyc-field-review');
+    Route::post('customer/{customer}/verify-bvn', [CustomerController::class, 'verifyCustomerBvn'])->name('customers.verify-bvn');
     Route::post('customers/bulk-actions', [CustomerController::class, 'bulkActions'])->name('customers.bulk-actions');
     Route::resource('customerlevel', CustomerLevelController::class);
     Route::get('customers-unverified', [CustomerController::class, 'unverifiedCustomers'])->name('customers.unverified');

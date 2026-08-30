@@ -36,9 +36,18 @@
     </div>
 @endif
 
-@if(auth()->user()?->type === 'customer' && empty(auth()->user()?->customer?->wallet_bank_account))
+@php
+    $shouldShowWalletBankAccountAlert = auth()->user()?->type === 'customer'
+        && empty(auth()->user()?->customer?->wallet_bank_account)
+        && (
+            request()->routeIs('profile.edit')
+            || request()->routeIs('wallet-to-bank')
+        );
+@endphp
+
+@if($shouldShowWalletBankAccountAlert)
     <div class="alert alert-danger alert-dismissible fade show" role="alert">
-        Hi, you have not filled your wallet to bank account details, <strong>click <a href="{{ route('profile.edit') }}/#wallet-to-bank-account">HERE</a> to fill it now</strong>
+        Hi, you have not filled your wallet to bank account details in order to do wallet to bank transfer, <strong>click <a href="{{ route('profile.edit') }}#wallet-to-bank-account">HERE</a> to fill it now</strong>
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
 @endif

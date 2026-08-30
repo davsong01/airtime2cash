@@ -2151,7 +2151,8 @@ if (!function_exists("kycStatus")) {
             $data = collect([
                 'key' => '',
                 'value' => '',
-                'status' => 'unverified'
+                'status' => 'unverified',
+                'review_note' => null,
             ]);
         }
 

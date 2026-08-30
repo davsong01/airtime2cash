@@ -364,7 +364,7 @@
                                 </div>
                                 <div class="col-md-6">
                                     <label for="phone" class="form-label">Phone number</label>
-                                    <input type="text" class="form-control" id="phone" name="phone" value="{{ auth()->user()->phone }}">
+                                    <input type="text" class="form-control" id="phone" value="{{ auth()->user()->phone }}" disabled>
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label">Email address</label>

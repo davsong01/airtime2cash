@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Providers;
 
 use App\Models\ReservedAccountNumber;
+use App\Models\Customer;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 
 class MonnifyController extends BankTransferProviderController
 {
@@ -45,6 +47,21 @@ class MonnifyController extends BankTransferProviderController
     {
         return data_get($this->api(), 'account_number')
             ?: data_get($this->api(), 'contract_id');
+    }
+
+    private function normalizeDateOfBirthForBvn(string $value): string
+    {
+        $value = trim($value);
+
+        if ($value === '') {
+            return '';
+        }
+
+        try {
+            return Carbon::parse($value)->format('d-M-Y');
+        } catch (\Throwable $e) {
+            return '';
+        }
     }
 
     public function verifyWebhookSignature(Request $request): array
@@ -143,8 +160,58 @@ class MonnifyController extends BankTransferProviderController
         ], $success ? 200 : 422);
     }
 
-    public function verifyBvn(string $bvn): array
+    public function verifyBvn(string $bvn, ?Customer $customer = null): array
     {
+        if (env('ENT') === 'local') {
+            $customer = $customer ?: auth()->user()?->customer;
+            $firstName = trim((string) data_get(kycStatus('FIRST_NAME', $customer?->id ?? 0), 'value', ''));
+            $middleName = trim((string) data_get(kycStatus('MIDDLE_NAME', $customer?->id ?? 0), 'value', ''));
+            $lastName = trim((string) data_get(kycStatus('LAST_NAME', $customer?->id ?? 0), 'value', ''));
+            $dateOfBirth = $this->normalizeDateOfBirthForBvn((string) (data_get(kycStatus('DOB', $customer?->id ?? 0), 'value') ?: data_get(kycStatus('DATE_OF_BIRTH', $customer?->id ?? 0), 'value') ?: now()->subYears(25)->format('Y-m-d')));
+            $phoneNumber = trim((string) data_get(kycStatus('PHONE_NUMBER', $customer?->id ?? 0), 'value', ''));
+            $name = trim(collect([$firstName, $middleName, $lastName])->filter()->implode(' '));
+
+            if (blank($name)) {
+                $name = trim((string) ($customer?->user?->name ?? $customer?->user?->firstname ?? 'Mock Customer'));
+            }
+
+            if (blank($phoneNumber)) {
+                $phoneNumber = trim((string) ($customer?->user?->phone ?? '08000000000'));
+            }
+
+            $payload = [
+                'bvn' => $bvn,
+                'name' => $name,
+                'dateOfBirth' => $dateOfBirth,
+                'mobileNo' => $phoneNumber,
+            ];
+
+            $mockResponse = [
+                'requestSuccessful' => true,
+                'responseCode' => '0',
+                'responseMessage' => 'BVN verified successfully.',
+                'responseBody' => [
+                    'bvnInformationMatch' => true,
+                    'name' => $name,
+                    'bvnName' => $name,
+                    'accountName' => $name,
+                    'customerName' => $name,
+                    'bvn' => $bvn,
+                    'maskBVN' => substr($bvn, 0, 3) . '******' . substr($bvn, -2),
+                    'dateOfBirth' => $dateOfBirth,
+                    'mobileNo' => $phoneNumber,
+                ],
+            ];
+
+            return [
+                'status' => 'success',
+                'provider_status' => 'mock_success',
+                'message' => 'BVN verified successfully (mocked in local environment).',
+                'api_response' => $mockResponse,
+                'payload' => $payload,
+            ];
+        }
+
         $token = $this->login();
 
         if (empty($token)) {
@@ -154,12 +221,12 @@ class MonnifyController extends BankTransferProviderController
             ];
         }
 
-        $customer = auth()->user()?->customer;
+        $customer = $customer ?: auth()->user()?->customer;
         $firstName = trim((string) data_get(kycStatus('FIRST_NAME', $customer?->id ?? 0), 'value', ''));
         $middleName = trim((string) data_get(kycStatus('MIDDLE_NAME', $customer?->id ?? 0), 'value', ''));
         $lastName = trim((string) data_get(kycStatus('LAST_NAME', $customer?->id ?? 0), 'value', ''));
         $phoneNumber = trim((string) data_get(kycStatus('PHONE_NUMBER', $customer?->id ?? 0), 'value', ''));
-        $dateOfBirth = trim((string) (data_get(kycStatus('DOB', $customer?->id ?? 0), 'value') ?: data_get(kycStatus('DATE_OF_BIRTH', $customer?->id ?? 0), 'value') ?: ''));
+        $dateOfBirth = $this->normalizeDateOfBirthForBvn((string) (data_get(kycStatus('DOB', $customer?->id ?? 0), 'value') ?: data_get(kycStatus('DATE_OF_BIRTH', $customer?->id ?? 0), 'value') ?: ''));
         $name = trim(collect([$firstName, $middleName, $lastName])->filter()->implode(' '));
 
         if (blank($name) || blank($dateOfBirth) || blank($phoneNumber)) {

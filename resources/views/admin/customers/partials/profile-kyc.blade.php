@@ -1,14 +1,23 @@
 @php
-    $kycField = fn (string $key) => $kycData->get($key) ?? (object) ['value' => '', 'status' => 'unverified'];
+    $kycField = fn (string $key) => $kycData->get($key) ?? (object) ['value' => '', 'status' => 'unverified', 'review_note' => null];
     $kycFields = [
         'FIRST_NAME' => 'First name',
         'MIDDLE_NAME' => 'Middle name',
         'LAST_NAME' => 'Last name',
         'PHONE_NUMBER' => 'Phone number',
+        'DOB' => 'Date of birth',
         'BVN' => 'BVN',
     ];
     $idCard = $kycField('IDCARD');
     $idCardType = $kycField('IDCARDTYPE');
+    $bvnData = (array) ($customer->bvn_data ?? []);
+    $bvnMode = $settings->bvn_verification_mode ?? 'manual';
+    $bvnVerificationCharge = (float) ($settings->bvn_verification_charge ?? 0);
+    $bvnNameMatch = (bool) data_get($bvnData, 'name_match', false);
+    $bvnVerifiedName = data_get($bvnData, 'verified_name');
+    $bvnProfileName = data_get($bvnData, 'profile_name');
+    $bvnResponse = data_get($bvnData, 'response', []);
+    $kycReviewUrl = route('customers.kyc-field-review', $customer->id);
 @endphp
 
 <div class="customer-section-heading">
@@ -89,10 +98,81 @@
             @php
                 $field = $kycField($key);
                 $fieldClass = $field->status === 'verified' ? 'text-success' : ($field->status === 'declined' ? 'text-danger' : 'text-warning');
+                $fieldValue = trim((string) $field->value);
+                $bvnHasVerification = $key === 'BVN' && (filled($bvnVerifiedName) || filled(data_get($bvnData, 'verified_at')) || filled($customer->bvn_verification_status) || filled($bvnResponse));
+                $bvnFieldClass = $key === 'BVN' && $bvnHasVerification
+                    ? ($bvnNameMatch ? 'is-valid' : 'is-invalid')
+                    : '';
             @endphp
             <div class="col-md-6 form-group">
-                <label for="{{ $key }}">{{ $label }} <span class="kyc-field-status {{ $fieldClass }}">{{ ucfirst(str_replace('-', ' ', $field->status)) }}</span></label>
-                <input type="text" class="form-control" id="{{ $key }}" name="{{ $key }}" value="{{ $field->value }}" @if($key === 'BVN') maxlength="11" inputmode="numeric" @endif>
+                <div class="d-flex align-items-center justify-content-between flex-wrap mb-50">
+                    <label for="{{ $key }}" class="mb-0">
+                        {{ $label }}
+                        @if($key === 'BVN' && $bvnHasVerification && ! $bvnNameMatch)
+                            <i
+                                class="bx bx-info-circle text-danger ml-25"
+                                data-toggle="tooltip"
+                                data-placement="top"
+                                title="BVN name does not match profile name."
+                                style="cursor: help;"
+                            ></i>
+                        @endif
+                        <span class="kyc-field-status {{ $fieldClass }}">{{ ucfirst(str_replace('-', ' ', $field->status ?: 'pending')) }}</span>
+                    </label>
+                    <div class="d-flex align-items-center flex-wrap">
+                        @if($key === 'BVN' && $bvnMode === 'auto' && $field->status !== 'verified')
+                            <button
+                                type="button"
+                                class="btn btn-outline-primary btn-sm mr-25 js-bvn-verify-btn"
+                                data-verify-url="{{ route('customers.verify-bvn', $customer->id) }}"
+                                data-bvn-field="#BVN"
+                                data-bvn-charge="{{ $bvnVerificationCharge }}">
+                                Verify BVN
+                            </button>
+                        @endif
+                        @if($key === 'BVN')
+                            <button
+                                type="button"
+                                class="btn btn-outline-secondary btn-sm mr-25 js-bvn-show-result-btn {{ $bvnHasVerification ? '' : 'd-none' }}"
+                                data-toggle="modal"
+                                data-target="#bvnVerificationResultModal">
+                                Show result
+                            </button>
+                        @endif
+                        <button
+                            type="button"
+                            class="btn btn-outline-success btn-sm mr-25 js-kyc-review-btn"
+                            data-field="{{ $key }}"
+                            data-field-label="{{ $label }}"
+                            data-action="approve"
+                            data-review-url="{{ $kycReviewUrl }}"
+                            data-value="{{ e($fieldValue) }}">
+                            Approve
+                        </button>
+                        <button
+                            type="button"
+                            class="btn btn-outline-danger btn-sm js-kyc-review-btn"
+                            data-field="{{ $key }}"
+                            data-field-label="{{ $label }}"
+                            data-action="reject"
+                            data-review-url="{{ $kycReviewUrl }}"
+                            data-value="{{ e($fieldValue) }}">
+                            Reject
+                        </button>
+                    </div>
+                </div>
+                <input type="text" class="form-control {{ $bvnFieldClass }}" id="{{ $key }}" name="{{ $key }}" value="{{ $field->value }}" @if($key === 'BVN') maxlength="11" inputmode="numeric" @endif>
+                @if($key === 'BVN')
+                    <small class="text-muted d-block mt-50">
+                        Verification status:
+                        <strong class="{{ $bvnHasVerification ? ($bvnNameMatch ? 'text-success' : 'text-danger') : 'text-warning' }}">
+                            {{ $bvnHasVerification ? ($bvnNameMatch ? 'Names match profile' : 'Names do not match') : 'Not verified yet' }}
+                        </strong>
+                    </small>
+                @endif
+                @if(filled($field->review_note))
+                    <small class="text-danger d-block mt-50">Rejection note: {{ $field->review_note }}</small>
+                @endif
             </div>
         @endforeach
 
@@ -101,7 +181,31 @@
             <input type="email" id="kyc-email" class="form-control" value="{{ $user->email }}" disabled>
         </div>
         <div class="col-md-6 form-group">
-            <label for="IDCARDTYPE">ID card type <span class="kyc-field-status {{ $idCardType->status === 'verified' ? 'text-success' : ($idCardType->status === 'declined' ? 'text-danger' : 'text-warning') }}">{{ ucfirst($idCardType->status) }}</span></label>
+            <div class="d-flex align-items-center justify-content-between flex-wrap mb-50">
+                <label for="IDCARDTYPE" class="mb-0">ID card type <span class="kyc-field-status {{ $idCardType->status === 'verified' ? 'text-success' : ($idCardType->status === 'declined' ? 'text-danger' : 'text-warning') }}">{{ ucfirst($idCardType->status ?: 'pending') }}</span></label>
+                <div class="d-flex align-items-center flex-wrap">
+                    <button
+                        type="button"
+                        class="btn btn-outline-success btn-sm mr-25 js-kyc-review-btn"
+                        data-field="IDCARDTYPE"
+                        data-field-label="ID card type"
+                        data-action="approve"
+                        data-review-url="{{ $kycReviewUrl }}"
+                        data-value="{{ e(trim((string) $idCardType->value)) }}">
+                        Approve
+                    </button>
+                    <button
+                        type="button"
+                        class="btn btn-outline-danger btn-sm js-kyc-review-btn"
+                        data-field="IDCARDTYPE"
+                        data-field-label="ID card type"
+                        data-action="reject"
+                        data-review-url="{{ $kycReviewUrl }}"
+                        data-value="{{ e(trim((string) $idCardType->value)) }}">
+                        Reject
+                    </button>
+                </div>
+            </div>
             <select id="IDCARDTYPE" name="IDCARDTYPE" class="form-control">
                 <option value="">Select ID card type</option>
                 @foreach(['Nin Slip', 'International Passport', "Driver's Licence", "Voter's Card"] as $type)
@@ -110,12 +214,43 @@
             </select>
         </div>
         <div class="col-md-6 form-group">
-            <label for="IDCARD">Identity document <span class="kyc-field-status {{ $idCard->status === 'verified' ? 'text-success' : ($idCard->status === 'declined' ? 'text-danger' : 'text-warning') }}">{{ ucfirst($idCard->status) }}</span></label>
+            <div class="d-flex align-items-center justify-content-between flex-wrap mb-50">
+                <label for="IDCARD" class="mb-0">Identity document <span class="kyc-field-status {{ $idCard->status === 'verified' ? 'text-success' : ($idCard->status === 'declined' ? 'text-danger' : 'text-warning') }}">{{ ucfirst($idCard->status ?: 'pending') }}</span></label>
+                <div class="d-flex align-items-center flex-wrap">
+                    <button
+                        type="button"
+                        class="btn btn-outline-success btn-sm mr-25 js-kyc-review-btn"
+                        data-field="IDCARD"
+                        data-field-label="Identity document"
+                        data-action="approve"
+                        data-review-url="{{ $kycReviewUrl }}"
+                        data-value="{{ e(trim((string) $idCard->value)) }}">
+                        Approve
+                    </button>
+                    <button
+                        type="button"
+                        class="btn btn-outline-danger btn-sm js-kyc-review-btn"
+                        data-field="IDCARD"
+                        data-field-label="Identity document"
+                        data-action="reject"
+                        data-review-url="{{ $kycReviewUrl }}"
+                        data-value="{{ e(trim((string) $idCard->value)) }}">
+                        Reject
+                    </button>
+                </div>
+            </div>
             @if($idCard->value)
                 <div class="mb-75"><img src="{{ asset($idCard->value) }}" alt="Submitted identity document" class="kyc-document-thumb" onclick="zoomImg(this)"></div>
             @endif
             <input type="file" id="IDCARD" name="IDCARD" accept="image/jpg,image/jpeg" class="form-control">
             <small class="text-muted">JPEG only, maximum 1 MB.</small>
+        </div>
+        <div class="col-12 form-group">
+            @if(filled($bvnResponse))
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-toggle="modal" data-target="#bvnVerificationResultModal">
+                    Show result
+                </button>
+            @endif
         </div>
         <div class="col-12 text-right">
             <button type="submit" class="btn btn-primary"><i class="bx bx-save mr-25"></i> Save KYC corrections</button>

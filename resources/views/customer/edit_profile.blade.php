@@ -124,8 +124,8 @@
                                                                             <label for="phone">Phone Number</label>
                                                                             <input autocomplete="false" type="phone"
                                                                                 class="form-control" id="phone"
-                                                                                name="phone"
-                                                                                value="{{ auth()->user()->phone }}">
+                                                                                value="{{ auth()->user()->phone }}"
+                                                                                disabled>
                                                                         </fieldset>
                                                                     </div>
                                                                     <div class="col-md-6">

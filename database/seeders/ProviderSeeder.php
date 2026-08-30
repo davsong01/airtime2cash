@@ -17,6 +17,7 @@ class ProviderSeeder extends Seeder
                 'live_base_url' => 'https://api.monnify.com',
                 'is_bank_transfer' => true,
                 'is_bank_verification' => true,
+                'is_bvn_verification' => true,
                 'is_payment_gateway' => true,
             ],
             [

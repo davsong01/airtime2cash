@@ -125,6 +125,10 @@
     <script>
         $(function () {
             $('.js-example-basic-single').select2({ width: '100%' });
+            $('[data-toggle="tooltip"]').tooltip();
+            bindBvnResultModal();
+            bindBvnVerification();
+            bindKycReviewActions();
             bindWalletBankVerification();
         });
 
@@ -282,6 +286,247 @@
                         $button.prop('disabled', false).html('<i class="bx bx-search-alt mr-25"></i> Verify account only');
                     }
                 });
+            });
+        }
+
+        function bindBvnResultModal() {
+            const $modal = $('#bvnVerificationResultModal');
+            const $loading = $('#bvn-verification-loading');
+            const $result = $('#bvn-verification-result');
+            const $title = $('#bvnVerificationResultTitle');
+            const $showResultBtn = $('.js-bvn-show-result-btn');
+            const state = window.adminBvnVerificationState || {};
+
+            if (!$modal.length) {
+                return;
+            }
+
+            const escapeHtml = (value) => String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+
+            const getResponsePayload = () => state.response || {};
+
+            const syncModal = () => {
+                $('#bvn-result-profile-name').text(state.profileName || 'N/A');
+                $('#bvn-result-verified-name').text(state.verifiedName || 'N/A');
+                $('#bvn-result-match-status')
+                    .text(state.nameMatch ? 'Names match' : 'Names do not match')
+                    .toggleClass('text-success', !!state.nameMatch)
+                    .toggleClass('text-danger', !state.nameMatch);
+                $('#bvn-result-json').text(JSON.stringify(getResponsePayload(), null, 2));
+            };
+
+            const showLoading = () => {
+                $title.text('Verifying BVN details...');
+                $loading.removeClass('d-none');
+                $result.addClass('d-none');
+            };
+
+            const showResult = () => {
+                syncModal();
+                $title.text('BVN verification result');
+                $loading.addClass('d-none');
+                $result.removeClass('d-none');
+            };
+
+            $modal.on('show.bs.modal', function () {
+                if (state && Object.keys(getResponsePayload()).length) {
+                    showResult();
+                } else {
+                    showLoading();
+                }
+            });
+
+            $showResultBtn.on('click', function () {
+                showResult();
+            });
+
+            window.adminBvnVerificationUi = {
+                setLoading: showLoading,
+                setResult: function (payload) {
+                    state.profileName = payload.profile_name || state.profileName || '';
+                    state.verifiedName = payload.verified_name || state.verifiedName || '';
+                    state.nameMatch = !!payload.name_match;
+                    state.response = payload.provider_response || payload.response || payload.stored_data?.response || payload;
+                    state.status = payload.verification_status || payload.status || state.status || '';
+                    state.verifiedAt = payload.stored_data?.verified_at || state.verifiedAt || '';
+                    $showResultBtn.removeClass('d-none');
+                    showResult();
+                },
+                open: function () {
+                    $modal.modal('show');
+                }
+            };
+        }
+
+        function bindBvnVerification() {
+            const $button = $('.js-bvn-verify-btn');
+
+            if (!$button.length) {
+                return;
+            }
+
+            $button.on('click', function () {
+                const $currentButton = $(this);
+                const verifyUrl = String($currentButton.data('verify-url') || '');
+                const bvnField = String($currentButton.data('bvn-field') || '#BVN');
+                const bvn = String($(bvnField).val() || '').trim();
+                const bvnCharge = parseFloat(String($currentButton.data('bvn-charge') || '0')) || 0;
+                const confirmMessage = bvnCharge > 0
+                    ? `This BVN verification may charge the customer's wallet with ${bvnCharge.toFixed(2)}. Continue?`
+                    : 'This BVN verification may charge the customer\'s wallet. Continue?';
+
+                if (!window.confirm(confirmMessage)) {
+                    return;
+                }
+
+                if (!verifyUrl) {
+                    window.adminBvnVerificationUi?.open();
+                    return;
+                }
+
+                if (!bvn) {
+                    window.adminBvnVerificationUi?.open();
+                    return;
+                }
+
+                window.adminBvnVerificationUi?.open();
+                window.adminBvnVerificationUi?.setLoading();
+
+                $.ajax({
+                    url: verifyUrl,
+                    method: 'POST',
+                    data: {
+                        _token: $('meta[name="csrf-token"]').attr('content'),
+                        bvn: bvn,
+                    },
+                    beforeSend: function () {
+                        $currentButton.prop('disabled', true).html('<span class="spinner-border spinner-border-sm mr-50" role="status" aria-hidden="true"></span> Verifying...');
+                    },
+                    success: function (response) {
+                        window.adminBvnVerificationUi?.setResult(response || {});
+                    },
+                    error: function (xhr) {
+                        const payload = xhr.responseJSON || { status: false, message: 'Unable to verify BVN right now.' };
+                        window.adminBvnVerificationUi?.setResult(payload);
+                    },
+                    complete: function () {
+                        $currentButton.prop('disabled', false).html('Verify BVN');
+                    }
+                });
+            });
+        }
+
+        function bindKycReviewActions() {
+            const $modal = $('#kyc-field-review-modal');
+            const $feedback = $('#kyc-field-review-feedback');
+            const $fieldLabel = $('#kyc-review-field-label');
+            const $field = $('#kyc-review-field');
+            const $action = $('#kyc-review-action');
+            const $value = $('#kyc-review-value');
+            const $reason = $('#kyc-review-reason');
+            const $approveBtn = $('#kyc-review-confirm-approve');
+            const $rejectBtn = $('#kyc-review-confirm-reject');
+
+            if (!$modal.length) {
+                return;
+            }
+
+            let reviewUrl = '';
+
+            const setFeedback = (type, message) => {
+                const alertClass = type === 'success' ? 'alert-success' : (type === 'warning' ? 'alert-warning' : 'alert-danger');
+                $feedback
+                    .removeClass('d-none alert-success alert-warning alert-danger')
+                    .addClass(alertClass)
+                    .text(message || '');
+            };
+
+            const hideFeedback = () => {
+                $feedback.addClass('d-none').removeClass('alert-success alert-warning alert-danger').text('');
+            };
+
+            const openModal = (data) => {
+                reviewUrl = String(data.reviewUrl || '');
+                $fieldLabel.val(data.fieldLabel || data.field || '');
+                $field.val(data.field || '');
+                $action.val(data.action || 'approve');
+                $value.val(data.value || '');
+                $reason.val('');
+                hideFeedback();
+
+                const isReject = String(data.action || '') === 'reject';
+                $approveBtn.toggle(!isReject);
+                $rejectBtn.toggle(isReject);
+                $reason.closest('.form-group').toggle(isReject);
+
+                $modal.modal('show');
+            };
+
+            const submitReview = (action) => {
+                const field = String($field.val() || '');
+                const value = String($value.val() || '');
+                const reason = String($reason.val() || '').trim();
+
+                if (!reviewUrl || !field) {
+                    setFeedback('warning', 'This review action is missing the route or field name.');
+                    return;
+                }
+
+                $.ajax({
+                    url: reviewUrl,
+                    method: 'POST',
+                    data: {
+                        _token: $('meta[name="csrf-token"]').attr('content'),
+                        field: field,
+                        action: action,
+                        value: value,
+                        reason: reason,
+                    },
+                    beforeSend: function () {
+                        $approveBtn.prop('disabled', true);
+                        $rejectBtn.prop('disabled', true);
+                        $reason.prop('disabled', true);
+                        setFeedback('warning', 'Processing field review...');
+                    },
+                    success: function (response) {
+                        setFeedback('success', response.message || 'Field review completed.');
+                        setTimeout(function () {
+                            window.location.reload();
+                        }, 700);
+                    },
+                    error: function (xhr) {
+                        const message = xhr.responseJSON?.message || 'Unable to update this KYC field right now.';
+                        setFeedback('danger', message);
+                    },
+                    complete: function () {
+                        $approveBtn.prop('disabled', false);
+                        $rejectBtn.prop('disabled', false);
+                        $reason.prop('disabled', false);
+                    }
+                });
+            };
+
+            $(document).on('click', '.js-kyc-review-btn', function () {
+                openModal({
+                    reviewUrl: $(this).data('review-url'),
+                    field: $(this).data('field'),
+                    fieldLabel: $(this).data('field-label'),
+                    action: $(this).data('action'),
+                    value: $(this).data('value'),
+                });
+            });
+
+            $approveBtn.on('click', function () {
+                submitReview('approve');
+            });
+
+            $rejectBtn.on('click', function () {
+                submitReview('reject');
             });
         }
 

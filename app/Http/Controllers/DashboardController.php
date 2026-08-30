@@ -421,7 +421,11 @@ class DashboardController extends Controller
     public function updateKycInfo()
     {
         $kyc = $this->getKycStatus(auth()->user());
-        return view(themeView('customer', 'edit_kyc_details'), compact('kyc'));
+        $kycRecords = KycData::where('customer_id', auth()->user()->customer->id)
+            ->get()
+            ->keyBy('key');
+
+        return view(themeView('customer', 'edit_kyc_details'), compact('kyc', 'kycRecords'));
     }
 
     public function apiSettings(){
@@ -431,8 +435,27 @@ class DashboardController extends Controller
     public function processUpdateKycInfo(Request $request)
     {
         $customer = auth()->user()->customer;
+        $hasDeclinedField = $this->customerHasDeclinedKycField($customer->id);
 
-        if ($customer->kyc_status !== 'unverified') {
+        if ($customer->kyc_status === 'verified') {
+            $message = 'Your verified KYC details cannot be changed from the customer portal. Please contact support if your information needs to be corrected.';
+
+            return back()->with(
+                'error',
+                $message
+            );
+        }
+
+        if ($customer->kyc_status === 'awaiting-approval' && ! $hasDeclinedField) {
+            $message = 'Your KYC submission is currently awaiting review and cannot be changed right now.';
+
+            return back()->with(
+                'error',
+                $message
+            );
+        }
+
+        if ($customer->kyc_status !== 'unverified' && ! $hasDeclinedField) {
             $message = $customer->kyc_status === 'awaiting-approval'
                 ? 'Your KYC submission is currently awaiting review and cannot be changed. You can update it if the administrator declines the submission.'
                 : 'Your verified KYC details cannot be changed from the customer portal. Please contact support if your information needs to be corrected.';
@@ -443,27 +466,45 @@ class DashboardController extends Controller
             );
         }
 
-        $input = $request->validate(
-            [
-                'FIRST_NAME'   => ['required'],
-                'MIDDLE_NAME'  => ['required'],
-                'LAST_NAME'    => ['required'],
-                'PHONE_NUMBER' => ['required'],
-                'BVN'          => ['required', 'digits:11'],
-                'IDCARD'       => ['required', 'image', 'mimes:jpg,jpeg', 'max:500'],
-                'IDCARDTYPE'   => ['required'],
-            ],
-            [
-                'IDCARD.required' => 'Please upload your ID card.',
-                'IDCARD.image'    => 'The uploaded file must be a valid image.',
-                'IDCARD.mimes'    => 'Only JPG and JPEG images are allowed.',
-                'IDCARD.max'      => 'Your ID card image must not be larger than 500 KB. Please upload a smaller image. You may upload a screenshot or clear photo of your ID card. Ensure all details are clearly visible.',
-            ]
-        );
+        $isResubmission = $hasDeclinedField;
+        $kycFieldStatuses = [
+            'FIRST_NAME' => kycStatus('FIRST_NAME', $customer->id)->status ?? 'unverified',
+            'MIDDLE_NAME' => kycStatus('MIDDLE_NAME', $customer->id)->status ?? 'unverified',
+            'LAST_NAME' => kycStatus('LAST_NAME', $customer->id)->status ?? 'unverified',
+            'DOB' => kycStatus('DOB', $customer->id)->status ?? 'unverified',
+            'BVN' => kycStatus('BVN', $customer->id)->status ?? 'unverified',
+            'IDCARDTYPE' => kycStatus('IDCARDTYPE', $customer->id)->status ?? 'unverified',
+            'IDCARD' => kycStatus('IDCARD', $customer->id)->status ?? 'unverified',
+        ];
+
+        $rules = [
+            'PHONE_NUMBER' => ['nullable'],
+        ];
+
+        foreach (array_keys($kycFieldStatuses) as $field) {
+            $fieldRequired = ! $isResubmission || ($kycFieldStatuses[$field] === 'declined');
+
+            $rules[$field] = match ($field) {
+                'BVN' => $fieldRequired ? ['required', 'digits:11'] : ['nullable', 'digits:11'],
+                'IDCARD' => $fieldRequired ? ['required', 'image', 'mimes:jpg,jpeg', 'max:500'] : ['nullable', 'image', 'mimes:jpg,jpeg', 'max:500'],
+                default => $fieldRequired ? ['required'] : ['nullable'],
+            };
+        }
+
+        $input = $request->validate($rules, [
+            'IDCARD.required' => 'Please upload your ID card.',
+            'IDCARD.image'    => 'The uploaded file must be a valid image.',
+            'IDCARD.mimes'    => 'Only JPG and JPEG images are allowed.',
+            'IDCARD.max'      => 'Your ID card image must not be larger than 500 KB. Please upload a smaller image. You may upload a screenshot or clear photo of your ID card. Ensure all details are clearly visible.',
+        ]);
+
+        $input = array_filter($input, static fn ($value) => ! is_null($value));
 
         if (!empty($request->IDCARD)) {
             $input['IDCARD'] = $this->uploadFile($request->IDCARD, 'kyc');
         }
+
+        $input['PHONE_NUMBER'] = $customer->user->phone;
 
         // $instantVerify = ['FIRST_NAME', 'LAST_NAME', 'MIDDLE_NAME', 'DOB', 'PHONE_NUMBER', 'COUNTRY', 'STATE', 'LGA', 'DOB', 'IDCARD', 'IDCARDTYPE'];
         // foreach ($input as $key => $value) {
@@ -517,6 +558,13 @@ class DashboardController extends Controller
         // }
         return back()->with('message', 'KYC Info Update. Awaiting Admin approval');
 
+    }
+
+    private function customerHasDeclinedKycField(int $customerId): bool
+    {
+        return KycData::where('customer_id', $customerId)
+            ->where('status', 'declined')
+            ->exists();
     }
 
     public function updateKycData($key, $value, $customer_id, $status = null)

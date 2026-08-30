@@ -289,6 +289,7 @@ class CustomerAccessControlsTest extends TestCase
             ->post(route('customers.update', $user->id), [
                 'firstname' => $user->firstname,
                 'lastname' => $user->lastname,
+                'email' => 'account-updated@example.com',
                 'status' => $user->status,
                 'phone' => $user->phone,
                 'customerlevel' => $user->customer->customer_level,
@@ -303,6 +304,10 @@ class CustomerAccessControlsTest extends TestCase
             'can_access_w2bank' => 1,
             'can_access_w2bank_auto' => 1,
             'can_access_a2c' => 1,
+        ]);
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'email' => 'account-updated@example.com',
         ]);
     }
 

@@ -6,6 +6,12 @@
         $customer = auth()->user()->customer;
         $finalKycStatus = getFinalKycStatus($customer->id);
         $kycIsLocked = $finalKycStatus === 'awaiting-approval';
+        $kycField = fn (string $key) => kycStatus($key, $customer->id);
+        $statusLabel = fn ($status) => $status === 'verified' ? 'Verified' : ($status === 'declined' ? 'Declined' : 'Not Verified');
+        $hasVerifiedKycField = collect(['FIRST_NAME', 'MIDDLE_NAME', 'LAST_NAME', 'DOB', 'BVN', 'IDCARDTYPE', 'IDCARD', 'PHONE_NUMBER'])
+            ->contains(fn ($key) => ($kycField($key)->status ?? 'unverified') === 'verified');
+        $hasOpenKycField = collect(['FIRST_NAME', 'MIDDLE_NAME', 'LAST_NAME', 'DOB', 'BVN', 'IDCARDTYPE', 'IDCARD', 'PHONE_NUMBER'])
+            ->contains(fn ($key) => ($kycField($key)->status ?? 'unverified') === 'declined');
         $settings = getSettings();
         $adminWhatsappNumber = preg_replace('/\D+/', '', (string) $settings->whatsapp_number);
         $submittedIdType = kycStatus('IDCARDTYPE', $customer->id)['value'] ?? 'Not provided';
@@ -31,6 +37,19 @@
 
     @include('sneat.layouts.alerts')
     @include('shared.kyc-rejection-alert')
+
+    <div class="alert border-0 shadow-sm mb-4" style="background: linear-gradient(135deg, rgba(245, 158, 11, .16), rgba(251, 191, 36, .10)); border-left: 6px solid #f59e0b !important; color: #92400e;">
+        <div class="d-flex align-items-start gap-3">
+            <span class="d-inline-flex align-items-center justify-content-center rounded-circle" style="width: 42px; height: 42px; background: rgba(245, 158, 11, .18); color: #b45309; flex: 0 0 auto;">
+                <i class="bx bx-error-circle fs-4"></i>
+            </span>
+            <div>
+                <div class="text-uppercase fw-bold small mb-1" style="letter-spacing: .08em;">Important billing notice</div>
+                <strong class="d-block mb-1">BVN verification fee applies.</strong>
+                <span>We may charge your wallet for BVN verification after approval or after your first funded transaction, depending on your account flow.</span>
+            </div>
+        </div>
+    </div>
 
     <div class="row g-4">
         <div class="col-lg-4">
@@ -87,7 +106,7 @@
                                     'FIRST_NAME' => ['label' => 'First name', 'value' => auth()->user()->firstname],
                                     'MIDDLE_NAME' => ['label' => 'Middle name', 'value' => auth()->user()->middlename],
                                     'LAST_NAME' => ['label' => 'Last name', 'value' => auth()->user()->lastname],
-                                    'PHONE_NUMBER' => ['label' => 'Phone number', 'value' => auth()->user()->phone],
+                                    'DOB' => ['label' => 'Date of birth', 'value' => kycStatus('DOB', $customer->id)['value'] ?? ''],
                                     'BVN' => ['label' => 'BVN', 'value' => ''],
                                 ];
                             @endphp
@@ -96,23 +115,70 @@
                                 @php
                                     $status = kycStatus($key, $customer->id)['status'] ?? 'unverified';
                                     $value = kycStatus($key, $customer->id)['value'] ?? $field['value'];
+                                    $reviewNote = kycStatus($key, $customer->id)->review_note ?? null;
                                     $displayValue = $key === 'BVN' ? starMiddle($value) : $value;
+                                    $fieldLocked = ($kycIsLocked || $hasVerifiedKycField || $hasOpenKycField) && $status !== 'declined';
                                 @endphp
                                 <div class="col-md-6">
-                                    <label class="form-label">{{ $field['label'] }}</label>
-                                    @if($status === 'verified' || $kycIsLocked)
+                                    <div class="d-flex align-items-center justify-content-between flex-wrap mb-1">
+                                        <label class="form-label mb-0">{{ $field['label'] }}</label>
+                                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                                            <span class="badge {{ $status === 'verified' ? 'bg-label-success' : ($status === 'declined' ? 'bg-label-danger' : 'bg-label-warning') }}">
+                                                {{ $statusLabel($status) }}
+                                            </span>
+                                            @if($status === 'declined' && filled($reviewNote))
+                                                <button type="button" class="btn btn-link btn-sm p-0 view-kyc-reason-btn" data-field="{{ $field['label'] }}" data-reason="{{ e($reviewNote) }}">View reason</button>
+                                            @endif
+                                        </div>
+                                    </div>
+                                    @if($status === 'verified' || $fieldLocked)
                                         <input type="text" class="form-control" value="{{ $displayValue }}" disabled>
+                                    @elseif($key === 'DOB')
+                                        <input type="date" class="form-control" name="DOB" value="{{ $value }}" required>
                                     @elseif($key === 'BVN')
                                         <input type="text" class="form-control" name="BVN" value="" autocomplete="off" inputmode="numeric" pattern="[0-9]{11}" placeholder="Enter your 11-digit BVN" minlength="11" maxlength="11" required>
                                     @else
-                                        <input type="text" class="form-control" name="{{ $key }}" value="{{ $field['value'] }}" required>
+                                        <input type="text" class="form-control" name="{{ $key }}" value="{{ filled($value) ? $value : $field['value'] }}" required>
                                     @endif
                                 </div>
                             @endforeach
 
                             <div class="col-md-6">
-                                <label for="IDCARDTYPE" class="form-label">ID card type</label>
-                                @if(kycStatus('IDCARD', $customer->id)['status'] == 'verified' || $kycIsLocked)
+                                @php $phoneKyc = $kycField('PHONE_NUMBER'); @endphp
+                                <div class="d-flex align-items-center justify-content-between flex-wrap mb-1">
+                                    <label class="form-label mb-0">Phone number</label>
+                                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                                        <span class="badge {{ $phoneKyc->status === 'verified' ? 'bg-label-success' : ($phoneKyc->status === 'declined' ? 'bg-label-danger' : 'bg-label-warning') }}">
+                                            {{ $statusLabel($phoneKyc->status ?? 'unverified') }}
+                                        </span>
+                                        @if($phoneKyc->status === 'declined' && filled($phoneKyc->review_note ?? null))
+                                            <button type="button" class="btn btn-link btn-sm p-0 view-kyc-reason-btn" data-field="Phone number" data-reason="{{ e($phoneKyc->review_note) }}">View reason</button>
+                                        @endif
+                                    </div>
+                                </div>
+                                <input type="text" class="form-control" value="{{ auth()->user()->phone }}" disabled>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label">Email address</label>
+                                <input class="form-control" value="{{ auth()->user()->email }}" disabled>
+                            </div>
+
+                            <div class="col-md-6">
+                                @php $idTypeKyc = $kycField('IDCARDTYPE'); @endphp
+                                @php $idTypeLocked = ($kycIsLocked || $hasVerifiedKycField || $hasOpenKycField) && $idTypeKyc->status !== 'declined'; @endphp
+                                <div class="d-flex align-items-center justify-content-between flex-wrap mb-1">
+                                    <label for="IDCARDTYPE" class="form-label mb-0">ID card type</label>
+                                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                                        <span class="badge {{ $idTypeKyc->status === 'verified' ? 'bg-label-success' : ($idTypeKyc->status === 'declined' ? 'bg-label-danger' : 'bg-label-warning') }}">
+                                            {{ $statusLabel($idTypeKyc->status ?? 'unverified') }}
+                                        </span>
+                                        @if($idTypeKyc->status === 'declined' && filled($idTypeKyc->review_note ?? null))
+                                            <button type="button" class="btn btn-link btn-sm p-0 view-kyc-reason-btn" data-field="ID card type" data-reason="{{ e($idTypeKyc->review_note) }}">View reason</button>
+                                        @endif
+                                    </div>
+                                </div>
+                                @if($idTypeKyc->status == 'verified' || $idTypeLocked)
                                     <input type="text" class="form-control" value="{{ kycStatus('IDCARDTYPE', $customer->id)['value'] }}" disabled>
                                 @else
                                     <select id="IDCARDTYPE" name="IDCARDTYPE" class="form-select" required>
@@ -126,9 +192,26 @@
                             </div>
 
                             <div class="col-md-6">
-                                <label for="IDCARD" class="form-label">ID Card</label>
+                                @php $idCardKyc = $kycField('IDCARD'); @endphp
+                                @php $idCardLocked = ($kycIsLocked || $hasVerifiedKycField || $hasOpenKycField) && $idCardKyc->status !== 'declined'; @endphp
+                                <div class="d-flex align-items-center justify-content-between flex-wrap mb-1">
+                                    <label for="IDCARD" class="form-label mb-0">Identity document</label>
+                                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                                        <span class="badge {{ $idCardKyc->status === 'verified' ? 'bg-label-success' : ($idCardKyc->status === 'declined' ? 'bg-label-danger' : 'bg-label-warning') }}">
+                                            {{ $statusLabel($idCardKyc->status ?? 'unverified') }}
+                                        </span>
+                                        @if($idCardKyc->status === 'declined' && filled($idCardKyc->review_note ?? null))
+                                            <button type="button" class="btn btn-link btn-sm p-0 view-kyc-reason-btn" data-field="Identity document" data-reason="{{ e($idCardKyc->review_note) }}">View reason</button>
+                                        @endif
+                                    </div>
+                                </div>
 
-                                @if(kycStatus('IDCARD', $customer->id)['status'] == 'verified' || $kycIsLocked)
+                                @if($idCardKyc->status == 'verified' || $idCardLocked)
+                                    @if(filled($idCardKyc->value))
+                                        <div class="mb-75">
+                                            <img src="{{ asset($idCardKyc->value) }}" alt="Submitted identity document" onclick="zoomKycDocument(this)" style="max-width: 150px; width: 150px; cursor: zoom-in; border-radius: 8px; border: 1px solid #ddd;">
+                                        </div>
+                                    @endif
                                     <input type="text" class="form-control" value="{{ kycStatus('IDCARDTYPE', $customer->id)['value'] }}" disabled>
                                 @else
                                     <input
@@ -145,19 +228,22 @@
                                     <strong>Maximum file size: 500 KB.</strong>
                                 </div>
                             </div>
-
-                            <div class="col-12">
-                                <label class="form-label">Email address</label>
-                                <input class="form-control" value="{{ auth()->user()->email }}" disabled>
-                            </div>
                         </div>
 
-                        @if(in_array($finalKycStatus, ['unverified', 'verified'], true))
+                        @if($finalKycStatus === 'verified')
+                            <div class="customer-form-actions mt-4 mx-n4 mb-n4">
+                                <a href="{{ route('customer.load.wallet') }}" class="btn btn-success customer-form-submit">Fund wallet</a>
+                            </div>
+                        @elseif($hasVerifiedKycField)
+                            <div class="customer-form-actions mt-4 mx-n4 mb-n4">
+                                <button class="btn btn-primary customer-form-submit" type="submit"><i class="bx bx-check-circle me-1"></i> Review and resubmit KYC</button>
+                            </div>
+                        @elseif($finalKycStatus === 'unverified' || $hasOpenKycField)
                             <div class="customer-form-actions mt-4 mx-n4 mb-n4">
                                 @if($finalKycStatus == 'unverified')
                                 <button class="btn btn-primary customer-form-submit" type="submit"><i class="bx bx-check-circle me-1"></i> Submit KYC</button>
                                 @else
-                                <a href="{{ route('customer.load.wallet') }}" class="btn btn-success customer-form-submit">Fund wallet</a>
+                                <button class="btn btn-primary customer-form-submit" type="submit"><i class="bx bx-check-circle me-1"></i> Review and resubmit KYC</button>
                                 @endif
                             </div>
                         @endif
@@ -166,4 +252,55 @@
             </div>
         </div>
     </div>
+
+    <div class="modal fade" id="kycReasonModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div>
+                        <h5 class="modal-title mb-0">Field rejection reason</h5>
+                        <small class="text-muted" id="kycReasonModalField"></small>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-danger mb-0" id="kycReasonModalText"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="kycDocumentModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title mb-0">Identity document</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <img id="kycDocumentModalImage" src="" alt="Identity document preview" style="max-width: 100%; height: auto; border-radius: 8px;">
+                </div>
+            </div>
+        </div>
+    </div>
+@endsection
+
+@section('page-script')
+    @parent
+    <script>
+        function zoomKycDocument(image) {
+            if (!image || !image.src) {
+                return;
+            }
+
+            $('#kycDocumentModalImage').attr('src', image.src);
+            $('#kycDocumentModal').modal('show');
+        }
+
+        $(document).on('click', '.view-kyc-reason-btn', function () {
+            $('#kycReasonModalField').text($(this).data('field') || '');
+            $('#kycReasonModalText').text($(this).data('reason') || 'No rejection reason was provided.');
+            $('#kycReasonModal').modal('show');
+        });
+    </script>
 @endsection

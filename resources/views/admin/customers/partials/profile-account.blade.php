@@ -31,6 +31,10 @@
             <input type="text" class="form-control" id="lastname" name="lastname" value="{{ old('lastname', $user->lastname) }}" required>
         </div>
         <div class="col-md-6 form-group">
+            <label for="email">Email address</label>
+            <input type="email" class="form-control" id="email" name="email" value="{{ old('email', $user->email) }}" required>
+        </div>
+        <div class="col-md-6 form-group">
             <label for="phone">Phone number</label>
             <input type="tel" class="form-control" id="phone" name="phone" value="{{ old('phone', $user->phone) }}">
         </div>

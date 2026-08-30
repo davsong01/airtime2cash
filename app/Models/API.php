@@ -21,6 +21,7 @@ class API extends Model
         'pricing_data_status' => 'boolean',
         'is_bank_transfer' => 'boolean',
         'is_bank_verification' => 'boolean',
+        'is_bvn_verification' => 'boolean',
         'is_auto_share' => 'boolean',
         'is_payment_gateway' => 'boolean',
         'charge' => 'float',

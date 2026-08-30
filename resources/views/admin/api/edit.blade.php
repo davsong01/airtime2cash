@@ -404,6 +404,12 @@
                                                                     </div>
                                                                     <div class="col-sm-6 mb-2">
                                                                         <div class="custom-control custom-checkbox">
+                                                                            <input type="checkbox" class="custom-control-input" id="is_bvn_verification" name="is_bvn_verification" value="1" @checked(old('is_bvn_verification', optional($api)->is_bvn_verification))>
+                                                                            <label class="custom-control-label" for="is_bvn_verification">Use for BVN verification</label>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div class="col-sm-6 mb-2">
+                                                                        <div class="custom-control custom-checkbox">
                                                                             <input type="checkbox" class="custom-control-input" id="is_auto_share" name="is_auto_share" value="1" @checked(old('is_auto_share', optional($api)->is_auto_share))>
                                                                             <label class="custom-control-label" for="is_auto_share">Use for auto share</label>
                                                                         </div>

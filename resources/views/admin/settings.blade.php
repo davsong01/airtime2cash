@@ -223,6 +223,17 @@
                                                                                 <small class="text-muted d-block mt-50">Controls whether customers can select Manual Transfer on the wallet-to-bank page.</small>
                                                                             </fieldset>
                                                                         </div>
+
+                                                                        <div class="col-md-6">
+                                                                            <fieldset class="form-group">
+                                                                                <label for="bvn_verification_charge">BVN Verification Charge ({!! $settings->currency !!})</label>
+                                                                                <input type="number" name="bvn_verification_charge" id="bvn_verification_charge" min="0" step="0.01" class="form-control @error('bvn_verification_charge') is-invalid @enderror" value="{{ old('bvn_verification_charge', $settings->bvn_verification_charge ?? 0) }}">
+                                                                                @error('bvn_verification_charge')
+                                                                                    <div class="invalid-feedback">{{ $message }}</div>
+                                                                                @enderror
+                                                                                <small class="text-muted d-block mt-50">This is the amount to charge the customer for BVN verification after approval or first wallet funding, depending on your flow.</small>
+                                                                            </fieldset>
+                                                                        </div>
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -286,6 +297,38 @@
                                                                                     <div class="invalid-feedback">{{ $message }}</div>
                                                                                 @enderror
                                                                                 <small class="text-muted d-block mt-50">Provider used to verify customer bank details before transfer.</small>
+                                                                            </fieldset>
+                                                                        </div>
+
+                                                                        <div class="col-md-6">
+                                                                            <fieldset class="form-group">
+                                                                                <label for="bvn_verification_provider_id">BVN Verification Provider</label>
+                                                                                <select name="bvn_verification_provider_id" class="form-control @error('bvn_verification_provider_id') is-invalid @enderror" id="bvn_verification_provider_id">
+                                                                                    <option value="">Select provider</option>
+                                                                                    @foreach($bvnVerificationProviders as $provider)
+                                                                                        <option value="{{ $provider->id }}" @selected((string) old('bvn_verification_provider_id', $settings->bvn_verification_provider_id) === (string) $provider->id)>
+                                                                                            {{ $provider->name }}{{ $provider->status !== 'active' ? ' (Inactive)' : '' }}
+                                                                                        </option>
+                                                                                    @endforeach
+                                                                                </select>
+                                                                                @error('bvn_verification_provider_id')
+                                                                                    <div class="invalid-feedback">{{ $message }}</div>
+                                                                                @enderror
+                                                                                <small class="text-muted d-block mt-50">Provider used for BVN verification during KYC review.</small>
+                                                                            </fieldset>
+                                                                        </div>
+
+                                                                        <div class="col-md-6">
+                                                                            <fieldset class="form-group">
+                                                                                <label for="bvn_verification_mode">BVN Verification Mode</label>
+                                                                                <select name="bvn_verification_mode" class="form-control @error('bvn_verification_mode') is-invalid @enderror" id="bvn_verification_mode">
+                                                                                    <option value="manual" @selected(old('bvn_verification_mode', $settings->bvn_verification_mode ?? 'manual') === 'manual')>Manual</option>
+                                                                                    <option value="auto" @selected(old('bvn_verification_mode', $settings->bvn_verification_mode ?? 'manual') === 'auto')>Auto</option>
+                                                                                </select>
+                                                                                @error('bvn_verification_mode')
+                                                                                    <div class="invalid-feedback">{{ $message }}</div>
+                                                                                @enderror
+                                                                                <small class="text-muted d-block mt-50">Manual keeps BVN verification on the admin button. Auto lets the system trigger it during KYC processing.</small>
                                                                             </fieldset>
                                                                         </div>
                                                                     </div>

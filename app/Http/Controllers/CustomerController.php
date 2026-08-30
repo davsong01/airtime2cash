@@ -17,6 +17,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use App\Models\ReservedAccountNumber;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Validation\Rule;
+use App\Services\BvnVerificationBillingService;
 
 class CustomerController extends Controller
 {
@@ -346,6 +348,7 @@ class CustomerController extends Controller
         $fundTotal = $curr . number_format((float) $transactionSummary->funded_total, 2);
         $a2cTotal = $curr . number_format((float) $airtimeTransactionSummary->total, 2);
         $balances = ['Wallet Balance' => $balance, 'Referral Earning' => $ref, 'Transaction Total' => $transTotal, 'A2C Total' => $a2cTotal, 'Funds Total' => $fundTotal];
+        $settings = getSettings();
         $downlines = collect();
         $reservedAccount = collect();
         $availableReservedBanks = collect();
@@ -421,6 +424,7 @@ class CustomerController extends Controller
                 'activeTab' => $activeTab,
                 'availableReservedBanks' => $availableReservedBanks,
                 'banks' => $banks,
+                'settings' => $settings,
             ]
         );
     }
@@ -431,6 +435,7 @@ class CustomerController extends Controller
             'status' => 'required',
             'firstname' => 'required',
             'lastname' => 'required',
+            'email' => ['required', 'email', Rule::unique('users', 'email')->ignore($id)],
             'can_access_w2bank' => ['nullable', 'in:0,1'],
             'can_access_w2bank_auto' => ['nullable', 'in:0,1'],
             'can_access_a2c' => ['nullable', 'in:0,1'],
@@ -741,6 +746,273 @@ class CustomerController extends Controller
 
     }
 
+    public function reviewCustomerKycField(Request $request, Customer $customer): JsonResponse
+    {
+        $validated = $request->validate([
+            'field' => ['required', Rule::in([
+                'FIRST_NAME',
+                'MIDDLE_NAME',
+                'LAST_NAME',
+                'PHONE_NUMBER',
+                'DOB',
+                'BVN',
+                'IDCARDTYPE',
+                'IDCARD',
+            ])],
+            'action' => ['required', Rule::in(['approve', 'reject'])],
+            'value' => ['nullable', 'string', 'max:5000'],
+            'reason' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $field = $validated['field'];
+        $action = $validated['action'];
+        $fieldLabel = $this->kycFieldLabel($field);
+        $pairedField = in_array($field, ['IDCARDTYPE', 'IDCARD'], true)
+            ? ($field === 'IDCARDTYPE' ? 'IDCARD' : 'IDCARDTYPE')
+            : null;
+        $submittedValue = trim((string) ($validated['value'] ?? ''));
+        $existing = KycData::query()
+            ->where('customer_id', $customer->id)
+            ->where('key', $field)
+            ->first();
+        $pairedExisting = $pairedField
+            ? KycData::query()
+                ->where('customer_id', $customer->id)
+                ->where('key', $pairedField)
+                ->first()
+            : null;
+        $storedValue = filled($submittedValue)
+            ? $submittedValue
+            : trim((string) data_get($existing, 'value', ''));
+        $pairedValue = trim((string) data_get($pairedExisting, 'value', ''));
+
+        if ($action === 'approve' && blank($storedValue) && $field !== 'IDCARD') {
+            return response()->json([
+                'status' => false,
+                'message' => 'This field cannot be approved without a value.',
+            ], 422);
+        }
+
+        DB::transaction(function () use ($customer, $field, $action, $storedValue, $validated, $fieldLabel, $pairedField, $pairedValue) {
+            $reviewNote = $action === 'reject' && filled($validated['reason'] ?? null)
+                ? trim((string) $validated['reason'])
+                : null;
+
+            $reviewData = [
+                'customer_id' => $customer->id,
+                'key' => $field,
+                'value' => $storedValue,
+                'status' => $action === 'approve' ? 'verified' : 'declined',
+                'review_note' => $reviewNote,
+                'reviewed_by' => auth()->id(),
+                'reviewed_at' => now(),
+            ];
+
+            KycData::updateOrCreate(
+                [
+                    'customer_id' => $customer->id,
+                    'key' => $field,
+                ],
+                $reviewData
+            );
+
+            if ($pairedField) {
+                KycData::updateOrCreate(
+                    [
+                        'customer_id' => $customer->id,
+                        'key' => $pairedField,
+                    ],
+                    [
+                        'customer_id' => $customer->id,
+                        'key' => $pairedField,
+                        'value' => $pairedValue,
+                        'status' => $action === 'approve' ? 'verified' : 'declined',
+                        'review_note' => $reviewNote,
+                        'reviewed_by' => auth()->id(),
+                        'reviewed_at' => now(),
+                    ]
+                );
+            }
+
+            if ($action === 'approve') {
+                if ($field === 'FIRST_NAME') {
+                    $customer->user?->forceFill(['firstname' => $storedValue])->save();
+                } elseif ($field === 'MIDDLE_NAME') {
+                    $customer->user?->forceFill(['middlename' => $storedValue])->save();
+                } elseif ($field === 'LAST_NAME') {
+                    $customer->user?->forceFill(['lastname' => $storedValue])->save();
+                } elseif ($field === 'PHONE_NUMBER') {
+                    $customer->user?->forceFill(['phone' => $storedValue])->save();
+                } elseif ($field === 'BVN' && filled($storedValue)) {
+                    $customer->forceFill([
+                        'bvn' => $storedValue,
+                    ])->save();
+                }
+            } else {
+                $customer->forceFill([
+                    'kyc_status' => 'unverified',
+                    'kyc_rejection_reason' => $fieldLabel . ' rejected: ' . trim((string) $validated['reason']),
+                ])->save();
+            }
+        });
+
+        return response()->json([
+            'status' => true,
+            'message' => $action === 'approve'
+                ? ($fieldLabel . ' approved successfully.')
+                : ($fieldLabel . ' rejected and returned to the customer for correction.'),
+            'field' => $field,
+            'field_label' => $fieldLabel,
+            'action' => $action,
+        ]);
+    }
+
+    public function verifyCustomerBvn(Request $request, Customer $customer): JsonResponse
+    {
+        $validated = $request->validate([
+            'bvn' => ['nullable', 'digits:11'],
+        ]);
+
+        $bvn = trim((string) ($validated['bvn'] ?? data_get(kycStatus('BVN', $customer->id), 'value', $customer->bvn)));
+
+        if (blank($bvn)) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Please provide a BVN before verification.',
+            ], 422);
+        }
+
+        $settings = getSettings();
+        if (($settings?->bvn_verification_mode ?? 'manual') !== 'auto') {
+            return response()->json([
+                'status' => false,
+                'message' => 'BVN verification is currently set to manual mode. Please review and approve the BVN field manually.',
+            ], 422);
+        }
+
+        $providerId = $settings?->bvn_verification_provider_id
+            ?: $settings?->bank_verification_provider_id
+            ?: $settings?->bank_transfer_provider_id;
+        $provider = API::query()
+            ->where('id', $providerId)
+            ->where('status', 'active')
+            ->first();
+
+        if (! $provider) {
+            return response()->json([
+                'status' => false,
+                'message' => 'No active BVN verification provider configured.',
+            ], 422);
+        }
+
+        $controller = resolveProviderController($provider);
+
+        if (! $controller || ! method_exists($controller, 'verifyBvn')) {
+            return response()->json([
+                'status' => false,
+                'message' => 'The selected provider does not support BVN verification.',
+            ], 422);
+        }
+
+        $verification = $controller->verifyBvn($bvn, $customer);
+        $verificationData = $verification instanceof JsonResponse ? $verification->getData(true) : (is_array($verification) ? $verification : []);
+        $providerResponse = data_get($verificationData, 'api_response', $verificationData);
+        $payload = data_get($verificationData, 'payload', []);
+        $verifiedName = $this->extractBvnVerifiedName($providerResponse);
+        $profileName = $this->customerProfileName($customer->user);
+        $providerNameMatch = filter_var(data_get($providerResponse, 'responseBody.bvnInformationMatch', false), FILTER_VALIDATE_BOOL);
+        $nameMatch = $providerNameMatch || ($verifiedName !== '' && $this->namesMatch($profileName, $verifiedName));
+        $verificationStatus = (($verificationData['status'] ?? null) === 'success') ? 'verified' : 'unverified';
+
+        DB::transaction(function () use ($customer, $bvn, $verificationStatus, $verificationData, $provider, $providerResponse, $payload, $verifiedName, $profileName, $nameMatch) {
+            $customer->forceFill([
+                'bvn' => $bvn,
+                'bvn_verification_status' => $verificationStatus,
+                'bvn_data' => [
+                    'provider_id' => $provider->id,
+                    'provider_slug' => $provider->slug,
+                    'provider_name' => $provider->name,
+                    'status' => $verificationStatus,
+                    'name_match' => $nameMatch,
+                    'profile_name' => $profileName,
+                    'verified_name' => $verifiedName,
+                    'verified_at' => now()->toDateTimeString(),
+                    'payload' => $payload,
+                    'response' => $providerResponse,
+                    'message' => data_get($verificationData, 'message'),
+                ],
+            ])->save();
+
+            KycData::updateOrCreate(
+                [
+                    'customer_id' => $customer->id,
+                    'key' => 'BVN',
+                ],
+                [
+                    'value' => $bvn,
+                    'status' => $verificationStatus,
+                    'review_note' => null,
+                    'reviewed_by' => auth()->id(),
+                    'reviewed_at' => now(),
+                ]
+            );
+        });
+
+        $billingSummary = [
+            'status' => 'skipped',
+            'settled' => true,
+            'amount' => 0,
+            'transaction_id' => null,
+        ];
+
+        if ($verificationStatus === 'verified') {
+            try {
+                $billingSummary = app(BvnVerificationBillingService::class)->recordCharge($customer->fresh(['user']), (float) ($settings?->bvn_verification_charge ?? 0), [
+                    'bvn' => $bvn,
+                    'customer_id' => $customer->id,
+                    'provider_id' => $provider->id,
+                    'provider_slug' => $provider->slug,
+                    'provider_name' => $provider->name,
+                    'verification_reference' => data_get($providerResponse, 'responseBody.requestId')
+                        ?? data_get($providerResponse, 'requestId')
+                        ?? data_get($verificationData, 'request_id')
+                        ?? $bvn,
+                    'profile_name' => $profileName,
+                    'verified_name' => $verifiedName,
+                    'name_match' => $nameMatch,
+                    'verified_at' => now()->toDateTimeString(),
+                    'status' => $verificationStatus,
+                    'settled_description' => 'BVN verification fee was charged successfully.',
+                    'pending_description' => 'BVN verification fee is pending wallet funding.',
+                ]);
+            } catch (\Throwable $throwable) {
+                \Log::error('Unable to record BVN verification billing charge.', [
+                    'customer_id' => $customer->id,
+                    'message' => $throwable->getMessage(),
+                    'file' => $throwable->getFile(),
+                    'line' => $throwable->getLine(),
+                ]);
+            }
+        }
+
+        return response()->json([
+            'status' => $verificationStatus === 'verified',
+            'message' => $verificationStatus === 'verified'
+                ? 'BVN verified successfully.'
+                : 'BVN verification failed.',
+            'verification_status' => $verificationStatus,
+            'name_match' => $nameMatch,
+            'profile_name' => $profileName,
+            'verified_name' => $verifiedName,
+            'provider_response' => $providerResponse,
+            'stored_data' => $customer->fresh()->bvn_data,
+            'billing_status' => $billingSummary['status'] ?? 'skipped',
+            'billing_settled' => $billingSummary['settled'] ?? true,
+            'billing_amount' => $billingSummary['amount'] ?? 0,
+            'billing_transaction_id' => data_get($billingSummary, 'transaction.transaction_id'),
+        ]);
+    }
+
     public function approveCustomerKyc(Customer $customer){
         $customer->update([
             "kyc_status" => 'verified',
@@ -802,5 +1074,53 @@ class CustomerController extends Controller
 
         return back()->with('message', 'KYC rejected and the customer has been notified of the reason.');
 
+    }
+
+    private function kycFieldLabel(string $key): string
+    {
+        return match ($key) {
+            'FIRST_NAME' => 'First name',
+            'MIDDLE_NAME' => 'Middle name',
+            'LAST_NAME' => 'Last name',
+            'PHONE_NUMBER' => 'Phone number',
+            'DOB' => 'Date of birth',
+            'BVN' => 'BVN',
+            'IDCARDTYPE' => 'ID card type',
+            'IDCARD' => 'Identity document',
+            default => ucfirst(strtolower(str_replace('_', ' ', $key))),
+        };
+    }
+
+    private function customerProfileName(?User $user): string
+    {
+        return trim(collect([
+            $user?->firstname,
+            $user?->middlename,
+            $user?->lastname,
+        ])->filter()->implode(' '));
+    }
+
+    private function extractBvnVerifiedName(array $response): string
+    {
+        $candidates = [
+            data_get($response, 'responseBody.name'),
+            data_get($response, 'responseBody.bvnName'),
+            data_get($response, 'responseBody.accountName'),
+            data_get($response, 'responseBody.customerName'),
+            data_get($response, 'data.name'),
+            data_get($response, 'data.accountName'),
+            data_get($response, 'data.customerName'),
+            data_get($response, 'name'),
+            data_get($response, 'customerName'),
+        ];
+
+        foreach ($candidates as $candidate) {
+            $candidate = trim((string) $candidate);
+            if ($candidate !== '') {
+                return $candidate;
+            }
+        }
+
+        return '';
     }
 }
