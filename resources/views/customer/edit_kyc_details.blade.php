@@ -310,7 +310,7 @@
                                                             </fieldset>
                                                             @if($canFundWallet)
                                                             <a href="{{ route('customer.load.wallet') }}" class="btn btn-success">Fund wallet</a>
-                                                            @elseif(getFinalKycStatus(auth()->user()->customer->id) !== 'verified')
+                                                            @else
                                                             <div class="row">
                                                                 <div class="col-md-12">
                                                                     <button class="btn btn-primary" type="submit">{{ $kycSubmitLabel }}</button>

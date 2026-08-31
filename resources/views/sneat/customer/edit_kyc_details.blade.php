@@ -252,7 +252,7 @@
                             <div class="customer-form-actions mt-4 mx-n4 mb-n4">
                                 <a href="{{ route('customer.load.wallet') }}" class="btn btn-success customer-form-submit">Fund wallet</a>
                             </div>
-                        @elseif($finalKycStatus !== 'verified')
+                        @else
                             <div class="customer-form-actions mt-4 mx-n4 mb-n4">
                                 <button class="btn btn-primary customer-form-submit" type="submit"><i class="bx bx-check-circle me-1"></i> {{ $kycSubmitLabel }}</button>
                             </div>
