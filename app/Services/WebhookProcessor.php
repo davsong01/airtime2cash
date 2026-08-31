@@ -308,9 +308,7 @@ class WebhookProcessor
                 ? 'Transaction completed successfully.'
                 : ($providerStatus === 'pending' ? 'Transaction is pending provider confirmation.' : 'Transaction failed.')),
             'admin_id' => $isWalletToBank ? auth()->user()?->admin?->id ?? ($transaction->admin_id ?? null) : ($transaction->admin_id ?? null),
-        ] + (Schema::hasColumn('transaction_logs', 'provider_status')
-            ? ['provider_status' => $providerStatus ?: ($isSuccessful ? 'successful' : 'failed')]
-            : []) + (Schema::hasColumn('transaction_logs', 'completed_at')
+        ] + (Schema::hasColumn('transaction_logs', 'completed_at')
             ? ['completed_at' => ($isSuccessful || $isFailed) ? ($transaction->completed_at ?? now()) : $transaction->completed_at]
             : []);
     }

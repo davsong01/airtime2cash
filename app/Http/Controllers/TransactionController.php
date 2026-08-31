@@ -1644,10 +1644,6 @@ class TransactionController extends Controller
             $payload['transfer_mode'] = $transaction->transfer_mode ?? null;
         }
 
-        if (array_key_exists('provider_status', $overrides) && Schema::hasColumn('transaction_logs', 'provider_status')) {
-            $payload['provider_status'] = $overrides['provider_status'];
-        }
-
         if (array_key_exists('api_response', $overrides)) {
             $payload['api_response'] = is_array($overrides['api_response'])
                 ? json_encode($overrides['api_response'], JSON_THROW_ON_ERROR)
@@ -2902,10 +2898,6 @@ class TransactionController extends Controller
             'balance_after' => $balanceAfter ?? $transaction->balance_after,
         ];
 
-        if ($providerStatus !== null && Schema::hasColumn('transaction_logs', 'provider_status')) {
-            $updates['provider_status'] = $providerStatus;
-        }
-
         if ($apiResponse !== null) {
             $updates['api_response'] = is_array($apiResponse) ? json_encode($apiResponse) : $apiResponse;
         }
@@ -3146,6 +3138,14 @@ class TransactionController extends Controller
         try {
             DB::transaction(function () use ($transaction): void {
                 $wallet = new WalletController();
+                $manualProviderId = getSettings()->bank_transfer_provider_id ?? null;
+
+                if ($manualProviderId) {
+                    $transaction->forceFill([
+                        'provider_id' => $manualProviderId,
+                    ])->save();
+                }
+
                 $customer = Customer::query()
                     ->whereKey($transaction->customer_id)
                     ->lockForUpdate()
@@ -3197,7 +3197,6 @@ class TransactionController extends Controller
                     'descr' => $description,
                     'balance_before' => $balanceBefore,
                     'balance_after' => $balanceAfter,
-                    'provider_status' => $providerStatus,
                 ]);
             });
         } catch (\Throwable $th) {
@@ -3219,7 +3218,6 @@ class TransactionController extends Controller
                 'approved_by' => auth()->user()->admin->id,
                 'provider_id' => getSettings()->bank_transfer_provider_id ?? null,
                 'completed_at' => now(),
-                'provider_status' => 'successful',
             ]);
 
             $subject = "Airtime2Cash Transaction Update";

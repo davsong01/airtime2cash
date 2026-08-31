@@ -46,7 +46,9 @@
             <div>
                 <div class="text-uppercase fw-bold small mb-1" style="letter-spacing: .08em;">Important billing notice</div>
                 <strong class="d-block mb-1">BVN verification fee applies.</strong>
-                <span>We may charge your wallet for BVN verification after approval or after your first funded transaction, depending on your account flow.</span>
+                <span>
+                    A one-time verification fee of {!! getSettings()->currency !!}{{ number_format((float) (getSettings()->bvn_verification_charge ?? 0), 2) }} will be debited from your wallet balance upon successful BVN verification and subsequent initial funding of your account.
+                </span>
             </div>
         </div>
     </div>

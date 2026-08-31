@@ -31,8 +31,10 @@ return new class extends Migration
             'status' => 'success',
         ];
 
-        if (Schema::hasColumn('transaction_logs', 'provider_status')) {
-            $updates['provider_status'] = 'successful';
+        $manualProviderId = DB::table('settings')->value('bank_transfer_provider_id');
+
+        if ($manualProviderId && Schema::hasColumn('transaction_logs', 'api_id')) {
+            $updates['api_id'] = $manualProviderId;
         }
 
         if (Schema::hasColumn('transaction_logs', 'completed_at')) {
