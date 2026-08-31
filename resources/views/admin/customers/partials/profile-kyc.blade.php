@@ -108,9 +108,19 @@
                 $fieldClass = $field->status === 'verified' ? 'text-success' : ($field->status === 'in-review' ? 'text-info' : ($field->status === 'declined' ? 'text-danger' : 'text-warning'));
                 $fieldValue = trim((string) $field->value);
                 $bvnHasVerification = $key === 'BVN' && (filled($bvnVerifiedName) || filled(data_get($bvnData, 'verified_at')) || filled($customer->bvn_verification_status) || filled($bvnResponse));
-                $bvnFieldClass = $key === 'BVN' && $bvnHasVerification
-                    ? ($bvnNameMatch ? 'is-valid' : 'is-invalid')
-                    : '';
+                $bvnFieldClass = '';
+                if ($key === 'BVN' && $bvnHasVerification) {
+                    $bvnFieldClass = $bvnDisplayMode === 'auto'
+                        ? ($bvnNameMatch ? 'is-valid' : 'is-invalid')
+                        : ($field->status === 'verified' ? 'is-valid' : '');
+                }
+                $bvnVerificationStatusText = $bvnDisplayMode === 'auto'
+                    ? ($bvnHasVerification
+                        ? ($bvnNameMatch ? 'Names match profile' : 'Names do not match')
+                        : 'Not verified yet')
+                    : ($field->status === 'verified'
+                        ? 'Verified manually'
+                        : ($bvnHasVerification ? 'Manual verification recorded' : 'Not verified yet'));
             @endphp
             <div class="col-md-6 form-group">
                 <div class="d-flex align-items-center justify-content-between flex-wrap mb-50">
@@ -179,8 +189,8 @@
                     </small>
                     <small class="text-muted d-block mt-50">
                         Verification status:
-                        <strong class="{{ $bvnHasVerification ? ($bvnNameMatch ? 'text-success' : 'text-danger') : 'text-warning' }}">
-                            {{ $bvnHasVerification ? ($bvnNameMatch ? 'Names match profile' : 'Names do not match') : 'Not verified yet' }}
+                        <strong class="{{ $bvnDisplayMode === 'auto' ? ($bvnHasVerification ? ($bvnNameMatch ? 'text-success' : 'text-danger') : 'text-warning') : ($field->status === 'verified' ? 'text-success' : 'text-warning') }}">
+                            {{ $bvnVerificationStatusText }}
                         </strong>
                     </small>
                 @endif

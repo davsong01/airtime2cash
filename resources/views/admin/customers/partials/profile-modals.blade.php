@@ -96,6 +96,7 @@
     @php
         $kycBvnRawData = $customer->getRawOriginal('bvn_data');
         $kycBvnData = (array) ($customer->bvn_data ?? []);
+        $kycBvnMode = data_get($kycBvnData, 'verification_mode', 'manual');
         $kycBvnProfileName = data_get($kycBvnData, 'profile_name');
         $kycBvnVerifiedName = data_get($kycBvnData, 'verified_name');
         $kycBvnNameMatch = (bool) data_get($kycBvnData, 'name_match', false);
@@ -180,8 +181,16 @@
                                 </div>
                                 <div class="col-md-4 mb-1">
                                     <div class="border rounded p-1 h-100">
-                                        <small class="text-muted d-block">Match status</small>
-                                        <strong id="bvn-result-match-status" class="{{ $kycBvnNameMatch ? 'text-success' : 'text-danger' }}">{{ $kycBvnNameMatch ? 'Names match' : 'Names do not match' }}</strong>
+                                        <small class="text-muted d-block">Mode</small>
+                                        <strong class="{{ $kycBvnMode === 'auto' ? 'text-success' : 'text-warning' }}">{{ ucfirst($kycBvnMode) }}</strong>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 mb-1">
+                                    <div class="border rounded p-1 h-100">
+                                        <small class="text-muted d-block">Verification status</small>
+                                        <strong id="bvn-result-match-status" class="{{ $kycBvnMode === 'auto' ? ($kycBvnNameMatch ? 'text-success' : 'text-danger') : 'text-warning' }}">
+                                            {{ $kycBvnMode === 'auto' ? ($kycBvnNameMatch ? 'Names match' : 'Names do not match') : 'Manual verification' }}
+                                        </strong>
                                     </div>
                                 </div>
                             </div>
