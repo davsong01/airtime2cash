@@ -1103,6 +1103,7 @@ class CustomerController extends Controller
                 'bvn' => $resolvedBvn,
                 'bvn_verification_status' => $fieldStatus,
                 'bvn_data' => [
+                    'verification_mode' => getSettings()?->bvn_verification_mode ?? 'manual',
                     'provider_id' => $provider->id,
                     'provider_slug' => $provider->slug,
                     'provider_name' => $provider->name,

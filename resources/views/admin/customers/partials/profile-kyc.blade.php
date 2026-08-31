@@ -13,6 +13,8 @@
     $bvnRawData = $customer->getRawOriginal('bvn_data');
     $bvnData = (array) ($customer->bvn_data ?? []);
     $bvnMode = $settings->bvn_verification_mode ?? 'manual';
+    $bvnStoredMode = data_get($bvnData, 'verification_mode');
+    $bvnDisplayMode = filled($bvnStoredMode) ? $bvnStoredMode : $bvnMode;
     $bvnVerificationCharge = (float) ($settings->bvn_verification_charge ?? 0);
     $bvnNameMatch = (bool) data_get($bvnData, 'name_match', false);
     $bvnVerifiedName = data_get($bvnData, 'verified_name');
@@ -169,6 +171,12 @@
                 </div>
                 <input type="text" class="form-control {{ $bvnFieldClass }}" id="{{ $key }}" name="{{ $key }}" value="{{ $field->value }}" @if($key === 'BVN') maxlength="11" inputmode="numeric" @endif>
                 @if($key === 'BVN')
+                    <small class="text-muted d-block mt-50">
+                        Mode:
+                        <strong class="{{ $bvnDisplayMode === 'auto' ? 'text-success' : 'text-warning' }}">
+                            {{ ucfirst($bvnDisplayMode) }}
+                        </strong>
+                    </small>
                     <small class="text-muted d-block mt-50">
                         Verification status:
                         <strong class="{{ $bvnHasVerification ? ($bvnNameMatch ? 'text-success' : 'text-danger') : 'text-warning' }}">
