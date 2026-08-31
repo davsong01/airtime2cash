@@ -868,6 +868,7 @@ class CustomerController extends Controller
             'field' => $field,
             'field_label' => $fieldLabel,
             'action' => $action,
+            'customer_kyc_status' => $customer->fresh()->kyc_status,
         ]);
     }
 

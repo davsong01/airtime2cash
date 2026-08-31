@@ -64,7 +64,10 @@
                             </div>
                             <div>
                                 <small>KYC status</small>
-                                <span class="badge {{ $finalKycStatus === 'verified' ? 'badge-light-success' : ($finalKycStatus === 'awaiting-approval' ? 'badge-light-warning' : 'badge-light-secondary') }}">{{ ucfirst(str_replace('-', ' ', $finalKycStatus)) }}</span>
+                                <span
+                                    id="customer-overall-kyc-badge"
+                                    class="badge {{ $finalKycStatus === 'verified' ? 'badge-light-success' : ($finalKycStatus === 'awaiting-approval' ? 'badge-light-warning' : 'badge-light-secondary') }}"
+                                >{{ ucfirst(str_replace('-', ' ', $finalKycStatus)) }}</span>
                             </div>
                             <div>
                                 <small>Customer level</small>
@@ -508,9 +511,55 @@
                     },
                     success: function (response) {
                         setFeedback('success', response.message || 'Field review completed.');
-                        setTimeout(function () {
-                            window.location.reload();
-                        }, 700);
+
+                        const finalStatus = String(response.customer_kyc_status || '').trim();
+                        if (finalStatus) {
+                            const normalized = finalStatus.toLowerCase();
+                            const prettyStatus = finalStatus.replace(/-/g, ' ');
+                            const formattedStatus = prettyStatus.charAt(0).toUpperCase() + prettyStatus.slice(1);
+
+                            const $statusBadge = $('#customer-overall-kyc-badge');
+                            if ($statusBadge.length) {
+                                const badgeClass = normalized === 'verified'
+                                    ? 'badge-light-success'
+                                    : (normalized === 'awaiting-approval' || normalized === 'in-review' || normalized === 'pending'
+                                        ? 'badge-light-warning'
+                                        : 'badge-light-secondary');
+
+                                $statusBadge
+                                    .removeClass('badge-light-success badge-light-warning badge-light-secondary')
+                                    .addClass(badgeClass)
+                                    .text(formattedStatus);
+                            }
+
+                            const $statusAlert = $('#customer-kyc-status-alert');
+                            const $statusText = $('#customer-kyc-status-text');
+                            if ($statusAlert.length) {
+                                const alertClass = normalized === 'verified'
+                                    ? 'alert-success'
+                                    : (normalized === 'awaiting-approval' || normalized === 'in-review' || normalized === 'pending'
+                                        ? 'alert-warning'
+                                        : 'alert-secondary');
+
+                                $statusAlert
+                                    .removeClass('alert-success alert-warning alert-secondary')
+                                    .addClass(alertClass);
+
+                                $statusText.text(formattedStatus);
+                            }
+                        }
+
+                        const fieldName = String(response.field || '').trim();
+                        if (fieldName) {
+                            const $reviewButton = $(`.js-kyc-review-btn[data-field="${fieldName}"][data-action="approve"]`).first();
+                            const $fieldLabel = $reviewButton.closest('.col-md-6.form-group, .col-md-6').find('.kyc-field-status').first();
+                            if ($fieldLabel.length && String(response.action || '') === 'approve') {
+                                $fieldLabel
+                                    .removeClass('text-warning text-danger text-info')
+                                    .addClass('text-success')
+                                    .text('Verified');
+                            }
+                        }
                     },
                     error: function (xhr) {
                         const message = xhr.responseJSON?.message || 'Unable to update this KYC field right now.';

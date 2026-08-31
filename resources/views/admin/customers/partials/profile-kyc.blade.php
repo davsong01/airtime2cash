@@ -89,8 +89,12 @@
     </script>
 @endif
 
-<div class="alert {{ in_array($finalKycStatus, ['awaiting-approval', 'in-review', 'pending'], true) ? 'alert-warning' : ($finalKycStatus === 'verified' ? 'alert-success' : 'alert-secondary') }}">
-    <strong>Current KYC status:</strong> {{ ucfirst(str_replace('-', ' ', $finalKycStatus)) }}
+<div
+    id="customer-kyc-status-alert"
+    class="alert {{ in_array($finalKycStatus, ['awaiting-approval', 'in-review', 'pending'], true) ? 'alert-warning' : ($finalKycStatus === 'verified' ? 'alert-success' : 'alert-secondary') }}"
+>
+    <strong>Current KYC status:</strong>
+    <span id="customer-kyc-status-text">{{ ucfirst(str_replace('-', ' ', $finalKycStatus)) }}</span>
 </div>
 
 <form action="{{ route('admin.customer.update.kyc', $customer->id) }}" method="POST" enctype="multipart/form-data" onsubmit="return confirm('Update this customer\'s KYC details?')" class="customer-form-panel">
