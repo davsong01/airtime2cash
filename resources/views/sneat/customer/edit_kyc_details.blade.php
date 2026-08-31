@@ -15,6 +15,8 @@
             ->contains(fn ($key) => $kycFieldStatus($key) === 'verified');
         $hasOpenKycField = collect(['FIRST_NAME', 'MIDDLE_NAME', 'LAST_NAME', 'DOB', 'BVN', 'IDCARDTYPE', 'IDCARD', 'PHONE_NUMBER'])
             ->contains(fn ($key) => $kycFieldStatus($key) === 'declined');
+        $needsKycResubmission = $hasVerifiedKycField || $hasOpenKycField;
+        $kycSubmitLabel = $needsKycResubmission ? 'Review and resubmit KYC' : 'Submit KYC';
         $settings = getSettings();
         $adminWhatsappNumber = preg_replace('/\D+/', '', (string) $settings->whatsapp_number);
         $submittedIdType = kycStatus('IDCARDTYPE', $customer->id)['value'] ?? 'Not provided';
@@ -123,7 +125,7 @@
                                     $value = data_get($fieldData, 'value', $field['value']);
                                     $reviewNote = data_get($fieldData, 'review_note');
                                     $displayValue = $key === 'BVN' ? starMiddle($value) : $value;
-                                    $fieldLocked = ($kycIsLocked || $hasVerifiedKycField || $hasOpenKycField) && $status !== 'declined';
+                                    $fieldLocked = $status === 'verified';
                                 @endphp
                                 <div class="col-md-6">
                                     <div class="d-flex align-items-center justify-content-between flex-wrap mb-1">
@@ -176,7 +178,7 @@
                                 @php $idTypeKyc = $kycField('IDCARDTYPE'); @endphp
                                 @php $idTypeStatus = data_get($idTypeKyc, 'status', 'unverified'); @endphp
                                 @php $idTypeNote = data_get($idTypeKyc, 'review_note'); @endphp
-                                @php $idTypeLocked = ($kycIsLocked || $hasVerifiedKycField || $hasOpenKycField) && $idTypeStatus !== 'declined'; @endphp
+                                @php $idTypeLocked = $idTypeStatus === 'verified'; @endphp
                                 <div class="d-flex align-items-center justify-content-between flex-wrap mb-1">
                                     <label for="IDCARDTYPE" class="form-label mb-0">ID card type</label>
                                     <div class="d-flex align-items-center gap-2 flex-wrap">
@@ -206,7 +208,7 @@
                                 @php $idCardStatus = data_get($idCardKyc, 'status', 'unverified'); @endphp
                                 @php $idCardValue = data_get($idCardKyc, 'value', ''); @endphp
                                 @php $idCardNote = data_get($idCardKyc, 'review_note'); @endphp
-                                @php $idCardLocked = ($kycIsLocked || $hasVerifiedKycField || $hasOpenKycField) && $idCardStatus !== 'declined'; @endphp
+                                @php $idCardLocked = $idCardStatus === 'verified'; @endphp
                                 <div class="d-flex align-items-center justify-content-between flex-wrap mb-1">
                                     <label for="IDCARD" class="form-label mb-0">Identity document</label>
                                     <div class="d-flex align-items-center gap-2 flex-wrap">
@@ -247,17 +249,9 @@
                             <div class="customer-form-actions mt-4 mx-n4 mb-n4">
                                 <a href="{{ route('customer.load.wallet') }}" class="btn btn-success customer-form-submit">Fund wallet</a>
                             </div>
-                        @elseif($hasVerifiedKycField)
+                        @elseif($finalKycStatus !== 'verified')
                             <div class="customer-form-actions mt-4 mx-n4 mb-n4">
-                                <button class="btn btn-primary customer-form-submit" type="submit"><i class="bx bx-check-circle me-1"></i> Review and resubmit KYC</button>
-                            </div>
-                        @elseif($finalKycStatus === 'unverified' || $hasOpenKycField)
-                            <div class="customer-form-actions mt-4 mx-n4 mb-n4">
-                                @if($finalKycStatus == 'unverified')
-                                <button class="btn btn-primary customer-form-submit" type="submit"><i class="bx bx-check-circle me-1"></i> Submit KYC</button>
-                                @else
-                                <button class="btn btn-primary customer-form-submit" type="submit"><i class="bx bx-check-circle me-1"></i> Review and resubmit KYC</button>
-                                @endif
+                                <button class="btn btn-primary customer-form-submit" type="submit"><i class="bx bx-check-circle me-1"></i> {{ $kycSubmitLabel }}</button>
                             </div>
                         @endif
                     </form>
