@@ -4,11 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Customer;
 use App\Models\Wallet;
-use App\Services\BvnVerificationBillingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
-use Throwable;
 
 class WalletController extends Controller
 {
@@ -97,19 +94,6 @@ class WalletController extends Controller
             $column => $nextBalance,
         ]);
         $customer->setAttribute($column, $nextBalance);
-
-        if ($column === 'wallet' && $type === 'credit' && $settlePendingBvnCharges) {
-            try {
-                app(BvnVerificationBillingService::class)->settlePendingCharges($customer);
-            } catch (Throwable $throwable) {
-                Log::error('Unable to settle pending BVN verification charges after wallet credit.', [
-                    'customer_id' => $customer->id ?? null,
-                    'message' => $throwable->getMessage(),
-                    'file' => $throwable->getFile(),
-                    'line' => $throwable->getLine(),
-                ]);
-            }
-        }
 
         return [
             'before' => $currentBalance,

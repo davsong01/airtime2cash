@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Airtime2CashTransactions;
 use App\Models\API;
 use App\Models\ApiRequestLog;
+use App\Services\BvnVerificationBillingService;
 use App\Services\ProviderUtilityService;
 use GuzzleHttp\Psr7\Response as GuzzleResponse;
 use Illuminate\Http\Client\ConnectionException;
@@ -473,26 +474,23 @@ class AutoSyncService
             $amountCharged = ((float) $lockedTransaction->charge_rate / 100) * $completedAmount;
             $amountPaid = $completedAmount - $amountCharged;
 
-            Wallet::create([
-                'customer_id' => $customer->id,
-                'amount' => $amountPaid,
-                'type' => 'credit',
+            $creditResult = app(BvnVerificationBillingService::class)->applyPendingChargeOnIncomingCredit($customer, $amountPaid, [
                 'transaction_id' => $lockedTransaction->transaction_id,
-                'reason' => 'Auto Airtime2Cash Payment',
+                'credit_reason' => 'Auto Airtime2Cash Payment',
                 'payment_method' => 'wallet',
+                'fee_description' => 'BVN verification fee was collected from wallet funding.',
             ]);
 
-            $customer->increment('wallet', $amountPaid);
             $lockedTransaction->update([
                 'amount_charged' => $amountCharged,
                 'amount_paid' => $amountPaid,
                 'total_amount' => $completedAmount,
                 'status' => 'approved',
-                'provider_status' => 'successful',
                 'provider_response' => json_encode($providerResponse),
                 'description' => 'Auto Transfer completed and wallet credited automatically.',
                 'completed_at' => now(),
                 'approved_by' => $resolvedBy ?? $lockedTransaction->approved_by,
+                'balance_after' => $creditResult['credit_after'] ?? ($customer->wallet ?? 0),
             ]);
 
             return $lockedTransaction->fresh();

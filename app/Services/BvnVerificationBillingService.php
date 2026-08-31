@@ -25,7 +25,7 @@ class BvnVerificationBillingService
         if ($amount <= 0) {
             return [
                 'status' => 'skipped',
-                'settled' => true,
+                'settled' => false,
                 'transaction' => null,
                 'amount' => 0,
             ];
@@ -47,37 +47,6 @@ class BvnVerificationBillingService
                 $this->buildTransactionPayload($customer, $amount, $balanceBefore, $context, $transactionId, $referenceId)
             );
 
-            if ($balanceBefore >= $amount) {
-                $change = $this->walletController->applyCustomerBalanceChange($customer, 'wallet', $amount, 'debit', false);
-                $customer->setAttribute('wallet', $change['after']);
-
-                $this->walletController->logWallet([
-                    'customer_id' => $customer->id,
-                    'amount' => $amount,
-                    'total_amount' => $amount,
-                    'balance_before' => $change['before'],
-                    'balance_after' => $change['after'],
-                    'type' => 'debit',
-                    'transaction_id' => $transactionId,
-                    'reason' => self::REASON,
-                    'payment_method' => 'wallet',
-                ]);
-
-                $transaction->update([
-                    'status' => 'success',
-                    'balance_before' => $change['before'],
-                    'balance_after' => $change['after'],
-                    'descr' => $context['settled_description'] ?? 'BVN verification fee was charged successfully.',
-                ]);
-
-                return [
-                    'status' => 'success',
-                    'settled' => true,
-                    'transaction' => $transaction->fresh(),
-                    'amount' => $amount,
-                ];
-            }
-
             $transaction->update([
                 'status' => 'pending',
                 'balance_before' => $balanceBefore,
@@ -94,16 +63,26 @@ class BvnVerificationBillingService
         });
     }
 
-    public function settlePendingCharges(Customer $customer): int
+    public function applyPendingChargeOnIncomingCredit(Customer $customer, float $grossAmount, array $context = []): array
     {
-        return DB::transaction(function () use ($customer) {
+        if ($grossAmount <= 0) {
+            return [
+                'gross_amount' => 0,
+                'net_amount' => 0,
+                'fee_amount' => 0,
+                'applied' => false,
+                'fee_transaction_id' => null,
+            ];
+        }
+
+        return DB::transaction(function () use ($customer, $grossAmount, $context) {
             $customer = Customer::query()
                 ->with('user')
                 ->whereKey($customer->id)
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            $pendingCharges = TransactionLog::query()
+            $pendingCharge = TransactionLog::query()
                 ->where('customer_id', $customer->id)
                 ->where('reason', self::REASON)
                 ->where('unique_element', self::UNIQUE_ELEMENT)
@@ -111,45 +90,75 @@ class BvnVerificationBillingService
                 ->orderBy('created_at')
                 ->orderBy('id')
                 ->lockForUpdate()
-                ->get();
+                ->first();
 
-            $settled = 0;
-            $currentBalance = (float) ($customer->wallet ?? 0);
+            $grossAmount = (float) $grossAmount;
+            $creditBefore = (float) ($customer->wallet ?? 0);
+            $creditChange = $this->walletController->applyCustomerBalanceChange($customer, 'wallet', $grossAmount, 'credit', false);
+            $customer->setAttribute('wallet', $creditChange['after']);
 
-            foreach ($pendingCharges as $charge) {
-                $amount = (float) ($charge->total_amount ?? $charge->amount ?? 0);
+            $creditTransactionId = (string) ($context['transaction_id'] ?? $this->buildIncomingTransactionId($customer));
+            $creditReason = (string) ($context['credit_reason'] ?? 'Wallet funding');
+            $creditPaymentMethod = (string) ($context['payment_method'] ?? 'wallet');
 
-                if ($amount <= 0 || $currentBalance < $amount) {
-                    break;
+            $this->walletController->logWallet([
+                'customer_id' => $customer->id,
+                'amount' => $grossAmount,
+                'total_amount' => $grossAmount,
+                'balance_before' => $creditChange['before'],
+                'balance_after' => $creditChange['after'],
+                'type' => 'credit',
+                'transaction_id' => $creditTransactionId,
+                'reason' => $creditReason,
+                'payment_method' => $creditPaymentMethod,
+            ]);
+
+            $feeAmount = 0.0;
+            $feeTransactionId = null;
+            $netAmount = $grossAmount;
+            $feeApplied = false;
+
+            if ($pendingCharge) {
+                $pendingChargeAmount = (float) ($pendingCharge->total_amount ?? $pendingCharge->amount ?? 0);
+
+                if ($pendingChargeAmount > 0 && $creditChange['after'] >= $pendingChargeAmount) {
+                    $feeAmount = $pendingChargeAmount;
+                    $feeTransactionId = $pendingCharge->transaction_id;
+                    $feeChange = $this->walletController->applyCustomerBalanceChange($customer, 'wallet', $feeAmount, 'debit', false);
+                    $customer->setAttribute('wallet', $feeChange['after']);
+                    $netAmount = $grossAmount - $feeAmount;
+                    $feeApplied = true;
+
+                    $this->walletController->logWallet([
+                        'customer_id' => $customer->id,
+                        'amount' => $feeAmount,
+                        'total_amount' => $feeAmount,
+                        'balance_before' => $feeChange['before'],
+                        'balance_after' => $feeChange['after'],
+                        'type' => 'debit',
+                        'transaction_id' => $feeTransactionId,
+                        'reason' => self::REASON,
+                        'payment_method' => 'wallet',
+                    ]);
+
+                    $pendingCharge->update([
+                        'status' => 'success',
+                        'balance_before' => $feeChange['before'],
+                        'balance_after' => $feeChange['after'],
+                        'descr' => $context['fee_description'] ?? 'BVN verification fee was collected from wallet funding.',
+                    ]);
                 }
-
-                $change = $this->walletController->applyCustomerBalanceChange($customer, 'wallet', $amount, 'debit', false);
-                $customer->setAttribute('wallet', $change['after']);
-                $currentBalance = (float) $change['after'];
-
-                $this->walletController->logWallet([
-                    'customer_id' => $customer->id,
-                    'amount' => $amount,
-                    'total_amount' => $amount,
-                    'balance_before' => $change['before'],
-                    'balance_after' => $change['after'],
-                    'type' => 'debit',
-                    'transaction_id' => $charge->transaction_id,
-                    'reason' => self::REASON,
-                    'payment_method' => 'wallet',
-                ]);
-
-                $charge->update([
-                    'status' => 'success',
-                    'balance_before' => $change['before'],
-                    'balance_after' => $change['after'],
-                    'descr' => 'BVN verification fee was collected after wallet funding.',
-                ]);
-
-                $settled++;
             }
 
-            return $settled;
+            return [
+                'gross_amount' => $grossAmount,
+                'net_amount' => $netAmount,
+                'fee_amount' => $feeAmount,
+                'applied' => $feeApplied,
+                'fee_transaction_id' => $feeTransactionId,
+                'credit_before' => $creditChange['before'],
+                'credit_after' => $feeApplied ? $customer->wallet : $creditChange['after'],
+            ];
         });
     }
 
@@ -210,6 +219,16 @@ class BvnVerificationBillingService
     {
         return sprintf(
             'BVN-%s-%s-%s',
+            now()->format('YmdHis'),
+            $customer->id,
+            Str::upper(Str::random(6))
+        );
+    }
+
+    private function buildIncomingTransactionId(Customer $customer): string
+    {
+        return sprintf(
+            'WALLET-%s-%s-%s',
             now()->format('YmdHis'),
             $customer->id,
             Str::upper(Str::random(6))

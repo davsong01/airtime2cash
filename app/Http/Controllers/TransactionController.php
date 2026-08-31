@@ -3155,41 +3155,17 @@ class TransactionController extends Controller
                 $amount = (float) $transaction->amount_paid;
                 $balanceAfter = $balanceBefore;
                 $walletLogStatus = 'success';
-                $providerStatus = 'successful';
                 $description = $transaction->description ?? 'Airtime2Cash Request was approved and completed by ADMIN';
 
                 if ($transaction->payment_method == 'Transfer to Wallet') {
-                    $balanceAfter = $balanceBefore + $amount;
-                    $walletLogStatus = 'success';
-
-                    $wallet->logWallet([
-                        'type' => 'credit',
-                        'customer_id' => $transaction->customer_id,
+                    $creditResult = app(\App\Services\BvnVerificationBillingService::class)->applyPendingChargeOnIncomingCredit($customer, $amount, [
                         'transaction_id' => $transaction->transaction_id,
+                        'credit_reason' => 'Airtime2Cash Payment',
                         'payment_method' => 'wallet',
-                        'ip_address' => $this->getIpAddress(),
-                        'domain_name' => $this->getDomainName(),
-                        'customer_email' => $transaction->customer->user->email,
-                        'customer_phone' => $transaction->customer->user->phone,
-                        'customer_name' => $transaction->customer->user->firstname,
-                        'product_id' => $transaction->product_id,
-                        'product_name' => $transaction->product->name,
-                        'unique_element' => 'Airtime2Cash Payment',
-                        'category_id' => $transaction->product?->category?->id,
-                        'discount' => 0,
-                        'reason' => 'Airtime2Cash Payment',
-                        'status' => 'success',
-                        'unit_price' => $amount,
-                        'quantity' => 1,
-                        'total_amount' => $amount,
-                        'amount' => $amount,
-                        'balance_before' => $balanceBefore,
-                        'balance_after' => $balanceAfter,
-                        'descr' => $transaction->description,
-                        'api_id' => $transaction->provider_id,
+                        'fee_description' => 'BVN verification fee was collected from wallet funding.',
                     ]);
 
-                    $wallet->updateCustomerWallet($transaction->customer->user, $amount, 'credit');
+                    $balanceAfter = (float) ($creditResult['credit_after'] ?? ($balanceBefore + $amount));
                 }
 
                 $this->upsertAirtime2CashTransactionLog($transaction, $customer, [

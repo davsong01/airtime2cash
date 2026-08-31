@@ -10,6 +10,7 @@ use App\Models\ReservedAccountNumber;
 use App\Models\ReservedAccountCallback;
 use App\Http\Controllers\PaymentProcessors\SquadController;
 use App\Http\Controllers\Providers\MonnifyController;
+use App\Services\BvnVerificationBillingService;
 use App\Services\WebhookService;
 
 class PaymentController extends Controller
@@ -240,10 +241,15 @@ class PaymentController extends Controller
                     $request['transaction_id'] = $transaction->transaction_id;
                     $request['reason'] = 'WALLET FUNDING Via Reserved account';
 
-                    $wal = $wallet->logWallet($request);
-
-                    // Update Customer Wallet
-                    $wallet->updateCustomerWallet($user, $amount, $request['type']);
+                    $creditResult = app(BvnVerificationBillingService::class)->applyPendingChargeOnIncomingCredit($customer, (float) $amount, [
+                        'transaction_id' => $transaction->transaction_id,
+                        'credit_reason' => 'WALLET FUNDING Via Reserved account',
+                        'payment_method' => $provider->name ?? 'wallet',
+                        'fee_description' => 'BVN verification fee was collected from wallet funding.',
+                    ]);
+                    $transaction->update([
+                        'balance_after' => $creditResult['credit_after'] ?? ($balance + $amount),
+                    ]);
                     ReservedAccountCallback::where('id', $call['id'])->update(['transaction_id' => $transaction_id]);
 
                     $this->sendTransactionEmail($transaction, $user);
@@ -297,23 +303,18 @@ class PaymentController extends Controller
             try {
                 DB::beginTransaction();
                 // Log basic transaction
+                $creditResult = app(BvnVerificationBillingService::class)->applyPendingChargeOnIncomingCredit(auth()->user()->customer, (float) $paid, [
+                    'transaction_id' => $transaction->transaction_id,
+                    'credit_reason' => 'WALLET FUNDING',
+                    'payment_method' => $providerDetails->name ?? 'wallet',
+                    'fee_description' => 'BVN verification fee was collected from wallet funding.',
+                ]);
+
                 $transaction->update([
-                    'balance_after' => $balance + $paid,
+                    'balance_after' => $creditResult['credit_after'] ?? ($balance + $paid),
                     'status' => 'delivered',
                     'descr' => 'Wallet Funding of ' . getSettings()->currency . number_format($paid, 2) . ' was successful',
                 ]);
-                // Log wallet
-                $request['customer_id'] = auth()->user()->customer->id;
-                $request['type'] = 'credit';
-                $request['amount'] = $paid;
-                $request['total_amount'] = $paid;
-                $request['transaction_id'] = $transaction->transaction_id;
-                $request['reason'] = 'WALLET FUNDING';
-
-                $wal = $wallet->logWallet($request->all());
-
-                // Update Customer Wallet
-                $wallet->updateCustomerWallet(auth()->user(), $paid, $request['type']);
 
                 DB::commit();
 
