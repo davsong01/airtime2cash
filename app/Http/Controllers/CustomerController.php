@@ -877,16 +877,6 @@ class CustomerController extends Controller
         $validated = $request->validate([
             'bvn' => ['nullable', 'digits:11'],
         ]);
-
-        $bvn = trim((string) ($validated['bvn'] ?? data_get(kycStatus('BVN', $customer->id), 'value', $customer->bvn)));
-
-        if (blank($bvn)) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Please provide a BVN before verification.',
-            ], 422);
-        }
-
         $settings = getSettings();
         if (($settings?->bvn_verification_mode ?? 'manual') !== 'auto') {
             return response()->json([
@@ -895,134 +885,110 @@ class CustomerController extends Controller
             ], 422);
         }
 
-        if ((float) ($settings?->bvn_verification_charge ?? 0) <= 0) {
+        $result = $this->runBvnVerificationForCustomer(
+            $customer,
+            $validated['bvn'] ?? null,
+            auth()->id()
+        );
+
+        if (! ($result['processed'] ?? false)) {
             return response()->json([
                 'status' => false,
-                'message' => 'BVN verification charge is not set. Please configure the charge in admin settings before verifying BVN.',
+                'message' => $result['message'] ?? 'Unable to verify BVN right now.',
             ], 422);
-        }
-
-        $providerId = $settings?->bvn_verification_provider_id
-            ?: $settings?->bank_verification_provider_id
-            ?: $settings?->bank_transfer_provider_id;
-        $provider = API::query()
-            ->where('id', $providerId)
-            ->where('status', 'active')
-            ->first();
-
-        if (! $provider) {
-            return response()->json([
-                'status' => false,
-                'message' => 'No active BVN verification provider configured.',
-            ], 422);
-        }
-
-        $controller = resolveProviderController($provider);
-
-        if (! $controller || ! method_exists($controller, 'verifyBvn')) {
-            return response()->json([
-                'status' => false,
-                'message' => 'The selected provider does not support BVN verification.',
-            ], 422);
-        }
-
-        $verification = $controller->verifyBvn($bvn, $customer);
-        $verificationData = $verification instanceof JsonResponse ? $verification->getData(true) : (is_array($verification) ? $verification : []);
-        $providerResponse = data_get($verificationData, 'api_response', $verificationData);
-        $payload = data_get($verificationData, 'payload', []);
-        $verifiedName = $this->extractBvnVerifiedName($providerResponse);
-        $profileName = $this->customerProfileName($customer->user);
-        $providerNameMatch = filter_var(data_get($providerResponse, 'responseBody.bvnInformationMatch', false), FILTER_VALIDATE_BOOL);
-        $nameMatch = $providerNameMatch || ($verifiedName !== '' && $this->namesMatch($profileName, $verifiedName));
-        $verificationStatus = (($verificationData['status'] ?? null) === 'success') ? 'verified' : 'unverified';
-
-        DB::transaction(function () use ($customer, $bvn, $verificationStatus, $verificationData, $provider, $providerResponse, $payload, $verifiedName, $profileName, $nameMatch) {
-            $customer->forceFill([
-                'bvn' => $bvn,
-                'bvn_verification_status' => $verificationStatus,
-                'bvn_data' => [
-                    'provider_id' => $provider->id,
-                    'provider_slug' => $provider->slug,
-                    'provider_name' => $provider->name,
-                    'status' => $verificationStatus,
-                    'name_match' => $nameMatch,
-                    'profile_name' => $profileName,
-                    'verified_name' => $verifiedName,
-                    'verified_at' => now()->toDateTimeString(),
-                    'payload' => $payload,
-                    'response' => $providerResponse,
-                    'message' => data_get($verificationData, 'message'),
-                ],
-            ])->save();
-
-            KycData::updateOrCreate(
-                [
-                    'customer_id' => $customer->id,
-                    'key' => 'BVN',
-                ],
-                [
-                    'value' => $bvn,
-                    'status' => $verificationStatus,
-                    'review_note' => null,
-                    'reviewed_by' => auth()->id(),
-                    'reviewed_at' => now(),
-                ]
-            );
-        });
-
-        $billingSummary = [
-            'status' => 'skipped',
-            'settled' => true,
-            'amount' => 0,
-            'transaction_id' => null,
-        ];
-
-        if ($verificationStatus === 'verified') {
-            try {
-                $billingSummary = app(BvnVerificationBillingService::class)->recordCharge($customer->fresh(['user']), (float) ($settings?->bvn_verification_charge ?? 0), [
-                    'bvn' => $bvn,
-                    'customer_id' => $customer->id,
-                    'provider_id' => $provider->id,
-                    'provider_slug' => $provider->slug,
-                    'provider_name' => $provider->name,
-                    'verification_reference' => data_get($providerResponse, 'responseBody.requestId')
-                        ?? data_get($providerResponse, 'requestId')
-                        ?? data_get($verificationData, 'request_id')
-                        ?? $bvn,
-                    'profile_name' => $profileName,
-                    'verified_name' => $verifiedName,
-                    'name_match' => $nameMatch,
-                    'verified_at' => now()->toDateTimeString(),
-                    'status' => $verificationStatus,
-                    'settled_description' => 'BVN verification fee was charged successfully.',
-                    'pending_description' => 'BVN verification fee is pending wallet funding.',
-                ]);
-            } catch (\Throwable $throwable) {
-                \Log::error('Unable to record BVN verification billing charge.', [
-                    'customer_id' => $customer->id,
-                    'message' => $throwable->getMessage(),
-                    'file' => $throwable->getFile(),
-                    'line' => $throwable->getLine(),
-                ]);
-            }
         }
 
         return response()->json([
-            'status' => $verificationStatus === 'verified',
-            'message' => $verificationStatus === 'verified'
-                ? 'BVN verified successfully.'
-                : 'BVN verification failed.',
-            'verification_status' => $verificationStatus,
-            'name_match' => $nameMatch,
-            'profile_name' => $profileName,
-            'verified_name' => $verifiedName,
-            'provider_response' => $providerResponse,
-            'stored_data' => $customer->fresh()->bvn_data,
-            'billing_status' => $billingSummary['status'] ?? 'skipped',
-            'billing_settled' => $billingSummary['settled'] ?? true,
-            'billing_amount' => $billingSummary['amount'] ?? 0,
-            'billing_transaction_id' => data_get($billingSummary, 'transaction.transaction_id'),
+            'status' => $result['field_status'] === 'verified',
+            'message' => $result['message'],
+            'verification_status' => $result['field_status'],
+            'name_match' => $result['name_match'] ?? false,
+            'profile_name' => $result['profile_name'] ?? '',
+            'verified_name' => $result['verified_name'] ?? '',
+            'provider_response' => $result['provider_response'] ?? [],
+            'stored_data' => $result['stored_data'] ?? [],
+            'billing_status' => $result['billing_status'] ?? 'skipped',
+            'billing_settled' => $result['billing_settled'] ?? true,
+            'billing_amount' => $result['billing_amount'] ?? 0,
+            'billing_transaction_id' => $result['billing_transaction_id'] ?? null,
+            'customer_kyc_status' => $result['customer_kyc_status'] ?? $customer->fresh()->kyc_status,
         ]);
+    }
+
+    public function cronVerifyPendingBvn(Request $request): JsonResponse
+    {
+        $settings = getSettings();
+        if (($settings?->bvn_verification_mode ?? 'manual') !== 'auto') {
+            return response()->json([
+                'status' => false,
+                'message' => 'BVN verification is currently set to manual mode.',
+            ], 422);
+        }
+
+        $limit = (int) ($request->query('limit', 100));
+        $limit = max(1, min($limit, 500));
+
+        $customers = Customer::query()
+            ->with('user')
+            ->whereIn('kyc_status', ['awaiting-approval', 'pending'])
+            ->whereHas('multiplekycdata', function ($query) {
+                $query->where('key', 'BVN')
+                    ->whereIn('status', ['unverified', 'in-review', 'pending'])
+                    ->whereNotNull('value')
+                    ->where('value', '!=', '');
+            })
+            ->where(function ($query) {
+                $query->whereNull('bvn_data')
+                    ->orWhereRaw("JSON_EXTRACT(COALESCE(bvn_data, JSON_OBJECT()), '$.verified_at') IS NULL");
+            })
+            ->orderBy('updated_at')
+            ->limit($limit)
+            ->get();
+
+        $summary = [
+            'status' => true,
+            'processed' => 0,
+            'verified' => 0,
+            'failed' => 0,
+            'mismatch' => 0,
+            'finalized' => 0,
+            'skipped' => 0,
+            'details' => [],
+        ];
+
+        foreach ($customers as $customer) {
+            $result = $this->runBvnVerificationForCustomer($customer, null, null);
+
+            if (! ($result['processed'] ?? false)) {
+                $summary['skipped']++;
+                $summary['details'][] = $result;
+                continue;
+            }
+
+            $summary['processed']++;
+
+            if (($result['provider_success'] ?? false) && ($result['field_status'] ?? null) === 'verified') {
+                $summary['verified']++;
+            } elseif (($result['provider_success'] ?? false) && ($result['field_status'] ?? null) === 'declined') {
+                $summary['mismatch']++;
+            } else {
+                $summary['failed']++;
+            }
+
+            if (! empty($result['finalized'])) {
+                $summary['finalized']++;
+            }
+
+            $summary['details'][] = [
+                'customer_id' => $customer->id,
+                'customer_email' => $customer->user?->email,
+                'field_status' => $result['field_status'] ?? null,
+                'customer_kyc_status' => $result['customer_kyc_status'] ?? null,
+                'message' => $result['message'] ?? null,
+            ];
+        }
+
+        return response()->json($summary);
     }
 
     public function approveCustomerKyc(Customer $customer){
@@ -1051,6 +1017,178 @@ class CustomerController extends Controller
                     ->orWhere('status', '!=', 'verified');
             })
             ->exists();
+    }
+
+    private function runBvnVerificationForCustomer(Customer $customer, ?string $bvn = null, ?int $reviewedBy = null): array
+    {
+        $customer->loadMissing('user');
+        $settings = getSettings();
+
+        $resolvedBvn = trim((string) ($bvn ?? data_get(kycStatus('BVN', $customer->id), 'value', $customer->bvn)));
+
+        if (blank($resolvedBvn)) {
+            return [
+                'processed' => false,
+                'message' => 'Please provide a BVN before verification.',
+            ];
+        }
+
+        if ((float) ($settings?->bvn_verification_charge ?? 0) <= 0) {
+            return [
+                'processed' => false,
+                'message' => 'BVN verification charge is not set. Please configure the charge in admin settings before verifying BVN.',
+            ];
+        }
+
+        $providerId = $settings?->bvn_verification_provider_id
+            ?: $settings?->bank_verification_provider_id
+            ?: $settings?->bank_transfer_provider_id;
+        $provider = API::query()
+            ->where('id', $providerId)
+            ->where('status', 'active')
+            ->first();
+
+        if (! $provider) {
+            return [
+                'processed' => false,
+                'message' => 'No active BVN verification provider configured.',
+            ];
+        }
+
+        $controller = resolveProviderController($provider);
+
+        if (! $controller || ! method_exists($controller, 'verifyBvn')) {
+            return [
+                'processed' => false,
+                'message' => 'The selected provider does not support BVN verification.',
+            ];
+        }
+
+        try {
+            $verification = $controller->verifyBvn($resolvedBvn, $customer);
+        } catch (\Throwable $throwable) {
+            \Log::error('BVN verification provider call failed.', [
+                'customer_id' => $customer->id,
+                'message' => $throwable->getMessage(),
+                'file' => $throwable->getFile(),
+                'line' => $throwable->getLine(),
+            ]);
+
+            return [
+                'processed' => false,
+                'message' => 'BVN verification could not be completed right now.',
+            ];
+        }
+
+        $verificationData = $verification instanceof JsonResponse ? $verification->getData(true) : (is_array($verification) ? $verification : []);
+        $providerResponse = data_get($verificationData, 'api_response', $verificationData);
+        $payload = data_get($verificationData, 'payload', []);
+        $verifiedName = $this->extractBvnVerifiedName($providerResponse);
+        $profileName = $this->customerProfileName($customer->user);
+        $providerNameMatch = filter_var(data_get($providerResponse, 'responseBody.bvnInformationMatch', false), FILTER_VALIDATE_BOOL);
+        $nameMatch = $providerNameMatch || ($verifiedName !== '' && $this->namesMatch($profileName, $verifiedName));
+        $providerSuccess = (($verificationData['status'] ?? null) === 'success');
+        $fieldStatus = $providerSuccess ? ($nameMatch ? 'verified' : 'declined') : 'unverified';
+        $reviewNote = $providerSuccess && ! $nameMatch ? 'BVN name does not match profile name.' : null;
+
+        DB::transaction(function () use ($customer, $resolvedBvn, $fieldStatus, $verificationData, $provider, $providerResponse, $payload, $verifiedName, $profileName, $nameMatch, $reviewedBy, $reviewNote) {
+            $customer->forceFill([
+                'bvn' => $resolvedBvn,
+                'bvn_verification_status' => $fieldStatus,
+                'bvn_data' => [
+                    'provider_id' => $provider->id,
+                    'provider_slug' => $provider->slug,
+                    'provider_name' => $provider->name,
+                    'status' => $fieldStatus,
+                    'name_match' => $nameMatch,
+                    'profile_name' => $profileName,
+                    'verified_name' => $verifiedName,
+                    'verified_at' => now()->toDateTimeString(),
+                    'payload' => $payload,
+                    'response' => $providerResponse,
+                    'message' => data_get($verificationData, 'message'),
+                ],
+            ])->save();
+
+            KycData::updateOrCreate(
+                [
+                    'customer_id' => $customer->id,
+                    'key' => 'BVN',
+                ],
+                [
+                    'value' => $resolvedBvn,
+                    'status' => $fieldStatus,
+                    'review_note' => $reviewNote,
+                    'reviewed_by' => $reviewedBy,
+                    'reviewed_at' => now(),
+                ]
+            );
+        });
+
+        $billingSummary = [
+            'status' => 'skipped',
+            'settled' => true,
+            'amount' => 0,
+            'transaction_id' => null,
+        ];
+
+        if ($providerSuccess) {
+            try {
+                $billingSummary = app(BvnVerificationBillingService::class)->recordCharge($customer->fresh(['user']), (float) ($settings?->bvn_verification_charge ?? 0), [
+                    'bvn' => $resolvedBvn,
+                    'customer_id' => $customer->id,
+                    'provider_id' => $provider->id,
+                    'provider_slug' => $provider->slug,
+                    'provider_name' => $provider->name,
+                    'verification_reference' => data_get($providerResponse, 'responseBody.requestId')
+                        ?? data_get($providerResponse, 'requestId')
+                        ?? data_get($verificationData, 'request_id')
+                        ?? $resolvedBvn,
+                    'profile_name' => $profileName,
+                    'verified_name' => $verifiedName,
+                    'name_match' => $nameMatch,
+                    'verified_at' => now()->toDateTimeString(),
+                    'status' => $fieldStatus,
+                    'settled_description' => 'BVN verification fee was charged successfully.',
+                    'pending_description' => 'BVN verification fee is pending wallet funding.',
+                ]);
+            } catch (\Throwable $throwable) {
+                \Log::error('Unable to record BVN verification billing charge.', [
+                    'customer_id' => $customer->id,
+                    'message' => $throwable->getMessage(),
+                    'file' => $throwable->getFile(),
+                    'line' => $throwable->getLine(),
+                ]);
+            }
+        }
+
+        $finalized = false;
+        if ($fieldStatus === 'verified' && $this->kycFieldsAreFullyVerified($customer->id)) {
+            $this->finalizeCustomerKycApproval($customer, true);
+            $finalized = true;
+        }
+
+        return [
+            'processed' => true,
+            'provider_success' => $providerSuccess,
+            'field_status' => $fieldStatus,
+            'name_match' => $nameMatch,
+            'profile_name' => $profileName,
+            'verified_name' => $verifiedName,
+            'provider_response' => $providerResponse,
+            'stored_data' => $customer->fresh()->bvn_data,
+            'billing_status' => $billingSummary['status'] ?? 'skipped',
+            'billing_settled' => $billingSummary['settled'] ?? true,
+            'billing_amount' => $billingSummary['amount'] ?? 0,
+            'billing_transaction_id' => data_get($billingSummary, 'transaction.transaction_id'),
+            'customer_kyc_status' => $customer->fresh()->kyc_status,
+            'finalized' => $finalized,
+            'message' => $providerSuccess
+                ? ($fieldStatus === 'verified'
+                    ? 'BVN verified successfully.'
+                    : 'BVN verification completed, but the BVN name does not match the profile name.')
+                : 'BVN verification failed.',
+        ];
     }
 
     private function finalizeCustomerKycApproval(Customer $customer, bool $force = false): array

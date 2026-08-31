@@ -365,6 +365,42 @@
                     state.status = payload.verification_status || payload.status || state.status || '';
                     state.verifiedAt = payload.stored_data?.verified_at || state.verifiedAt || '';
                     $showResultBtn.removeClass('d-none');
+                    const finalStatus = String(payload.customer_kyc_status || '').trim();
+                    if (finalStatus) {
+                        const normalized = finalStatus.toLowerCase();
+                        const prettyStatus = finalStatus.replace(/-/g, ' ');
+                        const formattedStatus = prettyStatus.charAt(0).toUpperCase() + prettyStatus.slice(1);
+
+                        const $statusBadge = $('#customer-overall-kyc-badge');
+                        if ($statusBadge.length) {
+                            const badgeClass = normalized === 'verified'
+                                ? 'badge-light-success'
+                                : (normalized === 'awaiting-approval' || normalized === 'in-review' || normalized === 'pending'
+                                    ? 'badge-light-warning'
+                                    : 'badge-light-secondary');
+
+                            $statusBadge
+                                .removeClass('badge-light-success badge-light-warning badge-light-secondary')
+                                .addClass(badgeClass)
+                                .text(formattedStatus);
+                        }
+
+                        const $statusAlert = $('#customer-kyc-status-alert');
+                        const $statusText = $('#customer-kyc-status-text');
+                        if ($statusAlert.length) {
+                            const alertClass = normalized === 'verified'
+                                ? 'alert-success'
+                                : (normalized === 'awaiting-approval' || normalized === 'in-review' || normalized === 'pending'
+                                    ? 'alert-warning'
+                                    : 'alert-secondary');
+
+                            $statusAlert
+                                .removeClass('alert-success alert-warning alert-secondary')
+                                .addClass(alertClass);
+
+                            $statusText.text(formattedStatus);
+                        }
+                    }
                     showResult();
                 },
                 open: function () {
