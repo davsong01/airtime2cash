@@ -26,6 +26,7 @@ class CustomerController extends Controller
     {
         $request->validate([
             'status' => ['nullable', 'in:active,api,delete,suspended,email-blacklist,phone-blacklist'],
+            'kyc_status' => ['nullable', 'in:verified,awaiting-approval,pending,in-review,unverified'],
             'level' => ['nullable', 'integer'],
             'from' => ['nullable', 'date'],
             'to' => ['nullable', 'date', 'after_or_equal:from'],
@@ -79,6 +80,12 @@ class CustomerController extends Controller
         if ($request->filled('level')) {
             $customers->whereHas('customer', function ($query) use ($request) {
                 $query->where('customer_level', $request->level);
+            });
+        }
+
+        if ($request->filled('kyc_status')) {
+            $customers->whereHas('customer', function ($query) use ($request) {
+                $query->where('kyc_status', $request->kyc_status);
             });
         }
 

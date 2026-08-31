@@ -74,6 +74,15 @@
                                     <label for="level">Customer level</label>
                                     <select class="form-control" id="level" name="level"><option value="">All levels</option>@foreach($customer_levels as $level)<option value="{{ $level->id }}" @selected((string) request('level') === (string) $level->id)>{{ $level->name }}</option>@endforeach</select>
                                 </div>
+                                <div class="col-md-6 col-xl-2 form-group">
+                                    <label for="kyc_status">KYC status</label>
+                                    <select class="form-control" id="kyc_status" name="kyc_status">
+                                        <option value="">All KYC states</option>
+                                        @foreach(['verified' => 'Verified', 'in-review' => 'In review', 'awaiting-approval' => 'Awaiting approval', 'pending' => 'Pending', 'unverified' => 'Unverified'] as $value => $label)
+                                            <option value="{{ $value }}" @selected(request('kyc_status') === $value)>{{ $label }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
                                 <div class="col-md-6 col-xl-2 form-group"><label for="from">Joined from</label><input type="date" class="form-control" id="from" name="from" value="{{ request('from') }}"></div>
                                 <div class="col-md-6 col-xl-2 form-group"><label for="to">Joined to</label><input type="date" class="form-control" id="to" name="to" value="{{ request('to') }}"></div>
                                 <div class="col-md-6 col-xl-2 d-flex align-items-end"><button class="btn btn-primary btn-block" type="submit"><i class="bx bx-search mr-25"></i> Apply filters</button></div>
