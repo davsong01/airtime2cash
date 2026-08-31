@@ -17,6 +17,7 @@
             ->contains(fn ($key) => $kycFieldStatus($key) === 'declined');
         $needsKycResubmission = $hasVerifiedKycField || $hasOpenKycField;
         $kycSubmitLabel = $needsKycResubmission ? 'Review and resubmit KYC' : 'Submit KYC';
+        $canFundWallet = $finalKycStatus === 'verified' && ! $hasOpenKycField;
         $settings = getSettings();
         $adminWhatsappNumber = preg_replace('/\D+/', '', (string) $settings->whatsapp_number);
         $submittedIdType = kycStatus('IDCARDTYPE', $customer->id)['value'] ?? 'Not provided';
@@ -245,7 +246,7 @@
                             </div>
                         </div>
 
-                        @if($finalKycStatus === 'verified')
+                        @if($canFundWallet)
                             <div class="customer-form-actions mt-4 mx-n4 mb-n4">
                                 <a href="{{ route('customer.load.wallet') }}" class="btn btn-success customer-form-submit">Fund wallet</a>
                             </div>

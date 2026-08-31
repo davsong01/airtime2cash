@@ -14,6 +14,7 @@
         ->contains(fn ($key) => $kycFieldStatus($key) === 'declined');
     $needsKycResubmission = $hasVerifiedKycField || $hasOpenKycField;
     $kycSubmitLabel = $needsKycResubmission ? 'Review and resubmit KYC' : 'Submit KYC';
+    $canFundWallet = getFinalKycStatus(auth()->user()->customer->id) === 'verified' && ! $hasOpenKycField;
 @endphp
 
 @section('page-css')
@@ -305,7 +306,7 @@
                                                             </div>
 
                                                             </fieldset>
-                                                            @if(getFinalKycStatus(auth()->user()->customer->id) == 'verified')
+                                                            @if($canFundWallet)
                                                             <a href="{{ route('customer.load.wallet') }}" class="btn btn-success">Fund wallet</a>
                                                             @elseif(getFinalKycStatus(auth()->user()->customer->id) !== 'verified')
                                                             <div class="row">
