@@ -15,9 +15,11 @@
             ->contains(fn ($key) => $kycFieldStatus($key) === 'verified');
         $hasOpenKycField = collect(['FIRST_NAME', 'MIDDLE_NAME', 'LAST_NAME', 'DOB', 'BVN', 'IDCARDTYPE', 'IDCARD', 'PHONE_NUMBER'])
             ->contains(fn ($key) => $kycFieldStatus($key) === 'declined');
+        $allKycFieldsVerified = collect(['FIRST_NAME', 'MIDDLE_NAME', 'LAST_NAME', 'DOB', 'BVN', 'IDCARDTYPE', 'IDCARD', 'PHONE_NUMBER'])
+            ->every(fn ($key) => $kycFieldStatus($key) === 'verified');
         $needsKycResubmission = $hasVerifiedKycField || $hasOpenKycField;
         $kycSubmitLabel = $needsKycResubmission ? 'Review and resubmit KYC' : 'Submit KYC';
-        $canFundWallet = $finalKycStatus === 'verified' && ! $hasOpenKycField;
+        $canFundWallet = $finalKycStatus === 'verified' && $allKycFieldsVerified;
         $settings = getSettings();
         $adminWhatsappNumber = preg_replace('/\D+/', '', (string) $settings->whatsapp_number);
         $submittedIdType = kycStatus('IDCARDTYPE', $customer->id)['value'] ?? 'Not provided';
