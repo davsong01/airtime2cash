@@ -437,52 +437,31 @@ class DashboardController extends Controller
         $customer = auth()->user()->customer;
         $hasDeclinedField = $this->customerHasDeclinedKycField($customer->id);
 
-        if ($customer->kyc_status === 'verified') {
-            $message = 'Your verified KYC details cannot be changed from the customer portal. Please contact support if your information needs to be corrected.';
-
-            return back()->with(
-                'error',
-                $message
-            );
-        }
-
-        if ($customer->kyc_status === 'awaiting-approval' && ! $hasDeclinedField) {
-            $message = 'Your KYC submission is currently awaiting review and cannot be changed right now.';
-
-            return back()->with(
-                'error',
-                $message
-            );
-        }
-
-        if ($customer->kyc_status !== 'unverified' && ! $hasDeclinedField) {
-            $message = $customer->kyc_status === 'awaiting-approval'
-                ? 'Your KYC submission is currently awaiting review and cannot be changed. You can update it if the administrator declines the submission.'
-                : 'Your verified KYC details cannot be changed from the customer portal. Please contact support if your information needs to be corrected.';
-
-            return back()->with(
-                'error',
-                $message
-            );
-        }
-
         $isResubmission = $hasDeclinedField;
         $kycFieldStatuses = [
-            'FIRST_NAME' => kycStatus('FIRST_NAME', $customer->id)->status ?? 'unverified',
-            'MIDDLE_NAME' => kycStatus('MIDDLE_NAME', $customer->id)->status ?? 'unverified',
-            'LAST_NAME' => kycStatus('LAST_NAME', $customer->id)->status ?? 'unverified',
-            'DOB' => kycStatus('DOB', $customer->id)->status ?? 'unverified',
-            'BVN' => kycStatus('BVN', $customer->id)->status ?? 'unverified',
-            'IDCARDTYPE' => kycStatus('IDCARDTYPE', $customer->id)->status ?? 'unverified',
-            'IDCARD' => kycStatus('IDCARD', $customer->id)->status ?? 'unverified',
+            'FIRST_NAME' => data_get(kycStatus('FIRST_NAME', $customer->id), 'status', 'unverified'),
+            'MIDDLE_NAME' => data_get(kycStatus('MIDDLE_NAME', $customer->id), 'status', 'unverified'),
+            'LAST_NAME' => data_get(kycStatus('LAST_NAME', $customer->id), 'status', 'unverified'),
+            'DOB' => data_get(kycStatus('DOB', $customer->id), 'status', 'unverified'),
+            'BVN' => data_get(kycStatus('BVN', $customer->id), 'status', 'unverified'),
+            'IDCARDTYPE' => data_get(kycStatus('IDCARDTYPE', $customer->id), 'status', 'unverified'),
+            'IDCARD' => data_get(kycStatus('IDCARD', $customer->id), 'status', 'unverified'),
         ];
+
+        if (collect($kycFieldStatuses)->every(fn ($status) => $status === 'verified')) {
+            return back()->with(
+                'error',
+                'Your verified KYC details cannot be changed from the customer portal. Please contact support if your information needs to be corrected.'
+            );
+        }
 
         $rules = [
             'PHONE_NUMBER' => ['nullable'],
         ];
 
         foreach (array_keys($kycFieldStatuses) as $field) {
-            $fieldRequired = ! $isResubmission || ($kycFieldStatuses[$field] === 'declined');
+            $fieldRequired = $kycFieldStatuses[$field] !== 'verified'
+                && (! $isResubmission || $kycFieldStatuses[$field] === 'declined');
 
             $rules[$field] = match ($field) {
                 'BVN' => $fieldRequired ? ['required', 'digits:11'] : ['nullable', 'digits:11'],
