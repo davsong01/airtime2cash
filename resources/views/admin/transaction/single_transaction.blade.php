@@ -860,37 +860,36 @@
     }
 
     function queryCredit(id, type){
-		var tid = id;
+			var tid = id;
         if(type == 'credit'){
-			url = '{{url("/")}}/admin/query-wallet/'+tid+'?type=credit&tid='+tid;
+				url = '{{url("/")}}/admin/query-wallet/'+tid+'?type=credit&tid='+tid;
         }else{
-			url = '{{url("/")}}/admin/query-wallet/'+tid+'?type=debit&tid='+tid;
+				url = '{{url("/")}}/admin/query-wallet/'+tid+'?type=debit&tid='+tid;
         }
-		$.ajax({
-			url : url,
-			type : 'GET',
+			$.ajax({
+				url : url,
+				type : 'GET',
 			beforeSend: function (){
 				$('#q_res').hide();
 				$('#img_loading').show();
 				$('#validate-biller').html('Processing....');
 			},
-            success:function (data) {
-				$('#qw_debit').html('Query '+type+' <i class="fa fa-check"></i>');
-				$('#img_loading').hide();
-				$('#q_res').show();
-				$('#q_res').html(renderHtmlResponsePanel(data, 'Query ' + type + ' response', 'Wallet query result'));
-			}
-		});
-		e.preventDefault();
-	}
+	            success:function (data) {
+					$('#qw_debit').html('Query '+type+' <i class="fa fa-check"></i>');
+					$('#img_loading').hide();
+					$('#q_res').show();
+					$('#q_res').html(renderHtmlResponsePanel(data, 'Query ' + type + ' response', 'Wallet query result'));
+				}
+			});
+		}
 
     function queryStatus(id){
 		var tid = id;
         url = '{{url("/")}}/admin/requery-transaction/'+tid;
 
-		$.ajax({
-			url : url,
-			type : 'GET',
+			$.ajax({
+				url : url,
+				type : 'GET',
 			beforeSend: function (){
 				$('#q_res').hide();
 				$('#img_loading').show();
@@ -908,13 +907,12 @@
                 // $('#validate-biller').html('Validate Biller <i class="fa fa-check"></i>');
 				$('#img_loading2').hide();
 				$('#validate-div').show();
-				$('#q_res2').show();
-				$('#q_res2').html(renderPrettyJsonPanel(data?.api_response ?? data, 'Provider response', 'Raw provider payload'));
+					$('#q_res2').show();
+					$('#q_res2').html(renderPrettyJsonPanel(data?.api_response ?? data, 'Provider response', 'Raw provider payload'));
 
-			}
-		});
-		e.preventDefault();
-	}
+				}
+			});
+		}
 
     function validateBiller(variation_id, element, value){
         var variation_id = variation_id;
@@ -923,8 +921,8 @@
 
         var data = {
             'variation':variation_id,
-            'unique_element':{{$transaction->unique_element}},
-            _token: {{ csrf_token() }},
+            'unique_element': @json($transaction->unique_element),
+            _token: @json(csrf_token()),
         };
 
         var url = "{{ route('admin.verify.post') }}";
@@ -946,8 +944,7 @@
 					$('#q_res2').html(renderPrettyJsonPanel(data, 'Validation response', 'Pretty JSON view'));
 				}
 			});
-			e.preventDefault();
-    }
+	    }
 
     // $('#qw-transaction').click(function () {
     //     let id = $(this).data('id')
