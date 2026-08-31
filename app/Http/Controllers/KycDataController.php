@@ -48,8 +48,8 @@ class KycDataController extends Controller
                         ->orWhere('users.phone', 'like', "%{$search}%");
                 });
             })
-            ->orderBy('customers.kyc_review_priority')
-            ->orderBy('customers.updated_at')
+            ->orderByDesc('customers.updated_at')
+            ->orderByDesc('customers.kyc_review_priority')
             ->paginate(50)
             ->withQueryString();
 

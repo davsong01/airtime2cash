@@ -224,7 +224,7 @@
                                     No matching customers
                                 @endif
                             </small>
-                            <small class="text-muted">Pending submissions are ordered oldest first</small>
+                            <small class="text-muted">Pending submissions are ordered by latest update first</small>
                         </div>
 
                         <div class="table-responsive">
