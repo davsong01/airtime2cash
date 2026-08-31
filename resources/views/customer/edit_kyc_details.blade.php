@@ -4,19 +4,19 @@
 @php
     $kycIsLocked = getFinalKycStatus(auth()->user()->customer->id) === 'awaiting-approval';
     $kycField = fn (string $key) => kycStatus($key, auth()->user()->customer->id);
-    $statusLabel = fn ($status) => $status === 'verified' ? 'Verified' : ($status === 'declined' ? 'Declined' : 'Not Verified');
+    $statusLabel = fn ($status) => $status === 'verified' ? 'Verified' : ($status === 'in-review' ? 'In Review' : ($status === 'declined' ? 'Declined' : 'Not Verified'));
     $kycFieldStatus = fn (string $key) => data_get($kycField($key), 'status', 'unverified');
     $kycFieldValue = fn (string $key) => data_get($kycField($key), 'value', '');
     $kycFieldReviewNote = fn (string $key) => data_get($kycField($key), 'review_note');
-    $hasVerifiedKycField = collect(['FIRST_NAME', 'MIDDLE_NAME', 'LAST_NAME', 'DOB', 'BVN', 'IDCARDTYPE', 'IDCARD', 'PHONE_NUMBER'])
-        ->contains(fn ($key) => $kycFieldStatus($key) === 'verified');
-    $hasOpenKycField = collect(['FIRST_NAME', 'MIDDLE_NAME', 'LAST_NAME', 'DOB', 'BVN', 'IDCARDTYPE', 'IDCARD', 'PHONE_NUMBER'])
-        ->contains(fn ($key) => $kycFieldStatus($key) === 'declined');
-    $allKycFieldsVerified = collect(['FIRST_NAME', 'MIDDLE_NAME', 'LAST_NAME', 'DOB', 'BVN', 'IDCARDTYPE', 'IDCARD', 'PHONE_NUMBER'])
+    $kycReviewableFields = ['FIRST_NAME', 'MIDDLE_NAME', 'LAST_NAME', 'DOB', 'BVN', 'IDCARDTYPE', 'IDCARD', 'PHONE_NUMBER'];
+    $hasKycHistory = collect($kycReviewableFields)
+        ->contains(fn ($key) => in_array($kycFieldStatus($key), ['verified', 'declined'], true));
+    $hasEditableKycField = collect($kycReviewableFields)
+        ->contains(fn ($key) => in_array($kycFieldStatus($key), ['unverified', 'declined'], true));
+    $allKycFieldsVerified = collect($kycReviewableFields)
         ->every(fn ($key) => $kycFieldStatus($key) === 'verified');
     $fullKycVerified = getFinalKycStatus(auth()->user()->customer->id) === 'verified' && $allKycFieldsVerified;
-    $needsKycResubmission = $hasVerifiedKycField || $hasOpenKycField;
-    $kycSubmitLabel = $needsKycResubmission ? 'Review and resubmit KYC' : 'Submit KYC';
+    $kycSubmitLabel = $hasKycHistory ? 'Review and resubmit KYC' : 'Submit KYC';
     $canFundWallet = $fullKycVerified;
 @endphp
 
@@ -26,8 +26,15 @@
         font-size: 10px;
         float: right;
     }
-     .verified{
+    .verified{
         color: green !important;
+        font-size: 13px;
+        margin-top: -6px;
+        display: inline-block;
+        margin-left: 5px;
+    }
+    .in-review{
+        color: #2563eb !important;
         font-size: 13px;
         margin-top: -6px;
         display: inline-block;
@@ -106,9 +113,9 @@
                                                                         @php $firstNameStatus = data_get($firstNameKyc, 'status', 'unverified'); @endphp
                                                                         @php $firstNameValue = data_get($firstNameKyc, 'value', ''); @endphp
                                                                         @php $firstNameNote = data_get($firstNameKyc, 'review_note'); @endphp
-                                                                        @php $firstNameLocked = $firstNameStatus === 'verified'; @endphp
-                                                                        @if($firstNameStatus == 'verified' || $firstNameLocked)
-                                                                        <label for="FIRST_NAME">First Name</label><span class="verified"><i class="fa fa-check"></i> Verified</span>
+                                                                        @php $firstNameLocked = in_array($firstNameStatus, ['verified', 'in-review'], true); @endphp
+                                                                        @if($firstNameLocked)
+                                                                        <label for="FIRST_NAME">First Name</label><span class="{{ $firstNameStatus === 'in-review' ? 'in-review' : 'verified' }}"><i class="fa fa-check"></i> {{ $firstNameStatus === 'in-review' ? 'In Review' : 'Verified' }}</span>
                                                                         <input type="text" class="form-control" value="{{ $firstNameValue }}" disabled>
                                                                         @else
                                                                             @if($firstNameStatus == 'declined')
@@ -130,9 +137,9 @@
                                                                         @php $middleNameStatus = data_get($middleNameKyc, 'status', 'unverified'); @endphp
                                                                         @php $middleNameValue = data_get($middleNameKyc, 'value', ''); @endphp
                                                                         @php $middleNameNote = data_get($middleNameKyc, 'review_note'); @endphp
-                                                                        @php $middleNameLocked = $middleNameStatus === 'verified'; @endphp
-                                                                        @if($middleNameStatus == 'verified' || $middleNameLocked)
-                                                                        <label for="MIDDLE_NAME">Middle Name</label><span class="verified"><i class="fa fa-check"></i> Verified</span>
+                                                                        @php $middleNameLocked = in_array($middleNameStatus, ['verified', 'in-review'], true); @endphp
+                                                                        @if($middleNameLocked)
+                                                                        <label for="MIDDLE_NAME">Middle Name</label><span class="{{ $middleNameStatus === 'in-review' ? 'in-review' : 'verified' }}"><i class="fa fa-check"></i> {{ $middleNameStatus === 'in-review' ? 'In Review' : 'Verified' }}</span>
                                                                         <input type="text" class="form-control" value="{{ $middleNameValue }}" disabled>
                                                                         @else
                                                                         @if($middleNameStatus == 'declined')
@@ -153,9 +160,9 @@
                                                                         @php $lastNameStatus = data_get($lastNameKyc, 'status', 'unverified'); @endphp
                                                                         @php $lastNameValue = data_get($lastNameKyc, 'value', ''); @endphp
                                                                         @php $lastNameNote = data_get($lastNameKyc, 'review_note'); @endphp
-                                                                        @php $lastNameLocked = $lastNameStatus === 'verified'; @endphp
-                                                                        @if($lastNameStatus == 'verified' || $lastNameLocked)
-                                                                        <label for="LAST_NAME">Last Name</label><span class="verified"><i class="fa fa-check"></i> Verified</span>
+                                                                        @php $lastNameLocked = in_array($lastNameStatus, ['verified', 'in-review'], true); @endphp
+                                                                        @if($lastNameLocked)
+                                                                        <label for="LAST_NAME">Last Name</label><span class="{{ $lastNameStatus === 'in-review' ? 'in-review' : 'verified' }}"><i class="fa fa-check"></i> {{ $lastNameStatus === 'in-review' ? 'In Review' : 'Verified' }}</span>
                                                                         <input type="text" class="form-control" value="{{ $lastNameValue }}" disabled>
                                                                         @else
                                                                         @if($lastNameStatus == 'declined')
@@ -181,8 +188,8 @@
                                                                         @php $phoneKyc = $kycField('PHONE_NUMBER'); @endphp
                                                                         @php $phoneStatus = data_get($phoneKyc, 'status', 'unverified'); @endphp
                                                                         @php $phoneNote = data_get($phoneKyc, 'review_note'); @endphp
-                                                                        @if($phoneStatus == 'verified')
-                                                                        <label for="PHONE_NUMBER">Phone Number</label><span class="verified"><i class="fa fa-check"></i> Verified</span>
+                                                                        @if($phoneStatus == 'verified' || $phoneStatus == 'in-review')
+                                                                        <label for="PHONE_NUMBER">Phone Number</label><span class="{{ $phoneStatus == 'in-review' ? 'in-review' : 'verified' }}"><i class="fa fa-check"></i> {{ $phoneStatus == 'in-review' ? 'In Review' : 'Verified' }}</span>
                                                                         @elseif($phoneStatus == 'declined')
                                                                         <label for="PHONE_NUMBER">Phone Number</label><span class="declined"><i class="fa fa-times"></i> Declined</span>
                                                                         @if(filled($phoneNote))
@@ -200,9 +207,9 @@
                                                                         @php $dobStatus = data_get($dobKyc, 'status', 'unverified'); @endphp
                                                                         @php $dobValue = data_get($dobKyc, 'value', ''); @endphp
                                                                         @php $dobNote = data_get($dobKyc, 'review_note'); @endphp
-                                                                        @php $dobLocked = $dobStatus === 'verified'; @endphp
-                                                                        @if($dobStatus == 'verified' || $dobLocked)
-                                                                        <label for="DOB">Date of Birth</label><span class="verified"><i class="fa fa-check"></i> Verified</span>
+                                                                        @php $dobLocked = in_array($dobStatus, ['verified', 'in-review'], true); @endphp
+                                                                        @if($dobLocked)
+                                                                        <label for="DOB">Date of Birth</label><span class="{{ $dobStatus === 'in-review' ? 'in-review' : 'verified' }}"><i class="fa fa-check"></i> {{ $dobStatus === 'in-review' ? 'In Review' : 'Verified' }}</span>
                                                                         <input type="text" class="form-control" value="{{ $dobValue }}" disabled>
                                                                         @else
                                                                         @if($dobStatus == 'declined')
@@ -223,9 +230,9 @@
                                                                         @php $bvnStatus = data_get($bvnKyc, 'status', 'unverified'); @endphp
                                                                         @php $bvnValue = data_get($bvnKyc, 'value', ''); @endphp
                                                                         @php $bvnNote = data_get($bvnKyc, 'review_note'); @endphp
-                                                                        @php $bvnLocked = $bvnStatus === 'verified'; @endphp
-                                                                        @if($bvnStatus == 'verified' || $bvnLocked)
-                                                                        <label for="BVN">BVN</label><span class="verified"><i class="fa fa-check"></i> Verified</span>
+                                                                        @php $bvnLocked = in_array($bvnStatus, ['verified', 'in-review'], true); @endphp
+                                                                        @if($bvnLocked)
+                                                                        <label for="BVN">BVN</label><span class="{{ $bvnStatus === 'in-review' ? 'in-review' : 'verified' }}"><i class="fa fa-check"></i> {{ $bvnStatus === 'in-review' ? 'In Review' : 'Verified' }}</span>
                                                                         <input autocomplete="off" type="text" class="form-control" value="{{ starMiddle($bvnValue) }}" disabled>
                                                                         @else
                                                                         @if($bvnStatus == 'declined')
@@ -244,10 +251,10 @@
                                                                 @php $idCardStatus = data_get($idCardKyc, 'status', 'unverified'); @endphp
                                                                 @php $idCardValue = data_get($idCardKyc, 'value', ''); @endphp
                                                                 @php $idCardNote = data_get($idCardKyc, 'review_note'); @endphp
-                                                                @php $idCardLocked = $idCardStatus === 'verified'; @endphp
+                                                                @php $idCardLocked = in_array($idCardStatus, ['verified', 'in-review'], true); @endphp
                                                                 @if($idCardStatus == 'verified' || $idCardLocked)
                                                                 <div class="col-md-6 mb-2">
-                                                                    <label for="IDCARD">Identity document</label><span class="verified"><i class="fa fa-check"></i> Verified</span>
+                                                                    <label for="IDCARD">Identity document</label><span class="{{ $idCardStatus === 'in-review' ? 'in-review' : 'verified' }}"><i class="fa fa-check"></i> {{ $idCardStatus === 'in-review' ? 'In Review' : 'Verified' }}</span>
                                                                     @if(filled($idCardValue))
                                                                         <div class="mb-75">
                                                                             <img src="{{ asset($idCardValue) }}" alt="Submitted identity document" onclick="zoomKycDocument(this)" style="max-width: 150px; width: 150px; cursor: zoom-in; border-radius: 8px; border: 1px solid #ddd;">
@@ -262,8 +269,10 @@
                                                                             @php $idTypeStatus = data_get($idTypeKyc, 'status', 'unverified'); @endphp
                                                                             @php $idTypeValue = data_get($idTypeKyc, 'value', ''); @endphp
                                                                             @php $idTypeNote = data_get($idTypeKyc, 'review_note'); @endphp
-                                                                            @php $idTypeLocked = $idTypeStatus === 'verified'; @endphp
-                                                                            @if($idTypeStatus == 'declined')
+                                                                            @php $idTypeLocked = in_array($idTypeStatus, ['verified', 'in-review'], true); @endphp
+                                                                            @if($idTypeLocked)
+                                                                            <label for="IDCARD">ID Card Type</label><span class="{{ $idTypeStatus === 'in-review' ? 'in-review' : 'verified' }}"><i class="fa fa-check"></i> {{ $idTypeStatus === 'in-review' ? 'In Review' : 'Verified' }}</span>
+                                                                            @elseif($idTypeStatus == 'declined')
                                                                             <label for="IDCARD">ID Card Type</label><span class="declined"><i class="fa fa-times"></i> Declined</span>
                                                                             @if(filled($idTypeNote))
                                                                                 <button type="button" class="btn btn-link btn-sm p-0 ml-2 view-kyc-reason-btn" data-field="ID Card Type" data-reason="{{ e($idTypeNote) }}">View reason</button>
@@ -287,7 +296,9 @@
                                                                             @php $idCardStatus = data_get($idCardKyc, 'status', 'unverified'); @endphp
                                                                             @php $idCardValue = data_get($idCardKyc, 'value', ''); @endphp
                                                                             @php $idCardNote = data_get($idCardKyc, 'review_note'); @endphp
-                                                                            @if($idCardStatus == 'declined')
+                                                                            @if($idCardLocked)
+                                                                            <label for="IDCARD">Identity document</label> <small class="primary" style="font-weight: bold;">(JPEG only, maximum 500 KB)</small> <span class="{{ $idCardStatus === 'in-review' ? 'in-review' : 'verified' }}"><i class="fa fa-check"></i> {{ $idCardStatus === 'in-review' ? 'In Review' : 'Verified' }}</span>
+                                                                            @elseif($idCardStatus == 'declined')
                                                                             <label for="IDCARD">Identity document </label> <small class="primary" style="font-weight: bold;">(JPEG only, maximum 500 KB)</small> <span class="declined"><i class="fa fa-times"></i> Declined</span>
                                                                             @if(filled($idCardNote))
                                                                                 <button type="button" class="btn btn-link btn-sm p-0 ml-2 view-kyc-reason-btn" data-field="ID Card" data-reason="{{ e($idCardNote) }}">View reason</button>
@@ -311,11 +322,15 @@
                                                             </fieldset>
                                                             @if($canFundWallet)
                                                             <a href="{{ route('customer.load.wallet') }}" class="btn btn-success">Fund wallet</a>
-                                                            @else
+                                                            @elseif($hasEditableKycField)
                                                             <div class="row">
                                                                 <div class="col-md-12">
                                                                     <button class="btn btn-primary" type="submit">{{ $kycSubmitLabel }}</button>
                                                                 </div>
+                                                            </div>
+                                                            @else
+                                                            <div class="alert alert-info mb-0">
+                                                                <strong>Your KYC submission is under review.</strong> The fields you submitted are locked until an administrator completes the review.
                                                             </div>
                                                             @endif
                                                         </form>

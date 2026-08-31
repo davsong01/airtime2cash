@@ -856,6 +856,10 @@ class CustomerController extends Controller
             }
         });
 
+        if ($action === 'approve' && $this->kycFieldsAreFullyVerified($customer->id)) {
+            $this->finalizeCustomerKycApproval($customer);
+        }
+
         return response()->json([
             'status' => true,
             'message' => $action === 'approve'
@@ -1021,25 +1025,61 @@ class CustomerController extends Controller
     }
 
     public function approveCustomerKyc(Customer $customer){
-        $customer->update([
-            "kyc_status" => 'verified',
-            'kyc_rejection_reason' => null,
-        ]);
+        $result = $this->finalizeCustomerKycApproval($customer, true);
+
+        return back()->with(
+            $result['reserved_account_created']
+                ? 'message'
+                : 'error',
+            $result['reserved_account_created']
+                ? 'KYC Approved succesfully and reserved accounts created'
+                : 'KYC Approved succesfully but NO reserved accounts created'
+        );
+    }
+
+    private function kycFieldsAreFullyVerified(int $customerId): bool
+    {
+        $reviewableFields = ['FIRST_NAME', 'MIDDLE_NAME', 'LAST_NAME', 'PHONE_NUMBER', 'DOB', 'BVN', 'IDCARDTYPE', 'IDCARD'];
+        $kycRows = KycData::where('customer_id', $customerId)
+            ->whereIn('key', $reviewableFields);
+
+        return $kycRows->count() === count($reviewableFields)
+            && ! (clone $kycRows)
+            ->where(function ($query) {
+                $query->whereNull('status')
+                    ->orWhere('status', '!=', 'verified');
+            })
+            ->exists();
+    }
+
+    private function finalizeCustomerKycApproval(Customer $customer, bool $force = false): array
+    {
+        $customer->refresh();
+
+        if (! $force && $customer->kyc_status === 'verified') {
+            return [
+                'reserved_account_created' => true,
+            ];
+        }
 
         KycData::where('customer_id', $customer->id)->update([
             'status' => 'verified',
         ]);
 
+        $customer->update([
+            'kyc_status' => 'verified',
+            'kyc_rejection_reason' => null,
+        ]);
+
         $data = [
-            'BVN' => kycStatus('BVN', $customer->id)['value'],
+            'BVN' => data_get(kycStatus('BVN', $customer->id), 'value'),
             'customerName' => $customer->user->username,
-            'accountName' => kycStatus('FIRST_NAME', $customer->id)['value'],
+            'accountName' => data_get(kycStatus('FIRST_NAME', $customer->id), 'value'),
             'customerEmail' => $customer->user->email,
             'customer_id' => $customer->id,
             'getAllAvailableBanks' => true,
         ];
 
-        // Log email
         $subject = "KYC Info Update";
         $body = '<p>Hello! ' . $customer->user->firstname . '</p>';
         $body .= '<p style="line-height: 2.0;">Your KYC Information has been approved ' . config('app.name') . '<br><br> You can now carry out transactions<br/></p>';
@@ -1047,12 +1087,11 @@ class CustomerController extends Controller
         logEmails($customer->user->email, $subject, $body);
 
         $reserved = createReservedAccount($data);
-        if ($reserved['status'] && $reserved['status'] == 'success') {
-            return back()->with('message', 'KYC Approved succesfully and reserved accounts created');
-        } else {
-            return back()->with('error', 'KYC Approved succesfully but NO reserved accounts created');
-        }
 
+        return [
+            'reserved_account_created' => (($reserved['status'] ?? null) === 'success'),
+            'reserved_account_response' => $reserved,
+        ];
     }
 
     public function declineCustomerKyc(Request $request, Customer $customer)

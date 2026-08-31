@@ -89,7 +89,7 @@
     </script>
 @endif
 
-<div class="alert {{ $finalKycStatus === 'awaiting-approval' ? 'alert-warning' : ($finalKycStatus === 'verified' ? 'alert-success' : 'alert-secondary') }}">
+<div class="alert {{ in_array($finalKycStatus, ['awaiting-approval', 'in-review', 'pending'], true) ? 'alert-warning' : ($finalKycStatus === 'verified' ? 'alert-success' : 'alert-secondary') }}">
     <strong>Current KYC status:</strong> {{ ucfirst(str_replace('-', ' ', $finalKycStatus)) }}
 </div>
 
@@ -99,7 +99,7 @@
         @foreach($kycFields as $key => $label)
             @php
                 $field = $kycField($key);
-                $fieldClass = $field->status === 'verified' ? 'text-success' : ($field->status === 'declined' ? 'text-danger' : 'text-warning');
+                $fieldClass = $field->status === 'verified' ? 'text-success' : ($field->status === 'in-review' ? 'text-info' : ($field->status === 'declined' ? 'text-danger' : 'text-warning'));
                 $fieldValue = trim((string) $field->value);
                 $bvnHasVerification = $key === 'BVN' && (filled($bvnVerifiedName) || filled(data_get($bvnData, 'verified_at')) || filled($customer->bvn_verification_status) || filled($bvnResponse));
                 $bvnFieldClass = $key === 'BVN' && $bvnHasVerification
@@ -184,7 +184,7 @@
         </div>
         <div class="col-md-6 form-group">
             <div class="d-flex align-items-center justify-content-between flex-wrap mb-50">
-                <label for="IDCARDTYPE" class="mb-0">ID card type <span class="kyc-field-status {{ $idCardType->status === 'verified' ? 'text-success' : ($idCardType->status === 'declined' ? 'text-danger' : 'text-warning') }}">{{ ucfirst($idCardType->status ?: 'pending') }}</span></label>
+                <label for="IDCARDTYPE" class="mb-0">ID card type <span class="kyc-field-status {{ $idCardType->status === 'verified' ? 'text-success' : ($idCardType->status === 'in-review' ? 'text-info' : ($idCardType->status === 'declined' ? 'text-danger' : 'text-warning')) }}">{{ ucfirst($idCardType->status ?: 'pending') }}</span></label>
                 <div class="d-flex align-items-center flex-wrap">
                     <button
                         type="button"
@@ -217,7 +217,7 @@
         </div>
         <div class="col-md-6 form-group">
             <div class="d-flex align-items-center justify-content-between flex-wrap mb-50">
-                <label for="IDCARD" class="mb-0">Identity document <span class="kyc-field-status {{ $idCard->status === 'verified' ? 'text-success' : ($idCard->status === 'declined' ? 'text-danger' : 'text-warning') }}">{{ ucfirst($idCard->status ?: 'pending') }}</span></label>
+                <label for="IDCARD" class="mb-0">Identity document <span class="kyc-field-status {{ $idCard->status === 'verified' ? 'text-success' : ($idCard->status === 'in-review' ? 'text-info' : ($idCard->status === 'declined' ? 'text-danger' : 'text-warning')) }}">{{ ucfirst($idCard->status ?: 'pending') }}</span></label>
                 <div class="d-flex align-items-center flex-wrap">
                     <button
                         type="button"

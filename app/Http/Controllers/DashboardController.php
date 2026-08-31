@@ -435,10 +435,7 @@ class DashboardController extends Controller
     public function processUpdateKycInfo(Request $request)
     {
         $customer = auth()->user()->customer;
-        $hasDeclinedField = $this->customerHasDeclinedKycField($customer->id);
-
-        $isResubmission = $hasDeclinedField;
-        $kycFieldStatuses = [
+        $kycReviewableFields = [
             'FIRST_NAME' => data_get(kycStatus('FIRST_NAME', $customer->id), 'status', 'unverified'),
             'MIDDLE_NAME' => data_get(kycStatus('MIDDLE_NAME', $customer->id), 'status', 'unverified'),
             'LAST_NAME' => data_get(kycStatus('LAST_NAME', $customer->id), 'status', 'unverified'),
@@ -448,10 +445,10 @@ class DashboardController extends Controller
             'IDCARD' => data_get(kycStatus('IDCARD', $customer->id), 'status', 'unverified'),
         ];
 
-        if (collect($kycFieldStatuses)->every(fn ($status) => $status === 'verified')) {
+        if (collect($kycReviewableFields)->every(fn ($status) => in_array($status, ['verified', 'in-review'], true))) {
             return back()->with(
                 'error',
-                'Your verified KYC details cannot be changed from the customer portal. Please contact support if your information needs to be corrected.'
+                'Your KYC details are currently under review. Please wait for the administrator to finish reviewing them before making further changes.'
             );
         }
 
@@ -459,9 +456,8 @@ class DashboardController extends Controller
             'PHONE_NUMBER' => ['nullable'],
         ];
 
-        foreach (array_keys($kycFieldStatuses) as $field) {
-            $fieldRequired = $kycFieldStatuses[$field] !== 'verified'
-                && (! $isResubmission || $kycFieldStatuses[$field] === 'declined');
+        foreach (array_keys($kycReviewableFields) as $field) {
+            $fieldRequired = in_array($kycReviewableFields[$field], ['unverified', 'declined'], true);
 
             $rules[$field] = match ($field) {
                 'BVN' => $fieldRequired ? ['required', 'digits:11'] : ['nullable', 'digits:11'],
@@ -483,8 +479,6 @@ class DashboardController extends Controller
             $input['IDCARD'] = $this->uploadFile($request->IDCARD, 'kyc');
         }
 
-        $input['PHONE_NUMBER'] = $customer->user->phone;
-
         // $instantVerify = ['FIRST_NAME', 'LAST_NAME', 'MIDDLE_NAME', 'DOB', 'PHONE_NUMBER', 'COUNTRY', 'STATE', 'LGA', 'DOB', 'IDCARD', 'IDCARDTYPE'];
         // foreach ($input as $key => $value) {
         //     if (in_array($key, $instantVerify)) {
@@ -503,8 +497,26 @@ class DashboardController extends Controller
         //     "middlename" => $middlename,
         //     "lastname" => $lastname,
         // ]);
-        foreach ($input as $key => $value) {
-            $this->updateKycData($key, $value, $customer->id, 'unverified');
+        $submittedFields = array_merge(array_keys($kycReviewableFields), ['PHONE_NUMBER']);
+        foreach ($submittedFields as $field) {
+            if (! array_key_exists($field, $input) && $field !== 'PHONE_NUMBER') {
+                continue;
+            }
+
+            if ($field === 'PHONE_NUMBER') {
+                $existingPhoneField = KycData::where('customer_id', $customer->id)
+                    ->where('key', 'PHONE_NUMBER')
+                    ->first();
+                $phoneStatus = data_get(kycStatus('PHONE_NUMBER', $customer->id), 'status', 'unverified');
+
+                if (! $existingPhoneField || in_array($phoneStatus, ['unverified', 'declined'], true)) {
+                    $this->updateKycData('PHONE_NUMBER', $customer->user->phone, $customer->id, 'in-review');
+                }
+
+                continue;
+            }
+
+            $this->updateKycData($field, $input[$field], $customer->id, 'in-review');
         }
 
         // verify BVN automatically
