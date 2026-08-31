@@ -1097,13 +1097,14 @@ class CustomerController extends Controller
         $providerSuccess = (($verificationData['status'] ?? null) === 'success');
         $fieldStatus = $providerSuccess ? ($nameMatch ? 'verified' : 'declined') : 'unverified';
         $reviewNote = $providerSuccess && ! $nameMatch ? 'BVN name does not match profile name.' : null;
+        $verificationMode = getSettings()?->bvn_verification_mode ?? 'manual';
 
-        DB::transaction(function () use ($customer, $resolvedBvn, $fieldStatus, $verificationData, $provider, $providerResponse, $payload, $verifiedName, $profileName, $nameMatch, $reviewedBy, $reviewNote) {
+        DB::transaction(function () use ($customer, $resolvedBvn, $fieldStatus, $verificationData, $provider, $providerResponse, $payload, $verifiedName, $profileName, $nameMatch, $reviewedBy, $reviewNote, $verificationMode) {
             $customer->forceFill([
                 'bvn' => $resolvedBvn,
                 'bvn_verification_status' => $fieldStatus,
                 'bvn_data' => [
-                    'verification_mode' => getSettings()?->bvn_verification_mode ?? 'manual',
+                    'verification_mode' => $verificationMode,
                     'provider_id' => $provider->id,
                     'provider_slug' => $provider->slug,
                     'provider_name' => $provider->name,
