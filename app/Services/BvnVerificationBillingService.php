@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Http\Controllers\WalletController;
 use App\Models\Customer;
 use App\Models\TransactionLog;
+use App\Models\Wallet;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -42,10 +43,27 @@ class BvnVerificationBillingService
             $transactionId = (string) ($context['transaction_id'] ?? $this->buildTransactionId($customer));
             $referenceId = (string) ($context['reference_id'] ?? $transactionId);
 
-            $transaction = TransactionLog::updateOrCreate(
-                ['transaction_id' => $transactionId],
-                $this->buildTransactionPayload($customer, $amount, $balanceBefore, $context, $transactionId, $referenceId)
-            );
+            $transaction = TransactionLog::query()
+                ->where('transaction_id', $transactionId)
+                ->lockForUpdate()
+                ->first();
+
+            if ($transaction && in_array(strtolower((string) $transaction->status), $transaction->terminalStatuses(), true)) {
+                return [
+                    'status' => $transaction->status,
+                    'settled' => true,
+                    'transaction' => $transaction->fresh(),
+                    'amount' => $amount,
+                ];
+            }
+
+            $payload = $this->buildTransactionPayload($customer, $amount, $balanceBefore, $context, $transactionId, $referenceId);
+
+            if ($transaction) {
+                $transaction->fill($payload);
+            } else {
+                $transaction = TransactionLog::create($payload);
+            }
 
             $transaction->update([
                 'status' => 'pending',
@@ -82,6 +100,26 @@ class BvnVerificationBillingService
                 ->lockForUpdate()
                 ->firstOrFail();
 
+            $creditTransactionId = (string) ($context['transaction_id'] ?? $this->buildIncomingTransactionId($customer));
+
+            $existingCredit = Wallet::query()
+                ->where('transaction_id', $creditTransactionId)
+                ->where('type', 'credit')
+                ->lockForUpdate()
+                ->first();
+
+            if ($existingCredit) {
+                return [
+                    'gross_amount' => $grossAmount,
+                    'net_amount' => (float) ($customer->wallet ?? $existingCredit->balance_after ?? 0),
+                    'fee_amount' => 0,
+                    'applied' => false,
+                    'fee_transaction_id' => null,
+                    'credit_before' => (float) ($existingCredit->balance_before ?? 0),
+                    'credit_after' => (float) ($customer->wallet ?? $existingCredit->balance_after ?? 0),
+                ];
+            }
+
             $pendingCharge = TransactionLog::query()
                 ->where('customer_id', $customer->id)
                 ->where('reason', self::REASON)
@@ -97,7 +135,6 @@ class BvnVerificationBillingService
             $creditChange = $this->walletController->applyCustomerBalanceChange($customer, 'wallet', $grossAmount, 'credit', false);
             $customer->setAttribute('wallet', $creditChange['after']);
 
-            $creditTransactionId = (string) ($context['transaction_id'] ?? $this->buildIncomingTransactionId($customer));
             $creditReason = (string) ($context['credit_reason'] ?? 'Wallet funding');
             $creditPaymentMethod = (string) ($context['payment_method'] ?? 'wallet');
 

@@ -309,6 +309,13 @@
                 .replace(/'/g, '&#039;');
 
             const getResponsePayload = () => state.response || {};
+            const hasSavedBvnData = Boolean(
+                state.hasSavedData
+                || state.profileName
+                || state.verifiedName
+                || state.verifiedAt
+                || Object.keys(getResponsePayload()).length
+            );
 
             const syncModal = () => {
                 $('#bvn-result-profile-name').text(state.profileName || 'N/A');
@@ -334,7 +341,7 @@
             };
 
             $modal.on('show.bs.modal', function () {
-                if (state && Object.keys(getResponsePayload()).length) {
+                if (hasSavedBvnData) {
                     showResult();
                 } else {
                     showLoading();

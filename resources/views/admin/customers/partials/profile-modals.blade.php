@@ -94,11 +94,18 @@
 
 @if($activeTab === 'kyc')
     @php
+        $kycBvnRawData = $customer->getRawOriginal('bvn_data');
         $kycBvnData = (array) ($customer->bvn_data ?? []);
         $kycBvnProfileName = data_get($kycBvnData, 'profile_name');
         $kycBvnVerifiedName = data_get($kycBvnData, 'verified_name');
         $kycBvnNameMatch = (bool) data_get($kycBvnData, 'name_match', false);
         $kycBvnResponse = data_get($kycBvnData, 'response', []);
+        $kycBvnHasSavedData = (
+            filled($kycBvnRawData)
+            && $kycBvnRawData !== 'null'
+            && $kycBvnRawData !== '[]'
+            && $kycBvnRawData !== '{}'
+        );
     @endphp
 
     <div class="modal fade" id="kyc-document-modal" tabindex="-1" role="dialog" aria-labelledby="kyc-document-title" aria-hidden="true">
@@ -156,17 +163,17 @@
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
                 </div>
                 <div class="modal-body">
-                    <div id="bvn-verification-loading" class="{{ filled($kycBvnResponse) ? 'd-none' : '' }}">
+                    <div id="bvn-verification-loading" class="{{ $kycBvnHasSavedData ? 'd-none' : '' }}">
                         <div class="d-flex align-items-center justify-content-center py-5">
                             <div class="text-center">
                                 <div class="spinner-border text-primary mb-3" role="status" aria-hidden="true"></div>
-                                <h6 class="mb-1">Verifying BVN details...</h6>
-                                <p class="text-muted mb-0">Please wait while we contact the verification provider.</p>
+                                <h6 class="mb-1">Fetching BVN details...</h6>
+                                <p class="text-muted mb-0">Please wait while we load the saved verification record for this customer.</p>
                             </div>
                         </div>
                     </div>
 
-                    <div id="bvn-verification-result" class="{{ filled($kycBvnResponse) ? '' : 'd-none' }}">
+                    <div id="bvn-verification-result" class="{{ $kycBvnHasSavedData ? '' : 'd-none' }}">
                         <div class="row">
                             <div class="col-md-4 mb-1">
                                 <div class="border rounded p-1 h-100">
@@ -204,6 +211,7 @@
             verifiedName: @json($kycBvnVerifiedName ?: ''),
             nameMatch: @json($kycBvnNameMatch),
             response: @json($kycBvnResponse),
+            hasSavedData: @json($kycBvnHasSavedData),
             status: @json(data_get($kycBvnData, 'status', $customer->bvn_verification_status ?: 'unverified')),
             verifiedAt: @json(data_get($kycBvnData, 'verified_at', '')),
         };

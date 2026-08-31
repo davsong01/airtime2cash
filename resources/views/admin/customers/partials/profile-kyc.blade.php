@@ -10,6 +10,7 @@
     ];
     $idCard = $kycField('IDCARD');
     $idCardType = $kycField('IDCARDTYPE');
+    $bvnRawData = $customer->getRawOriginal('bvn_data');
     $bvnData = (array) ($customer->bvn_data ?? []);
     $bvnMode = $settings->bvn_verification_mode ?? 'manual';
     $bvnVerificationCharge = (float) ($settings->bvn_verification_charge ?? 0);
@@ -17,6 +18,7 @@
     $bvnVerifiedName = data_get($bvnData, 'verified_name');
     $bvnProfileName = data_get($bvnData, 'profile_name');
     $bvnResponse = data_get($bvnData, 'response', []);
+    $bvnHasSavedData = filled($bvnRawData) && $bvnRawData !== 'null' && $bvnRawData !== '[]' && $bvnRawData !== '{}';
     $kycReviewUrl = route('customers.kyc-field-review', $customer->id);
 @endphp
 
@@ -133,7 +135,7 @@
                         @if($key === 'BVN')
                             <button
                                 type="button"
-                                class="btn btn-outline-secondary btn-sm mr-25 js-bvn-show-result-btn {{ $bvnHasVerification ? '' : 'd-none' }}"
+                                class="btn btn-outline-secondary btn-sm mr-25 js-bvn-show-result-btn {{ $bvnHasSavedData ? '' : 'd-none' }}"
                                 data-toggle="modal"
                                 data-target="#bvnVerificationResultModal">
                                 Show result
@@ -246,7 +248,7 @@
             <small class="text-muted">JPEG only, maximum 1 MB.</small>
         </div>
         <div class="col-12 form-group">
-            @if(filled($bvnResponse))
+            @if($bvnHasSavedData)
                 <button type="button" class="btn btn-outline-secondary btn-sm" data-toggle="modal" data-target="#bvnVerificationResultModal">
                     Show result
                 </button>

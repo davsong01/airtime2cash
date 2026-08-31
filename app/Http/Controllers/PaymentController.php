@@ -230,12 +230,6 @@ class PaymentController extends Controller
 
                     $transaction =  app('App\Http\Controllers\TransactionController')->logTransaction($request);
 
-                    $transaction->update([
-                        'balance_after' => $balance + $amount,
-                        'status' => 'delivered',
-                        'descr' => 'Wallet Funding Via Account: ' . $call['account_number'] . ' of ' . getSettings()->currency . number_format($amount, 2) . ' was successful',
-                    ]);
-
                     $request['type'] = 'credit';
                     $request['total_amount'] = $amount;
                     $request['transaction_id'] = $transaction->transaction_id;
@@ -249,6 +243,8 @@ class PaymentController extends Controller
                     ]);
                     $transaction->update([
                         'balance_after' => $creditResult['credit_after'] ?? ($balance + $amount),
+                        'status' => 'delivered',
+                        'descr' => 'Wallet Funding Via Account: ' . $call['account_number'] . ' of ' . getSettings()->currency . number_format($amount, 2) . ' was successful',
                     ]);
                     ReservedAccountCallback::where('id', $call['id'])->update(['transaction_id' => $transaction_id]);
 
