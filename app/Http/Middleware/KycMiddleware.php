@@ -33,9 +33,13 @@ class KycMiddleware
             $kyc_status = getFinalKycStatus($customer->id);
 
             if ($kyc_status != 'verified') {
-                return redirect(route('dashboard'))->with(
+                $redirectToKyc = in_array($kyc_status, ['pending', 'awaiting-approval'], true);
+
+                return redirect($redirectToKyc ? route('update.kyc.details') : route('dashboard'))->with(
                     'unverified',
-                    'Identity verification is required to use this service. Please <a href="' . route('update.kyc.details') . '"><strong>complete your KYC now</strong></a> to continue.'
+                    $redirectToKyc
+                        ? 'Identity verification is required to use this service. Please complete your KYC to continue.'
+                        : 'Identity verification is required to use this service. Please <a href="' . route('update.kyc.details') . '"><strong>complete your KYC now</strong></a> to continue.'
                 );
             }
 

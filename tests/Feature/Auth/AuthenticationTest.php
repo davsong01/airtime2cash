@@ -3,6 +3,7 @@
 namespace Tests\Feature\Auth;
 
 use App\Models\User;
+use App\Models\Customer;
 use App\Providers\RouteServiceProvider;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -29,6 +30,27 @@ class AuthenticationTest extends TestCase
 
         $this->assertAuthenticated();
         $response->assertRedirect(RouteServiceProvider::HOME);
+    }
+
+    public function test_customers_with_pending_kyc_are_redirected_to_kyc_after_login(): void
+    {
+        $user = User::factory()->create([
+            'type' => 'customer',
+            'status' => 'active',
+        ]);
+
+        Customer::create([
+            'user_id' => $user->id,
+            'kyc_status' => 'pending',
+        ]);
+
+        $response = $this->post('/login', [
+            'email' => $user->email,
+            'password' => 'password',
+        ]);
+
+        $this->assertAuthenticated();
+        $response->assertRedirect(route('update.kyc.details'));
     }
 
     public function test_users_can_not_authenticate_with_invalid_password(): void

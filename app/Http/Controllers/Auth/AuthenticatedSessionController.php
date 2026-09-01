@@ -63,6 +63,10 @@ class AuthenticatedSessionController extends Controller
         // Regenerate session to prevent fixation attacks
         $request->session()->regenerate();
 
+        if ($user->type === 'customer' && in_array((string) ($user->customer?->kyc_status ?? ''), ['pending', 'awaiting-approval'], true)) {
+            return redirect()->route('update.kyc.details');
+        }
+
         return redirect()->intended(RouteServiceProvider::HOME);
     }
 
