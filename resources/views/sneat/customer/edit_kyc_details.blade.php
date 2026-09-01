@@ -133,7 +133,23 @@
                                 @endphp
                                 <div class="col-md-6">
                                     <div class="d-flex align-items-center justify-content-between flex-wrap mb-1">
-                                        <label class="form-label mb-0">{{ $field['label'] }}</label>
+                                        <div class="d-flex align-items-center gap-1 flex-wrap">
+                                            <label class="form-label mb-0">{{ $field['label'] }}</label>
+                                            @if($key === 'BVN')
+                                                <a
+                                                    href="https://airtime2cash.com/what-the-cbns-circular-means-for-financial-services-in-nigeria/"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    class="text-muted"
+                                                    data-bs-toggle="tooltip"
+                                                    data-bs-placement="top"
+                                                    title="Learn more about the BVN requirement"
+                                                    aria-label="Learn more about the BVN requirement"
+                                                >
+                                                    <i class="icon-base bx bx-info-circle"></i>
+                                                </a>
+                                            @endif
+                                        </div>
                                         <div class="d-flex align-items-center gap-2 flex-wrap">
                                             <span class="badge {{ $status === 'verified' ? 'bg-label-success' : ($status === 'in-review' ? 'bg-label-info' : ($status === 'declined' ? 'bg-label-danger' : 'bg-label-warning')) }}">
                                                 {{ $statusLabel($status) }}
@@ -317,5 +333,11 @@
             $('#kycReasonModalText').text($(this).data('reason') || 'No rejection reason was provided.');
             $('#kycReasonModal').modal('show');
         });
+
+        if (window.bootstrap && typeof bootstrap.Tooltip === 'function') {
+            document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
+                new bootstrap.Tooltip(el);
+            });
+        }
     </script>
 @endsection

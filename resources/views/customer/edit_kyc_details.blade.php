@@ -232,16 +232,28 @@
                                                                         @php $bvnNote = data_get($bvnKyc, 'review_note'); @endphp
                                                                         @php $bvnLocked = in_array($bvnStatus, ['verified', 'in-review'], true); @endphp
                                                                         @if($bvnLocked)
-                                                                        <label for="BVN">BVN</label><span class="{{ $bvnStatus === 'in-review' ? 'in-review' : 'verified' }}"><i class="fa fa-check"></i> {{ $bvnStatus === 'in-review' ? 'In Review' : 'Verified' }}</span>
+                                                                        <label for="BVN" class="mb-0">BVN</label>
+                                                                        <a href="https://airtime2cash.com/what-the-cbns-circular-means-for-financial-services-in-nigeria/" target="_blank" rel="noopener noreferrer" class="ml-1" data-toggle="tooltip" title="Learn more about the BVN requirement">
+                                                                            <i class="fa fa-info-circle"></i>
+                                                                        </a>
+                                                                        <span class="{{ $bvnStatus === 'in-review' ? 'in-review' : 'verified' }}"><i class="fa fa-check"></i> {{ $bvnStatus === 'in-review' ? 'In Review' : 'Verified' }}</span>
                                                                         <input autocomplete="off" type="text" class="form-control" value="{{ starMiddle($bvnValue) }}" disabled>
                                                                         @else
                                                                         @if($bvnStatus == 'declined')
-                                                                        <label for="BVN">BVN</label><span class="declined"><i class="fa fa-times"></i> Declined</span>
+                                                                        <label for="BVN" class="mb-0">BVN</label>
+                                                                        <a href="https://airtime2cash.com/what-the-cbns-circular-means-for-financial-services-in-nigeria/" target="_blank" rel="noopener noreferrer" class="ml-1" data-toggle="tooltip" title="Learn more about the BVN requirement">
+                                                                            <i class="fa fa-info-circle"></i>
+                                                                        </a>
+                                                                        <span class="declined"><i class="fa fa-times"></i> Declined</span>
                                                                         @if(filled($bvnNote))
                                                                             <button type="button" class="btn btn-link btn-sm p-0 ml-2 view-kyc-reason-btn" data-field="BVN" data-reason="{{ e($bvnNote) }}">View reason</button>
                                                                         @endif
                                                                         @else
-                                                                        <label for="BVN">BVN</label><span class="unverified"><i class="fa fa-times"></i> Not Verified</span>
+                                                                        <label for="BVN" class="mb-0">BVN</label>
+                                                                        <a href="https://airtime2cash.com/what-the-cbns-circular-means-for-financial-services-in-nigeria/" target="_blank" rel="noopener noreferrer" class="ml-1" data-toggle="tooltip" title="Learn more about the BVN requirement">
+                                                                            <i class="fa fa-info-circle"></i>
+                                                                        </a>
+                                                                        <span class="unverified"><i class="fa fa-times"></i> Not Verified</span>
                                                                         @endif
                                                                         <input type="text" id="BVN" name="BVN" class="form-control" value="{{ filled($bvnValue) ? $bvnValue : '' }}" autocomplete="off" inputmode="numeric" pattern="[0-9]{11}" placeholder="Enter your 11-digit BVN" required maxlength="11" minlength="11">
                                                                         @endif
@@ -405,6 +417,12 @@
         $('#kycReasonModalField').text($(this).data('field') || '');
         $('#kycReasonModalText').text($(this).data('reason') || 'No rejection reason was provided.');
         $('#kycReasonModal').modal('show');
+    });
+
+    $(function () {
+        if ($.fn.tooltip) {
+            $('[data-toggle="tooltip"]').tooltip({ container: 'body' });
+        }
     });
 
     $('#state').on('change',function () {
