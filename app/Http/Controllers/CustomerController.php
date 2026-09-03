@@ -97,7 +97,7 @@ class CustomerController extends Controller
             $customers->where('created_at', '<=', $request->to . ' 23:59:59');
         }
 
-        $customers = $customers->latest('id')->paginate(50)->withQueryString();
+        $customers = $customers->latest('id')->paginate(100)->withQueryString();
 
         $summary = User::where('users.type', '!=', 'admin')
             ->leftJoin('customers', 'customers.user_id', '=', 'users.id')
