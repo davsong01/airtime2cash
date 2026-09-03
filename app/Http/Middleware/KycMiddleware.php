@@ -31,7 +31,7 @@ class KycMiddleware
             }
 
             $kyc_status = getFinalKycStatus($customer->id);
-    dd($kyc_status);
+    
             if ($kyc_status != 'verified') {
                 $redirectToKyc = in_array($kyc_status, ['pending', 'awaiting-approval'], true);
 
