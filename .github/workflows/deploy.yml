@@ -30,7 +30,7 @@ jobs:
             git pull origin production
             # composer update
             php artisan migrate --force
-            php artisan db:seed --class=Database\\Seeders\\BackfillApprovedGeneralKycStatusSeeder
+            php artisan db:seed --force --class="Database\\Seeders\\BackfillApprovedGeneralKycStatusSeeder"
             rm -rf ../modern-assets && cp -r public/modern-assets ../modern-assets
             php artisan optimize:clear
             echo "Deployment to Server completed!"
