@@ -27,6 +27,7 @@ class CustomerController extends Controller
         $request->validate([
             'status' => ['nullable', 'in:active,api,delete,suspended,email-blacklist,phone-blacklist'],
             'kyc_status' => ['nullable', 'in:verified,awaiting-approval,pending,in-review,unverified'],
+            'order_by' => ['nullable', 'in:wallet_balance,registration,kyc_verified,active_status'],
             'level' => ['nullable', 'integer'],
             'from' => ['nullable', 'date'],
             'to' => ['nullable', 'date', 'after_or_equal:from'],
@@ -89,15 +90,44 @@ class CustomerController extends Controller
             });
         }
 
+        $walletBalanceSubquery = DB::table('wallets')
+            ->select('customer_id')
+            ->selectRaw("COALESCE(SUM(CASE WHEN type = 'credit' THEN amount WHEN type = 'debit' THEN -amount ELSE 0 END), 0) AS net_wallet_balance")
+            ->groupBy('customer_id');
+
+        $customers->leftJoin('customers as customer_snapshot', 'customer_snapshot.user_id', '=', 'users.id')
+            ->leftJoinSub($walletBalanceSubquery, 'wallet_balances', function ($join) {
+                $join->on('wallet_balances.customer_id', '=', 'customer_snapshot.id');
+            })
+            ->addSelect('users.*')
+            ->addSelect(DB::raw('COALESCE(wallet_balances.net_wallet_balance, 0) AS live_wallet_balance'));
+
+        $orderBy = $request->input('order_by', 'registration');
+
+        match ($orderBy) {
+            'wallet_balance' => $customers
+                ->orderByDesc(DB::raw('COALESCE(wallet_balances.net_wallet_balance, 0)'))
+                ->orderByDesc('users.id'),
+            'kyc_verified' => $customers
+                ->orderByRaw("CASE WHEN customer_snapshot.kyc_status = 'verified' THEN 0 ELSE 1 END")
+                ->orderByDesc('users.id'),
+            'active_status' => $customers
+                ->orderByRaw("CASE WHEN users.status = 'active' THEN 0 ELSE 1 END")
+                ->orderByDesc('users.id'),
+            default => $customers
+                ->orderByDesc('users.created_at')
+                ->orderByDesc('users.id'),
+        };
+
         if ($request->from && $request->to) {
-            $customers->whereBetween('created_at', [$request->from . ' 00:00:00', $request->to . ' 23:59:59']);
+            $customers->whereBetween('users.created_at', [$request->from . ' 00:00:00', $request->to . ' 23:59:59']);
         } elseif ($request->from) {
-            $customers->where('created_at', '>=', $request->from . ' 00:00:00');
+            $customers->where('users.created_at', '>=', $request->from . ' 00:00:00');
         } elseif ($request->to) {
-            $customers->where('created_at', '<=', $request->to . ' 23:59:59');
+            $customers->where('users.created_at', '<=', $request->to . ' 23:59:59');
         }
 
-        $customers = $customers->latest('id')->paginate(100)->withQueryString();
+        $customers = $customers->paginate(100)->withQueryString();
 
         $summary = User::where('users.type', '!=', 'admin')
             ->leftJoin('customers', 'customers.user_id', '=', 'users.id')

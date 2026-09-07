@@ -83,9 +83,18 @@
                                         @endforeach
                                     </select>
                                 </div>
+                                <div class="col-md-6 col-xl-2 form-group">
+                                    <label for="order_by">Order by</label>
+                                    <select class="form-control" id="order_by" name="order_by">
+                                        <option value="registration" @selected(request('order_by', 'registration') === 'registration')>Registration</option>
+                                        <option value="wallet_balance" @selected(request('order_by') === 'wallet_balance')>Wallet Balance</option>
+                                        <option value="kyc_verified" @selected(request('order_by') === 'kyc_verified')>KYC Verified</option>
+                                        <option value="active_status" @selected(request('order_by') === 'active_status')>Active Status</option>
+                                    </select>
+                                </div>
                                 <div class="col-md-6 col-xl-2 form-group"><label for="from">Joined from</label><input type="date" class="form-control" id="from" name="from" value="{{ request('from') }}"></div>
                                 <div class="col-md-6 col-xl-2 form-group"><label for="to">Joined to</label><input type="date" class="form-control" id="to" name="to" value="{{ request('to') }}"></div>
-                                <div class="col-md-6 col-xl-2 d-flex align-items-end"><button class="btn btn-primary btn-block" type="submit"><i class="bx bx-search mr-25"></i> Apply filters</button></div>
+                                <div class="col-md-6 col-xl-2 form-group mt-2"><button class="btn btn-primary btn-block" type="submit"><i class="bx bx-search mr-25"></i> Apply filters</button></div>
                             </div>
                         </form>
                     </div>
@@ -93,9 +102,21 @@
 
                 <section class="card ops-panel">
                     <div class="card-header d-flex align-items-center justify-content-between flex-wrap">
-                        <div class="mb-1 mb-sm-0"><span class="ops-section-kicker">Account directory</span><h5 class="mb-0">{{ number_format($customers->total()) }} matching customers</h5></div>
+                        @php
+                            $orderBy = request('order_by', 'registration');
+                            $orderLabel = match ($orderBy) {
+                                'wallet_balance' => 'Wallet balance first',
+                                'kyc_verified' => 'KYC verified first',
+                                'active_status' => 'Active status first',
+                                default => 'Newest first',
+                            };
+                        @endphp
+                        <div class="mb-1 mb-sm-0">
+                            <span class="ops-section-kicker">Account directory</span>
+                            <h5 class="mb-0">{{ number_format($customers->total()) }} matching customers</h5>
+                        </div>
                                 <div class="d-flex align-items-center flex-wrap" style="gap: .5rem;">
-                                    <span class="badge badge-light-primary px-1 py-50">Newest first</span>
+                                    <span class="badge badge-light-primary px-1 py-50">{{ $orderLabel }}</span>
                                     @if($canEditCustomers)
                                         <select class="form-control form-control-sm" id="bulkActionSelect" style="min-width: 180px;">
                                             <option value="">Bulk action</option>
@@ -185,7 +206,7 @@
                                             </small>
                                             <small class="d-block {{ $user->email_verified_at ? 'text-success font-weight-bold' : 'text-muted' }}"><i class="bx bx-envelope mr-25"></i>Email {{ $user->email_verified_at ? 'verified' : 'unverified' }}</small>
                                         </td>
-                                        <td><strong class="d-block">{{ $currency }}{{ number_format((float) ($user->customer?->wallet ?? 0), 2) }}</strong><small class="d-block text-muted">Referral {{ $currency }}{{ number_format((float) ($user->customer?->referal_wallet ?? 0), 2) }}</small><small class="d-block text-muted">A2Cash {{ $currency }}{{ number_format((float) ($user->customer?->a2cashwallet ?? 0), 2) }}</small></td>
+                                        <td><strong class="d-block">{{ $currency }}{{ number_format((float) ($user->live_wallet_balance ?? $user->customer?->wallet ?? 0), 2) }}</strong><small class="d-block text-muted">Referral {{ $currency }}{{ number_format((float) ($user->customer?->referal_wallet ?? 0), 2) }}</small><small class="d-block text-muted">A2Cash {{ $currency }}{{ number_format((float) ($user->customer?->a2cashwallet ?? 0), 2) }}</small></td>
                                         <td><strong class="d-block">{{ $user->created_at->format('M j, Y') }}</strong><small class="text-muted">{{ $user->created_at->format('g:i A') }}</small></td>
                                         @if($canEditCustomers)<td class="text-right"><a href="{{ route('customers.edit', $user->id) }}" class="btn btn-sm btn-primary"><i class="bx bx-user mr-25"></i> Open</a></td>@endif
                                     </tr>
