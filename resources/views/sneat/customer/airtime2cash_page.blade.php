@@ -117,7 +117,7 @@
                     </div>
                     <span class="badge bg-label-success rounded-pill"><i class="bx bx-shield-quarter me-1"></i>Secure conversion</span>
                 </div>
-                @if($showProviderStatus && $activeProvider && $activeProviderAvailability && $activeProvider->availability_checked_at)
+                {{-- @if($showProviderStatus && $activeProvider && $activeProviderAvailability && $activeProvider->availability_checked_at)
                     <div class="a2c-provider-health">
                         <div>
                             <span class="a2c-provider-health-label">Auto Transfer Status</span>
@@ -131,7 +131,7 @@
                             {{ $activeProviderAvailabilityLabel }}
                         </span>
                     </div>
-                @endif
+                @endif --}}
                 <div class="row g-3 conversion-mode-options">
                     <div class="col-md-6">
                         <input class="btn-check" type="radio" name="transfer_mode" id="transfer-mode-manual" value="manual" autocomplete="off" @checked($defaultTransferMode === 'manual') @disabled(!$manualProducts)>

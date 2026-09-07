@@ -86,7 +86,7 @@
                                                             <div class="row">
                                                                 <div class="col-md-6 order-2 order-sm-1">
                                                                     <h5>Airtime to Cash</h5>
-                                                                        @if($showProviderStatus && $activeProvider && $activeProviderAvailability && $activeProvider?->availability_checked_at)
+                                                                        {{-- @if($showProviderStatus && $activeProvider && $activeProviderAvailability && $activeProvider?->availability_checked_at)
                                                                             <div class="provider-health-strip">
                                                                                 <div>
                                                                                     <span class="provider-health-kicker">Auto Transfer Status</span>
@@ -100,7 +100,7 @@
                                                                                     {{ $activeProviderAvailabilityLabel }}
                                                                                 </span>
                                                                             </div>
-                                                                        @endif
+                                                                        @endif --}}
                                                                         <div class="d-flex pb-1 justify-content-start align-items-center w-100" id="product-image-div" style="display:none !important">
                                                                             <img class="product-images product-image" style="padding-right: 8px;height: 70px;" id="product-image" src="" alt="">
                                                                             <div>

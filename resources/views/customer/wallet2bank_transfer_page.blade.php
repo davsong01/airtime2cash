@@ -262,8 +262,8 @@
                                                 </div>
                                                 <div class="card-content">
                                                     <div class="card-body">
-                    @if($showProviderStatus && $activeProvider && $activeProvider->availability_status_class && $activeProvider->availability_checked_at)
-                        <div class="provider-health-strip">
+                                                        {{-- @if($showProviderStatus && $activeProvider && $activeProvider->availability_status_class && $activeProvider->availability_checked_at)
+                                                            <div class="provider-health-strip">
                                                                 <div>
                                                                     <span class="provider-health-kicker">Auto Transfer Status</span>
                                                                     <small>Checked {{ $activeProvider->availability_checked_at->diffForHumans() }}</small>
@@ -276,7 +276,7 @@
                                                                     {{ $activeProvider->availability_status_label }}
                                                                 </span>
                                                             </div>
-                                                        @endif
+                                                        @endif --}}
                                                         <form action="{{route('initialize.wallet2banktransaction', $product->id)}}" method="POST" onsubmit="return confirm('I have entered correct details');">
                                                             @csrf
                                                             @include('layouts.alerts')

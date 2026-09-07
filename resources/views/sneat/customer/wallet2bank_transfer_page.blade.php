@@ -296,7 +296,7 @@
                     <div><h5 class="mb-1">Transfer details</h5><small class="text-muted">Confirm the destination account before proceeding.</small></div>
                 </div>
                 <div class="card-body">
-                @if($showProviderStatus && $activeProvider && $activeProvider->availability_status_class && $activeProvider->availability_checked_at)
+                {{-- @if($showProviderStatus && $activeProvider && $activeProvider->availability_status_class && $activeProvider->availability_checked_at)
                     <div class="provider-health-strip">
                         <div>
                             <span class="provider-health-kicker">Auto Transfer Status</span>
@@ -310,7 +310,7 @@
                             {{ $activeProvider->availability_status_label }}
                         </span>
                     </div>
-                @endif
+                @endif --}}
                     @php
                         $providerMin = 60;
                         $walletBal = walletBalance(auth()->user());
