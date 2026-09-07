@@ -28,10 +28,34 @@ class DashboardController extends Controller
 
         if (auth()->user()->type == 'admin') {
             $currency = getSettings()?->currency ?? 'NGN';
-            $walletSummary = Customer::selectRaw('COALESCE(SUM(wallet), 0) AS wallet_total')
-                ->selectRaw('COALESCE(SUM(referal_wallet), 0) AS referral_total')
-                ->selectRaw('COALESCE(SUM(a2cashwallet), 0) AS a2cash_total')
+            $walletFlow = DB::table('wallets')
+                ->join('customers', 'customers.id', '=', 'wallets.customer_id')
+                ->join('users', 'users.id', '=', 'customers.user_id')
+                ->where('users.type', '!=', 'admin')
+                ->where('users.status', 'active')
+                ->whereNotNull('users.email_verified_at')
+                ->where('customers.kyc_status', 'verified')
+                ->selectRaw("COALESCE(SUM(CASE WHEN wallets.type = 'credit' THEN wallets.amount ELSE 0 END), 0) AS money_in")
+                ->selectRaw("COALESCE(SUM(CASE WHEN wallets.type = 'debit' THEN wallets.amount ELSE 0 END), 0) AS money_out")
                 ->first();
+
+            $walletTotal = (float) ($walletFlow->money_in ?? 0) - (float) ($walletFlow->money_out ?? 0);
+
+            $referralTotal = DB::table('customers')
+                ->join('users', 'users.id', '=', 'customers.user_id')
+                ->where('users.type', '!=', 'admin')
+                ->where('users.status', 'active')
+                ->whereNotNull('users.email_verified_at')
+                ->where('customers.kyc_status', 'verified')
+                ->selectRaw('COALESCE(SUM(customers.referal_wallet), 0) AS referral_total')
+                ->value('referral_total');
+
+            $walletSummary = (object) [
+                'wallet_total' => (float) $walletTotal,
+                'referral_total' => (float) $referralTotal,
+                'money_in' => (float) ($walletFlow->money_in ?? 0),
+                'money_out' => (float) ($walletFlow->money_out ?? 0),
+            ];
 
             $customerSummary = User::where('users.type', '!=', 'admin')
                 ->leftJoin('customers', 'customers.user_id', '=', 'users.id')

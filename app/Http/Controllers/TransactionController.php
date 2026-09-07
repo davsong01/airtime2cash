@@ -2050,6 +2050,72 @@ class TransactionController extends Controller
         ]);
     }
 
+    public function walletLedgerAuditView(Request $request)
+    {
+        $request->validate([
+            'email' => ['nullable', 'string', 'max:255'],
+            'transaction_id' => ['nullable', 'string', 'max:255'],
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date', 'after_or_equal:from'],
+        ]);
+
+        $potentiallyMissingLedger = TransactionLog::query()
+            ->with(['customer.user:id,firstname,middlename,lastname,email,phone', 'wallets'])
+            ->whereDoesntHave('wallets')
+            ->whereNotNull('customer_id')
+            ->where(function ($query) {
+                $query->where('payment_method', 'wallet')
+                    ->orWhereIn('reason', [
+                        'WALLET-FUNDING',
+                        'ADMIN-CREDIT',
+                        'ADMIN-DEBIT',
+                        'Wallet to Bank Transfer refund',
+                        'Airtime-to-cash conversion',
+                        'Airtime2Cash Payment',
+                        'LEVEL-UPGRADE',
+                        'REFFERAL BALANCE WITHDRAWN TO WALLET',
+                    ])
+                    ->orWhere('unique_element', 'like', '%wallet%')
+                    ->orWhere('unique_element', 'like', '%WALLET%')
+                    ->orWhere('descr', 'like', '%wallet%')
+                    ->orWhere('descr', 'like', '%Airtime2Cash%');
+            })
+            ->latest();
+
+        if ($request->filled('email')) {
+            $email = trim((string) $request->email);
+            $potentiallyMissingLedger->where('customer_email', 'like', '%' . $email . '%');
+        }
+
+        if ($request->filled('transaction_id')) {
+            $potentiallyMissingLedger->where('transaction_id', 'like', '%' . trim((string) $request->transaction_id) . '%');
+        }
+
+        if ($request->filled('from') && $request->filled('to')) {
+            $potentiallyMissingLedger->whereBetween('created_at', [
+                $request->from . ' 00:00:00',
+                $request->to . ' 23:59:59',
+            ]);
+        } elseif ($request->filled('from')) {
+            $potentiallyMissingLedger->where('created_at', '>=', $request->from . ' 00:00:00');
+        } elseif ($request->filled('to')) {
+            $potentiallyMissingLedger->where('created_at', '<=', $request->to . ' 23:59:59');
+        }
+
+        $summary = (clone $potentiallyMissingLedger)
+            ->selectRaw('COUNT(*) AS total')
+            ->selectRaw("COALESCE(SUM(CASE WHEN status IN ('success', 'successful', 'delivered', 'completed', 'approved') THEN total_amount ELSE 0 END), 0) AS impacted_total")
+            ->first();
+
+        $transactions = $potentiallyMissingLedger->paginate(25)->withQueryString();
+
+        return view('admin.transaction.wallet_ledger_audit', [
+            'transactions' => $transactions,
+            'summary' => $summary,
+            'query' => $request->query(),
+        ]);
+    }
+
     public function walletFundingLogView(Request $request)
     {
         $request->validate([

@@ -181,6 +181,7 @@ Route::middleware(['auth', 'verified', 'admin', 'ipcheck', 'adminRoute'])->prefi
     // transactions route
     Route::get('transactions', [TransactionController::class, 'transView'])->name('admin.trans');
     Route::get('wallet-transactions', [TransactionController::class, 'walletTransView'])->name('admin.walletlog');
+    Route::get('wallet-ledger-audit', [TransactionController::class, 'walletLedgerAuditView'])->name('admin.walletledgeraudit');
     Route::get('admin-wallet-funding-log', [TransactionController::class, 'walletFundingLogView'])->name('admin.walletfundinglog');
     Route::get('admin-airtime-2-cash-log', [TransactionController::class, 'airtimeToCashTransactions'])->name('admin.airtime.2.cash.log');
     Route::get('callback-operations', [CallbackOperationsController::class, 'index'])->name('admin.autosync.index');

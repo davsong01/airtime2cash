@@ -33,6 +33,7 @@
                         <div class="col-lg-4 text-lg-right mt-2 mt-lg-0">
                             <a href="{{ route('admin.trans') }}" class="btn btn-light"><i class="bx bx-receipt mr-50"></i> Transaction log</a>
                             <a href="{{ route('admin.earninglog') }}" class="btn btn-outline-primary ml-50"><i class="bx bx-trending-up mr-50"></i> Earning log</a>
+                            <a href="{{ route('admin.walletledgeraudit') }}" class="btn btn-outline-warning ml-50"><i class="bx bx-search-alt mr-50"></i> Ledger audit</a>
                         </div>
                     </div>
                 </section>

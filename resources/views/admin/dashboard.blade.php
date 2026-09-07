@@ -59,9 +59,20 @@
                         <a href="{{ route('admin.walletlog') }}" class="card ops-metric-card h-100">
                             <div class="card-body">
                                 <span class="ops-metric-icon is-success"><i class="bx bx-wallet"></i></span>
-                                <span class="ops-metric-label">Wallet exposure</span>
+                                <span class="ops-metric-label">Net wallet balance</span>
                                 <strong>{{ $currency }}{{ number_format((float) $walletSummary->wallet_total, 2) }}</strong>
-                                <small>{{ $currency }}{{ number_format((float) $walletSummary->a2cash_total, 2) }} in A2Cash wallets</small>
+                                <small>Money in minus money out for active, email-verified, KYC-approved customers</small>
+                            </div>
+                        </a>
+                    </div>
+
+                    <div class="col-sm-6 col-xl-3 mb-2">
+                        <a href="{{ route('admin.walletlog') }}?wallet=referral" class="card ops-metric-card h-100">
+                            <div class="card-body">
+                                <span class="ops-metric-icon is-warning"><i class="bx bx-gift"></i></span>
+                                <span class="ops-metric-label">Referral wallet balance</span>
+                                <strong>{{ $currency }}{{ number_format((float) $walletSummary->referral_total, 2) }}</strong>
+                                <small>Referral earnings for the same filtered customers</small>
                             </div>
                         </a>
                     </div>
@@ -76,7 +87,33 @@
                             </div>
                         </a>
                     </div>
+                </section>
 
+                <section class="row">
+                    <div class="col-sm-6 col-xl-6 mb-2">
+                        <div class="card ops-metric-card h-100">
+                            <div class="card-body">
+                                <span class="ops-metric-icon is-success"><i class="bx bx-trending-up"></i></span>
+                                <span class="ops-metric-label">Money in</span>
+                                <strong>{{ $currency }}{{ number_format((float) $walletSummary->money_in, 2) }}</strong>
+                                <small>Gross credits recorded in the wallet ledger</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-sm-6 col-xl-6 mb-2">
+                        <div class="card ops-metric-card h-100">
+                            <div class="card-body">
+                                <span class="ops-metric-icon is-danger"><i class="bx bx-trending-down"></i></span>
+                                <span class="ops-metric-label">Money out</span>
+                                <strong>{{ $currency }}{{ number_format((float) $walletSummary->money_out, 2) }}</strong>
+                                <small>Gross debits recorded in the wallet ledger</small>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="row">
                     <div class="col-sm-6 col-xl-3 mb-2">
                         @if($customer?->customer?->user)
                             <a href="{{ route('customers.edit', $customer->customer->user_id) }}" class="card ops-metric-card h-100">
