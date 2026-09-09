@@ -462,11 +462,11 @@
                                                 <span class="customer-balance-label"><i class="bx bx-calculator"></i> Ledger</span>
                                                 <span class="customer-balance-value">{{ $currency }}{{ number_format($ledgerWalletBalance, 2) }}</span>
                                             </a>
+                                            <div class="customer-balance-row">
+                                                <span class="customer-balance-label"><i class="bx bx-data"></i> Stored</span>
+                                                <span class="customer-balance-value">{{ $currency }}{{ number_format($storedWalletBalance, 2) }}</span>
+                                            </div>
                                             @if(abs($walletBalanceVariance) > 0.009)
-                                                <div class="customer-balance-row">
-                                                    <span class="customer-balance-label"><i class="bx bx-data"></i> Stored</span>
-                                                    <span class="customer-balance-value">{{ $currency }}{{ number_format($storedWalletBalance, 2) }}</span>
-                                                </div>
                                                 <div class="customer-balance-row is-variance" title="Ledger balance minus stored balance">
                                                     <span class="customer-balance-label"><i class="bx bx-error-circle"></i> Variance</span>
                                                     <span class="customer-balance-value">{{ $walletBalanceVariance < 0 ? '-' : '+' }}{{ $currency }}{{ number_format(abs($walletBalanceVariance), 2) }}</span>
