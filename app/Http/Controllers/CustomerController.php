@@ -16,6 +16,8 @@ use App\Models\Airtime2CashTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use App\Models\ReservedAccountNumber;
+use App\Models\Wallet;
+use App\Services\ExcelService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\Rule;
 use App\Services\BvnVerificationBillingService;
@@ -142,6 +144,64 @@ class CustomerController extends Controller
         $activeCustomerLevels = $customer_levels;
 
         return view('admin.customers.index', compact('customers', 'customer_levels', 'activeCustomerLevels', 'summary', 'selectedStatus'));
+    }
+
+    public function downloadWalletReport(User $user, ExcelService $export)
+    {
+        $user->loadMissing('customer');
+
+        abort_unless($user->customer, 404);
+
+        $wallets = Wallet::query()
+            ->where('customer_id', $user->customer->id)
+            ->latest()
+            ->get();
+
+        if ($wallets->isEmpty()) {
+            return back()->with('error', 'No wallet transactions are available for this customer.');
+        }
+
+        $totalCredits = $wallets
+            ->filter(fn (Wallet $wallet) => strtolower((string) $wallet->type) === 'credit')
+            ->sum('amount');
+        $totalDebits = $wallets
+            ->filter(fn (Wallet $wallet) => strtolower((string) $wallet->type) === 'debit')
+            ->sum('amount');
+
+        $rows = $wallets
+            ->map(function (Wallet $wallet) {
+                $type = strtolower((string) $wallet->type);
+
+                return [
+                    'Date' => $wallet->created_at?->format('Y-m-d H:i:s'),
+                    'Transaction ID' => $wallet->transaction_id,
+                    'Credit' => $type === 'credit' ? (float) $wallet->amount : null,
+                    'Debit' => $type === 'debit' ? (float) $wallet->amount : null,
+                    'Initial Balance' => (float) ($wallet->balance_before ?? 0),
+                    'Final Balance' => (float) ($wallet->balance_after ?? 0),
+                    'Reason' => $wallet->reason,
+                    'Payment Method' => $wallet->payment_method,
+                ];
+            })
+            ->all();
+
+        $rows[] = [
+            'Date' => 'TOTAL',
+            'Transaction ID' => null,
+            'Credit' => (float) $totalCredits,
+            'Debit' => (float) $totalDebits,
+            'Initial Balance' => null,
+            'Final Balance' => null,
+            'Reason' => null,
+            'Payment Method' => null,
+        ];
+
+        return $export->fastExcelExport(
+            $rows,
+            'Wallet Report',
+            '',
+            'wallet-report-customer-' . $user->id . '-' . now()->format('Y-m-d') . '.xlsx'
+        );
     }
 
     public function bulkActions(Request $request)

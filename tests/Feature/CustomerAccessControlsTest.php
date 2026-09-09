@@ -15,10 +15,12 @@ use App\Models\Bank;
 use App\Models\Product;
 use App\Models\TransactionLog;
 use App\Models\User;
+use App\Models\Wallet;
 use App\Http\Controllers\Providers\MonnifyController;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\ViewErrorBag;
+use OpenSpout\Reader\XLSX\Reader;
 use Tests\TestCase;
 
 class CustomerAccessControlsTest extends TestCase
@@ -65,6 +67,8 @@ class CustomerAccessControlsTest extends TestCase
         $response->assertSee('Manual Wallet 2 Bank Disabled');
         $response->assertSee('Auto Wallet 2 Bank Disabled');
         $response->assertSee('Airtime 2 Cash Enabled');
+        $response->assertSee(route('admin.walletlog', ['email' => $enabledUser->email]), false);
+        $response->assertSee(route('admin.earninglog', ['upline_email' => $enabledUser->email]), false);
 
         $this->assertDatabaseHas('customers', [
             'id' => $enabledUser->customer->id,
@@ -79,6 +83,76 @@ class CustomerAccessControlsTest extends TestCase
             'can_access_w2bank_auto' => 0,
             'can_access_a2c' => 1,
         ]);
+    }
+
+    public function test_admin_can_download_a_customer_wallet_report(): void
+    {
+        $admin = $this->createAdminUser();
+        $user = $this->createCustomerUser('Wallet', 'Report');
+
+        Wallet::create([
+            'customer_id' => $user->customer->id,
+            'amount' => 2500,
+            'balance_before' => 1000,
+            'balance_after' => 3500,
+            'type' => 'credit',
+            'transaction_id' => 'WALLET-REPORT-001',
+            'reason' => 'Wallet funding',
+            'payment_method' => 'bank transfer',
+        ]);
+        Wallet::create([
+            'customer_id' => $user->customer->id,
+            'amount' => 700,
+            'balance_before' => 3500,
+            'balance_after' => 2800,
+            'type' => 'debit',
+            'transaction_id' => 'WALLET-REPORT-002',
+            'reason' => 'Service purchase',
+            'payment_method' => 'wallet',
+        ]);
+
+        $response = $this->withoutMiddleware([
+                AdminMiddleware::class,
+                CheckIpMiddleware::class,
+                RouteProtectionMiddleware::class,
+            ])
+            ->actingAs($admin)
+            ->get(route('customers.wallet-report', $user));
+
+        $response->assertOk();
+        $this->assertStringContainsString(
+            'wallet-report-customer-' . $user->id,
+            (string) $response->headers->get('content-disposition')
+        );
+
+        $reportPath = tempnam(sys_get_temp_dir(), 'wallet-report-');
+        file_put_contents($reportPath, $response->streamedContent());
+
+        $reader = new Reader();
+        $reader->open($reportPath);
+        $reportRows = [];
+
+        foreach ($reader->getSheetIterator() as $sheet) {
+            foreach ($sheet->getRowIterator() as $row) {
+                $reportRows[] = $row->toArray();
+            }
+        }
+
+        $reader->close();
+        unlink($reportPath);
+
+        $this->assertSame(['Date', 'Transaction ID', 'Credit', 'Debit'], array_slice($reportRows[0], 0, 4));
+
+        $creditRow = collect($reportRows)->first(fn (array $row) => ($row[1] ?? null) === 'WALLET-REPORT-001');
+        $debitRow = collect($reportRows)->first(fn (array $row) => ($row[1] ?? null) === 'WALLET-REPORT-002');
+        $totalsRow = collect($reportRows)->first(fn (array $row) => ($row[0] ?? null) === 'TOTAL');
+
+        $this->assertSame(2500, $creditRow[2]);
+        $this->assertSame('', $creditRow[3]);
+        $this->assertSame('', $debitRow[2]);
+        $this->assertSame(700, $debitRow[3]);
+        $this->assertSame(2500, $totalsRow[2]);
+        $this->assertSame(700, $totalsRow[3]);
     }
 
     public function test_admin_can_bulk_toggle_wallet_to_bank_and_airtime_to_cash_access(): void

@@ -162,12 +162,15 @@
                                     </tbody>
                                 </table>
                             </form>
-                            {{-- {{ $transactions->appends($query) }} --}}
                         </div>
                     </div>
+                    @if($transactions->hasPages())
                     <div class="card-footer">
-                        {!! $transactions->appends($_GET)->links() !!}
+                        <div class="d-flex justify-content-center">
+                            {{ $transactions->onEachSide(1)->links('pagination::bootstrap-4') }}
+                        </div>
                     </div>
+                    @endif
                 </div>
             </section>
             </div>

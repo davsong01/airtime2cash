@@ -229,6 +229,7 @@ Route::middleware(['auth', 'verified', 'admin', 'ipcheck', 'adminRoute'])->prefi
     Route::get('customers-active/{status}', [CustomerController::class, 'customers'])->name('customers.active');
     Route::get('customers-suspended/{status}', [CustomerController::class, 'customers'])->name('customers.suspended');
     Route::get('customer/edit/{id}', [CustomerController::class, 'singleCustomer'])->name('customers.edit');
+    Route::get('customer/{user}/wallet-report', [CustomerController::class, 'downloadWalletReport'])->name('customers.wallet-report');
     Route::post('customer/update/{id}', [CustomerController::class, 'updateCustomer'])->name('customers.update');
     Route::post('customer/{customer}/wallet-bank-account', [CustomerController::class, 'updateWalletBankAccount'])->name('customers.wallet-bank-account.update');
     Route::delete('customer/{customer}/wallet-bank-account', [CustomerController::class, 'deleteWalletBankAccount'])->name('customers.wallet-bank-account.delete');

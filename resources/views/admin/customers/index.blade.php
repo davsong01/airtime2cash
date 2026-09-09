@@ -7,6 +7,243 @@
 
 @section('page-css')
     <link rel="stylesheet" href="{{ asset('app-assets/css/admin-operations.css') }}">
+    <style>
+        .customer-access-cell {
+            min-width: 190px;
+        }
+
+        .customer-access-services,
+        .customer-verification-states {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .35rem;
+        }
+
+        .customer-access-chip,
+        .customer-verification-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: .3rem;
+            border: 1px solid transparent;
+            border-radius: 999px;
+            padding: .3rem .55rem;
+            font-size: .7rem;
+            font-weight: 600;
+            line-height: 1;
+            white-space: nowrap;
+        }
+
+        .customer-access-chip.is-enabled,
+        .customer-verification-chip.is-verified {
+            color: #168554;
+            background: #e9f8f1;
+            border-color: #c8eddd;
+        }
+
+        .customer-access-chip.is-disabled {
+            color: #b33a3a;
+            background: #fff1f1;
+            border-color: #f4d0d0;
+        }
+
+        .customer-verification-chip.is-pending {
+            color: #6b7280;
+            background: #f4f6f8;
+            border-color: #e1e5ea;
+        }
+
+        .customer-verification-states {
+            margin-top: .45rem;
+            padding-top: .45rem;
+            border-top: 1px solid #edf0f4;
+        }
+
+        .customer-directory-table thead th {
+            border-top: 0;
+            color: #697386;
+            font-size: .69rem;
+            letter-spacing: .055em;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        .customer-directory-table tbody td {
+            padding-top: .85rem;
+            padding-bottom: .85rem;
+            vertical-align: middle;
+        }
+
+        .customer-directory-table tbody tr {
+            transition: background-color .18s ease, transform .18s ease;
+        }
+
+        .customer-directory-table tbody tr:hover {
+            background: #f8faff;
+        }
+
+        .customer-row-number {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 30px;
+            height: 30px;
+            border-radius: 9px;
+            color: #637085;
+            background: #f1f4f8;
+            font-size: .72rem;
+            font-weight: 700;
+        }
+
+        .customer-account-cell {
+            min-width: 235px;
+        }
+
+        .customer-account {
+            display: flex;
+            align-items: flex-start;
+            gap: .7rem;
+        }
+
+        .customer-avatar {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex: 0 0 38px;
+            width: 38px;
+            height: 38px;
+            border-radius: 12px;
+            color: #fff;
+            background: linear-gradient(135deg, #5969e8, #7c4dff);
+            box-shadow: 0 5px 12px rgba(89, 105, 232, .2);
+            font-size: .82rem;
+            font-weight: 700;
+        }
+
+        .customer-account-name {
+            color: #202a3b;
+            font-size: .86rem;
+        }
+
+        .customer-account-meta {
+            display: flex;
+            align-items: center;
+            gap: .3rem;
+            color: #7b8495;
+            font-size: .72rem;
+            line-height: 1.55;
+        }
+
+        .customer-account-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .3rem;
+            margin-top: .35rem;
+        }
+
+        .customer-account-tags .badge {
+            padding: .28rem .45rem;
+            font-size: .64rem;
+            font-weight: 600;
+        }
+
+        .customer-balance-cell {
+            min-width: 175px;
+        }
+
+        .customer-balance-primary,
+        .customer-balance-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: .75rem;
+            border-radius: 9px;
+            padding: .4rem .5rem;
+        }
+
+        .customer-balance-primary {
+            margin-bottom: .25rem;
+            color: #3347c8;
+            background: #eef1ff;
+        }
+
+        .customer-balance-primary:hover {
+            color: #2436aa;
+            background: #e5e9ff;
+        }
+
+        .customer-balance-row {
+            color: #697386;
+            font-size: .69rem;
+        }
+
+        .customer-balance-row:hover {
+            color: #3347c8;
+            background: #f5f7fb;
+        }
+
+        .customer-balance-label {
+            display: inline-flex;
+            align-items: center;
+            gap: .3rem;
+            font-size: .67rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .customer-balance-value {
+            font-size: .76rem;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .customer-joined {
+            min-width: 120px;
+        }
+
+        .customer-joined-date {
+            display: flex;
+            align-items: center;
+            gap: .45rem;
+            color: #303b4e;
+            font-size: .78rem;
+            font-weight: 700;
+        }
+
+        .customer-joined-date i {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            border-radius: 8px;
+            color: #6371db;
+            background: #eff1ff;
+            font-size: 1rem;
+        }
+
+        .customer-joined-time {
+            display: block;
+            margin: .2rem 0 0 2.9rem;
+            color: #8a93a3;
+            font-size: .68rem;
+        }
+
+        .customer-row-actions {
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
+        }
+
+        .customer-action-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            border-radius: 9px;
+            padding: 0;
+        }
+    </style>
 @endsection
 
 @section('content')
@@ -142,7 +379,7 @@
                             <input type="hidden" name="action" id="bulkActionValue">
                             <input type="hidden" name="customer_ids" id="bulkCustomerIds">
                         </form>
-                        <table class="table table-hover mb-0 ops-table">
+                        <table class="table table-hover mb-0 ops-table customer-directory-table">
                             <thead>
                                 <tr>
                                     @if($canEditCustomers)
@@ -153,7 +390,7 @@
                                             </div>
                                         </th>
                                     @endif
-                                    <th style="white-space: nowrap;">S/N</th><th>Account</th><th>Access</th><th>Balances</th><th>Joined</th>@if($canEditCustomers)<th class="text-right">Action</th>@endif
+                                    <th style="white-space: nowrap;">S/N</th><th>Account</th><th>Access</th><th>Balances</th><th>Joined</th>@if($canEditCustomers)<th class="text-right">Actions</th>@endif
                                 </tr>
                             </thead>
                             <tbody>
@@ -176,39 +413,67 @@
                                                 </div>
                                             </td>
                                         @endif
-                                        <td class="text-muted" style="width: 52px; white-space: nowrap;">{{ $customers->firstItem() + $loop->index }}</td>
-                                        <td>
-                                            <div class="min-width-0">
-                                                <a href="{{ route('customers.edit', $user->id) }}" class="d-block font-weight-bold text-truncate">{{ $name }}</a>
-                                                <small class="d-block text-muted text-truncate">{{ $user->email }}</small>
-                                                <small class="d-block text-muted">{{ $user->phone ?: 'No phone number' }}</small>
-                                                <strong class="d-block mt-50">{{ '@' . ($user->username ?: 'not-set') }}</strong>
-                                                <span class="badge badge-light-{{ $statusColor }} mt-50">{{ ucfirst(str_replace('-', ' ', $status)) }}</span>
-                                                <small class="d-block text-muted mt-50">{{ $user->customer?->level?->name ?: 'No level assigned' }}</small>
+                                        <td style="width: 52px; white-space: nowrap;"><span class="customer-row-number">{{ $customers->firstItem() + $loop->index }}</span></td>
+                                        <td class="customer-account-cell">
+                                            <div class="customer-account">
+                                                <div class="min-width-0">
+                                                    <a href="{{ route('customers.edit', $user->id) }}" class="customer-account-name d-block font-weight-bold text-truncate">{{ $name }}</a>
+                                                    <span class="customer-account-meta text-truncate"><i class="bx bx-envelope"></i>{{ $user->email }}</span>
+                                                    <span class="customer-account-meta"><i class="bx bx-phone"></i>{{ $user->phone ?: 'No phone number' }}</span>
+                                                    <div class="customer-account-tags">
+                                                        <span class="badge badge-light-{{ $statusColor }}">{{ ucfirst(str_replace('-', ' ', $status)) }}</span>
+                                                        <span class="badge badge-light-secondary">{{ '@' . ($user->username ?: 'not-set') }}</span>
+                                                        <span class="badge badge-light-info">{{ $user->customer?->level?->name ?: 'No level' }}</span>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </td>
-                                        <td>
-                                            <span class="badge badge-light-{{ $walletAccess ? 'success' : 'danger' }} d-inline-flex align-items-center mb-50">
-                                                <i class="bx {{ $walletAccess ? 'bx-check-circle' : 'bx-x-circle' }} mr-25"></i>
-                                                Manual Wallet 2 Bank {{ $walletAccess ? 'Enabled' : 'Disabled' }}
-                                            </span>
-                                            <span class="badge badge-light-{{ $walletAutoAccess ? 'success' : 'danger' }} d-inline-flex align-items-center mb-50">
-                                                <i class="bx {{ $walletAutoAccess ? 'bx-check-circle' : 'bx-x-circle' }} mr-25"></i>
-                                                Auto Wallet 2 Bank {{ $walletAutoAccess ? 'Enabled' : 'Disabled' }}
-                                            </span>
-                                            <span class="badge badge-light-{{ $a2cAccess ? 'success' : 'danger' }} d-inline-flex align-items-center">
-                                                <i class="bx {{ $a2cAccess ? 'bx-check-circle' : 'bx-x-circle' }} mr-25"></i>
-                                                Airtime 2 Cash {{ $a2cAccess ? 'Enabled' : 'Disabled' }}
-                                            </span>
-                                            <small class="d-block mt-50 {{ $kycVerified ? 'text-success font-weight-bold' : 'text-muted' }}">
-                                                <i class="bx {{ $kycVerified ? 'bx-check-shield' : 'bx-time-five' }} mr-25"></i>
-                                                {{ $kycVerified ? 'KYC verified' : 'KYC pending' }}
-                                            </small>
-                                            <small class="d-block {{ $user->email_verified_at ? 'text-success font-weight-bold' : 'text-muted' }}"><i class="bx bx-envelope mr-25"></i>Email {{ $user->email_verified_at ? 'verified' : 'unverified' }}</small>
+                                        <td class="customer-access-cell">
+                                            <div class="customer-access-services">
+                                                <span class="customer-access-chip {{ $walletAccess ? 'is-enabled' : 'is-disabled' }}" title="Manual Wallet 2 Bank {{ $walletAccess ? 'Enabled' : 'Disabled' }}">
+                                                    <i class="bx {{ $walletAccess ? 'bx-check-circle' : 'bx-x-circle' }}"></i> Manual W2B
+                                                </span>
+                                                <span class="customer-access-chip {{ $walletAutoAccess ? 'is-enabled' : 'is-disabled' }}" title="Auto Wallet 2 Bank {{ $walletAutoAccess ? 'Enabled' : 'Disabled' }}">
+                                                    <i class="bx {{ $walletAutoAccess ? 'bx-check-circle' : 'bx-x-circle' }}"></i> Auto W2B
+                                                </span>
+                                                <span class="customer-access-chip {{ $a2cAccess ? 'is-enabled' : 'is-disabled' }}" title="Airtime 2 Cash {{ $a2cAccess ? 'Enabled' : 'Disabled' }}">
+                                                    <i class="bx {{ $a2cAccess ? 'bx-check-circle' : 'bx-x-circle' }}"></i> Airtime 2 Cash
+                                                </span>
+                                            </div>
+                                            <div class="customer-verification-states">
+                                                <span class="customer-verification-chip {{ $kycVerified ? 'is-verified' : 'is-pending' }}">
+                                                    <i class="bx {{ $kycVerified ? 'bx-check-shield' : 'bx-time-five' }}"></i> KYC {{ $kycVerified ? 'verified' : 'pending' }}
+                                                </span>
+                                                <span class="customer-verification-chip {{ $user->email_verified_at ? 'is-verified' : 'is-pending' }}">
+                                                    <i class="bx {{ $user->email_verified_at ? 'bx-envelope-open' : 'bx-envelope' }}"></i> Email {{ $user->email_verified_at ? 'verified' : 'unverified' }}
+                                                </span>
+                                            </div>
                                         </td>
-                                        <td><strong class="d-block">{{ $currency }}{{ number_format((float) ($user->live_wallet_balance ?? $user->customer?->wallet ?? 0), 2) }}</strong><small class="d-block text-muted">Referral {{ $currency }}{{ number_format((float) ($user->customer?->referal_wallet ?? 0), 2) }}</small><small class="d-block text-muted">A2Cash {{ $currency }}{{ number_format((float) ($user->customer?->a2cashwallet ?? 0), 2) }}</small></td>
-                                        <td><strong class="d-block">{{ $user->created_at->format('M j, Y') }}</strong><small class="text-muted">{{ $user->created_at->format('g:i A') }}</small></td>
-                                        @if($canEditCustomers)<td class="text-right"><a href="{{ route('customers.edit', $user->id) }}" class="btn btn-sm btn-primary"><i class="bx bx-user mr-25"></i> Open</a></td>@endif
+                                        <td class="customer-balance-cell">
+                                            <a href="{{ route('admin.walletlog', ['email' => $user->email]) }}" class="customer-balance-primary">
+                                                <span class="customer-balance-label"><i class="bx bx-wallet"></i> Wallet</span>
+                                                <span class="customer-balance-value">{{ $currency }}{{ number_format((float) ($user->live_wallet_balance ?? $user->customer?->wallet ?? 0), 2) }}</span>
+                                            </a>
+                                            <a href="{{ route('admin.earninglog', ['upline_email' => $user->email]) }}" class="customer-balance-row">
+                                                <span class="customer-balance-label"><i class="bx bx-gift"></i> Referral</span>
+                                                <span class="customer-balance-value">{{ $currency }}{{ number_format((float) ($user->customer?->referal_wallet ?? 0), 2) }}</span>
+                                            </a>
+                                            <div class="customer-balance-row">
+                                                <span class="customer-balance-label"><i class="bx bx-transfer-alt"></i> A2Cash</span>
+                                                <span class="customer-balance-value">{{ $currency }}{{ number_format((float) ($user->customer?->a2cashwallet ?? 0), 2) }}</span>
+                                            </div>
+                                        </td>
+                                        <td class="customer-joined"><span class="customer-joined-date"><i class="bx bx-calendar"></i>{{ $user->created_at->format('M j, Y') }}</span><small class="customer-joined-time">{{ $user->created_at->format('g:i A') }}</small></td>
+                                        @if($canEditCustomers)
+                                            <td class="text-right">
+                                                <div class="customer-row-actions">
+                                                    <a href="{{ route('customers.edit', $user->id) }}" class="btn btn-outline-primary customer-action-button" title="Open customer" aria-label="Open customer"><i class="bx bx-user"></i></a>
+                                                    @if($user->customer)
+                                                        <a href="{{ route('customers.wallet-report', $user) }}" class="btn btn-outline-success customer-action-button" title="Download wallet report" aria-label="Download wallet report"><i class="bx bx-download"></i></a>
+                                                    @endif
+                                                </div>
+                                            </td>
+                                        @endif
                                     </tr>
                                 @empty
                                     <tr><td colspan="{{ $canEditCustomers ? 7 : 6 }}" class="text-center py-3"><i class="bx bx-user-x d-block font-large-1 text-muted mb-1"></i><strong>No customers found</strong><p class="text-muted mb-0">Try clearing or adjusting the filters.</p></td></tr>
