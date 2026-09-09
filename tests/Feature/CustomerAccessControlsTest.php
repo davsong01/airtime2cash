@@ -185,6 +185,70 @@ class CustomerAccessControlsTest extends TestCase
         $this->assertSame(700, $totalsRow[3]);
     }
 
+    public function test_admin_can_download_wallet_variance_report(): void
+    {
+        $admin = $this->createAdminUser();
+        $varianceUser = $this->createCustomerUser('Variance', 'Customer', ['wallet' => 80]);
+        $balancedUser = $this->createCustomerUser('Balanced', 'Customer', ['wallet' => 100]);
+
+        Wallet::create([
+            'customer_id' => $varianceUser->customer->id,
+            'amount' => 100,
+            'balance_before' => 0,
+            'balance_after' => 100,
+            'type' => 'credit',
+            'transaction_id' => 'VARIANCE-REPORT-001',
+            'reason' => 'Variance test',
+            'payment_method' => 'wallet',
+        ]);
+        Wallet::create([
+            'customer_id' => $balancedUser->customer->id,
+            'amount' => 100,
+            'balance_before' => 0,
+            'balance_after' => 100,
+            'type' => 'credit',
+            'transaction_id' => 'VARIANCE-REPORT-002',
+            'reason' => 'Balanced test',
+            'payment_method' => 'wallet',
+        ]);
+
+        $response = $this->withoutMiddleware([
+                AdminMiddleware::class,
+                CheckIpMiddleware::class,
+                RouteProtectionMiddleware::class,
+            ])
+            ->actingAs($admin)
+            ->get(route('customers.wallet-variance-report'));
+
+        $response->assertOk();
+        $this->assertStringContainsString('wallet-balance-variance-', (string) $response->headers->get('content-disposition'));
+
+        $reportPath = tempnam(sys_get_temp_dir(), 'wallet-variance-');
+        file_put_contents($reportPath, $response->streamedContent());
+
+        $reader = new Reader();
+        $reader->open($reportPath);
+        $reportRows = [];
+
+        foreach ($reader->getSheetIterator() as $sheet) {
+            foreach ($sheet->getRowIterator() as $row) {
+                $reportRows[] = $row->toArray();
+            }
+        }
+
+        $reader->close();
+        unlink($reportPath);
+
+        $this->assertSame(['Customer ID', 'Customer Name', 'Email', 'Stored Balance', 'Ledger Balance', 'Variance Amount'], $reportRows[0]);
+        $varianceRow = collect($reportRows)->first(fn (array $row) => ($row[2] ?? null) === $varianceUser->email);
+
+        $this->assertNotNull($varianceRow);
+        $this->assertSame(80, $varianceRow[3]);
+        $this->assertSame(100, $varianceRow[4]);
+        $this->assertSame(20, $varianceRow[5]);
+        $this->assertCount(2, $reportRows);
+    }
+
     public function test_admin_can_bulk_toggle_wallet_to_bank_and_airtime_to_cash_access(): void
     {
         $admin = $this->createAdminUser();
@@ -248,6 +312,7 @@ class CustomerAccessControlsTest extends TestCase
             'can_access_w2bank' => 0,
             'can_access_w2bank_auto' => 0,
             'can_access_a2c' => 0,
+            'kyc_status' => 'verified',
         ]);
 
         DB::table('settings')->insert([
@@ -258,6 +323,24 @@ class CustomerAccessControlsTest extends TestCase
             'favicon' => 'site/upgrade.jpg',
             'created_at' => now(),
             'updated_at' => now(),
+        ]);
+
+        $category = Category::create([
+            'name' => 'Airtime to Cash',
+            'slug' => 'airtime-to-cash-access-category',
+            'type' => 'airtime2cash',
+            'status' => 'active',
+        ]);
+
+        Product::create([
+            'name' => 'Airtime Network',
+            'slug' => 'airtime-to-cash-access-product',
+            'type' => 'airtime2cash',
+            'category_id' => $category->id,
+            'status' => 'active',
+            'api_id' => '1',
+            'manual_status' => 'active',
+            'auto_share_status' => 'active',
         ]);
 
         $walletResponse = $this->withoutMiddleware()
@@ -273,9 +356,10 @@ class CustomerAccessControlsTest extends TestCase
             ->actingAs($user)
             ->get(route('airtime-to-cash'));
 
-        $a2cResponse->assertStatus(403);
-        $a2cResponse->assertSee('This service (Airtime 2 Cash) is not available for you at the moment');
-        $a2cResponse->assertSee('Click to contact admin on WhatsApp');
+        $a2cResponse->assertOk();
+        $a2cResponse->assertSee('Manual Transfer Access Required');
+        $a2cResponse->assertSee('Auto Transfer Access Required');
+        $a2cResponse->assertSee('Contact admin on WhatsApp');
         $a2cResponse->assertSee('2348012345678');
     }
 

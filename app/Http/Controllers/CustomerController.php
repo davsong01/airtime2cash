@@ -204,10 +204,62 @@ class CustomerController extends Controller
         );
     }
 
+    public function downloadWalletVarianceReport(ExcelService $export)
+    {
+        $customers = User::query()
+            ->join('customers', 'customers.user_id', '=', 'users.id')
+            ->where(function ($query) {
+                $query->whereNull('users.type')->orWhere('users.type', '!=', 'admin');
+            })
+            ->select([
+                'users.id',
+                'users.firstname',
+                'users.middlename',
+                'users.lastname',
+                'users.email',
+                'customers.wallet as stored_balance',
+                'customers.id as customer_id',
+            ])
+            ->orderBy('users.id')
+            ->get();
+
+        $ledgerBalances = Wallet::query()
+            ->whereIn('customer_id', $customers->pluck('customer_id'))
+            ->select('customer_id')
+            ->selectRaw("COALESCE(SUM(CASE WHEN type = 'credit' THEN amount WHEN type = 'debit' THEN -amount ELSE 0 END), 0) AS ledger_balance")
+            ->groupBy('customer_id')
+            ->pluck('ledger_balance', 'customer_id');
+
+        $rows = $customers->map(function ($customer) use ($ledgerBalances) {
+            $storedBalance = (float) ($customer->stored_balance ?? 0);
+            $ledgerBalance = (float) ($ledgerBalances[$customer->customer_id] ?? 0);
+
+            if (abs($ledgerBalance - $storedBalance) <= 0.009) {
+                return null;
+            }
+
+            return [
+                'Customer ID' => $customer->id,
+                'Customer Name' => trim(collect([$customer->firstname, $customer->middlename, $customer->lastname])->filter()->implode(' ')),
+                'Email' => $customer->email,
+                'Stored Balance' => $storedBalance,
+                'Ledger Balance' => $ledgerBalance,
+                'Variance Amount' => $ledgerBalance - $storedBalance,
+            ];
+        })->filter()->values()->all();
+
+        return $export->fastExcelExport(
+            $rows,
+            'Wallet Balance Variance Report',
+            '',
+            'wallet-balance-variance-' . now()->format('Y-m-d') . '.xlsx'
+        );
+    }
+
     public function bulkActions(Request $request)
     {
         $this->validate($request, [
-            'action' => ['required', 'in:activate,deactivate,suspend,delete,move_level,enable_w2bank_manual_access,disable_w2bank_manual_access,enable_w2bank_auto_access,disable_w2bank_auto_access,enable_a2c_access,disable_a2c_access'],
+            'action' => ['required', 'in:activate,deactivate,suspend,delete,move_level,enable_w2bank_manual_access,disable_w2bank_manual_access,enable_w2bank_auto_access,disable_w2bank_auto_access,enable_a2c_access,disable_a2c_access,enable_a2c_manual_access,disable_a2c_manual_access,enable_a2c_auto_access,disable_a2c_auto_access'],
             'customer_ids' => ['required', 'string'],
             'level_id' => ['nullable', 'integer'],
         ]);
@@ -246,6 +298,10 @@ class CustomerController extends Controller
             'disable_w2bank_manual_access',
             'enable_w2bank_auto_access',
             'disable_w2bank_auto_access',
+            'enable_a2c_manual_access',
+            'disable_a2c_manual_access',
+            'enable_a2c_auto_access',
+            'disable_a2c_auto_access',
             'enable_a2c_access',
             'disable_a2c_access',
         ], true)) {
@@ -254,8 +310,12 @@ class CustomerController extends Controller
                 'disable_w2bank_manual_access' => ['can_access_w2bank' => 0],
                 'enable_w2bank_auto_access' => ['can_access_w2bank_auto' => 1],
                 'disable_w2bank_auto_access' => ['can_access_w2bank_auto' => 0],
-                'enable_a2c_access' => ['can_access_a2c' => 1],
-                'disable_a2c_access' => ['can_access_a2c' => 0],
+                'enable_a2c_manual_access' => ['can_access_a2c_manual' => 1],
+                'disable_a2c_manual_access' => ['can_access_a2c_manual' => 0],
+                'enable_a2c_auto_access' => ['can_access_a2c_auto' => 1],
+                'disable_a2c_auto_access' => ['can_access_a2c_auto' => 0],
+                'enable_a2c_access' => ['can_access_a2c_auto' => 1, 'can_access_a2c_manual' => 1, 'can_access_a2c' => 1],
+                'disable_a2c_access' => ['can_access_a2c_auto' => 0, 'can_access_a2c_manual' => 0, 'can_access_a2c' => 0],
             };
 
             Customer::whereIn('user_id', $customerIds)->update($updates);
@@ -550,6 +610,8 @@ class CustomerController extends Controller
             'can_access_w2bank' => ['nullable', 'in:0,1'],
             'can_access_w2bank_auto' => ['nullable', 'in:0,1'],
             'can_access_a2c' => ['nullable', 'in:0,1'],
+            'can_access_a2c_auto' => ['nullable', 'in:0,1'],
+            'can_access_a2c_manual' => ['nullable', 'in:0,1'],
         ]);
 
         $level = null;
@@ -566,13 +628,23 @@ class CustomerController extends Controller
             $user = User::query()->findOrFail($id);
             $customer = Customer::query()->where('user_id', $user->id)->lockForUpdate()->first();
 
-            $user->update($request->except(['_token', 'ip', 'customerlevel', 'can_access_w2bank', 'can_access_w2bank_auto', 'can_access_a2c']));
+            $user->update($request->except(['_token', 'ip', 'customerlevel', 'can_access_w2bank', 'can_access_w2bank_auto', 'can_access_a2c', 'can_access_a2c_auto', 'can_access_a2c_manual']));
 
             if ($customer) {
+                $legacyA2cAccess = (int) ($validated['can_access_a2c'] ?? 0);
+                $a2cAutoAccess = array_key_exists('can_access_a2c_auto', $validated)
+                    ? (int) $validated['can_access_a2c_auto']
+                    : $legacyA2cAccess;
+                $a2cManualAccess = array_key_exists('can_access_a2c_manual', $validated)
+                    ? (int) $validated['can_access_a2c_manual']
+                    : $legacyA2cAccess;
+
                 $customer->forceFill([
                     'can_access_w2bank' => (int) ($validated['can_access_w2bank'] ?? 0),
                     'can_access_w2bank_auto' => (int) ($validated['can_access_w2bank_auto'] ?? 0),
-                    'can_access_a2c' => (int) ($validated['can_access_a2c'] ?? 0),
+                    'can_access_a2c_auto' => $a2cAutoAccess,
+                    'can_access_a2c_manual' => $a2cManualAccess,
+                    'can_access_a2c' => (int) ($a2cAutoAccess || $a2cManualAccess),
                 ])->save();
             }
 

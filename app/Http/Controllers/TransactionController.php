@@ -66,10 +66,6 @@ class TransactionController extends Controller
 
     public function airtimeToCash()
     {
-        if (! $this->customerCanAccessService('a2c')) {
-            return $this->serviceUnavailableResponse('Airtime 2 Cash', 'a2c');
-        }
-
         if (auth()->user()->customer->kyc_status == 'unverified') {
             $kycLink = '<a href="' . route('update.kyc.details') . '"><strong>complete your KYC now</strong></a>';
 
@@ -310,7 +306,9 @@ class TransactionController extends Controller
             'transfer_mode' => ['required', 'in:manual,auto_share'],
         ]);
 
-        if (! $this->customerCanAccessService('a2c')) {
+        $accessService = $request->transfer_mode === 'auto_share' ? 'a2c_auto' : 'a2c_manual';
+
+        if (! $this->customerCanAccessService($accessService)) {
             return $this->serviceUnavailableResponse('Airtime 2 Cash', 'a2c');
         }
 
@@ -957,7 +955,7 @@ class TransactionController extends Controller
     {
         $customerId = auth()->user()?->customer?->id;
         $customer = $customerId
-            ? Customer::query()->select(['id', 'can_access_w2bank', 'can_access_w2bank_auto', 'can_access_a2c'])->whereKey($customerId)->first()
+            ? Customer::query()->select(['id', 'can_access_w2bank', 'can_access_w2bank_auto', 'can_access_a2c', 'can_access_a2c_auto', 'can_access_a2c_manual'])->whereKey($customerId)->first()
             : null;
         if (! $customer) {
             return false;
@@ -968,7 +966,10 @@ class TransactionController extends Controller
             'wallet2bank_manual' => (bool) ($customer->can_access_w2bank ?? false),
             'wallet2bank_auto' => (bool) ($customer->can_access_w2bank_auto ?? false),
             'wallet2bank' => (bool) (($customer->can_access_w2bank ?? false) || ($customer->can_access_w2bank_auto ?? false)),
-            'a2c' => (bool) ($customer->can_access_a2c ?? false),
+            'a2c' => (bool) (($customer->can_access_a2c_auto ?? false) || ($customer->can_access_a2c_manual ?? false)),
+            'a2c_any' => (bool) (($customer->can_access_a2c_auto ?? false) || ($customer->can_access_a2c_manual ?? false)),
+            'a2c_auto' => (bool) ($customer->can_access_a2c_auto ?? false),
+            'a2c_manual' => (bool) ($customer->can_access_a2c_manual ?? false),
             default => true,
         };
     }

@@ -54,11 +54,19 @@
                 @endforeach
             </select>
         </div>
+        <div class="col-12"><small class="text-muted font-weight-bold">Airtime 2 Cash access controls</small></div>
         <div class="col-md-6 form-group">
-            <label for="can_access_a2c">Airtime 2 Cash access</label>
-            <select name="can_access_a2c" class="form-control" id="can_access_a2c">
-                <option value="0" @selected(! (bool) old('can_access_a2c', $customer->can_access_a2c ?? false))>Disabled</option>
-                <option value="1" @selected((bool) old('can_access_a2c', $customer->can_access_a2c ?? false))>Enabled</option>
+            <label for="can_access_a2c_auto">Auto Airtime 2 Cash access</label>
+            <select name="can_access_a2c_auto" class="form-control" id="can_access_a2c_auto">
+                <option value="0" @selected(! (bool) old('can_access_a2c_auto', $customer->can_access_a2c_auto ?? $customer->can_access_a2c ?? false))>Disabled</option>
+                <option value="1" @selected((bool) old('can_access_a2c_auto', $customer->can_access_a2c_auto ?? $customer->can_access_a2c ?? false))>Enabled</option>
+            </select>
+        </div>
+        <div class="col-md-6 form-group">
+            <label for="can_access_a2c_manual">Manual Airtime 2 Cash access</label>
+            <select name="can_access_a2c_manual" class="form-control" id="can_access_a2c_manual">
+                <option value="0" @selected(! (bool) old('can_access_a2c_manual', $customer->can_access_a2c_manual ?? $customer->can_access_a2c ?? false))>Disabled</option>
+                <option value="1" @selected((bool) old('can_access_a2c_manual', $customer->can_access_a2c_manual ?? $customer->can_access_a2c ?? false))>Enabled</option>
             </select>
         </div>
         <div class="col-md-6 form-group">

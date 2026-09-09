@@ -90,6 +90,17 @@
     $activeProviderAvailability = $activeProvider?->availability_status_class;
     $activeProviderAvailabilityLabel = $activeProvider?->availability_status_label;
     $showProviderStatus = (bool) (getSettings()->show_provider_status_on_customer_pages ?? true);
+    $a2cAutoAccess = (bool) (auth()->user()?->customer?->can_access_a2c_auto ?? auth()->user()?->customer?->can_access_a2c ?? false);
+    $a2cManualAccess = (bool) (auth()->user()?->customer?->can_access_a2c_manual ?? auth()->user()?->customer?->can_access_a2c ?? false);
+    $adminWhatsappNumber = preg_replace('/\D+/', '', (string) (getSettings()->whatsapp_number ?? ''));
+    $a2cWhatsappLinks = [
+        'manual' => filled($adminWhatsappNumber)
+            ? 'https://api.whatsapp.com/send?phone=' . $adminWhatsappNumber . '&text=' . urlencode('Manual Airtime 2 Cash access request from ' . (auth()->user()?->email ?? 'customer') . '. Please enable this service for my account.')
+            : null,
+        'auto_share' => filled($adminWhatsappNumber)
+            ? 'https://api.whatsapp.com/send?phone=' . $adminWhatsappNumber . '&text=' . urlencode('Auto Airtime 2 Cash access request from ' . (auth()->user()?->email ?? 'customer') . '. Please enable this service for my account.')
+            : null,
+    ];
 @endphp
 
 @section('content')
@@ -274,6 +285,25 @@
                         </section>
                     </div>
 
+                    <div id="a2c-manual-locked" class="alert alert-warning mb-4" style="display:none">
+                        <h5 class="alert-heading"><i class="bx bx-lock-alt me-1"></i>Manual Transfer Access Required</h5>
+                        <p>Manual Airtime 2 Cash is not enabled for your account.</p>
+                        @if($a2cWhatsappLinks['manual'])
+                            <a class="btn btn-success" href="{{ $a2cWhatsappLinks['manual'] }}" target="_blank" rel="noopener"><i class="bx bxl-whatsapp me-1"></i>Contact admin on WhatsApp</a>
+                        @else
+                            <p class="mb-0">Admin WhatsApp is not configured yet. Please contact support.</p>
+                        @endif
+                    </div>
+                    <div id="a2c-auto-locked" class="alert alert-warning mb-4" style="display:none">
+                        <h5 class="alert-heading"><i class="bx bx-lock-alt me-1"></i>Auto Transfer Access Required</h5>
+                        <p>Auto Airtime 2 Cash is not enabled for your account.</p>
+                        @if($a2cWhatsappLinks['auto_share'])
+                            <a class="btn btn-success" href="{{ $a2cWhatsappLinks['auto_share'] }}" target="_blank" rel="noopener"><i class="bx bxl-whatsapp me-1"></i>Contact admin on WhatsApp</a>
+                        @else
+                            <p class="mb-0">Admin WhatsApp is not configured yet. Please contact support.</p>
+                        @endif
+                    </div>
+
                     <section class="a2c-card a2c-secure-flow mb-4 p-4 p-md-5" id="auto-secure-flow" style="display:none">
                         <div class="a2c-secure-shell">
                             <div class="alert alert-danger a2c-flow-error" id="auto-flow-error" style="display:none"></div>
@@ -312,7 +342,7 @@
                         </div>
                     </section>
 
-                    <section class="a2c-card a2c-action-bar">
+                    <section id="conversion-action-bar" class="a2c-card a2c-action-bar">
                         <div class="a2c-action-stack">
                             <span class="a2c-action-note"><i class="bx bx-lock-alt fs-5 text-success"></i>Your conversion details are transmitted securely.</span>
                             <label class="conversion-agreement" for="agreement" id="agreement-panel">
@@ -393,6 +423,7 @@
             const $bankDetailsDiv = $('#bank-details-div');
 
             const $conversionDetailsPanel = $('#conversion-details-panel');
+            const $conversionActionBar = $('#conversion-action-bar');
             const $autoSecureFlow = $('#auto-secure-flow');
             const $autoPinStage = $('#auto-pin-stage');
             const $autoOtpStage = $('#auto-otp-stage');
@@ -421,6 +452,10 @@
 
             const defaultAutoInstruction = @json($autoTransferInstruction);
             const csrfToken = @json(csrf_token());
+            const modeAccess = {
+                manual: @json($a2cManualAccess),
+                auto_share: @json($a2cAutoAccess)
+            };
 
             const endpoints = {
                 initiate: @json(route('initialize.airtime2cashtransaction')),
@@ -474,6 +509,17 @@
             function isAutoTransfer() {
                 return $('input[name="transfer_mode"]:checked').val()
                     === 'auto_share';
+            }
+
+            function refreshModeAccess() {
+                const transferMode = $('input[name="transfer_mode"]:checked').val();
+                const hasAccess = Boolean(modeAccess[transferMode]);
+
+                $conversionDetailsPanel.toggle(hasAccess);
+                $conversionActionBar.toggle(hasAccess);
+                $autoSecureFlow.toggle(hasAccess && isAutoTransfer() && autoStage !== AUTO_STAGE_DETAILS);
+                $('#a2c-manual-locked').toggle(transferMode === 'manual' && !hasAccess);
+                $('#a2c-auto-locked').toggle(transferMode === 'auto_share' && !hasAccess);
             }
 
             function normalizePhone(value) {
@@ -1406,6 +1452,7 @@
                         ? 'bx-bolt-circle'
                         : 'bx-transfer'
                 );
+                refreshModeAccess();
             });
 
             function isAutoTransfer() { return $('input[name="transfer_mode"]:checked').val() === 'auto_share'; }

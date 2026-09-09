@@ -24,6 +24,7 @@ class RouteProtectionMiddleware
             'admin.autosync.webhooks.resolve' => ['admin.autosync.webhooks.resolve', 'admin.webhooks.index', 'admin.autosync.index'],
             'admin.api-logs.index' => ['admin.api-logs.index', 'admin.autosync.index'],
             'customers.wallet-report' => ['customers.edit'],
+            'customers.wallet-variance-report' => ['customers.edit'],
             default => [$curRouteName],
         };
 

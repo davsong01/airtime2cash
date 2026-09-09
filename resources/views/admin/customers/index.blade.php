@@ -360,6 +360,9 @@
                                 <div class="d-flex align-items-center flex-wrap" style="gap: .5rem;">
                                     <span class="badge badge-light-primary px-1 py-50">{{ $orderLabel }}</span>
                                     @if($canEditCustomers)
+                                        <a href="{{ route('customers.wallet-variance-report') }}" class="btn btn-sm btn-outline-warning" title="Download customers with wallet variance">
+                                            <i class="bx bx-error-circle mr-25"></i> Wallet variance report
+                                        </a>
                                         <select class="form-control form-control-sm" id="bulkActionSelect" style="min-width: 180px;">
                                             <option value="">Bulk action</option>
                                             <option value="deactivate">Deactivate</option>
@@ -370,8 +373,10 @@
                                             <option value="disable_w2bank_manual_access">Disable Manual Wallet 2 Bank</option>
                                             <option value="enable_w2bank_auto_access">Enable Auto Wallet 2 Bank</option>
                                             <option value="disable_w2bank_auto_access">Disable Auto Wallet 2 Bank</option>
-                                            <option value="enable_a2c_access">Enable Airtime 2 Cash</option>
-                                            <option value="disable_a2c_access">Disable Airtime 2 Cash</option>
+                                            <option value="enable_a2c_auto_access">Enable Auto Airtime 2 Cash</option>
+                                            <option value="disable_a2c_auto_access">Disable Auto Airtime 2 Cash</option>
+                                            <option value="enable_a2c_manual_access">Enable Manual Airtime 2 Cash</option>
+                                            <option value="disable_a2c_manual_access">Disable Manual Airtime 2 Cash</option>
                                             <option value="move_level">Move to level</option>
                                         </select>
                                         <button type="button" class="btn btn-sm btn-secondary" id="bulkActionApplyBtn">Apply</button>
@@ -407,7 +412,8 @@
                                         $kycVerified = $user->customer?->kyc_status === 'verified';
                                         $walletAccess = (bool) ($user->customer?->can_access_w2bank ?? true);
                                         $walletAutoAccess = (bool) ($user->customer?->can_access_w2bank_auto ?? false);
-                                        $a2cAccess = (bool) ($user->customer?->can_access_a2c ?? false);
+                                        $a2cAutoAccess = (bool) ($user->customer?->can_access_a2c_auto ?? $user->customer?->can_access_a2c ?? false);
+                                        $a2cManualAccess = (bool) ($user->customer?->can_access_a2c_manual ?? $user->customer?->can_access_a2c ?? false);
                                         $ledgerWalletBalance = (float) ($user->live_wallet_balance ?? 0);
                                         $storedWalletBalance = (float) ($user->customer?->wallet ?? 0);
                                         $walletBalanceVariance = $ledgerWalletBalance - $storedWalletBalance;
@@ -444,8 +450,11 @@
                                                 <span class="customer-access-chip {{ $walletAutoAccess ? 'is-enabled' : 'is-disabled' }}" title="Auto Wallet 2 Bank {{ $walletAutoAccess ? 'Enabled' : 'Disabled' }}">
                                                     <i class="bx {{ $walletAutoAccess ? 'bx-check-circle' : 'bx-x-circle' }}"></i> Auto W2B
                                                 </span>
-                                                <span class="customer-access-chip {{ $a2cAccess ? 'is-enabled' : 'is-disabled' }}" title="Airtime 2 Cash {{ $a2cAccess ? 'Enabled' : 'Disabled' }}">
-                                                    <i class="bx {{ $a2cAccess ? 'bx-check-circle' : 'bx-x-circle' }}"></i> Airtime 2 Cash
+                                                <span class="customer-access-chip {{ $a2cAutoAccess ? 'is-enabled' : 'is-disabled' }}" title="Airtime 2 Cash {{ ($a2cAutoAccess || $a2cManualAccess) ? 'Enabled' : 'Disabled' }}">
+                                                    <i class="bx {{ $a2cAutoAccess ? 'bx-check-circle' : 'bx-x-circle' }}"></i> Auto A2C
+                                                </span>
+                                                <span class="customer-access-chip {{ $a2cManualAccess ? 'is-enabled' : 'is-disabled' }}" title="Manual Airtime 2 Cash {{ $a2cManualAccess ? 'Enabled' : 'Disabled' }}">
+                                                    <i class="bx {{ $a2cManualAccess ? 'bx-check-circle' : 'bx-x-circle' }}"></i> Manual A2C
                                                 </span>
                                             </div>
                                             <div class="customer-verification-states">
@@ -574,8 +583,10 @@
                 disable_w2bank_manual_access: 'Disable Manual Wallet 2 Bank access for the selected customer(s)?',
                 enable_w2bank_auto_access: 'Enable Auto Wallet 2 Bank access for the selected customer(s)?',
                 disable_w2bank_auto_access: 'Disable Auto Wallet 2 Bank access for the selected customer(s)?',
-                enable_a2c_access: 'Enable Airtime 2 Cash access for the selected customer(s)?',
-                disable_a2c_access: 'Disable Airtime 2 Cash access for the selected customer(s)?',
+                enable_a2c_auto_access: 'Enable Auto Airtime 2 Cash access for the selected customer(s)?',
+                disable_a2c_auto_access: 'Disable Auto Airtime 2 Cash access for the selected customer(s)?',
+                enable_a2c_manual_access: 'Enable Manual Airtime 2 Cash access for the selected customer(s)?',
+                disable_a2c_manual_access: 'Disable Manual Airtime 2 Cash access for the selected customer(s)?',
             };
 
             if (!window.confirm(messages[action] || 'Apply this action to the selected customer(s)?')) {

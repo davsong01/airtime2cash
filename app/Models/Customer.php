@@ -17,14 +17,30 @@ class Customer extends Model
         'can_access_w2bank' => 1,
         'can_access_w2bank_auto' => 0,
         'can_access_a2c' => 0,
+        'can_access_a2c_auto' => 0,
+        'can_access_a2c_manual' => 0,
     ];
     protected $casts = [
         'can_access_w2bank' => 'boolean',
         'can_access_w2bank_auto' => 'boolean',
         'can_access_a2c' => 'boolean',
+        'can_access_a2c_auto' => 'boolean',
+        'can_access_a2c_manual' => 'boolean',
         'wallet_bank_account' => 'array',
         'bvn_data' => 'array',
     ];
+
+    protected static function booted(): void
+    {
+        static::saving(function (self $customer): void {
+            if ($customer->isDirty('can_access_a2c')
+                && ! $customer->isDirty('can_access_a2c_auto')
+                && ! $customer->isDirty('can_access_a2c_manual')) {
+                $customer->can_access_a2c_auto = (bool) $customer->can_access_a2c;
+                $customer->can_access_a2c_manual = (bool) $customer->can_access_a2c;
+            }
+        });
+    }
 
     public function level()
     {

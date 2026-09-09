@@ -225,6 +225,7 @@ Route::middleware(['auth', 'verified', 'admin', 'ipcheck', 'adminRoute'])->prefi
 
     Route::post('verify-bank-details', [TransactionController::class, 'verifyBankDetails'])->name('admin.verify.bank.details');
 
+    Route::get('customers/wallet-variance-report', [CustomerController::class, 'downloadWalletVarianceReport'])->name('customers.wallet-variance-report');
     Route::get('customers/{status?}', [CustomerController::class, 'customers'])->name('customers');
     Route::get('customers-active/{status}', [CustomerController::class, 'customers'])->name('customers.active');
     Route::get('customers-suspended/{status}', [CustomerController::class, 'customers'])->name('customers.suspended');

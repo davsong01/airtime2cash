@@ -7,6 +7,17 @@
     $activeProviderAvailability = $activeProvider?->availability_status_class;
     $activeProviderAvailabilityLabel = $activeProvider?->availability_status_label;
     $showProviderStatus = (bool) (getSettings()->show_provider_status_on_customer_pages ?? true);
+    $a2cAutoAccess = (bool) (auth()->user()?->customer?->can_access_a2c_auto ?? auth()->user()?->customer?->can_access_a2c ?? false);
+    $a2cManualAccess = (bool) (auth()->user()?->customer?->can_access_a2c_manual ?? auth()->user()?->customer?->can_access_a2c ?? false);
+    $adminWhatsappNumber = preg_replace('/\D+/', '', (string) (getSettings()->whatsapp_number ?? ''));
+    $a2cWhatsappLinks = [
+        'manual' => filled($adminWhatsappNumber)
+            ? 'https://api.whatsapp.com/send?phone=' . $adminWhatsappNumber . '&text=' . urlencode('Manual Airtime 2 Cash access request from ' . (auth()->user()?->email ?? 'customer') . '. Please enable this service for my account.')
+            : null,
+        'auto_share' => filled($adminWhatsappNumber)
+            ? 'https://api.whatsapp.com/send?phone=' . $adminWhatsappNumber . '&text=' . urlencode('Auto Airtime 2 Cash access request from ' . (auth()->user()?->email ?? 'customer') . '. Please enable this service for my account.')
+            : null,
+    ];
 ?>
 @extends('layouts.app')
 @section('title', $category->seo_title)
@@ -123,6 +134,7 @@
                                                                                     </div>
                                                                                 </div>
                                                                             </div>
+                                                                            <div id="a2c-form-content">
                                                                             <div class="col-md-12">
                                                                                 <fieldset class="form-group">
                                                                                     <label for="product">Select Network Provider</label>
@@ -216,6 +228,25 @@
                                                                         </div>
                                                                     </div>
                                                                     <button id="buy-buttonx" style="margin-top:4px" class="btn btn-primary" type="submit" onclick="return submitForm()">PROCEED</button>
+                                                                    </div>
+                                                                    <div id="a2c-manual-locked" class="alert alert-warning mt-2" style="display:none">
+                                                                        <h5 class="alert-heading"><i class="bx bx-lock-alt mr-25"></i>Manual Transfer Access Required</h5>
+                                                                        <p>Manual Airtime 2 Cash is not enabled for your account.</p>
+                                                                        @if($a2cWhatsappLinks['manual'])
+                                                                            <a class="btn btn-success" href="{{ $a2cWhatsappLinks['manual'] }}" target="_blank" rel="noopener"><i class="bx bxl-whatsapp mr-25"></i>Contact admin on WhatsApp</a>
+                                                                        @else
+                                                                            <p class="mb-0">Admin WhatsApp is not configured yet. Please contact support.</p>
+                                                                        @endif
+                                                                    </div>
+                                                                    <div id="a2c-auto-locked" class="alert alert-warning mt-2" style="display:none">
+                                                                        <h5 class="alert-heading"><i class="bx bx-lock-alt mr-25"></i>Auto Transfer Access Required</h5>
+                                                                        <p>Auto Airtime 2 Cash is not enabled for your account.</p>
+                                                                        @if($a2cWhatsappLinks['auto_share'])
+                                                                            <a class="btn btn-success" href="{{ $a2cWhatsappLinks['auto_share'] }}" target="_blank" rel="noopener"><i class="bx bxl-whatsapp mr-25"></i>Contact admin on WhatsApp</a>
+                                                                        @else
+                                                                            <p class="mb-0">Admin WhatsApp is not configured yet. Please contact support.</p>
+                                                                        @endif
+                                                                    </div>
                                                                 </div>
                                                                 <div class="col-md-6 order-1 order-sm-2">
                                                                     <div id="instruction-div" style="display: none">
@@ -302,8 +333,19 @@
         };
         var autoStage = 'details';
         var autoTransactionId = null;
+        var modeAccess = {
+            manual: @json($a2cManualAccess),
+            auto_share: @json($a2cAutoAccess)
+        };
 
         function isAutoTransfer() { return $('input[name="transfer_mode"]:checked').val() === 'auto_share'; }
+        function refreshModeAccess() {
+            var transferMode = $('input[name="transfer_mode"]:checked').val();
+            var hasAccess = Boolean(modeAccess[transferMode]);
+            $('#a2c-form-content').toggle(hasAccess);
+            $('#a2c-manual-locked').toggle(transferMode === 'manual' && !hasAccess);
+            $('#a2c-auto-locked').toggle(transferMode === 'auto_share' && !hasAccess);
+        }
         function setLegacyButton(label, disabled) { $('#buy-buttonx').text(label).prop('disabled', disabled); }
         function showLegacyError(message) { $('#legacy-auto-error').text(message).toggle(Boolean(message)); }
         function firstLegacyError(data) {
@@ -429,7 +471,9 @@
             $('#payment_method option[value="Transfer to Bank Account"]').prop('disabled', auto);
             setLegacyButton(auto ? 'INITIATE AUTO TRANSFER' : 'PROCEED', false);
             refreshNetworks();
+            refreshModeAccess();
         });
+        refreshModeAccess();
         $("#amount").val('');
         $('#amount-div').hide();
         $('#payment_method').val('');
