@@ -429,7 +429,12 @@ class CustomerController extends Controller
         $customer = $user->customer->id;
 
         $curr = getSettings()?->currency ?? '₦';
-        $balance = $curr . number_format(walletBalance($user), 2) ?? 0;
+        $storedWalletBalance = (float) walletBalance($user);
+        $ledgerWalletBalance = (float) Wallet::query()
+            ->where('customer_id', $customer)
+            ->selectRaw("COALESCE(SUM(CASE WHEN LOWER(type) = 'credit' THEN amount WHEN LOWER(type) = 'debit' THEN -amount ELSE 0 END), 0) AS balance")
+            ->value('balance');
+        $walletBalanceVariance = $ledgerWalletBalance - $storedWalletBalance;
         $ref = $curr . number_format(referralBalance($user), 2) ?? 0;
         $transactionSummary = $user->customer->transactions()
             ->selectRaw('COALESCE(SUM(amount), 0) as total')
@@ -444,7 +449,15 @@ class CustomerController extends Controller
         $transTotal = $curr . number_format((float) $transactionSummary->total, 2);
         $fundTotal = $curr . number_format((float) $transactionSummary->funded_total, 2);
         $a2cTotal = $curr . number_format((float) $airtimeTransactionSummary->total, 2);
-        $balances = ['Wallet Balance' => $balance, 'Referral Earning' => $ref, 'Transaction Total' => $transTotal, 'A2C Total' => $a2cTotal, 'Funds Total' => $fundTotal];
+        $balances = [
+            'Ledger Balance' => $curr . number_format($ledgerWalletBalance, 2),
+            'Stored Balance' => $curr . number_format($storedWalletBalance, 2),
+            'Balance Variance' => ($walletBalanceVariance > 0 ? '+' : ($walletBalanceVariance < 0 ? '-' : '')) . $curr . number_format(abs($walletBalanceVariance), 2),
+            'Referral Earning' => $ref,
+            'Transaction Total' => $transTotal,
+            'A2C Total' => $a2cTotal,
+            'Funds Total' => $fundTotal,
+        ];
         $settings = getSettings();
         $downlines = collect();
         $reservedAccount = collect();
@@ -522,6 +535,7 @@ class CustomerController extends Controller
                 'availableReservedBanks' => $availableReservedBanks,
                 'banks' => $banks,
                 'settings' => $settings,
+                'walletBalanceVariance' => $walletBalanceVariance,
             ]
         );
     }

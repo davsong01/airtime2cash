@@ -82,17 +82,19 @@
                 @foreach ($balances as $key => $balance)
                     @php
                         $balanceIcons = [
-                            'Wallet Balance' => 'bx bx-wallet',
+                            'Ledger Balance' => 'bx bx-calculator',
+                            'Stored Balance' => 'bx bx-data',
+                            'Balance Variance' => 'bx bx-error-circle',
                             'Referral Earning' => 'bx bx-gift',
                             'Transaction Total' => 'bx bx-transfer-alt',
                             'Funds Total' => 'bx bx-credit-card',
                         ];
                     @endphp
                     <div class="col-xl-3 col-sm-6">
-                        <div class="card customer-balance-card">
+                        <div class="card customer-balance-card {{ $key === 'Balance Variance' && abs($walletBalanceVariance) > 0.009 ? 'border-danger' : '' }}">
                             <div class="card-body d-flex align-items-center">
                                 <span class="customer-balance-icon mr-1"><i class="{{ $balanceIcons[$key] ?? 'bx bx-bar-chart' }}"></i></span>
-                                <div><small>{{ $key }}</small><strong>{!! $balance !!}</strong></div>
+                                <div><small>{{ $key }}</small><strong class="{{ $key === 'Balance Variance' ? (abs($walletBalanceVariance) > 0.009 ? 'text-danger' : 'text-success') : '' }}">{!! $balance !!}</strong>@if($key === 'Balance Variance')<small class="d-block text-muted">Ledger minus stored wallet</small>@endif</div>
                             </div>
                         </div>
                     </div>

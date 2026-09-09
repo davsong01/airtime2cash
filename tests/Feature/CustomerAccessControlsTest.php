@@ -32,6 +32,7 @@ class CustomerAccessControlsTest extends TestCase
         $admin = $this->createAdminUser();
 
         $enabledUser = $this->createCustomerUser('Enabled', 'Customer', [
+            'wallet' => 80,
             'can_access_w2bank' => 1,
             'can_access_w2bank_auto' => 1,
             'can_access_a2c' => 0,
@@ -41,6 +42,17 @@ class CustomerAccessControlsTest extends TestCase
             'can_access_w2bank' => 0,
             'can_access_w2bank_auto' => 0,
             'can_access_a2c' => 1,
+        ]);
+
+        Wallet::create([
+            'customer_id' => $enabledUser->customer->id,
+            'amount' => 100,
+            'balance_before' => 0,
+            'balance_after' => 100,
+            'type' => 'credit',
+            'transaction_id' => 'BALANCE-VARIANCE-001',
+            'reason' => 'Balance variance test',
+            'payment_method' => 'wallet',
         ]);
 
         DB::table('settings')->insert([
@@ -69,6 +81,24 @@ class CustomerAccessControlsTest extends TestCase
         $response->assertSee('Airtime 2 Cash Enabled');
         $response->assertSee(route('admin.walletlog', ['email' => $enabledUser->email]), false);
         $response->assertSee(route('admin.earninglog', ['upline_email' => $enabledUser->email]), false);
+        $response->assertSee('Ledger');
+        $response->assertSee('Stored');
+        $response->assertSee('Variance');
+        $response->assertSee('+₦20.00');
+
+        $profileResponse = $this->withoutMiddleware([
+                AdminMiddleware::class,
+                CheckIpMiddleware::class,
+                RouteProtectionMiddleware::class,
+            ])
+            ->actingAs($admin)
+            ->get(route('customers.edit', $enabledUser));
+
+        $profileResponse->assertOk();
+        $profileResponse->assertSee('Ledger Balance');
+        $profileResponse->assertSee('Stored Balance');
+        $profileResponse->assertSee('Balance Variance');
+        $profileResponse->assertSee('+₦20.00');
 
         $this->assertDatabaseHas('customers', [
             'id' => $enabledUser->customer->id,

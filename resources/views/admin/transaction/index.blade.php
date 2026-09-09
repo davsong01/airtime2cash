@@ -14,19 +14,237 @@
         };
     };
 
-    $transactionModeClass = static function ($transaction) {
-        return match (strtolower((string) ($transaction->transfer_mode ?? ''))) {
-            'manual' => 'text-warning',
-            'auto_share' => 'text-success',
-            default => 'text-muted',
-        };
-    };
 @endphp
 
 @extends('layouts.app')
 @section('title', 'Transaction Log')
 @section('page-css')
     <link rel="stylesheet" href="{{ asset('app-assets/css/admin-operations.css') }}">
+    <style>
+        .transaction-directory-table thead th {
+            border-top: 0;
+            color: #697386;
+            font-size: .68rem;
+            letter-spacing: .055em;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        .transaction-directory-table tbody td {
+            padding-top: .85rem;
+            padding-bottom: .85rem;
+            vertical-align: middle;
+        }
+
+        .transaction-directory-table tbody tr {
+            transition: background-color .18s ease;
+        }
+
+        .transaction-directory-table tbody tr:hover {
+            background: #f8faff;
+        }
+
+        .transaction-row-number {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 30px;
+            height: 30px;
+            border-radius: 9px;
+            color: #637085;
+            background: #f1f4f8;
+            font-size: .72rem;
+            font-weight: 700;
+        }
+
+        .transaction-customer-cell {
+            min-width: 220px;
+        }
+
+        .transaction-customer {
+            display: flex;
+            align-items: flex-start;
+            gap: .65rem;
+        }
+
+        .transaction-customer-avatar {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex: 0 0 38px;
+            width: 38px;
+            height: 38px;
+            border-radius: 12px;
+            color: #fff;
+            background: linear-gradient(135deg, #5969e8, #7c4dff);
+            box-shadow: 0 5px 12px rgba(89, 105, 232, .2);
+            font-size: .78rem;
+            font-weight: 700;
+        }
+
+        .transaction-customer-name {
+            color: #202a3b;
+            font-size: .84rem;
+            font-weight: 700;
+        }
+
+        .transaction-meta-line {
+            display: flex;
+            align-items: center;
+            gap: .3rem;
+            color: #7b8495;
+            font-size: .7rem;
+            line-height: 1.55;
+        }
+
+        .transaction-meta-line i {
+            color: #8993a5;
+        }
+
+        .transaction-reference-cell {
+            min-width: 205px;
+        }
+
+        .transaction-reference-primary {
+            display: block;
+            color: #3347c8;
+            font-size: .76rem;
+            font-weight: 700;
+            word-break: break-all;
+        }
+
+        .transaction-reference-secondary {
+            display: block;
+            margin-top: .2rem;
+            color: #8a93a3;
+            font-size: .68rem;
+            word-break: break-all;
+        }
+
+        .transaction-status-chip,
+        .transaction-mode-chip,
+        .transaction-identifier-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: .3rem;
+            border: 1px solid transparent;
+            border-radius: 999px;
+            padding: .3rem .55rem;
+            font-size: .68rem;
+            font-weight: 700;
+            line-height: 1;
+            white-space: nowrap;
+        }
+
+        .transaction-status-chip.is-success {
+            color: #168554;
+            background: #e9f8f1;
+            border-color: #c8eddd;
+        }
+
+        .transaction-status-chip.is-warning {
+            color: #a46500;
+            background: #fff7e3;
+            border-color: #f6dfaa;
+        }
+
+        .transaction-status-chip.is-danger {
+            color: #b33a3a;
+            background: #fff1f1;
+            border-color: #f4d0d0;
+        }
+
+        .transaction-status-chip.is-neutral,
+        .transaction-mode-chip,
+        .transaction-identifier-chip {
+            color: #606b7d;
+            background: #f3f5f8;
+            border-color: #e2e6eb;
+        }
+
+        .transaction-date {
+            display: block;
+            margin-top: .4rem;
+            color: #8a93a3;
+            font-size: .67rem;
+        }
+
+        .transaction-financial-cell {
+            min-width: 175px;
+        }
+
+        .transaction-total {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: .75rem;
+            margin-bottom: .25rem;
+            border-radius: 9px;
+            padding: .42rem .5rem;
+            color: #3347c8;
+            background: #eef1ff;
+        }
+
+        .transaction-financial-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: .75rem;
+            padding: .2rem .5rem;
+            color: #727c8d;
+            font-size: .68rem;
+        }
+
+        .transaction-financial-row strong,
+        .transaction-total strong {
+            color: inherit;
+            white-space: nowrap;
+        }
+
+        .transaction-balance-flow {
+            margin-top: .35rem;
+            border-top: 1px solid #edf0f4;
+            padding: .4rem .5rem 0;
+            color: #7b8495;
+            font-size: .66rem;
+            white-space: nowrap;
+        }
+
+        .transaction-service-cell {
+            min-width: 180px;
+        }
+
+        .transaction-service-name {
+            display: block;
+            color: #273247;
+            font-size: .8rem;
+            font-weight: 700;
+        }
+
+        .transaction-service-meta {
+            display: block;
+            margin-top: .18rem;
+            color: #7b8495;
+            font-size: .69rem;
+        }
+
+        .transaction-service-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .3rem;
+            margin-top: .45rem;
+        }
+
+        .transaction-action-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            border-radius: 9px;
+            padding: 0;
+        }
+    </style>
 @endsection
 @section('content')
     <!-- Content wrapper -->
@@ -184,96 +402,96 @@
                             <hr>
                         </div>
                         <div class="table-responsive">
-                            {{-- <form method="post"> --}}
-                                <table id="table-extended-success" class="table mb-0">
+                                <table id="table-extended-success" class="table mb-0 transaction-directory-table">
                                     <thead>
                                         <tr>
                                             <th>S/N</th>
                                             <th>Customer</th>
-                                            <th>Payment Details</th>
-                                            <th>Transaction Details</th>
-                                            <th>Unique Element</th>
+                                            <th>Transaction</th>
+                                            <th>Financials</th>
+                                            <th>Service</th>
+                                            <th>Identifier</th>
                                             @if(hasAccess('admin.single.transaction.view'))
-                                            <th>Action</th>
+                                            <th class="text-right">Action</th>
                                             @endif
                                         </tr>
                                     </thead>
                                     <tbody>
                                         @foreach ($transactions as $transaction)
+                                            @php
+                                                $customerName = trim((string) $transaction->customer_name) ?: 'Unknown customer';
+                                                $status = strtolower((string) $transaction->status);
+                                                $statusClass = match (true) {
+                                                    in_array($status, ['success', 'successful', 'delivered', 'completed', 'approved'], true) => 'is-success',
+                                                    in_array($status, ['failed', 'declined', 'rejected', 'cancelled', 'canceled'], true) => 'is-danger',
+                                                    in_array($status, ['pending', 'initiated', 'attention-required'], true) => 'is-warning',
+                                                    default => 'is-neutral',
+                                                };
+                                                $detailUrl = ($transaction->product?->type ?? null) === 'airtime2cash' && $transaction->airtime2cash
+                                                    ? route('admin.single.airtime2cash.transaction.view', $transaction->airtime2cash->id)
+                                                    : route('admin.single.transaction.view', $transaction->id);
+                                            @endphp
                                             <tr>
-                                                <td class="text-muted">{{ $transactions->firstItem() + $loop->index }}</td>
-                                                <td>
-                                                    <span style="color:crimson"><strong>TransactionID: </strong> <br>{{ $transaction->transaction_id }}</span> <br>
-                                                    <span style="color:rgb(27, 20, 220)"><strong>Request ID: </strong> <br>{{ $transaction->reference_id }}</span> <br><br>
-                                                    {{ $transaction->customer_name }} <br>
-                                                    @if($transaction->customer?->user)
-                                                        <a href="{{ route('customers.edit', $transaction->customer->user->id) }}">{{ $transaction->customer_email }}</a> <br>
-                                                    @else
-                                                        {{ $transaction->customer_email }} <br>
-                                                    @endif
-                                                    {{ $transaction->customer_phone }} <br>
-                                                     {{ date("M jS, Y g:iA", strtotime($transaction->created_at)) }} <br>
-                                                    @php
-                                                        $statusButtonClass = match ($transaction->status) {
-                                                            'success', 'delivered' => 'btn-success',
-                                                            'pending' => 'btn-warning',
-                                                            'failed' => 'btn-danger',
-                                                            default => 'btn-secondary',
-                                                        };
-                                                    @endphp
-                                                    <button class="btn {{ $statusButtonClass }} btn-sm" readonly>{{ ucfirst($transaction->status) }}</button>
-                                                    
-                                                   
+                                                <td><span class="transaction-row-number">{{ $transactions->firstItem() + $loop->index }}</span></td>
+                                                <td class="transaction-customer-cell">
+                                                    <div class="transaction-customer">
+                                                        <div class="min-width-0">
+                                                            <span class="transaction-customer-name d-block text-truncate">{{ $customerName }}</span>
+                                                            @if($transaction->customer?->user)
+                                                                <a href="{{ route('customers.edit', $transaction->customer->user->id) }}" class="transaction-meta-line text-truncate"><i class="bx bx-envelope"></i>{{ $transaction->customer_email }}</a>
+                                                            @else
+                                                                <span class="transaction-meta-line text-truncate"><i class="bx bx-envelope"></i>{{ $transaction->customer_email ?: 'No email' }}</span>
+                                                            @endif
+                                                            <span class="transaction-meta-line"><i class="bx bx-phone"></i>{{ $transaction->customer_phone ?: 'No phone' }}</span>
+                                                        </div>
+                                                    </div>
                                                 </td>
-                                                <td>
-                                                    <small>
-                                                    <strong>Amount: </strong>{!! getSettings()->currency. number_format((float) $transaction->amount, 2) !!} <br>
-                                                    <strong>Charge: </strong>{!! getSettings()->currency. number_format((float) $transaction->provider_charge, 2) !!} <br>
-                                                    <strong>Total Amount: </strong>{!! getSettings()->currency. number_format((float) $transaction->total_amount,2) !!} <br>
-                                                    <strong>Initial Balance: </strong>{!! getSettings()->currency. number_format((float) $transaction->balance_before, 2) !!} <br>
-                                                    <strong>Final Balance: </strong>{!! getSettings()->currency. number_format((float) $transaction->balance_after, 2) !!} <br>
-                                                    </small>
+                                                <td class="transaction-reference-cell">
+                                                    <a href="{{ $detailUrl }}" class="transaction-reference-primary">{{ $transaction->transaction_id }}</a>
+                                                    <span class="transaction-reference-secondary">Request: {{ $transaction->reference_id ?: '—' }}</span>
+                                                    <span class="transaction-status-chip {{ $statusClass }} mt-50"><i class="bx bx-circle"></i>{{ ucfirst(str_replace('-', ' ', $status)) }}</span>
+                                                    <span class="transaction-date"><i class="bx bx-calendar mr-25"></i>{{ $transaction->created_at->format('M j, Y · g:i A') }}</span>
                                                 </td>
-                                                <td>
-                                                    <small>
-                                                    <strong>Product: </strong>{{ $transaction->product_name }} <br>
-                                                    <strong>Category: </strong>{{ $transaction->category->name ?? null}} <br>
+                                                <td class="transaction-financial-cell">
+                                                    <div class="transaction-total"><span>Total</span><strong>{{ $currency }}{{ number_format((float) $transaction->total_amount, 2) }}</strong></div>
+                                                    <div class="transaction-financial-row"><span>Amount</span><strong>{{ $currency }}{{ number_format((float) $transaction->amount, 2) }}</strong></div>
+                                                    <div class="transaction-financial-row"><span>Charge</span><strong>{{ $currency }}{{ number_format((float) $transaction->provider_charge, 2) }}</strong></div>
+                                                    {{-- <div class="transaction-balance-flow">{{ $currency }}{{ number_format((float) $transaction->balance_before, 2) }} <i class="bx bx-right-arrow-alt mx-25"></i> {{ $currency }}{{ number_format((float) $transaction->balance_after, 2) }}</div> --}}
+                                                </td>
+                                                <td class="transaction-service-cell">
+                                                    <span class="transaction-service-name">{{ $transaction->product_name ?: 'Unspecified service' }}</span>
+                                                    <span class="transaction-service-meta">{{ $transaction->category->name ?? 'No category' }}</span>
                                                     @if($transaction->variation)
-                                                    <strong>Variation: </strong>{{ $transaction->variation->system_name ?? 'null'}} <br>
-                                                    @endif
-                                                    @if($transactionModeLabel($transaction))
-                                                    <strong>Mode: </strong><span class="{{ $transactionModeClass($transaction) }} font-weight-600">{{ $transactionModeLabel($transaction) }}</span> <br>
+                                                        <span class="transaction-service-meta">{{ $transaction->variation->system_name ?? 'Unknown variation' }}</span>
                                                     @endif
                                                     @if(!empty($transaction->api))
-                                                    <strong>Provider: </strong>{{ $transaction->api->name }} <br>
+                                                        <span class="transaction-service-meta"><i class="bx bx-server mr-25"></i>{{ $transaction->api->name }}</span>
                                                     @endif
-                                                    <strong>Convenience: </strong>{!! getSettings()->currency. number_format((float) $transaction->provider_charge, 2) !!} <br>
-                                                    <strong>Discount: </strong>{!! getSettings()->currency. number_format((float) $transaction->discount, 2) !!} <br>
-                                                
-
-                                                    </small>
+                                                    <div class="transaction-service-tags">
+                                                        @if($transactionModeLabel($transaction))
+                                                            <span class="transaction-mode-chip"><i class="bx bx-transfer"></i>Mode: {{ $transactionModeLabel($transaction) }}</span>
+                                                        @endif
+                                                        @if((float) $transaction->discount > 0)
+                                                            <span class="transaction-mode-chip"><i class="bx bx-purchase-tag"></i>-{{ $currency }}{{ number_format((float) $transaction->discount, 2) }}</span>
+                                                        @endif
+                                                    </div>
                                                 </td>
-                                                <td>{{ $transaction->unique_element }}</td>
+                                                <td><span class="transaction-identifier-chip"><i class="bx bx-target-lock"></i>{{ $transaction->unique_element ?: 'Not provided' }}</span></td>
 
                                                 @if(hasAccess('admin.single.transaction.view'))
-                                                <td>
-                                                    @if(($transaction->product?->type ?? null) === 'airtime2cash')
-                                                    <a class="btn btn-primary btn-sm mr-1 mb-1" href="{{ route('admin.single.airtime2cash.transaction.view', $transaction->airtime2cash->id) }}">
-                                                        <i class="fa fa-eye"></i><span class="align-middle ml-25">View</span>
-                                                    </a>
-                                                    @else
-                                                    <a class="btn btn-primary btn-sm mr-1 mb-1" href="{{ route('admin.single.transaction.view', $transaction->id) }}">
-                                                        <i class="fa fa-eye"></i><span class="align-middle ml-25">View</span>
-                                                    </a>
-                                                    @endif
+                                                <td class="text-right">
+                                                    <a class="btn btn-outline-primary transaction-action-button" href="{{ $detailUrl }}" title="View transaction" aria-label="View transaction"><i class="bx bx-show"></i></a>
                                                 </td>
                                                 @endif
                                             </tr>
                                         @endforeach
                                     </tbody>
                                 </table>
-                            </form>
-                            {{ $transactions->appends($query) }}
+                            @if($transactions->hasPages())
+                                <div class="d-flex justify-content-center mt-2">
+                                    {{ $transactions->onEachSide(1)->links('pagination::bootstrap-4') }}
+                                </div>
+                            @endif
                         </div>
                     </div>
                 </div>

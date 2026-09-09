@@ -181,6 +181,11 @@
             background: #f5f7fb;
         }
 
+        .customer-balance-row.is-variance {
+            color: #b54708;
+            background: #fff7e8;
+        }
+
         .customer-balance-label {
             display: inline-flex;
             align-items: center;
@@ -403,6 +408,9 @@
                                         $walletAccess = (bool) ($user->customer?->can_access_w2bank ?? true);
                                         $walletAutoAccess = (bool) ($user->customer?->can_access_w2bank_auto ?? false);
                                         $a2cAccess = (bool) ($user->customer?->can_access_a2c ?? false);
+                                        $ledgerWalletBalance = (float) ($user->live_wallet_balance ?? 0);
+                                        $storedWalletBalance = (float) ($user->customer?->wallet ?? 0);
+                                        $walletBalanceVariance = $ledgerWalletBalance - $storedWalletBalance;
                                     @endphp
                                     <tr>
                                         @if($canEditCustomers)
@@ -451,9 +459,19 @@
                                         </td>
                                         <td class="customer-balance-cell">
                                             <a href="{{ route('admin.walletlog', ['email' => $user->email]) }}" class="customer-balance-primary">
-                                                <span class="customer-balance-label"><i class="bx bx-wallet"></i> Wallet</span>
-                                                <span class="customer-balance-value">{{ $currency }}{{ number_format((float) ($user->live_wallet_balance ?? $user->customer?->wallet ?? 0), 2) }}</span>
+                                                <span class="customer-balance-label"><i class="bx bx-calculator"></i> Ledger</span>
+                                                <span class="customer-balance-value">{{ $currency }}{{ number_format($ledgerWalletBalance, 2) }}</span>
                                             </a>
+                                            @if(abs($walletBalanceVariance) > 0.009)
+                                                <div class="customer-balance-row">
+                                                    <span class="customer-balance-label"><i class="bx bx-data"></i> Stored</span>
+                                                    <span class="customer-balance-value">{{ $currency }}{{ number_format($storedWalletBalance, 2) }}</span>
+                                                </div>
+                                                <div class="customer-balance-row is-variance" title="Ledger balance minus stored balance">
+                                                    <span class="customer-balance-label"><i class="bx bx-error-circle"></i> Variance</span>
+                                                    <span class="customer-balance-value">{{ $walletBalanceVariance < 0 ? '-' : '+' }}{{ $currency }}{{ number_format(abs($walletBalanceVariance), 2) }}</span>
+                                                </div>
+                                            @endif
                                             <a href="{{ route('admin.earninglog', ['upline_email' => $user->email]) }}" class="customer-balance-row">
                                                 <span class="customer-balance-label"><i class="bx bx-gift"></i> Referral</span>
                                                 <span class="customer-balance-value">{{ $currency }}{{ number_format((float) ($user->customer?->referal_wallet ?? 0), 2) }}</span>

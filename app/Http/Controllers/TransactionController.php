@@ -1958,7 +1958,7 @@ class TransactionController extends Controller
             ->selectRaw("COALESCE(SUM(CASE WHEN status = 'attention-required' THEN amount ELSE 0 END), 0) AS attention_required")
             ->first();
 
-        $transactions = $baseQuery->with(['category', 'variation', 'api', 'airtime2cash', 'customer.user'])->latest();
+        $transactions = $baseQuery->with(['product', 'category', 'variation', 'api', 'airtime2cash', 'customer.user'])->latest();
         $products = Product::orderBy('display_name')->get(['id', 'display_name']);
         $apis = API::query()->orderBy('name')->get(['id', 'name', 'slug']);
 
