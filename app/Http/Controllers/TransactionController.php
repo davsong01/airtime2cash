@@ -1958,7 +1958,7 @@ class TransactionController extends Controller
             ->selectRaw("COALESCE(SUM(CASE WHEN status = 'attention-required' THEN amount ELSE 0 END), 0) AS attention_required")
             ->first();
 
-        $transactions = $baseQuery->with(['category', 'variation', 'api', 'airtime2cash'])->latest();
+        $transactions = $baseQuery->with(['category', 'variation', 'api', 'airtime2cash', 'customer.user'])->latest();
         $products = Product::orderBy('display_name')->get(['id', 'display_name']);
         $apis = API::query()->orderBy('name')->get(['id', 'name', 'slug']);
 
@@ -3099,7 +3099,7 @@ class TransactionController extends Controller
         $trans = TransactionLog::find($transactionlog);
         if (!$trans) return ['status' => 'failed', 'message' => 'Transaction not found!'];
 
-        if ($trans->product->type == 'wallet2bank') {
+        if (in_array($trans->product->type, ['wallet2bank', 'airtime2cash'])) {
             $provider = $trans->api ?: API::query()
                 ->whereKey(getSettings()->bank_transfer_provider_id)
                 ->where('status', 'active')
@@ -3108,7 +3108,7 @@ class TransactionController extends Controller
             $controller = resolveProviderController($provider);
             $query = $controller && method_exists($controller, 'requery')
                 ? $controller->requery($trans)
-                : ['status' => 'failed', 'message' => 'No supported bank transfer provider found.'];
+                : ['status' => 'failed', 'message' => 'No provider found.'];
         } else {
             if ($trans->reason == 'WALLET-FUNDING') {
                 $provider = $trans->provider ?: $trans->api;

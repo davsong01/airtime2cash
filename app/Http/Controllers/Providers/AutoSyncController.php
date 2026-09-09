@@ -7,6 +7,7 @@ use App\Http\Controllers\TransactionController;
 use App\Models\Airtime2CashTransactions;
 use App\Models\API;
 use App\Models\Product;
+use App\Models\TransactionLog;
 use App\Services\AutoSyncService;
 use App\Services\AutoSyncSettlementService;
 use Illuminate\Http\JsonResponse;
@@ -33,6 +34,13 @@ class AutoSyncController extends Controller
             transaction: $transaction,
             otp: $otp,
             provider: $provider,
+        );
+    }
+
+    public function requery(TransactionLog $transaction){
+        return app(AutoSyncService::class)->queryTransaction(
+            transaction: $transaction->airtime2cash,
+            provider: $transaction->airtime2cash->provider,
         );
     }
 

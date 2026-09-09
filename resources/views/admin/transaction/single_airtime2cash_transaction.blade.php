@@ -149,7 +149,7 @@
                                                                 @if(in_array($transaction->reason, ['LEVEL-UPGRADE','WALLET-FUNDING','ADMIN-DEBIT','ADMIN-CREDIT']))
                                                                 <img id="product-image" width="60" height="60" src="{{ asset('site/upgrade.jpg') }}" alt="" class="product-image" style="margin:5px; box-shadow: rgba(0, 0, 0, 0.24) 0px 3px 8px;">
                                                                 @else
-                                                                
+
                                                                 <img id="product-image" width="60" height="60" src="{{ asset($productImage) }}" alt="" class="product-image" style="margin:5px; box-shadow: rgba(0, 0, 0, 0.24) 0px 3px 8px;">
                                                                 @endif
 
@@ -160,12 +160,17 @@
                                                                     {{ $transaction->transaction_id }}</h5> <br>
 
                                                                 {{ $transaction->created_at }}
-                                                                
+
                                                             </div>
-                                                            
+
                                                             <div class="col-md-6">
                                                                 <strong>Status:</strong>
                                                                 <span style="color:{{ $color }}"><strong>{{ ucfirst($transaction->status) }}</strong></span><br>
+                                                                @if($transaction->transactionLog)
+                                                                    <a target="_blank" href="{{ route('admin.single.transaction.view', $transaction->transactionLog->id) }}" class="btn btn-dark btn-sm mt-50">
+                                                                        <i class="bx bx-show mr-25"></i> View Transaction
+                                                                    </a><br>
+                                                                @endif
                                                                 @if(!empty($transaction->description))
                                                                 <strong>Description:</strong> {{$transaction->description}} <br>
                                                                 @endif
@@ -173,7 +178,7 @@
                                                                 <strong>Decline Reason:</strong> {{$transaction->decline_reason}}
                                                                 @endif
                                                                 <br>
-                                                                
+
                                                                 @if($transaction->status == 'pending')
                                                                     <a onclick="return confirm('You are about to approve this transaction. Customer will be credited')" href="{{ url('/admin/approve-airtime2cash-transaction/'.$transaction->id) }}" class="btn btn-success btn-sm" id="approve"> Approve</a>
 
@@ -243,7 +248,7 @@
                                                                 <span style="color:green"><strong>Approved:</strong> {{ $transaction->updated_at}}
                                                                 @endif
                                                                 @if($transaction->status == 'declined')
-                                                                <span style="color:red"><strong>Declined:</strong> {{ $transaction->updated_at}} 
+                                                                <span style="color:red"><strong>Declined:</strong> {{ $transaction->updated_at}}
                                                                 @endif
                                                                 <br>
                                                                 <strong>Completed:</strong>
@@ -267,7 +272,7 @@
                                                             <div class="col-md-4">
                                                                 <strong class="heads" style="color:green">Payment Method</strong>  <br>
                                                                 <strong>Where to receive funds: </strong>{{ $transaction->payment_method }}
-                                                                
+
                                                                 @if($transaction->payment_method == 'Transfer to Bank Account') <br>
                                                                 <strong>Bank Name: </strong>{{ $transaction->bank_name }}<br>
                                                                 <strong>Bank Code: </strong>{{ $transaction->bank_code }}<br>
@@ -281,15 +286,17 @@
                                                                 <strong>Provider: </strong>{{ $transaction->provider->name ?? 'Unknown' }} <br>
                                                                 <strong>Current Status: </strong>
                                                                 <span id="airtime-provider-status">{{ ucfirst($transaction->provider_status ?? $transaction->status) }}</span><br>
-                                                                <button type="button" class="btn btn-primary btn-sm mt-2" id="query-airtime-status" onclick="queryAirtimeStatus()">
-                                                                    Query Provider Status
-                                                                </button>
+                                                                @if($transaction->transactionLog)
+                                                                    <button type="button" class="btn btn-primary btn-sm mt-2" id="query-airtime-status" onclick="queryAirtimeStatus('{{ route('admin.requery.transaction', $transaction->transactionLog->id) }}')">
+                                                                        Query Provider Status
+                                                                    </button>
+                                                                @endif
                                                                 <div class="well mt-2" id="airtime-status-container" style="display:none;">
                                                                     <img src="{{url('/')}}/site/loading.gif" height="70" style="display:none; margin-left: auto; margin-right:auto;height:initial;" id="airtime-status-loading">
                                                                     <div id="airtime-status-response" style="max-height:300px;overflow:scroll;word-wrap: break-word"></div>
                                                                 </div>
                                                             </div>
-                                                            
+
                                                         </div>
                                                         @if($transaction->payment_method == 'Transfer to Bank Account')
                                                         <hr>
@@ -304,7 +311,7 @@
                                                                 </div>
                                                                 <a id="verify-bank-details" onclick="return confirm('Are you sure?')?queryBankDetails():'';" class="btn btn-success btn-sm" style="color:#fff;"><svg fill="white" xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24"><path d="M480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q65 0 123 19t107 53l-58 59q-38-24-81-37.5T480-800q-133 0-226.5 93.5T160-480q0 133 93.5 226.5T480-160q32 0 62-6t58-17l60 61q-41 20-86 31t-94 11Zm280-80v-120H640v-80h120v-120h80v120h120v80H840v120h-80ZM424-296 254-466l56-56 114 114 400-401 56 56-456 457Z"/></svg> Verify Bank Details</a>
 
-                                                                
+
                                                             </div>
                                                             @if(!empty($transaction->bank_transfer_api_response))
                                                             <div class="col-md-6">
@@ -328,10 +335,10 @@
                                 </section>
                             </div>
                         </div>
-                       
+
                     </div>
                 </div>
-                
+
             </section>
         </div>
     </div>
@@ -501,13 +508,13 @@
 		$.ajax({
 			url : url,
 			type : 'POST',
-            data: formData, 
+            data: formData,
 			beforeSend: function (){
 				$('#q_res').hide();
 				$('#img_loading').show();
 				$('#validate-biller').html('Processing....');
 			},
-			success:function (data) { 
+			success:function (data) {
 				$('#qw_debit').html('Query Debit <i class="fa fa-check"></i>');
 				$('#img_loading').hide();
 				$('#q_res').show();
@@ -517,9 +524,7 @@
 		e.preventDefault();
 	}
 
-    function queryAirtimeStatus() {
-        const url = '{{ url('/admin/single-airtime2cash-transaction-view/'.$transaction->id.'/requery') }}';
-
+    function queryAirtimeStatus(url) {
         $.ajax({
             url: url,
             type: 'GET',
@@ -530,7 +535,7 @@
                 $('#query-airtime-status').prop('disabled', true).text('Querying...');
             },
             success: function (data) {
-                $('#airtime-provider-status').text((data?.provider_status ?? 'unknown').toString().replace(/^./, function (char) { return char.toUpperCase(); }));
+                $('#airtime-provider-status').text((data?.provider_status ?? data?.status ?? 'unknown').toString().replace(/^./, function (char) { return char.toUpperCase(); }));
                 $('#airtime-status-loading').hide();
                 $('#airtime-status-response').show().html(renderPrettyJsonPanel(data, 'Provider status response', 'Airtime-to-cash lookup result'));
                 $('#query-airtime-status').prop('disabled', false).text('Query Provider Status');

@@ -883,7 +883,7 @@ class WalletConcurrencyTest extends TestCase
             'status' => 'pending',
         ]);
 
-        TransactionLog::create([
+        $transactionLog = TransactionLog::create([
             'status' => 'pending',
             'reference_id' => $transaction->transaction_id,
             'transaction_id' => $transaction->transaction_id,
@@ -925,6 +925,10 @@ class WalletConcurrencyTest extends TestCase
         $response->assertSee('₦697,450.00');
         $response->assertSee('A2C-TEST-FALLBACK-001');
         $response->assertSee('Status: Pending');
+        $response->assertSee('View Transaction');
+        $response->assertSee(route('admin.single.transaction.view', $transactionLog), false);
+        $response->assertSee(url('/admin/requery-transaction/' . $transactionLog->id), false);
+        $response->assertDontSee(url('/admin/single-airtime2cash-transaction-view/' . $transaction->id . '/requery'), false);
         $response->assertDontSee('No wallet trail recorded for this airtime-to-cash transaction.');
     }
 
@@ -1233,6 +1237,7 @@ class WalletConcurrencyTest extends TestCase
         $response->assertSee('Mode:');
         $response->assertSee('Manual');
         $response->assertSee('Auto');
+        $response->assertSee(route('customers.edit', $user->id), false);
     }
 
     private function createAdminUser(): User

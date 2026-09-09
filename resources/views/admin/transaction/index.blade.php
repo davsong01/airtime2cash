@@ -206,7 +206,11 @@
                                                     <span style="color:crimson"><strong>TransactionID: </strong> <br>{{ $transaction->transaction_id }}</span> <br>
                                                     <span style="color:rgb(27, 20, 220)"><strong>Request ID: </strong> <br>{{ $transaction->reference_id }}</span> <br><br>
                                                     {{ $transaction->customer_name }} <br>
-                                                    <a href="">{{ $transaction->customer_email  }}</a> <br>
+                                                    @if($transaction->customer?->user)
+                                                        <a href="{{ route('customers.edit', $transaction->customer->user->id) }}">{{ $transaction->customer_email }}</a> <br>
+                                                    @else
+                                                        {{ $transaction->customer_email }} <br>
+                                                    @endif
                                                     {{ $transaction->customer_phone }} <br>
                                                      {{ date("M jS, Y g:iA", strtotime($transaction->created_at)) }} <br>
                                                     @php

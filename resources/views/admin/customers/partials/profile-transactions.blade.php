@@ -17,7 +17,7 @@
                     <td>{!! getSettings()->currency !!}{{ number_format((float) $transaction->amount, 2) }}</td>
                     <td>{!! getSettings()->currency !!}{{ number_format((float) $transaction->total_amount, 2) }}</td>
                     <td>{{ $transaction->unique_element ?: '-' }}</td>
-                    <td><span class="badge {{ $transaction->status === 'success' ? 'badge-light-success' : ($transaction->status === 'failed' ? 'badge-light-danger' : 'badge-light-warning') }}">{{ ucfirst($transaction->status) }}</span></td>
+                    <td><span class="badge {{ in_array(strtolower((string) $transaction->status), ['success', 'successful', 'delivered'], true) ? 'badge-light-success' : ($transaction->status === 'failed' ? 'badge-light-danger' : 'badge-light-warning') }}">{{ ucfirst($transaction->status) }}</span></td>
                     <td><a href="{{ route('admin.single.transaction.view', $transaction->id) }}" class="font-weight-bold">{{ $transaction->transaction_id }}</a></td>
                 </tr>
             @empty
