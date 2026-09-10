@@ -445,7 +445,7 @@
                                             </div>
                                         @endif
                                         @if($wallet2bankAutoEnabled && $wallet2bankAutoAccess)
-                                            <div class="manual-resolution-note mt-3" id="auto-wallet2bank-usage-note" role="status" style="{{ count($availableTransferModes) > 1 ? 'display:none' : ($defaultTransferMode === 'auto_share' ? '' : 'display:none') }}">
+                                            <div class="manual-resolution-note mt-3" id="auto-wallet2bank-usage-note" role="status" data-reset-at="{{ ($autoWallet2BankUsage['reset_at'] ?? now()->addMinutes($autoWallet2BankUsage['window_minutes']))->timestamp * 1000 }}" style="{{ count($availableTransferModes) > 1 ? 'display:none' : ($defaultTransferMode === 'auto_share' ? '' : 'display:none') }}">
                                                 <strong>{{ $autoWallet2BankUsage['used'] }}/{{ $autoWallet2BankUsage['limit'] }}</strong> auto Wallet 2 Bank usages used.
                                                 @if($autoWallet2BankUsage['remaining'] > 0)
                                                     You have {{ $autoWallet2BankUsage['remaining'] }} more usage{{ $autoWallet2BankUsage['remaining'] === 1 ? '' : 's' }} until {{ ($autoWallet2BankUsage['reset_at'] ?? now()->addMinutes($autoWallet2BankUsage['window_minutes']))->format('l F j, Y, g:i A') }}. Please take note.
@@ -553,6 +553,11 @@ document.addEventListener('DOMContentLoaded', function () {
     const submitButton = document.getElementById('transfer-submit');
     const manualResolutionNote = document.getElementById('manual-resolution-note');
     const autoWallet2BankUsageNote = document.getElementById('auto-wallet2bank-usage-note');
+    if (autoWallet2BankUsageNote?.dataset.resetAt) {
+        const resetAt = Number(autoWallet2BankUsageNote.dataset.resetAt);
+        const refreshDelay = resetAt - Date.now() + 500;
+        window.setTimeout(() => window.location.reload(), Math.max(1000, refreshDelay));
+    }
     const transferModes = document.querySelectorAll('input[name="transfer_mode"]');
     const transferModeFallback = document.querySelector('input[type="hidden"][name="transfer_mode"]');
     const walletBankReady = @json($walletBankAccountReady);
