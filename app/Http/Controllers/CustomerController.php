@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use App\Models\ReservedAccountNumber;
 use App\Models\Wallet;
+use App\Models\TransactionLog;
 use App\Services\ExcelService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\Rule;
@@ -609,6 +610,8 @@ class CustomerController extends Controller
             'email' => ['required', 'email', Rule::unique('users', 'email')->ignore($id)],
             'can_access_w2bank' => ['nullable', 'in:0,1'],
             'can_access_w2bank_auto' => ['nullable', 'in:0,1'],
+            'auto_wallet2bank_usage_limit' => ['nullable', 'integer', 'min:1', 'max:1000'],
+            'auto_wallet2bank_usage_window_minutes' => ['nullable', 'integer', 'min:1', 'max:525600'],
             'can_access_a2c' => ['nullable', 'in:0,1'],
             'can_access_a2c_auto' => ['nullable', 'in:0,1'],
             'can_access_a2c_manual' => ['nullable', 'in:0,1'],
@@ -628,7 +631,18 @@ class CustomerController extends Controller
             $user = User::query()->findOrFail($id);
             $customer = Customer::query()->where('user_id', $user->id)->lockForUpdate()->first();
 
-            $user->update($request->except(['_token', 'ip', 'customerlevel', 'can_access_w2bank', 'can_access_w2bank_auto', 'can_access_a2c', 'can_access_a2c_auto', 'can_access_a2c_manual']));
+            $user->update($request->except([
+                '_token',
+                'ip',
+                'customerlevel',
+                'can_access_w2bank',
+                'can_access_w2bank_auto',
+                'auto_wallet2bank_usage_limit',
+                'auto_wallet2bank_usage_window_minutes',
+                'can_access_a2c',
+                'can_access_a2c_auto',
+                'can_access_a2c_manual',
+            ]));
 
             if ($customer) {
                 $legacyA2cAccess = (int) ($validated['can_access_a2c'] ?? 0);
@@ -639,13 +653,40 @@ class CustomerController extends Controller
                     ? (int) $validated['can_access_a2c_manual']
                     : $legacyA2cAccess;
 
-                $customer->forceFill([
+                $usageState = [];
+                $oldWindowMinutes = max(1, (int) ($customer->auto_wallet2bank_usage_window_minutes ?? 1440));
+                $windowChanged = array_key_exists('auto_wallet2bank_usage_window_minutes', $validated)
+                    && (int) $validated['auto_wallet2bank_usage_window_minutes'] !== $oldWindowMinutes;
+
+                if ($windowChanged && ! $customer->auto_wallet2bank_usage_reset_at) {
+                    $usageQuery = TransactionLog::query()
+                        ->where('customer_id', $customer->id)
+                        ->where('reason', 'Wallet to Bank Transfer')
+                        ->where('transfer_mode', 'auto_share')
+                        ->where('created_at', '>=', now()->subMinutes($oldWindowMinutes))
+                        ->orderBy('created_at');
+                    $usageCount = (int) ($customer->auto_wallet2bank_usage_count ?? 0) ?: $usageQuery->count();
+                    $latestUsage = (int) ($customer->auto_wallet2bank_usage_count ?? 0) > 0
+                        ? (clone $usageQuery)->latest('created_at')->first(['created_at'])
+                        : $usageQuery->latest('created_at')->first(['created_at']);
+
+                    if ($usageCount > 0 && $latestUsage) {
+                        $usageState = [
+                            'auto_wallet2bank_usage_count' => $usageCount,
+                            'auto_wallet2bank_usage_reset_at' => $latestUsage->created_at->copy()->addMinutes((int) $validated['auto_wallet2bank_usage_window_minutes']),
+                        ];
+                    }
+                }
+
+                $customer->forceFill(array_merge([
                     'can_access_w2bank' => (int) ($validated['can_access_w2bank'] ?? 0),
                     'can_access_w2bank_auto' => (int) ($validated['can_access_w2bank_auto'] ?? 0),
+                    'auto_wallet2bank_usage_limit' => (int) ($validated['auto_wallet2bank_usage_limit'] ?? $customer->auto_wallet2bank_usage_limit ?? 3),
+                    'auto_wallet2bank_usage_window_minutes' => (int) ($validated['auto_wallet2bank_usage_window_minutes'] ?? $customer->auto_wallet2bank_usage_window_minutes ?? 1440),
                     'can_access_a2c_auto' => $a2cAutoAccess,
                     'can_access_a2c_manual' => $a2cManualAccess,
                     'can_access_a2c' => (int) ($a2cAutoAccess || $a2cManualAccess),
-                ])->save();
+                ], $usageState))->save();
             }
 
             if ($level && $customer) {
@@ -667,6 +708,16 @@ class CustomerController extends Controller
 
         return back()->with('message', 'Update successful!');
 
+    }
+
+    public function resetAutoWallet2BankUsages(Customer $customer)
+    {
+        $customer->forceFill([
+            'auto_wallet2bank_usage_count' => 0,
+            'auto_wallet2bank_usage_reset_at' => now(),
+        ])->save();
+
+        return back()->with('message', 'Auto Wallet 2 Bank usages reset successfully.');
     }
 
     public function updateWalletBankAccount(Request $request, Customer $customer)

@@ -232,6 +232,7 @@ Route::middleware(['auth', 'verified', 'admin', 'ipcheck', 'adminRoute'])->prefi
     Route::get('customer/edit/{id}', [CustomerController::class, 'singleCustomer'])->name('customers.edit');
     Route::get('customer/{user}/wallet-report', [CustomerController::class, 'downloadWalletReport'])->name('customers.wallet-report');
     Route::post('customer/update/{id}', [CustomerController::class, 'updateCustomer'])->name('customers.update');
+    Route::post('customer/{customer}/reset-auto-wallet2bank-usages', [CustomerController::class, 'resetAutoWallet2BankUsages'])->name('customers.reset-auto-wallet2bank-usages');
     Route::post('customer/{customer}/wallet-bank-account', [CustomerController::class, 'updateWalletBankAccount'])->name('customers.wallet-bank-account.update');
     Route::delete('customer/{customer}/wallet-bank-account', [CustomerController::class, 'deleteWalletBankAccount'])->name('customers.wallet-bank-account.delete');
     Route::post('customer/{customer}/kyc-field-review', [CustomerController::class, 'reviewCustomerKycField'])->name('customers.kyc-field-review');

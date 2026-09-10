@@ -27,6 +27,7 @@
         auth()->user()?->middlename,
         auth()->user()?->lastname,
     ])->filter()->implode(' '))));
+    $autoWallet2BankUsage = $autoWallet2BankUsage ?? ['used' => 0, 'limit' => 3, 'remaining' => 3, 'window_minutes' => 1440, 'window_label' => '24 hours', 'reset_at' => null];
 ?>
 @extends('layouts.app')
 @section('title', $category->seo_title ?? getSettings()->seo_title)
@@ -397,8 +398,18 @@
                                                                                         {{-- Auto Transfer is available for this wallet-to-bank request. --}}
                                                                                     @endif
                                                                                 </div>
-                                                                            @endif
-                                                                        @else
+                                                                        @endif
+                                                                        @if($wallet2bankAutoEnabled && $wallet2bankAutoAccess)
+                                                                            <div class="manual-resolution-note mt-3" id="auto-wallet2bank-usage-note" role="status" style="{{ count($availableTransferModes) > 1 ? 'display:none' : ($defaultTransferMode === 'auto_share' ? '' : 'display:none') }}">
+                                                                                <strong>{{ $autoWallet2BankUsage['used'] }}/{{ $autoWallet2BankUsage['limit'] }}</strong> auto Wallet 2 Bank usages used.
+                                                                                @if($autoWallet2BankUsage['remaining'] > 0)
+                                                                                    You have {{ $autoWallet2BankUsage['remaining'] }} more usage{{ $autoWallet2BankUsage['remaining'] === 1 ? '' : 's' }} until {{ ($autoWallet2BankUsage['reset_at'] ?? now()->addMinutes($autoWallet2BankUsage['window_minutes']))->format('l F j, Y, g:i A') }}. Please take note.
+                                                                                @elseif($autoWallet2BankUsage['reset_at'])
+                                                                                    Your next usage will be available after {{ $autoWallet2BankUsage['reset_at']->format('l F j, Y, g:i A') }}.
+                                                                                @endif
+                                                                            </div>
+                                                                        @endif
+                                                                    @else
                                                                             <div class="alert alert-warning mt-3 mb-0">
                                                                                 Wallet to bank access is partially available on this page, but none of the available modes are enabled for your account. Please contact admin to request access.
                                                                             </div>
@@ -517,6 +528,10 @@
                                                                         const previewAdditionalSection = document.getElementById('preview-additional-section');
                                                                         const submitButton = document.getElementById('transfer-submit');
                                                                         const walletBankReady = @json($walletBankAccountReady);
+                                                                        const autoWallet2BankRemaining = @json($autoWallet2BankUsage['remaining']);
+                                                                        const selectedTransferMode = () => document.querySelector('input[name="transfer_mode"]:checked')?.value
+                                                                            || document.querySelector('input[type="hidden"][name="transfer_mode"]')?.value
+                                                                            || 'auto_share';
 
                                                                         if (!amountInput || !previewAmount || !previewFee || !previewTotal || !submitButton) return;
 
@@ -628,7 +643,7 @@
 
                                                                             previewCard.style.opacity = (amount > 0 && !isValid) ? '0.92' : '1';
 
-                                                                            submitButton.disabled = !isValid || !walletBankReady;
+                                                                            submitButton.disabled = !isValid || !walletBankReady || (selectedTransferMode() === 'auto_share' && autoWallet2BankRemaining <= 0);
                                                                         });
 
                                                                         submitButton.disabled = true;
@@ -637,7 +652,7 @@
                                                                 </script>
 
                                                                 <div class="col-md-12">
-                                                                        <button style="margin-top:4px" class="btn btn-primary" id="transfer-submit" type="submit" @disabled(!$canWithdraw || ! $hasSelectableTransferMode || ! $walletBankAccountReady)>PROCEED </button>
+                                                                        <button style="margin-top:4px" class="btn btn-primary" id="transfer-submit" type="submit" @disabled(!$canWithdraw || ! $hasSelectableTransferMode || ! $walletBankAccountReady || ($defaultTransferMode === 'auto_share' && $autoWallet2BankUsage['remaining'] <= 0))>PROCEED </button>
                                                                     </div>
 
                                                             </div>
@@ -778,7 +793,8 @@
 
 
         $(document).ready(function () {
-            const manualResolutionNote = document.getElementById('manual-resolution-note');
+    const manualResolutionNote = document.getElementById('manual-resolution-note');
+    const autoWallet2BankUsageNote = document.getElementById('auto-wallet2bank-usage-note');
             const verifyBankSection = document.getElementById('verify-bank-section');
             const submitButton = document.querySelector('#buy-buttonx');
             const transferModes = document.querySelectorAll('input[name="transfer_mode"]');
@@ -787,9 +803,12 @@
                 const selectedMode = document.querySelector('input[name="transfer_mode"]:checked')?.value
                     || transferModeFallback?.value
                     || 'auto_share';
-                if (manualResolutionNote) {
-                    manualResolutionNote.style.display = selectedMode === 'manual' ? 'block' : 'none';
-                }
+        if (manualResolutionNote) {
+            manualResolutionNote.style.display = selectedMode === 'manual' ? 'block' : 'none';
+        }
+        if (autoWallet2BankUsageNote) {
+            autoWallet2BankUsageNote.style.display = selectedMode === 'auto_share' ? 'block' : 'none';
+        }
                 if (verifyBankSection) {
                     verifyBankSection.style.display = selectedMode === 'manual' ? 'none' : 'block';
                 }
@@ -800,7 +819,10 @@
 
             if (transferModes.length > 0) {
                 transferModes.forEach(function (radio) {
-                    radio.addEventListener('change', updateTransferModeUi);
+                    radio.addEventListener('change', function () {
+                        updateTransferModeUi();
+                        document.getElementById('amount')?.dispatchEvent(new Event('input'));
+                    });
                 });
             }
 

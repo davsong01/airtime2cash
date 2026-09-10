@@ -83,10 +83,28 @@
                 <option value="1" @selected((bool) old('can_access_w2bank', $customer->can_access_w2bank ?? true))>Enabled</option>
             </select>
         </div>
+        <div class="col-12"><small class="text-muted font-weight-bold">Auto Wallet 2 Bank usage limit</small></div>
+        <div class="col-md-6 form-group">
+            <label for="auto_wallet2bank_usage_limit">Usages allowed</label>
+            <input type="number" class="form-control" id="auto_wallet2bank_usage_limit" name="auto_wallet2bank_usage_limit" min="1" max="1000" required value="{{ old('auto_wallet2bank_usage_limit', $customer->auto_wallet2bank_usage_limit ?? 3) }}">
+            <small class="form-text text-muted">Maximum auto Wallet 2 Bank requests in the window.</small>
+        </div>
+        <div class="col-md-6 form-group">
+            <label for="auto_wallet2bank_usage_window_minutes">Window in minutes</label>
+            <input type="number" class="form-control" id="auto_wallet2bank_usage_window_minutes" name="auto_wallet2bank_usage_window_minutes" min="1" max="525600" required value="{{ old('auto_wallet2bank_usage_window_minutes', $customer->auto_wallet2bank_usage_window_minutes ?? 1440) }}">
+            <small class="form-text text-muted">Requests become available again after this many minutes.</small>
+        </div>
         <div class="col-md-6">
             <button type="submit" class="btn btn-success"><i class="bx bx-save mr-25"></i> Save account changes</button>
         </div>
+        <div class="col-md-6 d-flex align-items-end">
+            <button type="submit" class="btn btn-outline-warning" form="reset-auto-wallet2bank-usages" onclick="return confirm('Reset this customer\'s current auto Wallet 2 Bank usage count?');"><i class="bx bx-refresh mr-25"></i> Reset current usages</button>
+        </div>
     </div>
+</form>
+
+<form id="reset-auto-wallet2bank-usages" action="{{ route('customers.reset-auto-wallet2bank-usages', $customer->id) }}" method="POST">
+    @csrf
 </form>
 
 <div class="customer-section-heading mt-4">

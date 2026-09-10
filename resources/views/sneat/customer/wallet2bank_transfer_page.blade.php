@@ -27,6 +27,7 @@
         auth()->user()?->middlename,
         auth()->user()?->lastname,
     ])->filter()->implode(' '))));
+    $autoWallet2BankUsage = $autoWallet2BankUsage ?? ['used' => 0, 'limit' => 3, 'remaining' => 3, 'window_minutes' => 1440, 'window_label' => '24 hours', 'reset_at' => null];
 @endphp
 @extends('sneat.layouts.app')
 @section('title', $category->seo_title ?? 'Wallet to Bank Transfer')
@@ -443,6 +444,16 @@
                                                 @endif
                                             </div>
                                         @endif
+                                        @if($wallet2bankAutoEnabled && $wallet2bankAutoAccess)
+                                            <div class="manual-resolution-note mt-3" id="auto-wallet2bank-usage-note" role="status" style="{{ count($availableTransferModes) > 1 ? 'display:none' : ($defaultTransferMode === 'auto_share' ? '' : 'display:none') }}">
+                                                <strong>{{ $autoWallet2BankUsage['used'] }}/{{ $autoWallet2BankUsage['limit'] }}</strong> auto Wallet 2 Bank usages used.
+                                                @if($autoWallet2BankUsage['remaining'] > 0)
+                                                    You have {{ $autoWallet2BankUsage['remaining'] }} more usage{{ $autoWallet2BankUsage['remaining'] === 1 ? '' : 's' }} until {{ ($autoWallet2BankUsage['reset_at'] ?? now()->addMinutes($autoWallet2BankUsage['window_minutes']))->format('l F j, Y, g:i A') }}. Please take note.
+                                                @elseif($autoWallet2BankUsage['reset_at'])
+                                                    Your next usage will be available after {{ $autoWallet2BankUsage['reset_at']->format('l F j, Y, g:i A') }}.
+                                                @endif
+                                            </div>
+                                        @endif
                                     @else
                                         <div class="alert alert-warning mb-0">
                                             Wallet to bank access is partially available on this page, but none of the available modes are enabled for your account. Please contact admin to request access.
@@ -511,7 +522,7 @@
                             </div>
                         </div>
                         <div class="mt-4">
-                            <button class="btn btn-primary customer-form-submit" id="transfer-submit" type="submit" @disabled(!$canWithdraw || ! $hasSelectableTransferMode || ! $walletBankAccountReady)><i class="bx bx-right-arrow-alt me-1"></i> Proceed</button>
+                            <button class="btn btn-primary customer-form-submit" id="transfer-submit" type="submit" @disabled(!$canWithdraw || ! $hasSelectableTransferMode || ! $walletBankAccountReady || ($defaultTransferMode === 'auto_share' && $autoWallet2BankUsage['remaining'] <= 0))><i class="bx bx-right-arrow-alt me-1"></i> Proceed</button>
                         </div>
                     </form>
                 </div>
@@ -541,9 +552,11 @@ document.addEventListener('DOMContentLoaded', function () {
     const previewAdditionalSection = document.getElementById('preview-additional-section');
     const submitButton = document.getElementById('transfer-submit');
     const manualResolutionNote = document.getElementById('manual-resolution-note');
+    const autoWallet2BankUsageNote = document.getElementById('auto-wallet2bank-usage-note');
     const transferModes = document.querySelectorAll('input[name="transfer_mode"]');
     const transferModeFallback = document.querySelector('input[type="hidden"][name="transfer_mode"]');
     const walletBankReady = @json($walletBankAccountReady);
+    const autoWallet2BankRemaining = @json($autoWallet2BankUsage['remaining']);
     const updateTransferModeUi = () => {
         const selectedMode = document.querySelector('input[name="transfer_mode"]:checked')?.value
             || transferModeFallback?.value
@@ -551,10 +564,16 @@ document.addEventListener('DOMContentLoaded', function () {
         if (manualResolutionNote) {
             manualResolutionNote.style.display = selectedMode === 'manual' ? 'block' : 'none';
         }
+        if (autoWallet2BankUsageNote) {
+            autoWallet2BankUsageNote.style.display = selectedMode === 'auto_share' ? 'block' : 'none';
+        }
         if (submitButton) {
             submitButton.innerHTML = selectedMode === 'manual'
                 ? '<i class="bx bx-right-arrow-alt me-1"></i> Proceed to WhatsApp'
                 : '<i class="bx bx-right-arrow-alt me-1"></i> Proceed';
+            if (selectedMode === 'auto_share' && autoWallet2BankRemaining <= 0) {
+                submitButton.disabled = true;
+            }
         }
     };
     if (!amountInput || !previewAmount || !previewFee || !previewTotal || !submitButton) return;
@@ -694,12 +713,18 @@ document.addEventListener('DOMContentLoaded', function () {
             previewCard.style.opacity = (amount > 0 && !isValid) ? '0.92' : '1';
         }
 
-        submitButton.disabled = !isValid || !walletBankReady;
+        const selectedMode = document.querySelector('input[name="transfer_mode"]:checked')?.value
+            || transferModeFallback?.value
+            || 'auto_share';
+        submitButton.disabled = !isValid || !walletBankReady || (selectedMode === 'auto_share' && autoWallet2BankRemaining <= 0);
     });
 
     if (transferModes.length > 0) {
         transferModes.forEach((radio) => {
-            radio.addEventListener('change', updateTransferModeUi);
+            radio.addEventListener('change', () => {
+                updateTransferModeUi();
+                amountInput.dispatchEvent(new Event('input'));
+            });
         });
     }
     updateTransferModeUi();

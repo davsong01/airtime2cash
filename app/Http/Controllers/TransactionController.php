@@ -154,9 +154,10 @@ class TransactionController extends Controller
             : ['transfer_fee' => 0];
         $minimumRequiredBalance = $providerMin + (float) ($minimumCharge['transfer_fee'] ?? 0);
         $walletBalance = walletBalance(auth()->user());
+        $autoWallet2BankUsage = $this->autoWallet2BankUsage($customer);
 
         if (!empty($product) && $product->status == 'active') {
-            return view(themeView('customer', 'wallet2bank_transfer_page'), compact('product', 'banks', 'pricingProvider', 'activeProvider', 'pricingBands', 'pricingAmountRange', 'providerMin', 'minimumRequiredBalance', 'pricingEnabled', 'pricingAvailable', 'walletBalance', 'walletBankAccount', 'walletBankAccountMatchesProfile'));
+            return view(themeView('customer', 'wallet2bank_transfer_page'), compact('product', 'banks', 'pricingProvider', 'activeProvider', 'pricingBands', 'pricingAmountRange', 'providerMin', 'minimumRequiredBalance', 'pricingEnabled', 'pricingAvailable', 'walletBalance', 'walletBankAccount', 'walletBankAccountMatchesProfile', 'autoWallet2BankUsage'));
         } else {
             return back();
         }
@@ -761,12 +762,24 @@ class TransactionController extends Controller
 
         $wallet = new WalletController();
 
+        $usageNotice = null;
+
         try {
-            DB::transaction(function () use (&$transaction, $wallet, $request) {
+            DB::transaction(function () use (&$transaction, &$usageNotice, $wallet, $request) {
                 $customer = Customer::query()
                     ->whereKey(auth()->user()->customer->id)
                     ->lockForUpdate()
                     ->firstOrFail();
+
+                if ($request['transfer_mode'] === 'auto_share') {
+                    $usage = $this->autoWallet2BankUsage($customer);
+
+                    if ($usage['used'] >= $usage['limit']) {
+                        throw new RuntimeException(
+                            'AUTO_W2B_LIMIT|' . ($usage['reset_at']?->format('M j, Y g:i A') ?? 'the usage window resets')
+                        );
+                    }
+                }
 
                 $recentDuplicate = $this->findRecentWalletToBankDuplicate($customer, $request->all());
 
@@ -792,6 +805,31 @@ class TransactionController extends Controller
 
                 $transaction = $this->logTransaction($request->all());
 
+                if ($request['transfer_mode'] === 'auto_share') {
+                    $usage['used']++;
+                    $usage['remaining'] = max(0, $usage['limit'] - $usage['used']);
+                    $usage['reset_at'] = $usage['reset_at'] ?? now()->addMinutes($usage['window_minutes']);
+                    $usageNotice = $usage['remaining'] > 0
+                        ? sprintf(
+                            '%d/%d auto Wallet 2 Bank usages used. You have %d more auto Wallet 2 Bank usage%s until %s. Please take note.',
+                            $usage['used'],
+                            $usage['limit'],
+                            $usage['remaining'],
+                            $usage['remaining'] === 1 ? '' : 's',
+                            $usage['reset_at']?->format('l F j, Y, g:i A') ?? now()->addMinutes($usage['window_minutes'])->format('l F j, Y, g:i A')
+                        )
+                        : sprintf(
+                            '%d/%d auto Wallet 2 Bank usages used. You have used all your usages. Your next usage will be available after %s.',
+                            $usage['used'],
+                            $usage['limit'],
+                            $usage['reset_at']?->format('l F j, Y, g:i A') ?? now()->addMinutes($usage['window_minutes'])->format('l F j, Y, g:i A')
+                        );
+                    $customer->forceFill([
+                        'auto_wallet2bank_usage_count' => $usage['used'],
+                        'auto_wallet2bank_usage_reset_at' => $usage['reset_at'] ?? now()->addMinutes($usage['window_minutes']),
+                    ])->save();
+                }
+
                 $wallet->logWallet($request->all());
                 $wallet->applyCustomerBalanceChange($customer, 'wallet', (float) $request['total_amount'], $request['type']);
             });
@@ -804,6 +842,11 @@ class TransactionController extends Controller
 
             if ($th instanceof RuntimeException && str_contains($th->getMessage(), 'Insufficient wallet balance')) {
                 return back()->with('error', $th->getMessage());
+            }
+
+            if ($th instanceof RuntimeException && str_starts_with($th->getMessage(), 'AUTO_W2B_LIMIT|')) {
+                $resetAt = explode('|', $th->getMessage(), 2)[1];
+                return back()->with('error', "You have used all your auto Wallet 2 Bank usages. Your next usage will be available after {$resetAt}.");
             }
 
             return back()->with('error', 'An error occured, please try again later');
@@ -922,7 +965,8 @@ class TransactionController extends Controller
 
             $this->sendTransactionEmail($transaction, auth()->user());
 
-            return redirect(route('transaction.status', $transaction->transaction_id));
+            return redirect(route('transaction.status', $transaction->transaction_id))
+                ->with('warning', $usageNotice);
         } catch (\Throwable $th) {
             DB::transaction(function () use ($wallet, $request, $transaction, $th) {
                 $wallet->logWallet([
@@ -949,6 +993,73 @@ class TransactionController extends Controller
 
             return back()->with('error', 'An error occured, please try again later');
         }
+    }
+
+    private function autoWallet2BankUsage(Customer $customer): array
+    {
+        $limit = max(1, (int) ($customer->auto_wallet2bank_usage_limit ?? 3));
+        $windowMinutes = max(1, (int) ($customer->auto_wallet2bank_usage_window_minutes ?? 1440));
+        $cutoff = now()->subMinutes($windowMinutes);
+        $storedCount = (int) ($customer->auto_wallet2bank_usage_count ?? 0);
+        $storedResetAt = $customer->auto_wallet2bank_usage_reset_at;
+
+        if ($storedResetAt && $storedResetAt->isFuture()) {
+            return [
+                'used' => $storedCount,
+                'limit' => $limit,
+                'remaining' => max(0, $limit - $storedCount),
+                'window_minutes' => $windowMinutes,
+                'window_label' => $this->formatDuration($windowMinutes),
+                'reset_at' => $storedResetAt,
+            ];
+        }
+
+        if ($storedResetAt && $storedResetAt->isPast()) {
+            return [
+                'used' => 0,
+                'limit' => $limit,
+                'remaining' => $limit,
+                'window_minutes' => $windowMinutes,
+                'window_label' => $this->formatDuration($windowMinutes),
+                'reset_at' => null,
+            ];
+        }
+
+        $recentUsages = TransactionLog::query()
+            ->where('customer_id', $customer->id)
+            ->where('reason', 'Wallet to Bank Transfer')
+            ->where('transfer_mode', 'auto_share')
+            ->where('created_at', '>=', $cutoff)
+            ->orderBy('created_at')
+            ->get(['created_at']);
+        $used = $recentUsages->count();
+        $oldestUsage = $recentUsages->first();
+
+        return [
+            'used' => $used,
+            'limit' => $limit,
+            'remaining' => max(0, $limit - $used),
+            'window_minutes' => $windowMinutes,
+            'window_label' => $this->formatDuration($windowMinutes),
+            'reset_at' => $oldestUsage?->created_at?->copy()->addMinutes($windowMinutes),
+        ];
+    }
+
+    private function formatDuration(int $minutes): string
+    {
+        if ($minutes < 60) {
+            return $minutes . ' ' . str('minute')->plural($minutes);
+        }
+
+        $hours = intdiv($minutes, 60);
+        $remainingMinutes = $minutes % 60;
+        $parts = [$hours . ' ' . str('hour')->plural($hours)];
+
+        if ($remainingMinutes > 0) {
+            $parts[] = $remainingMinutes . ' ' . str('minute')->plural($remainingMinutes);
+        }
+
+        return implode(' ', $parts);
     }
 
     private function customerCanAccessService(string $service): bool

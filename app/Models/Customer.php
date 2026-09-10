@@ -16,6 +16,9 @@ class Customer extends Model
     protected $attributes = [
         'can_access_w2bank' => 1,
         'can_access_w2bank_auto' => 0,
+        'auto_wallet2bank_usage_limit' => 3,
+        'auto_wallet2bank_usage_window_minutes' => 1440,
+        'auto_wallet2bank_usage_count' => 0,
         'can_access_a2c' => 0,
         'can_access_a2c_auto' => 0,
         'can_access_a2c_manual' => 0,
@@ -23,6 +26,10 @@ class Customer extends Model
     protected $casts = [
         'can_access_w2bank' => 'boolean',
         'can_access_w2bank_auto' => 'boolean',
+        'auto_wallet2bank_usage_limit' => 'integer',
+        'auto_wallet2bank_usage_window_minutes' => 'integer',
+        'auto_wallet2bank_usage_count' => 'integer',
+        'auto_wallet2bank_usage_reset_at' => 'datetime',
         'can_access_a2c' => 'boolean',
         'can_access_a2c_auto' => 'boolean',
         'can_access_a2c_manual' => 'boolean',
