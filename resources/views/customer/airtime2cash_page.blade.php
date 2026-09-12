@@ -9,6 +9,7 @@
     $showProviderStatus = (bool) (getSettings()->show_provider_status_on_customer_pages ?? true);
     $a2cAutoAccess = (bool) (auth()->user()?->customer?->can_access_a2c_auto ?? auth()->user()?->customer?->can_access_a2c ?? false);
     $a2cManualAccess = (bool) (auth()->user()?->customer?->can_access_a2c_manual ?? auth()->user()?->customer?->can_access_a2c ?? false);
+    $walletBankAccount = $walletBankAccount ?? auth()->user()?->customer?->wallet_bank_account;
     $adminWhatsappNumber = preg_replace('/\D+/', '', (string) (getSettings()->whatsapp_number ?? ''));
     $a2cWhatsappLinks = [
         'manual' => filled($adminWhatsappNumber)
@@ -202,20 +203,24 @@
                                                                             <div class="col-md-12" id="bank-details-div" style="display:none">
                                                                                 <fieldset class="form-group">
                                                                                     <label for="payment_method">Select Bank </label>
-                                                                                    <select class="form-control" name="bank" id="bank">
-                                                                                        <option value="">Select</option>
-                                                                                        @foreach($banks as $bank)
-                                                                                        <option value="{{ $bank->cbn_code }}">{{ $bank->bank_name }}</option>
-                                                                                        @endforeach
-                                                                                    </select>
+                                                                                    @if(!empty($walletBankAccount))
+                                                                                        {{ data_get($walletBankAccount, 'bank_name', 'Bank') }}
+                                                                                        <input type="hidden" name="bank" id="bank" value="{{ data_get($walletBankAccount, 'bank_id') }}">
+                                                                                    @else
+                                                                                        <div class="alert alert-warning mb-0">
+                                                                                            <strong>Locked bank account: Not set</strong>
+                                                                                            <div>You have not set up your wallet to bank account details yet.</div>
+                                                                                            <a href="{{ route('profile.edit') }}#wallet-to-bank-account" class="btn btn-sm btn-outline-primary mt-2">Go to profile</a>
+                                                                                        </div>
+                                                                                    @endif
                                                                                 </fieldset>
                                                                                 <fieldset class="form-group">
                                                                                     <label for="receive" class="">Account Number</label>
-                                                                                    <input class="form-control" id="account_number" name="account_number" type="text">
+                                                                                    <input class="form-control" id="account_number" name="account_number" type="text" value="{{ data_get($walletBankAccount, 'account_number') }}" readonly>
                                                                                 </fieldset>
                                                                                 <fieldset class="form-group">
                                                                                     <label for="receive" class="">Account Name</label>
-                                                                                    <input class="form-control" id="account_name" name="account_name" type="text">
+                                                                                    <input class="form-control" id="account_name" name="account_name" type="text" value="{{ data_get($walletBankAccount, 'account_name') }}" readonly>
                                                                                 </fieldset>
                                                                                 <small class="footnote" style="color:red">Please ensure that bank details entered are correct to enable us complete the transaction</small>
                                                                             </div>
@@ -346,7 +351,9 @@
             $('#a2c-manual-locked').toggle(transferMode === 'manual' && !hasAccess);
             $('#a2c-auto-locked').toggle(transferMode === 'auto_share' && !hasAccess);
         }
-        function setLegacyButton(label, disabled) { $('#buy-buttonx').text(label).prop('disabled', disabled); }
+        var hasLockedBankAccount = @json(!empty($walletBankAccount));
+        function bankPayoutBlocked() { return $('#payment_method').val() === 'Transfer to Bank Account' && !hasLockedBankAccount; }
+        function setLegacyButton(label, disabled) { $('#buy-buttonx').text(label).prop('disabled', disabled || bankPayoutBlocked()); }
         function showLegacyError(message) { $('#legacy-auto-error').text(message).toggle(Boolean(message)); }
         function firstLegacyError(data) {
             if (data.errors) {
@@ -371,11 +378,10 @@
             return {
                 product: $('#product').val(), transfer_mode: 'auto_share', amount: $('#amount').val(),
                 phone: $('#phone').val().replace(/\s+/g, ''), email: $('#email').val(),
-                payment_method: 'Transfer to Wallet', agreement: $('#agreement').prop('checked') ? 1 : 0
+                payment_method: $('#payment_method').val(), bank: $('#bank').val(), account_number: $('#account_number').val(), account_name: $('#account_name').val(), agreement: $('#agreement').prop('checked') ? 1 : 0
             };
         }
         function validateLegacyDetails() {
-            if (isAutoTransfer()) $('#payment_method').val('Transfer to Wallet').trigger('change');
             if (!document.getElementById('initialize').reportValidity()) return false;
             if (!$('#agreement').prop('checked')) { alert('You must agree to the transfer instructions'); return false; }
             return true;
@@ -468,7 +474,6 @@
             var auto = this.value === 'auto_share';
             autoStage = 'details'; autoTransactionId = null;
             $('#legacy-auto-flow').hide();
-            $('#payment_method option[value="Transfer to Bank Account"]').prop('disabled', auto);
             setLegacyButton(auto ? 'INITIATE AUTO TRANSFER' : 'PROCEED', false);
             refreshNetworks();
             refreshModeAccess();
@@ -568,6 +573,7 @@
                 $("#account_number").removeAttr('required');
                 $("#account_name").removeAttr('required');
             }
+            $('#buy-buttonx').prop('disabled', bankPayoutBlocked());
             var fixed_price = $('#product').find(':selected').data('fixed_price');
         });
 
@@ -583,7 +589,6 @@
                 $('#receive-div').show();
                 $('#receive').val(receive);
                 $('#payment-div').show();
-                if (isAutoTransfer()) $('#payment_method').val('Transfer to Wallet').trigger('change');
             }else{
                 $('#receive-div').hide();
                 $('#payment-div').hide();

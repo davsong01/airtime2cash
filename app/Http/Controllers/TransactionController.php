@@ -109,9 +109,10 @@ class TransactionController extends Controller
             ->whereKey(getSettings()?->auto_share_provider_id)
             ->where('status', 'active')
             ->first();
+        $walletBankAccount = auth()->user()?->customer?->wallet_bank_account ?? null;
 
         if (!empty($category) && $category->status == 'active') {
-            return view(themeView('customer', 'airtime2cash_page'), compact('category', 'banks', 'activeProvider'));
+            return view(themeView('customer', 'airtime2cash_page'), compact('category', 'banks', 'activeProvider', 'walletBankAccount'));
         } else {
             return back();
         }
@@ -360,14 +361,44 @@ class TransactionController extends Controller
             ->whereKey($verificationProviderId)
             ->where('status', 'active')
             ->first();
-        $bank = $verificationProvider ? getWalletToBankBanks($verificationProvider)->first(function (Bank $candidate) use ($request) {
-            return strcasecmp(trim((string) $candidate->cbn_code), trim((string) $request->bank)) === 0;
-        }) : null;
-        if (!empty($bank)) {
+        $bank = null;
+        $bank_name = '';
+
+        if ($request->input('payment_method') === 'Transfer to Bank Account') {
+            $walletBankAccount = auth()->user()?->customer?->wallet_bank_account;
+            $walletBankId = data_get($walletBankAccount, 'bank_id');
+            $walletBankCode = trim((string) data_get($walletBankAccount, 'bank_code'));
+            $walletAccountNumber = trim((string) data_get($walletBankAccount, 'account_number'));
+            $walletAccountName = trim((string) data_get($walletBankAccount, 'account_name'));
+
+            if (! $verificationProvider || blank($walletBankAccount) || blank($walletAccountNumber) || blank($walletAccountName)) {
+                $message = 'Please save and verify your wallet to bank account details before selecting bank payout.';
+
+                return $request->expectsJson()
+                    ? response()->json(['status' => false, 'message' => $message], 422)
+                    : back()->withInput()->with('error', $message);
+            }
+
+            $bank = getWalletToBankBanks($verificationProvider)->first(function (Bank $candidate) use ($walletBankId, $walletBankCode) {
+                return (filled($walletBankId) && (int) $candidate->getKey() === (int) $walletBankId)
+                    || (filled($walletBankCode) && strcasecmp(trim((string) $candidate->cbn_code), $walletBankCode) === 0);
+            });
+
+            if (! $bank) {
+                $message = 'Your locked payout bank is no longer available. Please contact admin.';
+
+                return $request->expectsJson()
+                    ? response()->json(['status' => false, 'message' => $message], 422)
+                    : back()->withInput()->with('error', $message);
+            }
+
+            $request->merge([
+                'bank' => $bank->cbn_code,
+                'bank_id' => $bank->id,
+                'account_number' => $walletAccountNumber,
+                'account_name' => $walletAccountName,
+            ]);
             $bank_name = $bank->bank_name;
-            $request['bank_id'] = $bank->id;
-        } else {
-            $bank_name = '';
         }
 
         $transaction = [
@@ -1338,22 +1369,36 @@ class TransactionController extends Controller
             $alreadySettled = $transaction->status === 'successful';
             $balanceBefore = (float) ($customer->wallet ?? 0);
             $balanceAfter = $balanceBefore;
+            $bankPayoutResponse = null;
 
             if ($statusCode === 1 && ! $alreadySettled && (float) $transaction->amount_paid > 0) {
-                $wallet = new WalletController();
-                $balanceAfter = $balanceBefore + (float) $transaction->amount_paid;
+                if ($transaction->payment_method === 'Transfer to Bank Account') {
+                    $bankPayoutResponse = $this->transferToBankAccount(
+                        (string) $transaction->bank_code,
+                        (string) $transaction->account_number,
+                        (string) $transaction->account_name,
+                        (float) $transaction->amount_paid
+                    );
 
-                $wallet->logWallet([
-                    'customer_id' => $transaction->customer_id,
-                    'type' => 'credit',
-                    'total_amount' => (float) $transaction->amount_paid,
-                    'transaction_id' => $transaction->transaction_id,
-                    'reason' => 'Airtime-to-cash conversion',
-                    'balance_before' => $balanceBefore,
-                    'balance_after' => $balanceAfter,
-                ]);
+                    if (($bankPayoutResponse['status'] ?? null) !== 'success') {
+                        $statusCode = 2;
+                    }
+                } else {
+                    $wallet = new WalletController();
+                    $balanceAfter = $balanceBefore + (float) $transaction->amount_paid;
 
-                $wallet->applyCustomerBalanceChange($customer, 'wallet', (float) $transaction->amount_paid, 'credit');
+                    $wallet->logWallet([
+                        'customer_id' => $transaction->customer_id,
+                        'type' => 'credit',
+                        'total_amount' => (float) $transaction->amount_paid,
+                        'transaction_id' => $transaction->transaction_id,
+                        'reason' => 'Airtime-to-cash conversion',
+                        'balance_before' => $balanceBefore,
+                        'balance_after' => $balanceAfter,
+                    ]);
+
+                    $wallet->applyCustomerBalanceChange($customer, 'wallet', (float) $transaction->amount_paid, 'credit');
+                }
             }
 
             if ($statusCode === 1 && $alreadySettled) {
@@ -1375,7 +1420,7 @@ class TransactionController extends Controller
 
             $transaction->update([
                 'provider_status' => $providerStatus,
-                'bank_transfer_api_response' => json_encode($providerResponse, JSON_THROW_ON_ERROR),
+                'bank_transfer_api_response' => json_encode($bankPayoutResponse ?? $providerResponse, JSON_THROW_ON_ERROR),
                 'status' => match ($statusCode) {
                     1 => 'successful',
                     2 => 'pending',

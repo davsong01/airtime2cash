@@ -274,11 +274,22 @@
                                 <div id="bank-details-div" class="mt-4" style="display:none">
                                     <div class="rounded border bg-body-tertiary p-3 p-md-4">
                                         <div class="d-flex align-items-center gap-2 mb-3"><i class="bx bx-building-house text-primary fs-5"></i><h6 class="mb-0">Bank account details</h6></div>
-                                        <div class="row g-3">
-                                            <div class="col-md-4"><label for="bank" class="form-label">Bank</label><select class="form-select modern-select2" name="bank" id="bank" data-placeholder="Search banks"><option value="">Select a bank</option>@foreach($banks as $bank)<option value="{{ $bank->cbn_code }}">{{ $bank->bank_name }}</option>@endforeach</select></div>
-                                            <div class="col-md-4"><label for="account_number" class="form-label">Account number</label><input class="form-control" id="account_number" name="account_number" type="text" inputmode="numeric"></div>
-                                            <div class="col-md-4"><label for="account_name" class="form-label">Account name</label><input class="form-control" id="account_name" name="account_name" type="text"></div>
-                                        </div>
+                                        @if(!empty($walletBankAccount))
+                                            <div class="alert alert-info mb-0">
+                                                <strong>Locked payout account</strong><br>
+                                                {{ data_get($walletBankAccount, 'bank_name', 'Bank') }} — {{ data_get($walletBankAccount, 'account_name', 'Account holder') }}<br>
+                                                Account number: {{ data_get($walletBankAccount, 'account_number') }}
+                                            </div>
+                                            <input type="hidden" name="bank" id="bank" value="{{ data_get($walletBankAccount, 'bank_id') }}">
+                                            <input type="hidden" name="account_number" id="account_number" value="{{ data_get($walletBankAccount, 'account_number') }}">
+                                            <input type="hidden" name="account_name" id="account_name" value="{{ data_get($walletBankAccount, 'account_name') }}">
+                                        @else
+                                            <div class="alert alert-warning mb-0">
+                                                <strong>Locked bank account: Not set</strong>
+                                                <div>You have not set up your wallet to bank account details yet.</div>
+                                                <a href="{{ route('profile.edit') }}#wallet-to-bank-account" class="btn btn-sm btn-outline-primary mt-2">Go to profile</a>
+                                            </div>
+                                        @endif
                                     </div>
                                 </div>
                             </div>
@@ -544,8 +555,12 @@
                 disabled = false,
                 icon = 'bx-transfer'
             ) {
+                const bankPayoutBlocked = $paymentMethod.val()
+                    === 'Transfer to Bank Account'
+                    && !@json(!empty($walletBankAccount));
+
                 $buyButton
-                    .prop('disabled', disabled)
+                    .prop('disabled', disabled || bankPayoutBlocked)
                     .html(
                         `<i class="bx ${icon} me-1"></i>` +
                         `<span>${label}</span>`
@@ -879,11 +894,6 @@
                 $receiveDiv.show();
                 $paymentDiv.show();
 
-                if (isAutoTransfer()) {
-                    $paymentMethod
-                        .val('Transfer to Wallet')
-                        .trigger('change');
-                }
             }
 
             /*
@@ -907,12 +917,6 @@
                         });
 
                     return false;
-                }
-
-                if (isAutoTransfer()) {
-                    $paymentMethod
-                        .val('Transfer to Wallet')
-                        .trigger('change');
                 }
 
                 if (!form.reportValidity()) {
@@ -942,7 +946,10 @@
                     amount: $amount.val(),
                     phone: normalizePhone($phone.val()),
                     email: $email.val(),
-                    payment_method: 'Transfer to Wallet',
+                    payment_method: $paymentMethod.val(),
+                    bank: $bank.val(),
+                    account_number: $accountNumber.val(),
+                    account_name: $accountName.val(),
                     agreement: $agreement.prop('checked') ? 1 : 0,
                     share_pin: $sharePin.val()
                 };
@@ -1427,10 +1434,6 @@
                 $product.val('');
                 resetSelectedProductDetails();
 
-                $paymentMethod
-                    .find('option[value="Transfer to Bank Account"]')
-                    .prop('disabled', autoMode);
-
                 $('#instruction-context').text(
                     autoMode
                         ? 'Follow these steps to complete an automatic airtime transfer.'
@@ -1507,6 +1510,8 @@
                 if (!useBank) {
                     resetBankDetails();
                 }
+
+                $buyButton.prop('disabled', useBank && !@json(!empty($walletBankAccount)));
             });
 
             $amount.on('input', recalculatePayout);
