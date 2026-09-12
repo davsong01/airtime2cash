@@ -248,7 +248,9 @@
 
             $button.on('click', function () {
                 const verifyUrl = String($button.data('verify-url') || '');
-                const bankCode = String($('#wallet_bank_bank').val() || '').trim();
+                const $selectedBank = $('#wallet_bank_bank option:selected');
+                const bankId = String($selectedBank.val() || '').trim();
+                const bankCode = String($selectedBank.data('cbn-code') || '').trim();
                 const accountNumber = String($('#wallet_bank_account_number').val() || '').trim();
                 const accountName = String($('#wallet_bank_account_name').val() || '').trim();
                 const profileName = String($('#wallet_bank_profile_name').val() || '').trim();
@@ -256,7 +258,7 @@
                 const verifiedAt = String($('#wallet_bank_verified_at').val() || '').trim();
                 const customerName = String($button.data('customer-name') || '').trim();
 
-                if (!bankCode || !accountNumber) {
+                if (!bankId || !bankCode || !accountNumber) {
                     $result.html('<div class="alert alert-warning mb-0">Please choose a bank and enter an account number before verifying.</div>').show();
                     return;
                 }
@@ -266,6 +268,7 @@
                     method: 'POST',
                     data: {
                         _token: $('meta[name="csrf-token"]').attr('content'),
+                        bank_id: bankId,
                         bank: bankCode,
                         bank_code: bankCode,
                         account_number: accountNumber,

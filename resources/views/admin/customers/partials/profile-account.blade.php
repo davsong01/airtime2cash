@@ -125,7 +125,7 @@
                 <select class="form-control js-example-basic-single" id="wallet_bank_bank" name="wallet_bank_bank" required>
                     <option value="">Select bank</option>
                     @foreach ($banks as $bank)
-                        <option value="{{ $bank->cbn_code }}" @selected((string) old('wallet_bank_bank', data_get($walletBankAccount, 'bank_code')) === (string) $bank->cbn_code)>
+                        <option value="{{ $bank->id }}" data-cbn-code="{{ $bank->cbn_code }}" @selected((string) old('wallet_bank_bank', data_get($walletBankAccount, 'bank_id')) === (string) $bank->id || (! data_get($walletBankAccount, 'bank_id') && (string) old('wallet_bank_bank', data_get($walletBankAccount, 'bank_code')) === (string) $bank->cbn_code))>
                             {{ $bank->bank_name }} ({{ $bank->cbn_code }})
                         </option>
                     @endforeach
@@ -151,7 +151,7 @@
                 <label for="wallet_bank_verified_at">Verified at</label>
                 <input type="datetime-local" class="form-control" id="wallet_bank_verified_at" name="wallet_bank_verified_at" value="{{ old('wallet_bank_verified_at', $walletVerifiedAtValue) }}">
             </div>
-            
+
             <div class="col-12 d-flex align-items-center justify-content-between flex-wrap gap-3 mt-1">
                 <small class="text-muted">Use the current draft values to verify the account before saving.</small>
                 <div class="d-flex align-items-center flex-wrap gap-2">

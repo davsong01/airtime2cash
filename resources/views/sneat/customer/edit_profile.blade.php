@@ -444,7 +444,7 @@
                                         <select class="form-select modern-select2" name="bank" id="wallet_bank_bank" data-placeholder="Search banks" required>
                                             <option value="">Select a bank</option>
                                             @foreach($banks as $bank)
-                                                <option value="{{ $bank->cbn_code }}">{{ $bank->bank_name }}</option>
+                                                <option value="{{ $bank->id }}" data-cbn-code="{{ $bank->cbn_code }}">{{ $bank->bank_name }}</option>
                                             @endforeach
                                         </select>
                                     </div>

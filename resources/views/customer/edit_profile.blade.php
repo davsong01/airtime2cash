@@ -230,7 +230,7 @@
                                                                                 <select class="form-control" name="bank" id="wallet_bank_bank" required>
                                                                                     <option value="">Select</option>
                                                                                     @foreach($banks as $bank)
-                                                                                        <option value="{{ $bank->cbn_code }}">{{ $bank->bank_name }}</option>
+                                                                                        <option value="{{ $bank->id }}" data-cbn-code="{{ $bank->cbn_code }}">{{ $bank->bank_name }}</option>
                                                                                     @endforeach
                                                                                 </select>
                                                                             </fieldset>
