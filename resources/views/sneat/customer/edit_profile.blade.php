@@ -454,7 +454,6 @@
                                     </div>
                                 </div>
                                 <div class="alert alert-info mt-3 mb-0">
-                                    Account details, <strong>click</strong> <a href="{{ url('/profile#wallet-to-bank-account') }}">HERE</a> to fill it now.
                                     We will verify the account number and only save it if it matches your profile name.
                                 </div>
                                 <div class="bank-setup-actions mt-4">
