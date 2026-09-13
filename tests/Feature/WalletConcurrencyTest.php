@@ -8,6 +8,7 @@ use App\Models\API;
 use App\Models\Product;
 use App\Models\Bank;
 use App\Http\Controllers\WalletController;
+use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\Providers\MonnifyController;
 use App\Http\Middleware\AdminMiddleware;
 use App\Http\Middleware\CheckIpMiddleware;
@@ -28,6 +29,92 @@ use Tests\TestCase;
 class WalletConcurrencyTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_airtime2cash_transaction_log_tracks_real_provider_not_product_api(): void
+    {
+        $user = User::factory()->create([
+            'firstname' => 'Provider',
+            'lastname' => 'Trace',
+            'status' => 'active',
+        ]);
+
+        $customer = Customer::create([
+            'user_id' => $user->id,
+            'wallet' => 1000,
+            'referal_wallet' => 0,
+            'a2cashwallet' => 0,
+        ]);
+
+        $productApi = API::create([
+            'name' => 'Monnify',
+            'slug' => 'monnify',
+            'status' => 'active',
+        ]);
+
+        $airtimeProvider = API::create([
+            'name' => 'AutoSync',
+            'slug' => 'autosync',
+            'status' => 'active',
+        ]);
+
+        $category = Category::create([
+            'name' => 'Airtime to Cash Provider Trace',
+            'slug' => 'airtime-to-cash-provider-trace',
+            'type' => 'airtime2cash',
+            'status' => 'active',
+        ]);
+
+        $product = Product::create([
+            'name' => 'MTN Airtime to Cash',
+            'slug' => 'mtn-airtime-to-cash-provider-trace',
+            'category_id' => $category->id,
+            'type' => 'airtime2cash',
+            'image' => 'site/upgrade.jpg',
+            'status' => 'active',
+            'api_id' => $productApi->id,
+        ]);
+
+        $transaction = Airtime2CashTransactions::create([
+            'transaction_id' => 'A2C-TEST-PROVIDER-TRACE-001',
+            'product_id' => $product->id,
+            'customer_id' => $customer->id,
+            'type' => 'credit',
+            'amount_paid' => 920,
+            'amount_charged' => 80,
+            'charge_rate' => 8,
+            'total_amount' => 1000,
+            'payment_method' => 'Transfer to Wallet',
+            'transfer_mode' => 'auto_share',
+            'status' => 'pending',
+        ]);
+
+        $controller = new TransactionController();
+        $method = new \ReflectionMethod($controller, 'upsertAirtime2CashTransactionLog');
+        $method->setAccessible(true);
+
+        // Before the real provider is selected, the log must not guess from
+        // the product API (which is Monnify in this regression case).
+        $method->invoke($controller, $transaction, $customer, [
+            'status' => 'pending',
+            'balance_before' => 1000,
+            'balance_after' => 1000,
+        ]);
+
+        $this->assertNull(TransactionLog::where('transaction_id', $transaction->transaction_id)->value('api_id'));
+
+        // Once AutoSync is selected, the transaction log should identify it.
+        $transaction->update(['provider_id' => $airtimeProvider->id]);
+        $method->invoke($controller, $transaction->fresh(), $customer, [
+            'status' => 'pending',
+            'balance_before' => 1000,
+            'balance_after' => 1000,
+        ]);
+
+        $this->assertSame(
+            $airtimeProvider->id,
+            TransactionLog::where('transaction_id', $transaction->transaction_id)->value('api_id')
+        );
+    }
 
     public function test_stale_wallet_instances_do_not_overwrite_each_other(): void
     {
@@ -1073,7 +1160,8 @@ class WalletConcurrencyTest extends TestCase
             'product_id' => $product->id,
             'customer_id' => $customer->id,
             'provider_id' => $provider->id,
-            'provider_request_ref' => 'ASNA2C20260828082539QHJE6M',
+            'provider_reference' => 'ASNA2C20260828082539QHJE6M',
+            'provider_request_ref' => 'A2C-AUTOSYNC-REQUERY-001',
             'type' => 'credit',
             'amount_paid' => 1200,
             'amount_charged' => 100,

@@ -116,7 +116,10 @@ class AutoSyncService
             && isset($data['data']['transaction']['reference'])
         ) {
             $transaction->update([
-                'provider_request_ref' => $data['data']['transaction']['reference'],
+                // AutoSync returns its own reference separately from the
+                // request_ref that we sent. Keep those identifiers distinct.
+                'provider_reference' => $data['data']['transaction']['reference'],
+                'provider_request_ref' => $payload['request_ref'],
                 'provider_response' => $data,
                 'provider_status' => $data['data']['transaction']['status'] ?? null,
             ]);
@@ -159,11 +162,13 @@ class AutoSyncService
 
     public function complete(Airtime2CashTransactions $transaction, string $otp, API $provider): array
     {
-        if (blank($transaction->provider_request_ref)) {
+        $reference = $this->resolveProviderReference($transaction);
+
+        if (blank($reference)) {
             throw new RuntimeException('The provider transaction reference is missing.');
         }
 
-        $endpoint = $this->resolveBaseUrl($provider).'/airtime/cash/'.rawurlencode($transaction->provider_request_ref);
+        $endpoint = $this->resolveBaseUrl($provider).'/airtime/cash/'.rawurlencode($reference);
         $payload = ['otp' => $otp];
         $headers = [
             'Accept' => 'application/json',
@@ -246,7 +251,7 @@ class AutoSyncService
 
     public function queryTransaction(Airtime2CashTransactions $transaction, API $provider): array
     {
-        $reference = $transaction->provider_request_ref ?: $transaction->transaction_id;
+        $reference = $this->resolveProviderReference($transaction);
 
         if (blank($reference)) {
             throw new RuntimeException('The provider transaction reference is missing.');
@@ -258,7 +263,11 @@ class AutoSyncService
             'Authorization' => 'Bearer '.$provider->api_key,
         ];
         $startedAt = microtime(true);
-
+        Log::info('Querying AutoSync transaction', [
+            'transaction_id' => $transaction->transaction_id,
+            'provider_reference' => $reference,
+            'endpoint' => $endpoint,
+        ]);
         try {
             $response = Http::withHeaders($headers)
                 ->asJson()
@@ -324,11 +333,13 @@ class AutoSyncService
 
     public function resendOtp(Airtime2CashTransactions $transaction, API $provider, array $context = []): array
     {
-        if (blank($transaction->provider_request_ref)) {
+        $reference = $this->resolveProviderReference($transaction);
+
+        if (blank($reference)) {
             throw new RuntimeException('The provider transaction reference is missing.');
         }
 
-        $endpoint = $this->resolveBaseUrl($provider).'/airtime/cash/'.rawurlencode($transaction->provider_request_ref).'/resend-otp';
+        $endpoint = $this->resolveBaseUrl($provider).'/airtime/cash/'.rawurlencode($reference).'/resend-otp';
         $headers = [
             'Accept' => 'application/json',
             'Authorization' => 'Bearer '.$provider->api_key,
@@ -436,6 +447,20 @@ class AutoSyncService
             'error' => $error,
             'duration_ms' => (int) round((microtime(true) - $startedAt) * 1000),
         ]);
+    }
+
+    /**
+     * Resolve the external AutoSync reference used in provider API URLs.
+     *
+     * provider_request_ref was historically populated with the external
+     * reference, so keep it as a fallback for transactions created before the
+     * reference fields were separated.
+     */
+    private function resolveProviderReference(Airtime2CashTransactions $transaction): ?string
+    {
+        return filled($transaction->provider_reference)
+            ? $transaction->provider_reference
+            : $transaction->provider_request_ref;
     }
 
     public function redact(array $data): array

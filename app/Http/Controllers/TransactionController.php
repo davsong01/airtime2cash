@@ -452,6 +452,13 @@ class TransactionController extends Controller
                 }
 
                 $log->update(['provider_id' => $providerId]);
+                // The transaction log must identify the provider that processes
+                // the Airtime2Cash request. Do not inherit the product API here:
+                // that API can be unrelated to the auto-transfer provider (for
+                // example, the bank verification provider may be Monnify while
+                // the real Airtime2Cash transaction is handled by AutoSync).
+                TransactionLog::where('transaction_id', $log->transaction_id)
+                    ->update(['api_id' => $providerId]);
 
                 if ($provider->slug == 'autosync') {
                     $response = (new AutoSyncService())->initiate(
@@ -576,7 +583,7 @@ class TransactionController extends Controller
             ], 422);
         }
 
-        if (blank($transaction->provider_request_ref)) {
+        if (blank($transaction->provider_reference) && blank($transaction->provider_request_ref)) {
             return response()->json([
                 'status' => false,
                 'message' => 'The provider transaction reference is missing.',
@@ -1788,7 +1795,10 @@ class TransactionController extends Controller
             'ip_address' => $overrides['ip_address'] ?? $this->getIpAddress(),
             'domain_name' => $overrides['domain_name'] ?? $this->getDomainName(),
             'app_version' => Session::get('app_version') ?? null,
-            'api_id' => $transaction->provider_id ?? $transaction->product?->api_id,
+            // Only record an API after the Airtime2Cash provider has actually
+            // been selected. The product API is not a safe fallback here: it
+            // may represent a bank-verification or unrelated product provider.
+            'api_id' => $transaction->provider_id,
             'reason' => 'Airtime2Cash Payment',
             'provider_charge' => $transaction->amount_charged ?? null,
             'charge_breakdown' => $overrides['charge_breakdown'] ?? null,
@@ -2729,6 +2739,16 @@ class TransactionController extends Controller
 
     private function resolveTransactionProvider(TransactionLog $transaction, bool $allowFallback = true): ?API
     {
+        $transaction->loadMissing(['product', 'airtime2cash.provider']);
+        $transactionType = strtolower((string) ($transaction->product?->type ?? $transaction->unique_element ?? $transaction->reason ?? ''));
+
+        // Airtime2Cash owns the provider selection on its transaction row.
+        // The transaction log can contain a stale product/verification API,
+        // so it must not take precedence for AutoSync requeries.
+        if ($transactionType === 'airtime2cash' && $transaction->airtime2cash?->provider) {
+            return $transaction->airtime2cash->provider;
+        }
+
         $provider = $transaction->api ?: API::query()->find($transaction->api_id);
 
         if ($provider) {
@@ -3253,14 +3273,16 @@ class TransactionController extends Controller
     {
         if (!$transactionlog) return ['status' => 'failed'];
 
-        $trans = TransactionLog::find($transactionlog);
+        $trans = TransactionLog::with(['product', 'api', 'airtime2cash.provider'])->find($transactionlog);
         if (!$trans) return ['status' => 'failed', 'message' => 'Transaction not found!'];
 
-        if (in_array($trans->product->type, ['wallet2bank', 'airtime2cash'])) {
-            $provider = $trans->api ?: API::query()
+        if (in_array($trans->product?->type, ['wallet2bank', 'airtime2cash'])) {
+            $provider = $trans->product?->type === 'airtime2cash'
+                ? ($trans->airtime2cash?->provider ?: $trans->api)
+                : ($trans->api ?: API::query()
                 ->whereKey(getSettings()->bank_transfer_provider_id)
                 ->where('status', 'active')
-                ->first();
+                ->first());
 
             $controller = resolveProviderController($provider);
             $query = $controller && method_exists($controller, 'requery')
