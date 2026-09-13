@@ -252,7 +252,7 @@ class AutoSyncService
     public function queryTransaction(Airtime2CashTransactions $transaction, API $provider): array
     {
         $reference = $this->resolveProviderReference($transaction);
-        dd($reference, $transaction);
+        // dd($reference, $transaction);
         if (blank($reference)) {
             throw new RuntimeException('The provider transaction reference is missing.');
         }
