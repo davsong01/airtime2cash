@@ -330,9 +330,13 @@
                                                                      <br>
                                                                      <a href="{{ route('transaction.receipt.download', $transaction->id)}}" target="_blank" class="btn btn-primary btn-sm" style="color:#fff;"><i class="fa fa-download"></i> Download Receipt</a> <br>
                                                                     @endif
-                                                                </div>
+                                                               </div>
                                                                <div class="col-md-3">
-                                                                   <strong>Request Id:</strong> <br>{{ $transaction->reference_id }} <br>
+                                                                   <strong>Request Id:</strong> <br>{{ $transaction->transaction_id }} <br>
+                                                                   @if($transaction->airtime2cash)
+                                                                       <strong>Provider Request Ref:</strong><br>{{ $transaction->airtime2cash->provider_request_ref ?: 'N/A' }} <br>
+                                                                       <strong>Provider Reference:</strong><br>{{ $transaction->airtime2cash->provider_reference ?: 'N/A' }} <br>
+                                                                   @endif
                                                                    <strong>IP Address: </strong><br>{{ $transaction->ip_address }} <br>
                                                                    @if(filled($resolutionSource) || filled($resolutionNote) || filled($resolutionDate) || !empty($transaction->extras) || !empty($transaction->extra_info))
                                                                     <div class="card mt-1">

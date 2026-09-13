@@ -8,11 +8,11 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (! Schema::hasTable('a_p_is') || ! Schema::hasTable('airtime2_cash_transactions')) {
+        if (! Schema::hasTable('apis') || ! Schema::hasTable('airtime2_cash_transactions')) {
             return;
         }
 
-        $autosyncId = DB::table('a_p_is')->where('slug', 'autosync')->value('id');
+        $autosyncId = DB::table('apis')->where('slug', 'autosync')->value('id');
 
         if (! $autosyncId || ! Schema::hasColumn('airtime2_cash_transactions', 'provider_id')) {
             return;

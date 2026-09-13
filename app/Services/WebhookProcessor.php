@@ -50,7 +50,22 @@ class WebhookProcessor
                     throw new RuntimeException('No local transaction matches this webhook.');
                 }
 
-                $verification = $this->verifyTransactionWithProvider($webhook, $transaction);
+                $payloadStatus = strtolower($this->extractProviderStatus($payload, $transaction));
+                $payloadIsSuccessful = in_array($payloadStatus, ['successful', 'success', 'completed', 'paid', 'approved'], true);
+                $payloadIsFailed = in_array($payloadStatus, ['failed', 'declined', 'rejected', 'cancelled', 'canceled'], true);
+
+                // A valid, signed webhook is already the provider's final
+                // notification. Use its terminal status directly instead of
+                // re-querying with a possibly different reference/provider.
+                // Requery only when the webhook is non-terminal or incomplete.
+                $verification = ($payloadIsSuccessful || $payloadIsFailed)
+                    ? [
+                        'status' => $payloadIsSuccessful ? 'success' : 'failed',
+                        'provider_status' => $payloadStatus,
+                        'api_response' => $payload,
+                        'message' => $this->extractMessage($payload),
+                    ]
+                    : $this->verifyTransactionWithProvider($webhook, $transaction);
 
                 if (! is_array($verification)) {
                     $webhook->update([

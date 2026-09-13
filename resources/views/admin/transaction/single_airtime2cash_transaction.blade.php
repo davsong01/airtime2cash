@@ -158,6 +158,9 @@
                                                                 <h5 style="color:black"><strong>{{ $productName }}</strong></h5>
                                                                 <h5 class="mb-1">
                                                                     {{ $transaction->transaction_id }}</h5> <br>
+                                                                <strong>Request Id:</strong><br>{{ $transaction->transaction_id }} <br>
+                                                                <strong>Provider Request Ref:</strong><br>{{ $transaction->provider_request_ref ?: 'N/A' }} <br>
+                                                                <strong>Provider Reference:</strong><br>{{ $transaction->provider_reference ?: 'N/A' }} <br>
 
                                                                 {{ $transaction->created_at }}
 

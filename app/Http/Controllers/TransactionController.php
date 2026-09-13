@@ -2470,7 +2470,7 @@ class TransactionController extends Controller
 
     public function singleTransactionView(TransactionLog $transaction)
     {
-        $transaction->loadMissing(['bank', 'api', 'customer']);
+        $transaction->loadMissing(['bank', 'api', 'customer', 'airtime2cash']);
 
         return view('admin.transaction.single_transaction', compact('transaction'));
     }

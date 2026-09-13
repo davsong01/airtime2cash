@@ -829,6 +829,8 @@ class WalletConcurrencyTest extends TestCase
             'total_amount' => 150,
             'payment_method' => 'Transfer to Wallet',
             'status' => 'successful',
+            'provider_reference' => 'ASNA2C-TEST-TRAIL-001',
+            'provider_request_ref' => 'A2C-TEST-TRAIL-001',
         ]);
 
         DB::table('wallets')->insert([
@@ -842,6 +844,28 @@ class WalletConcurrencyTest extends TestCase
             'payment_method' => 'wallet',
             'created_at' => now(),
             'updated_at' => now(),
+        ]);
+
+        TransactionLog::create([
+            'status' => 'success',
+            'reference_id' => 'A2C-REQUEST-TRAIL-001',
+            'transaction_id' => $transaction->transaction_id,
+            'payment_method' => 'Transfer to Wallet',
+            'customer_id' => $customer->id,
+            'customer_email' => $user->email,
+            'customer_name' => $user->name,
+            'customer_phone' => $user->phone,
+            'unique_element' => 'Airtime2Cash Payment',
+            'discount' => 0,
+            'unit_price' => 120,
+            'amount' => 120,
+            'total_amount' => 150,
+            'balance_before' => 250,
+            'balance_after' => 370,
+            'quantity' => 1,
+            'product_id' => $product->id,
+            'product_name' => $product->name,
+            'api_id' => $api->id,
         ]);
 
         $response = $this->withoutExceptionHandling()
@@ -863,6 +887,10 @@ class WalletConcurrencyTest extends TestCase
         $response->assertSee('250.00');
         $response->assertSee('370.00');
         $response->assertSee('Query Provider Status');
+        $response->assertSee('Request Id:');
+        $response->assertSee('Provider Request Ref:');
+        $response->assertSee('Provider Reference:');
+        $response->assertSee('ASNA2C-TEST-TRAIL-001');
         $response->assertDontSee('n/a → n/a');
 
         $customerResponse = $this->withoutMiddleware([
@@ -891,6 +919,22 @@ class WalletConcurrencyTest extends TestCase
         $adminLogResponse->assertSee('₦370.00');
         $adminLogResponse->assertSee('Initial / final wallet balance');
         $adminLogResponse->assertSee('badge-light-success');
+
+        $singleTransactionResponse = $this->withoutMiddleware([
+                AdminMiddleware::class,
+                CheckIpMiddleware::class,
+                RouteProtectionMiddleware::class,
+            ])
+            ->actingAs($user)
+            ->get(route('admin.single.transaction.view', TransactionLog::where('transaction_id', $transaction->transaction_id)->firstOrFail()));
+
+        $singleTransactionResponse->assertOk();
+        $singleTransactionResponse->assertSee('Request Id:');
+        $singleTransactionResponse->assertSee($transaction->transaction_id);
+        $singleTransactionResponse->assertSee('Provider Request Ref:');
+        $singleTransactionResponse->assertSee('A2C-TEST-TRAIL-001');
+        $singleTransactionResponse->assertSee('Provider Reference:');
+        $singleTransactionResponse->assertSee('ASNA2C-TEST-TRAIL-001');
 
         $statusResponse = $this->withoutMiddleware([
                 AdminMiddleware::class,

@@ -8,6 +8,7 @@ use App\Models\TransactionLog;
 use Illuminate\Support\Facades\DB;
 use App\Models\ReservedAccountNumber;
 use App\Models\ReservedAccountCallback;
+use App\Models\PaymentGateway;
 use App\Http\Controllers\PaymentProcessors\SquadController;
 use App\Http\Controllers\Providers\MonnifyController;
 use App\Services\BvnVerificationBillingService;
@@ -80,19 +81,21 @@ class PaymentController extends Controller
     public function dumpCallback(Request $request, $provider)
     {
         $providerApi = API::query()->find($provider) ?: resolvePaymentGatewayProvider($provider);
-        $providerSlug = strtolower((string) ($providerApi?->slug ?? ''));
+        $legacyGateway = $providerApi ? null : PaymentGateway::query()->find($provider);
+        $providerSlug = strtolower((string) ($providerApi?->slug ?? ($legacyGateway?->name ? \Illuminate\Support\Str::slug($legacyGateway->name) : '')));
         $account_number = null;
         $session_id = null;
         $transaction_reference = null;
         $payment_method = null;
         $paid_on = null;
 
-        if ($providerSlug === 'monnify') {
-            $account_number = $request['eventData']['destinationAccountInformation']['accountNumber'];
-            $session_id = $request['eventData']['paymentSourceInformation'][0]['sessionId'];
-            $transaction_reference = $request['eventData']['transactionReference'] ?? $request['eventData']['paymentReference'];
-            $payment_method = $request['eventData']['paymentMethod'];
-            $paid_on = $request['eventData']['paidOn'];
+        if ($providerSlug === 'monnify' || data_get($request->all(), 'eventData.destinationAccountInformation.accountNumber')) {
+            $account_number = data_get($request->all(), 'eventData.destinationAccountInformation.accountNumber');
+            $session_id = data_get($request->all(), 'eventData.paymentSourceInformation.0.sessionId');
+            $transaction_reference = data_get($request->all(), 'eventData.transactionReference')
+                ?? data_get($request->all(), 'eventData.paymentReference');
+            $payment_method = data_get($request->all(), 'eventData.paymentMethod');
+            $paid_on = data_get($request->all(), 'eventData.paidOn');
         } elseif ($providerSlug === 'squad') {
             $account_number = data_get($request->all(), 'data.accountNumber');
             $session_id = data_get($request->all(), 'data.sessionId');
@@ -146,7 +149,8 @@ class PaymentController extends Controller
                 $decodeCall = json_decode($call['raw'], true);
                 $account = ReservedAccountNumber::with('customer')->where('account_number', $call['account_number'])->first();
                 $provider = API::query()->find($call->provider_id) ?: resolvePaymentGatewayProvider($call->provider_id);
-                $providerSlug = strtolower((string) ($provider?->slug ?? ''));
+                $legacyGateway = $provider ? null : PaymentGateway::query()->find($call->provider_id);
+                $providerSlug = strtolower((string) ($provider?->slug ?? ($legacyGateway?->name ? \Illuminate\Support\Str::slug($legacyGateway->name) : '')));
 
                 if (!$account) {
                     ReservedAccountCallback::whereIn('id', $ids)->update(['status' => 'no-account']);
@@ -156,14 +160,17 @@ class PaymentController extends Controller
                 $customer = $account->customer;
                 $user = $account->customer->user;
 
+                // Card wallet-funding callbacks are handled by the payment
+                // gateway callback flow, not the reserved bank-transfer
+                // analyzer. Leave the callback picked for the existing retry/
+                // audit behavior instead of marking it analyzed without a
+                // provider verification result.
+                if (strtoupper((string) $call->payment_method) === 'CARD') {
+                    continue;
+                }
+
                 if ($providerSlug === 'monnify') {
                     $payment_type = $call->payment_method;
-
-                    if ($payment_type === 'CARD') {
-                        $extra_charge = getSettings()->card_funding_extra_charge > 0 ? getSettings()->card_funding_extra_charge : 0;
-
-                        continue;
-                    }
 
                     $monnify = new MonnifyController($provider);
                     $analyze = $monnify->verifyTransaction($call->transaction_reference);
