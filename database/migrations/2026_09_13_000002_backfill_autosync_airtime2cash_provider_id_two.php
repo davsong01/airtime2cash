@@ -17,7 +17,7 @@ return new class extends Migration
         if (! $autosyncId || ! Schema::hasColumn('airtime2_cash_transactions', 'provider_id')) {
             return;
         }
-
+        
         $query = DB::table('airtime2_cash_transactions')
             ->where(function ($query): void {
                 if (Schema::hasColumn('airtime2_cash_transactions', 'transfer_mode')) {

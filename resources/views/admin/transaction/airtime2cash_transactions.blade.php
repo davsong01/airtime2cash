@@ -183,7 +183,7 @@
                                         $status = strtolower((string) ($transaction->status ?? 'pending'));
                                         $statusColor = in_array($status, ['approved', 'successful', 'success', 'completed'], true)
                                             ? 'success'
-                                            : ($status === 'declined' ? 'danger' : 'warning');
+                                            : (in_array($status, ['failed', 'declined'], true) ? 'danger' : 'warning');
                                         $productName = $transaction->product?->display_name ?: $transaction->product?->name ?: 'Unknown network';
                                         $walletTrail = $transaction->wallets ?? collect();
                                         $hasWalletBalances = $walletTrail->contains(fn ($wallet) => ! is_null($wallet->balance_before) || ! is_null($wallet->balance_after));

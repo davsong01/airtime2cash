@@ -318,7 +318,7 @@
                                                             </div>
                                                             @if(!empty($transaction->bank_transfer_api_response))
                                                             <div class="col-md-6">
-                                                                <label for="">Bank Transfer Response</label>
+                                                                <label for="">Verification Response</label>
                                                                 <div class="validate-div">
                                                                     <address>
                                                                         <div id="q_res2" style="max-height:300px;overflow:scroll;word-wrap: break-word">

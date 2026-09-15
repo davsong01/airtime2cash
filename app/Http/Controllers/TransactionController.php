@@ -412,6 +412,7 @@ class TransactionController extends Controller
             'customer_id' => auth()->user()->customer->id,
             'type' => 'credit',
             'transaction_id' => $transaction_id,
+            'status' => 'pending',
             'total_amount' => $amount_charged + $amount_paid,
             'phone_numbers' => $request->phone,
             'payment_method' => $request->payment_method,
@@ -423,22 +424,22 @@ class TransactionController extends Controller
         ];
 
 
-        // Process Transaction
-        try {
-            $log = Airtime2CashTransactions::updateOrCreate(
-                ['transaction_id' => $transaction_id],
-                $transaction
-            );
+        // Persist both records before any provider processing. AutoSync must
+        // only update this pending transaction; it must never be responsible
+        // for creating the initial Airtime2Cash record.
+        $log = Airtime2CashTransactions::create($transaction);
+        $customer = auth()->user()->customer;
+        $currentBalance = (float) ($customer->wallet ?? 0);
+        $this->upsertAirtime2CashTransactionLog($log, $customer, [
+            'status' => 'pending',
+            'descr' => 'Airtime2Cash request initiated.',
+            'balance_before' => $currentBalance,
+            'balance_after' => $currentBalance,
+            'provider_status' => 'initiated',
+        ]);
 
-            $customer = auth()->user()->customer;
-            $currentBalance = (float) ($customer->wallet ?? 0);
-            $this->upsertAirtime2CashTransactionLog($log, $customer, [
-                'status' => 'pending',
-                'descr' => 'Airtime2Cash request initiated.',
-                'balance_before' => $currentBalance,
-                'balance_after' => $currentBalance,
-                'provider_status' => 'initiated',
-            ]);
+        // Process provider notification/approval after the records exist.
+        try {
 
             if ($request->input('transfer_mode') === 'auto_share') {
                 $providerId = getSettings()?->auto_share_provider_id;
@@ -465,6 +466,51 @@ class TransactionController extends Controller
                         $log,
                         $provider
                     );
+
+                    $providerStatus = strtolower((string) data_get(
+                        $response,
+                        'data.transaction.status',
+                        'pending'
+                    ));
+
+                    if (in_array($providerStatus, [
+                        'failed',
+                        'declined',
+                        'rejected',
+                        'cancelled',
+                        'canceled',
+                        'error',
+                    ], true)) {
+                        $failureMessage = data_get(
+                            $response,
+                            'data.transaction.details'
+                        ) ?: ($response['message'] ?? 'Auto Transfer initiation failed.');
+
+                        $log->update([
+                            'status' => 'failed',
+                            'provider_status' => $providerStatus,
+                            'decline_reason' => $failureMessage,
+                            'completed_at' => now(),
+                        ]);
+
+                        $this->upsertAirtime2CashTransactionLog($log, $customer, [
+                            'status' => 'failed',
+                            'descr' => $failureMessage,
+                            'balance_before' => $currentBalance,
+                            'balance_after' => $currentBalance,
+                            'api_response' => $response,
+                        ]);
+
+                        return response()->json([
+                            'status' => false,
+                            'message' => $failureMessage,
+                            'data' => [
+                                'transaction_id' => $log->transaction_id,
+                                'provider_response' => $response,
+                            ],
+                            'terminal' => true,
+                        ], 422);
+                    }
 
                     return response()->json([
                         'status' => true,
@@ -576,6 +622,26 @@ class TransactionController extends Controller
 
         $transaction = Airtime2CashTransactions::where('transaction_id', $validated['transaction_id'])->firstOrFail();
 
+        $providerStatus = strtolower((string) ($transaction->provider_status ?? ''));
+        $terminalProviderStatuses = ['failed', 'declined', 'rejected', 'cancelled', 'canceled', 'error'];
+
+        if ($transaction->status === 'failed' || in_array($providerStatus, $terminalProviderStatuses, true)) {
+            // Resending the OTP is an explicit retry of the provider step.
+            // Reopen the existing transaction instead of rejecting the retry.
+            $transaction->update([
+                'status' => 'pending',
+                'provider_status' => 'pending',
+                'decline_reason' => null,
+                'completed_at' => null,
+            ]);
+
+            TransactionLog::where('transaction_id', $transaction->transaction_id)
+                ->update([
+                    'status' => 'pending',
+                    'descr' => 'OTP resend requested for Airtime2Cash transaction.',
+                ]);
+        }
+
         if ($transaction->status !== 'pending') {
             return response()->json([
                 'status' => false,
@@ -612,6 +678,36 @@ class TransactionController extends Controller
                 ),
             };
 
+            $resendProviderStatus = strtolower((string) data_get(
+                $response,
+                'data.transaction.status',
+                'pending'
+            ));
+
+            if (in_array($resendProviderStatus, $terminalProviderStatuses, true)) {
+                $failureMessage = data_get($response, 'data.transaction.details')
+                    ?: ($response['message'] ?? 'Auto Transfer failed at the provider.');
+
+                $transaction->update([
+                    'status' => 'failed',
+                    'provider_status' => $resendProviderStatus,
+                    'decline_reason' => $failureMessage,
+                    'completed_at' => now(),
+                ]);
+
+                TransactionLog::where('transaction_id', $transaction->transaction_id)
+                    ->update([
+                        'status' => 'failed',
+                        'descr' => $failureMessage,
+                    ]);
+
+                return response()->json([
+                    'status' => false,
+                    'terminal' => true,
+                    'message' => $failureMessage,
+                ], 422);
+            }
+
             return response()->json([
                 'status' => true,
                 'message' => $response['message'] ?? 'OTP resent successfully.',
@@ -622,9 +718,39 @@ class TransactionController extends Controller
                 ],
             ]);
         } catch (RuntimeException $exception) {
+            $resendMessage = $exception->getMessage();
+            $terminalResendFailure = str_contains(strtolower($resendMessage), 'transaction not found')
+                || str_contains(strtolower($resendMessage), 'cannot resend otp');
+
+            if ($terminalResendFailure) {
+                $transaction->update([
+                    'status' => 'failed',
+                    'provider_status' => 'failed',
+                    'decline_reason' => $resendMessage,
+                    'completed_at' => $transaction->completed_at ?? now(),
+                ]);
+
+                TransactionLog::where('transaction_id', $transaction->transaction_id)
+                    ->update([
+                        'status' => 'failed',
+                        'descr' => $resendMessage,
+                        'api_response' => $transaction->provider_response
+                            ? json_encode($transaction->provider_response, JSON_THROW_ON_ERROR)
+                            : null,
+                        'completed_at' => now(),
+                    ]);
+
+                return response()->json([
+                    'status' => false,
+                    'terminal' => true,
+                    'reload' => true,
+                    'message' => $resendMessage,
+                ], 422);
+            }
+
             return response()->json([
                 'status' => false,
-                'message' => $exception->getMessage(),
+                'message' => $resendMessage,
             ], 422);
         } catch (Throwable $exception) {
             Log::error('Auto Transfer OTP resend failed.', [
@@ -1321,6 +1447,51 @@ class TransactionController extends Controller
             ->where('transaction_id', $request->transaction_id)
             ->firstOrFail();
 
+        $terminalProviderStatuses = [
+            'failed',
+            'declined',
+            'rejected',
+            'cancelled',
+            'canceled',
+            'error',
+        ];
+
+        if ($transaction->status === 'failed' || in_array(strtolower((string) $transaction->provider_status), $terminalProviderStatuses, true)) {
+            $failureMessage = collect([
+                $transaction->decline_reason,
+                data_get($transaction->provider_response, 'data.transaction.details'),
+                data_get($transaction->provider_response, 'data.transaction.message'),
+                data_get($transaction->provider_response, 'message'),
+            ])->first(function ($message) {
+                return filled($message) && trim((string) $message) !== '-';
+            }) ?: 'Auto Transfer failed at the provider.';
+
+            if ($transaction->status !== 'failed') {
+                $transaction->update([
+                    'status' => 'failed',
+                    'decline_reason' => $failureMessage,
+                    'completed_at' => $transaction->completed_at ?: now(),
+                ]);
+            }
+
+            TransactionLog::where('transaction_id', $transaction->transaction_id)
+                ->update([
+                    'status' => 'failed',
+                    'descr' => $failureMessage,
+                    'api_response' => $transaction->provider_response
+                        ? json_encode($transaction->provider_response, JSON_THROW_ON_ERROR)
+                        : null,
+                    'completed_at' => now(),
+                ]);
+
+            return response()->json([
+                'status' => false,
+                'terminal' => true,
+                'transaction_status' => 'failed',
+                'message' => $failureMessage,
+            ], 422);
+        }
+
         $provider = $transaction->provider;
 
         if (! $provider) {
@@ -1435,7 +1606,9 @@ class TransactionController extends Controller
                 },
 
                 'decline_reason' => $statusCode === 0
-                    ? ($providerResponse['message'] ?? data_get($providerResponse, 'data.transaction.details'))
+                    ? (data_get($providerResponse, 'data.transaction.details')
+                        ?: data_get($providerResponse, 'data.transaction.message')
+                        ?: ($providerResponse['message'] ?? 'Auto Transfer failed at the provider.'))
                     : null,
 
                 'completed_at' => in_array($statusCode, [0, 1], true)
@@ -1472,12 +1645,20 @@ class TransactionController extends Controller
                 ], 202);
             }
 
+            $completionFailureMessage = collect([
+                data_get($providerResponse, 'data.transaction.details'),
+                data_get($providerResponse, 'data.transaction.message'),
+                $providerResponse['message'] ?? null,
+            ])->first(function ($message) {
+                return filled($message) && trim((string) $message) !== '-';
+            }) ?: 'The airtime conversion could not be completed.';
+
             return response()->json([
                 'status' => false,
                 'transaction_status' => 'failed',
-                'message' => $providerResponse['message']
-                    ?? data_get($providerResponse, 'data.transaction.details')
-                    ?? 'The airtime conversion could not be completed.',
+                'terminal' => true,
+                'reload' => true,
+                'message' => $completionFailureMessage,
                 'data' => [
                     'transaction_id' => $transaction->transaction_id,
                     'provider_status' => $providerStatus,
@@ -1488,6 +1669,83 @@ class TransactionController extends Controller
                 DB::rollBack();
             }
 
+            $providerResponse = $transaction->bank_transfer_api_response;
+            if (is_string($providerResponse)) {
+                $providerResponse = json_decode($providerResponse, true);
+            }
+            $providerResponse = is_array($providerResponse) ? $providerResponse : [];
+
+            $failureMessage = collect([
+                data_get($providerResponse, 'data.transaction.details'),
+                data_get($providerResponse, 'data.transaction.message'),
+                data_get($providerResponse, 'message'),
+                $exception->getMessage(),
+            ])->first(function ($message) {
+                return filled($message) && trim((string) $message) !== '-';
+            }) ?: 'Auto Transfer failed at the provider.';
+
+            $providerStatus = strtolower((string) data_get(
+                $providerResponse,
+                'data.transaction.status',
+                'failed'
+            ));
+
+            $normalizedFailureMessage = strtolower($failureMessage);
+            $isInvalidOtp = str_contains($normalizedFailureMessage, 'wrong phone number or verification code')
+                || str_contains($normalizedFailureMessage, 'verification code has expired')
+                || str_contains($normalizedFailureMessage, 'invalid otp')
+                || str_contains($normalizedFailureMessage, 'incorrect otp')
+                || str_contains($normalizedFailureMessage, 'invalid verification code');
+
+            if ($isInvalidOtp) {
+                $transaction->update([
+                    'status' => 'pending',
+                    'provider_status' => 'pending',
+                    'provider_response' => $providerResponse ?: $transaction->provider_response,
+                    'decline_reason' => null,
+                    'completed_at' => null,
+                ]);
+
+                TransactionLog::where('transaction_id', $transaction->transaction_id)
+                    ->update([
+                        'status' => 'pending',
+                        'descr' => $failureMessage,
+                        'api_response' => $providerResponse
+                            ? json_encode($providerResponse, JSON_THROW_ON_ERROR)
+                            : null,
+                        'completed_at' => null,
+                    ]);
+
+                return response()->json([
+                    'status' => false,
+                    'transaction_status' => 'pending',
+                    'otp_invalid' => true,
+                    'terminal' => false,
+                    'message' => $failureMessage,
+                    'data' => [
+                        'transaction_id' => $transaction->transaction_id,
+                    ],
+                ], 422);
+            }
+
+            $transaction->update([
+                'status' => 'failed',
+                'provider_status' => $providerStatus === 'pending' ? 'failed' : $providerStatus,
+                'provider_response' => $providerResponse ?: $transaction->provider_response,
+                'decline_reason' => $failureMessage,
+                'completed_at' => $transaction->completed_at ?? now(),
+            ]);
+
+            TransactionLog::where('transaction_id', $transaction->transaction_id)
+                ->update([
+                    'status' => 'failed',
+                    'descr' => $failureMessage,
+                    'api_response' => $providerResponse
+                        ? json_encode($providerResponse, JSON_THROW_ON_ERROR)
+                        : null,
+                    'completed_at' => now(),
+                ]);
+
             Log::error('Airtime-to-cash settlement failed.', [
                 'message' => $exception->getMessage(),
                 'transaction_id' => $transaction->transaction_id,
@@ -1496,7 +1754,10 @@ class TransactionController extends Controller
 
             return response()->json([
                 'status' => false,
-                'message' => $exception->getMessage(),
+                'transaction_status' => 'failed',
+                'terminal' => true,
+                'reload' => true,
+                'message' => $failureMessage,
             ], 422);
         }
     }
@@ -3385,7 +3646,11 @@ class TransactionController extends Controller
                 $wallet = new WalletController();
                 $manualProviderId = getSettings()->bank_transfer_provider_id ?? null;
 
-                if ($manualProviderId) {
+                // Auto-share transactions are processed by their selected
+                // Airtime2Cash provider (for example, AutoSync). The bank
+                // transfer provider must not replace that provider during
+                // admin approval.
+                if ($transaction->transfer_mode !== 'auto_share' && $manualProviderId) {
                     $transaction->forceFill([
                         'provider_id' => $manualProviderId,
                     ])->save();
@@ -3433,13 +3698,16 @@ class TransactionController extends Controller
         }
 
         try {
+            $providerUpdate = $transaction->transfer_mode === 'auto_share'
+                ? []
+                : ['provider_id' => getSettings()->bank_transfer_provider_id ?? null];
+
             $transaction->update([
                 'status' => 'approved',
                 'description' => 'Airtime2Cash Request was approved and completed by ADMIN',
                 'approved_by' => auth()->user()->admin->id,
-                'provider_id' => getSettings()->bank_transfer_provider_id ?? null,
                 'completed_at' => now(),
-            ]);
+            ] + $providerUpdate);
 
             $subject = "Airtime2Cash Transaction Update";
             $body = '<p>Hello! ' . $transaction->customer->user->name . ',</p>';

@@ -369,7 +369,11 @@
                 body: JSON.stringify(payload)
             }).then(function (response) {
                 return response.json().catch(function () { return {}; }).then(function (data) {
-                    if (!response.ok) throw new Error(firstLegacyError(data));
+                    if (!response.ok) {
+                        var error = new Error(firstLegacyError(data));
+                        error.responseData = data;
+                        throw error;
+                    }
                     return data;
                 });
             });
@@ -424,7 +428,22 @@
                 if (!/^\d{4,8}$/.test(pin)) return false;
                 setLegacyButton('SENDING OTP...', true); showLegacyError('');
                 postLegacyAuto(autoUrls.initiate, Object.assign(legacyAutoPayload(), {share_pin: pin}))
-                    .then(openLegacyOtp).catch(function (error) { showLegacyError(error.message); setLegacyButton('SUBMIT PIN AND ENTER OTP', false); });
+                    .then(openLegacyOtp).catch(function (error) {
+                        if (error.responseData && (
+                            error.responseData.terminal === true
+                            || (error.responseData.data
+                                && error.responseData.data.transaction
+                                && error.responseData.data.transaction.status === 'failed')
+                        )) {
+                            autoStage = 'failed';
+                            $('#legacy-pin-stage, #legacy-otp-stage').hide();
+                            showLegacyError(error.message || 'This Auto Transfer has failed and cannot be retried.');
+                            setLegacyButton('TRANSACTION FAILED', true);
+                            return;
+                        }
+                        showLegacyError(error.message);
+                        setLegacyButton('SUBMIT PIN AND ENTER OTP', false);
+                    });
                 return false;
             }
             var otp = $('#legacy-auto-otp').val();
@@ -432,7 +451,18 @@
             setLegacyButton('SHARING AIRTIME...', true); showLegacyError('');
             postLegacyAuto(autoUrls.complete, {transaction_id:autoTransactionId, otp:otp})
                 .then(function (data) { window.location.href = data.redirect; })
-                .catch(function (error) { showLegacyError(error.message); setLegacyButton('SHARE AIRTIME', false); });
+                .catch(function (error) {
+                    if (error.responseData && (error.responseData.terminal === true || error.responseData.reload === true)) {
+                        showLegacyError(error.message || 'The Airtime2Cash transaction failed.');
+                        setLegacyButton('TRANSACTION FAILED', true);
+                        window.setTimeout(function () {
+                            window.location.reload();
+                        }, 3500);
+                        return;
+                    }
+                    showLegacyError(error.message);
+                    setLegacyButton('SHARE AIRTIME', false);
+                });
             return false;
         };
         $('#legacy-share-pin').on('input', function () { this.value=this.value.replace(/\D/g,'').slice(0,8); if(autoStage==='pin') setLegacyButton('SUBMIT PIN AND ENTER OTP', !/^\d{4,8}$/.test(this.value)); });
@@ -442,7 +472,18 @@
             var button=$(this).prop('disabled',true).text('Sending...'); showLegacyError('');
             postLegacyAuto(autoUrls.resend,{transaction_id:autoTransactionId})
                 .then(function(){button.text('OTP sent');setTimeout(function(){button.prop('disabled',false).html('<i class="bx bx-refresh"></i> Resend OTP');},2500);})
-                .catch(function(error){showLegacyError(error.message);button.prop('disabled',false).html('<i class="bx bx-refresh"></i> Resend OTP');});
+                .catch(function(error){
+                    if (error.responseData && (error.responseData.terminal === true || error.responseData.reload === true)) {
+                        showLegacyError(error.message || 'The OTP could not be resent because the transaction has failed.');
+                        button.prop('disabled', true).html('<i class="bx bx-x"></i> Transaction failed');
+                        window.setTimeout(function () {
+                            window.location.reload();
+                        }, 3500);
+                        return;
+                    }
+                    showLegacyError(error.message);
+                    button.prop('disabled',false).html('<i class="bx bx-refresh"></i> Resend OTP');
+                });
         });
 
         function showInstruction(instruction) {

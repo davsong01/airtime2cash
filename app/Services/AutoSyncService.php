@@ -76,6 +76,21 @@ class AutoSyncService
 
             $data = $response->json();
 
+            $this->writeLog(
+                'initiate',
+                $provider->id,
+                $endpoint,
+                $headers,
+                $payload,
+                $response,
+                is_array($data)
+                    ? $data
+                    : ['raw' => $response->body()],
+                ['transaction_id' => $transaction->transaction_id, 'customer_id' => $transaction->customer_id],
+                $startedAt
+            );
+
+
         } catch (ConnectionException $exception) {
             $this->writeLog(
                 'initiate',
@@ -85,7 +100,7 @@ class AutoSyncService
                 $payload,
                 null,
                 null,
-                ['transaction_id' => $transaction->transaction_id, 'customer_id' => auth()->id()],
+                ['transaction_id' => $transaction->transaction_id, 'customer_id' => $transaction->customer_id],
                 $startedAt,
                 $exception->getMessage()
             );
@@ -97,19 +112,6 @@ class AutoSyncService
             );
         }
 
-        $this->writeLog(
-            'initiate',
-            $provider->id,
-            $endpoint,
-            $headers,
-            $payload,
-            $response,
-            is_array($data)
-                ? $data
-                : ['raw' => $response->body()],
-            ['transaction_id' => $transaction->transaction_id, 'customer_id' => auth()->id()],
-            $startedAt
-        );
 
         if (
             $response->successful()
@@ -432,7 +434,7 @@ class AutoSyncService
             return;
         }
 
-        ApiRequestLog::create([
+        $apiRequest = ApiRequestLog::create([
             'api_id' => $apiId ?? null,
             'customer_id' => $context['customer_id'] ?? null,
             'transaction_id' => $context['transaction_id'] ?? null,
@@ -447,6 +449,7 @@ class AutoSyncService
             'error' => $error,
             'duration_ms' => (int) round((microtime(true) - $startedAt) * 1000),
         ]);
+
     }
 
     /**

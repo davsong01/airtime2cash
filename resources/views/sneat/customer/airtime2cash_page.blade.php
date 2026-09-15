@@ -655,12 +655,14 @@
                 const data = await parseResponse(response);
 
                 if (!response.ok) {
-                    throw new Error(
+                    const error = new Error(
                         extractFirstError(
                             data,
                             'The request could not be completed. Please try again.'
                         )
                     );
+                    error.responseData = data;
+                    throw error;
                 }
 
                 return data;
@@ -1134,6 +1136,20 @@
                      */
                     openOtpStage(response);
                 } catch (error) {
+                    if (
+                        error.responseData?.terminal === true
+                        || error.responseData?.data?.transaction?.status === 'failed'
+                    ) {
+                        autoStage = 'failed';
+                        autoTransactionId = null;
+                        $autoPinStage.hide();
+                        $autoOtpStage.hide();
+                        $autoSecureFlow.show();
+                        showAutoError(error.message || 'This Auto Transfer has failed and cannot be retried.');
+                        setActionButton('Transaction failed', true, 'bx-x-circle');
+                        return;
+                    }
+
                     /*
                      * Stop the process at the PIN stage.
                      * Do not open the OTP stage.
@@ -1287,6 +1303,18 @@
                         || 'The airtime conversion could not be completed.'
                     );
                 } catch (error) {
+                    if (error.responseData?.terminal === true || error.responseData?.reload === true) {
+                        showAutoError(
+                            error.message
+                            || 'The Airtime2Cash transaction failed.'
+                        );
+                        setActionButton('Transaction failed', true, 'bx-x-circle');
+                        window.setTimeout(function () {
+                            window.location.reload();
+                        }, 3500);
+                        return;
+                    }
+
                     showAutoError(error.message);
 
                     setActionButton(
@@ -1341,6 +1369,20 @@
                             );
                     }, 2500);
                 } catch (error) {
+                    if (error.responseData?.terminal === true || error.responseData?.reload === true) {
+                        showAutoError(
+                            error.message
+                            || 'The OTP could not be resent because the transaction has failed.'
+                        );
+                        $resendOtpButton
+                            .prop('disabled', true)
+                            .html('<i class="bx bx-x me-1"></i>Transaction failed');
+                        window.setTimeout(function () {
+                            window.location.reload();
+                        }, 3500);
+                        return;
+                    }
+
                     showAutoError(
                         error.message
                         || 'The OTP could not be resent. Please try again.'
