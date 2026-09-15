@@ -3202,8 +3202,7 @@ class TransactionController extends Controller
         $summary = [
             'processed' => 0,
             'successful' => 0,
-            'failed' => 0,
-            'pending' => 0,
+            'unchanged' => 0,
             'skipped' => 0,
         ];
 
@@ -3245,6 +3244,155 @@ class TransactionController extends Controller
             $summary['pending'],
             $summary['skipped'],
         ));
+    }
+
+    public function requeryPendingAirtime2CashTransactions(Request $request, ?API $api = null, ?int $pick = null)
+    {
+        $pickValue = $request->has('pick') ? (int) $request->input('pick') : $pick;
+        $limit = is_numeric($pickValue) && (int) $pickValue > 0
+            ? min((int) $pickValue, 500)
+            : null;
+
+        $query = Airtime2CashTransactions::with([
+            'provider',
+            'customer.user',
+            'product',
+            'transactionLog',
+        ])->where('transfer_mode', 'auto_share')
+            ->whereIn('status', ['pending', 'initiated', 'processing'])
+            ->orderBy('id');
+
+        if ($api) {
+            $query->where('provider_id', $api->id);
+        }
+
+        if ($limit !== null) {
+            $query->take($limit);
+        }
+
+        $transactions = $query->get();
+        $summary = [
+            'processed' => 0,
+            'successful' => 0,
+            'failed' => 0,
+            'pending' => 0,
+            'skipped' => 0,
+        ];
+
+        foreach ($transactions as $transaction) {
+            try {
+                $provider = $transaction->provider;
+
+                if (! $provider || strtolower((string) $provider->slug) !== 'autosync') {
+                    $summary['skipped']++;
+                    continue;
+                }
+
+                $providerResponse = app(AutoSyncService::class)->queryTransaction(
+                    $transaction,
+                    $provider
+                );
+
+                $result = $this->applyAirtime2CashRequeryResult($transaction, $providerResponse, 'CRON/System');
+                $summary['processed']++;
+                $summary[$result['status']]++;
+            } catch (Throwable $exception) {
+                $summary['skipped']++;
+                Log::warning('Airtime2Cash provider requery failed.', [
+                    'provider_id' => $api?->id,
+                    'transaction_id' => $transaction->transaction_id,
+                    'message' => $exception->getMessage(),
+                ]);
+            }
+        }
+
+        return back()->with('message', sprintf(
+            'Airtime2Cash requery completed%s. Processed: %d, Successful: %d, Unchanged: %d, Skipped: %d.',
+            $api ? ' for ' . $api->name : '',
+            $summary['processed'],
+            $summary['successful'],
+            $summary['unchanged'],
+            $summary['skipped'],
+        ));
+    }
+
+    private function applyAirtime2CashRequeryResult(
+        Airtime2CashTransactions $transaction,
+        array $providerResponse,
+        string $resolutionSource = 'CRON/System'
+    ): array {
+        $providerStatus = strtolower((string) (
+            data_get($providerResponse, 'data.transaction.status')
+            ?? data_get($providerResponse, 'provider_status')
+            ?? (($providerResponse['status'] ?? null) === 'error' ? 'failed' : 'pending')
+        ));
+        $successful = in_array($providerStatus, ['successful', 'success', 'completed'], true);
+        $message = collect([
+            data_get($providerResponse, 'data.transaction.details'),
+            data_get($providerResponse, 'data.transaction.message'),
+            $providerResponse['message'] ?? null,
+        ])->first(fn ($value) => filled($value) && trim((string) $value) !== '-')
+            ?? ($successful ? 'Airtime2Cash transaction completed successfully.' : 'Airtime2Cash provider response left unchanged.');
+
+        if (! $successful) {
+            return [
+                'status' => 'unchanged',
+                'message' => $message,
+            ];
+        }
+
+        return DB::transaction(function () use ($transaction, $providerResponse, $providerStatus, $message, $resolutionSource) {
+            $locked = Airtime2CashTransactions::with(['product', 'customer.user'])
+                ->whereKey($transaction->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            $customer = Customer::query()->whereKey($locked->customer_id)->lockForUpdate()->firstOrFail();
+            $balanceBefore = (float) ($customer->wallet ?? 0);
+            $balanceAfter = $balanceBefore;
+            $status = 'approved';
+            $logStatus = 'success';
+            $settlementMessage = 'AutoSync delivery confirmed and resolved automatically.';
+
+            // Match approveAirtime2CashTransactions(): wallet transfers use
+            // the billing service, which atomically prevents a duplicate
+            // credit and applies any pending BVN charge. Bank-account
+            // transactions are only marked resolved here; admin approval
+            // does not initiate a second bank payout.
+            if ($locked->payment_method === 'Transfer to Wallet') {
+                $creditResult = app(\App\Services\BvnVerificationBillingService::class)
+                    ->applyPendingChargeOnIncomingCredit($customer, (float) $locked->amount_paid, [
+                        'transaction_id' => $locked->transaction_id,
+                        'credit_reason' => 'Airtime2Cash Payment',
+                        'payment_method' => 'wallet',
+                        'fee_description' => 'BVN verification fee was collected from wallet funding.',
+                    ]);
+
+                $balanceAfter = (float) ($creditResult['credit_after'] ?? ($balanceBefore + (float) $locked->amount_paid));
+            }
+
+            $locked->update([
+                'status' => $status,
+                'provider_status' => $providerStatus,
+                'provider_response' => $providerResponse,
+                'decline_reason' => null,
+                'description' => $settlementMessage,
+                'balance_after' => $balanceAfter,
+                'completed_at' => $locked->completed_at ?? now(),
+            ]);
+
+            $this->upsertAirtime2CashTransactionLog($locked, $customer, [
+                'status' => $logStatus,
+                'descr' => "[$resolutionSource] {$settlementMessage}",
+                'balance_before' => $balanceBefore,
+                'balance_after' => $balanceAfter,
+                'api_response' => $providerResponse,
+            ]);
+
+            return [
+                'status' => 'successful',
+                'message' => $settlementMessage,
+            ];
+        });
     }
 
     private function authorizePendingMonnifyTransaction(TransactionLog $transaction, string $authorizationCode)
