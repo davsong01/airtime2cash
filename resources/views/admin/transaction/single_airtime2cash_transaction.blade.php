@@ -246,12 +246,12 @@
                                                             </div>
                                                             <div class="col-md-4">
                                                                 <strong class="heads">Trail:</strong> <br>
-                                                                <span class="text warning"><strong>Requested: </strong> {{ $transaction->created_at}} <br>
+                                                                <span class="text warning"><strong>Requested: </strong> {{ date("M jS, Y g:iA", strtotime($transaction->created_at)) }}<br>
                                                                 @if($transaction->status == 'approved')
-                                                                <span style="color:green"><strong>Approved:</strong> {{ $transaction->updated_at}}
+                                                                <span style="color:green"><strong>Approved:</strong> {{ date("M jS, Y g:iA", strtotime($transaction->updated_at)) }}
                                                                 @endif
                                                                 @if($transaction->status == 'declined')
-                                                                <span style="color:red"><strong>Declined:</strong> {{ $transaction->updated_at}}
+                                                                <span style="color:red"><strong>Declined:</strong> {{ date("M jS, Y g:iA", strtotime($transaction->updated_at)) }}
                                                                 @endif
                                                                 <br>
                                                                 <strong>Completed:</strong>
