@@ -179,7 +179,7 @@ use App\Models\Airtime2CashTransactions;
                                                             {{ $transaction->transaction_id }}</strong>
                                                         </small> <br>
                                                         <span class="title">Payout Type</span>:
-                                                        <small>{{ $transaction->payment_method === 'Transfer to Bank Account' ? 'Wallet to Bank' : 'Wallet to Cash' }}</small> <br>
+                                                        <small><span class="badge" style="font-size:.65rem;padding:.2rem .4rem;line-height:1.1;background-color:{{ $transaction->payment_method === 'Transfer to Bank Account' ? '#dbeafe' : '#dcfce7' }};color:{{ $transaction->payment_method === 'Transfer to Bank Account' ? '#1d4ed8' : '#15803d' }};">{{ $transaction->payment_method === 'Transfer to Bank Account' ? 'Wallet to Bank' : 'Wallet to Cash' }}</span></small> <br>
                                                         <span class="title">Payment Method</span>: 
                                                         <small>
                                                             {{ $transaction->payment_method }}</strong>

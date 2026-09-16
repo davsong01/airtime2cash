@@ -106,7 +106,7 @@
                             <td>
                                 <span class="d-block fw-semibold text-heading">{{ $transaction->product->name ?? 'Not set' }}</span>
                                 <small class="d-block text-muted mt-1">{{ $transaction->transaction_id }}</small>
-                                <small class="d-block text-muted">{{ $transaction->payment_method === 'Transfer to Bank Account' ? 'Wallet to Bank' : 'Wallet to Cash' }}</small>
+                                <small class="d-block mt-1"><span class="badge" style="font-size:.65rem;padding:.2rem .4rem;line-height:1.1;background-color:{{ $transaction->payment_method === 'Transfer to Bank Account' ? '#dbeafe' : '#dcfce7' }};color:{{ $transaction->payment_method === 'Transfer to Bank Account' ? '#1d4ed8' : '#15803d' }};">{{ $transaction->payment_method === 'Transfer to Bank Account' ? 'Wallet to Bank' : 'Wallet to Cash' }}</span></small>
                             </td>
                             <td>{{ getSettings()['currency'] }}{{ number_format($transaction->total_amount, 2) }}</td>
                             <td>

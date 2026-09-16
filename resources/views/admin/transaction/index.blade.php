@@ -449,6 +449,9 @@
                                                 <td class="transaction-reference-cell">
                                                     <a href="{{ $detailUrl }}" class="transaction-reference-primary">{{ $transaction->transaction_id }}</a>
                                                     <span class="transaction-reference-secondary">Request: {{ $transaction->reference_id ?: '—' }}</span>
+                                                    @if($transaction->airtime2cash)
+                                                        <span class="transaction-reference-secondary"><span class="badge" style="font-size:.65rem;padding:.2rem .4rem;line-height:1.1;background-color:{{ $transaction->airtime2cash->payment_method === 'Transfer to Bank Account' ? '#dbeafe' : '#dcfce7' }};color:{{ $transaction->airtime2cash->payment_method === 'Transfer to Bank Account' ? '#1d4ed8' : '#15803d' }};">{{ $transaction->airtime2cash->payment_method === 'Transfer to Bank Account' ? 'Wallet to Bank' : 'Wallet to Cash' }}</span></span>
+                                                    @endif
                                                     <span class="transaction-status-chip {{ $statusClass }} mt-50"><i class="bx bx-circle"></i>{{ ucfirst(str_replace('-', ' ', $status)) }}</span>
                                                     <span class="transaction-date"><i class="bx bx-calendar mr-25"></i>{{ $transaction->created_at->format('M j, Y · g:i A') }}</span>
                                                 </td>
