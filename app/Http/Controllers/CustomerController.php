@@ -734,14 +734,7 @@ class CustomerController extends Controller
 
         $existing = is_array($customer->wallet_bank_account) ? $customer->wallet_bank_account : [];
         $bankReference = trim((string) $validated['wallet_bank_bank']);
-        $bank = getWalletToBankBanks()->first(function (Bank $bank) use ($bankReference) {
-            if (is_numeric($bankReference) && (int) $bankReference === (int) $bank->id) {
-                return true;
-            }
-
-            return strcasecmp(trim((string) $bank->cbn_code), $bankReference) === 0
-                || strcasecmp(trim((string) $bank->bank_name), $bankReference) === 0;
-        });
+        $bank = getWalletToBankBanks()->where('id', $bankReference)->first();
 
         if (! $bank) {
             return back()->with('error', 'Please select a valid active bank.');
@@ -774,6 +767,7 @@ class CustomerController extends Controller
         ];
 
         $verificationResponse = $validated['wallet_bank_verification_response'] ?? null;
+
         if (filled($verificationResponse)) {
             $decoded = json_decode($verificationResponse, true);
             $next['verification_response'] = json_last_error() === JSON_ERROR_NONE
@@ -782,7 +776,7 @@ class CustomerController extends Controller
         } elseif (array_key_exists('verification_response', $existing)) {
             $next['verification_response'] = $existing['verification_response'];
         }
-
+        
         $customer->forceFill([
             'wallet_bank_account' => array_filter($next, static fn ($value) => ! is_null($value) && $value !== ''),
         ])->save();

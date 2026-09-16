@@ -120,12 +120,27 @@
     <form action="{{ route('customers.wallet-bank-account.update', $customer->id) }}" method="POST" class="customer-form-panel">
         @csrf
         <div class="row">
-            <div class="col-md-6 form-group">
+            {{-- <div class="col-md-6 form-group">
                 <label for="wallet_bank_bank">Bank</label>
                 <select class="form-control js-example-basic-single" id="wallet_bank_bank" name="wallet_bank_bank" required>
                     <option value="">Select bank</option>
                     @foreach ($banks as $bank)
                         <option value="{{ $bank->id }}" data-cbn-code="{{ $bank->cbn_code }}" @selected((string) old('wallet_bank_bank', data_get($walletBankAccount, 'bank_id')) === (string) $bank->id || (! data_get($walletBankAccount, 'bank_id') && (string) old('wallet_bank_bank', data_get($walletBankAccount, 'bank_code')) === (string) $bank->cbn_code))>
+                            {{ $bank->bank_name }} ({{ $bank->cbn_code }})
+                        </option>
+                    @endforeach
+                </select>
+            </div> --}}
+
+            <div class="col-md-6 form-group">
+                <label for="wallet_bank_bank">Bank</label>
+                <select class="form-control js-example-basic-single" id="wallet_bank_bank" name="wallet_bank_bank" required>
+                    <option value="">Select bank</option>
+                    @foreach ($banks as $bank)
+                        <option
+                            value="{{ $bank->id }}"
+                            data-cbn-code="{{ $bank->cbn_code }}"
+                            @selected((int) old('wallet_bank_bank', data_get($walletBankAccount, 'bank_id')) === (int) $bank->id)>
                             {{ $bank->bank_name }} ({{ $bank->cbn_code }})
                         </option>
                     @endforeach

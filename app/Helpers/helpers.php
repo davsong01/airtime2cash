@@ -517,7 +517,7 @@ if (!function_exists("getWalletToBankBanks")) {
 
         $providerSlug = strtolower((string) ($provider?->slug ?? ''));
 
-        return Bank::query()
+        return Bank::select('id', 'provider_codes', 'cbn_code', 'bank_name')
             ->where('status', 'active')
             ->orderBy('bank_name')
             ->get()
