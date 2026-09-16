@@ -230,7 +230,7 @@ class AutoSyncService
         $transaction->update([
             'provider_status' => $providerStatus,
             'bank_transfer_api_response' => json_encode($data, JSON_THROW_ON_ERROR),
-            'completed_at' => $providerStatus === 'successful'
+            'completed_at' => $providerStatus == 'successful'
                 ? ($transaction->completed_at ?? now())
                 : $transaction->completed_at,
         ]);
