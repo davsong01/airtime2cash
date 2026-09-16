@@ -109,10 +109,23 @@ class TransactionController extends Controller
             ->whereKey(getSettings()?->auto_share_provider_id)
             ->where('status', 'active')
             ->first();
+        $bankTransferPricingProvider = API::query()
+            ->whereKey(getSettings()?->bank_transfer_provider_id)
+            ->where('status', 'active')
+            ->first();
+        $bankTransferPricingBands = $bankTransferPricingProvider?->pricing_data ?? [];
+        $bankTransferGlobalExtraCharges = $bankTransferPricingProvider?->extra_charges ?? [];
         $walletBankAccount = auth()->user()?->customer?->wallet_bank_account ?? null;
 
         if (!empty($category) && $category->status == 'active') {
-            return view(themeView('customer', 'airtime2cash_page'), compact('category', 'banks', 'activeProvider', 'walletBankAccount'));
+            return view(themeView('customer', 'airtime2cash_page'), compact(
+                'category',
+                'banks',
+                'activeProvider',
+                'walletBankAccount',
+                'bankTransferPricingBands',
+                'bankTransferGlobalExtraCharges'
+            ));
         } else {
             return back();
         }
@@ -343,9 +356,12 @@ class TransactionController extends Controller
         $min = $product->effectiveTransferMin($request->transfer_mode) ?? (float) ($product->min ?? 0);
         $max = $product->effectiveTransferMax($request->transfer_mode) ?? (float) ($product->max ?? 0);
         $amount = $this->removeCharsInAmount($request->amount);
+        $airtimeAmount = (float) $amount;
 
         $amount_charged = ($rate / 100) * $amount;
         $amount_paid = $amount - $amount_charged;
+        $bankTransferFee = 0.0;
+        $bankTransferAmount = $amount_paid;
         $profitPercentage = is_numeric($profitPercentage) ? (float) $profitPercentage : 0;
         $profit = $profitPercentage > 0 ? (($amount / 100) * $profitPercentage) : 0;
 
@@ -399,11 +415,49 @@ class TransactionController extends Controller
                 'account_name' => $walletAccountName,
             ]);
             $bank_name = $bank->bank_name;
+
+            $bankChargeDetails = getBankTransferChargeDetails($amount_paid);
+            if (! ($bankChargeDetails['pricing_enabled'] ?? false)) {
+                $message = 'Bank transfer charges are not configured yet. Please select wallet payout or contact support.';
+
+                return $request->expectsJson()
+                    ? response()->json(['status' => false, 'message' => $message], 422)
+                    : back()->withInput()->with('error', $message);
+            }
+
+            if (! ($bankChargeDetails['pricing_available'] ?? false) || ! ($bankChargeDetails['matched'] ?? false)) {
+                $rangeText = getBankTransferPricingAmountRange($bankChargeDetails['provider_id'] ?? null)['range_text'] ?? null;
+                $message = $rangeText
+                    ? 'Bank transfer charges are only configured for these converted amounts: '.$rangeText.'.'
+                    : 'Bank transfer charges are not configured for this converted amount.';
+
+                return $request->expectsJson()
+                    ? response()->json(['status' => false, 'message' => $message], 422)
+                    : back()->withInput()->with('error', $message);
+            }
+
+            $bankTransferFee = (float) ($bankChargeDetails['transfer_fee'] ?? 0);
+            $bankTransferAmount = max(0, $amount_paid - $bankTransferFee);
+        }
+
+        $chargeBreakdown = [
+            ['label' => 'Airtime Amount', 'amount' => $airtimeAmount, 'type' => 'airtime_amount'],
+            ['label' => 'Airtime Conversion Fee', 'amount' => (float) $amount_charged, 'type' => 'airtime_conversion_fee'],
+        ];
+
+        if ($request->input('payment_method') === 'Transfer to Bank Account') {
+            $chargeBreakdown[] = ['label' => 'Bank Transfer Fee', 'amount' => $bankTransferFee, 'type' => 'bank_transfer_fee'];
+            $chargeBreakdown[] = ['label' => 'Amount Paid to Bank', 'amount' => $bankTransferAmount, 'type' => 'bank_payout'];
+        } else {
+            $chargeBreakdown[] = ['label' => 'Amount Paid to Wallet', 'amount' => (float) $amount_paid, 'type' => 'wallet_payout'];
         }
 
         $transaction = [
             'amount_charged' => $amount_charged,
             'amount_paid' => $amount_paid,
+            'bank_transfer_fee' => $bankTransferFee,
+            'bank_transfer_amount' => $bankTransferAmount,
+            'bank_transfer_charge_breakdown' => $chargeBreakdown,
             'charge_rate' => $rate,
             'profit_percentage' => $profitPercentage,
             'profit' => $profit,
@@ -436,6 +490,7 @@ class TransactionController extends Controller
             'balance_before' => $currentBalance,
             'balance_after' => $currentBalance,
             'provider_status' => 'initiated',
+            'charge_breakdown' => $chargeBreakdown,
         ]);
 
         // Process provider notification/approval after the records exist.
@@ -1549,13 +1604,17 @@ class TransactionController extends Controller
             $balanceAfter = $balanceBefore;
             $bankPayoutResponse = null;
 
-            if ($statusCode === 1 && ! $alreadySettled && (float) $transaction->amount_paid > 0) {
+            $bankPayoutAmount = $transaction->payment_method === 'Transfer to Bank Account'
+                ? (float) ($transaction->bank_transfer_amount ?? ((float) $transaction->amount_paid - (float) ($transaction->bank_transfer_fee ?? 0)))
+                : (float) $transaction->amount_paid;
+
+            if ($statusCode === 1 && ! $alreadySettled && $bankPayoutAmount > 0) {
                 if ($transaction->payment_method === 'Transfer to Bank Account') {
                     $bankPayoutResponse = $this->transferToBankAccount(
                         (string) $transaction->bank_code,
                         (string) $transaction->account_number,
                         (string) $transaction->account_name,
-                        (float) $transaction->amount_paid
+                        $bankPayoutAmount
                     );
 
                     if (($bankPayoutResponse['status'] ?? null) !== 'success') {
@@ -1563,19 +1622,19 @@ class TransactionController extends Controller
                     }
                 } else {
                     $wallet = new WalletController();
-                    $balanceAfter = $balanceBefore + (float) $transaction->amount_paid;
+                    $balanceAfter = $balanceBefore + $bankPayoutAmount;
 
                     $wallet->logWallet([
                         'customer_id' => $transaction->customer_id,
                         'type' => 'credit',
-                        'total_amount' => (float) $transaction->amount_paid,
+                        'total_amount' => $bankPayoutAmount,
                         'transaction_id' => $transaction->transaction_id,
                         'reason' => 'Airtime-to-cash conversion',
                         'balance_before' => $balanceBefore,
                         'balance_after' => $balanceAfter,
                     ]);
 
-                    $wallet->applyCustomerBalanceChange($customer, 'wallet', (float) $transaction->amount_paid, 'credit');
+                    $wallet->applyCustomerBalanceChange($customer, 'wallet', $bankPayoutAmount, 'credit');
                 }
             }
 
@@ -2063,7 +2122,9 @@ class TransactionController extends Controller
             'api_id' => $transaction->provider_id,
             'reason' => 'Airtime2Cash Payment',
             'provider_charge' => $transaction->amount_charged ?? null,
-            'charge_breakdown' => $overrides['charge_breakdown'] ?? null,
+            'charge_breakdown' => $overrides['charge_breakdown']
+                ?? $transaction->bank_transfer_charge_breakdown
+                ?? null,
             'bank_id' => $transaction->bank_id ?? null,
             'account_name' => $transaction->account_name ?? null,
             'account_number' => $transaction->account_number ?? null,
@@ -2146,7 +2207,7 @@ class TransactionController extends Controller
             'transfer_mode' => ['nullable', 'in:manual,auto_share'],
         ]);
 
-        $transactions = Airtime2CashTransactions::with(['product', 'customer'])->where('customer_id', auth()->user()->customer->id);
+        $transactions = Airtime2CashTransactions::with(['product', 'customer', 'transactionLog'])->where('customer_id', auth()->user()->customer->id);
 
         if (!empty($request->product_id)) {
             $transactions = $transactions->where('product_id', $request->product_id);
@@ -2749,8 +2810,14 @@ class TransactionController extends Controller
                 ->where('status', 'active')
                 ->first()
             : null;
+        $bankTransferProvider = $settings?->bank_transfer_provider_id
+            ? API::query()
+                ->whereKey($settings->bank_transfer_provider_id)
+                ->where('status', 'active')
+                ->first()
+            : null;
         $banks = $verificationProvider ? getWalletToBankBanks($verificationProvider) : collect();
-        return view('admin.transaction.single_airtime2cash_transaction', compact('transaction', 'banks'));
+        return view('admin.transaction.single_airtime2cash_transaction', compact('transaction', 'banks', 'bankTransferProvider'));
     }
 
     public function requeryAirtimeTransaction(Airtime2CashTransactions $transaction): JsonResponse

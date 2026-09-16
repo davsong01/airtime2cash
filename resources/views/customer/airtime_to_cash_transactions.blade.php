@@ -154,9 +154,20 @@ use App\Models\Airtime2CashTransactions;
                                                         <span class="title">Amount To Transfer</span>: 
                                                         <small>{!! getSettings()['currency']!!}{{ number_format($transaction->total_amount, 2) }}
                                                         </small> <br>
-                                                        <span class="title">Amount Charged</span>: 
-                                                        <small>{!! getSettings()['currency']!!}{{ number_format($transaction->amount_charged, 2) }}
-                                                        </small> <br>
+                                                        <span class="title">Charges</span>:<br>
+                                                        @php
+                                                            $chargeItems = collect($transaction->bank_transfer_charge_breakdown ?? $transaction->transactionLog?->charge_breakdown ?? [])
+                                                                ->filter(fn ($item) => in_array(data_get($item, 'type'), ['airtime_conversion_fee', 'bank_transfer_fee'], true));
+                                                        @endphp
+                                                        @if($chargeItems->isNotEmpty())
+                                                            @foreach($chargeItems as $chargeItem)
+                                                                <small class="d-block">{{ data_get($chargeItem, 'label', 'Charge') }}: {!! getSettings()['currency'] !!}{{ number_format((float) data_get($chargeItem, 'amount', 0), 2) }}</small>
+                                                            @endforeach
+                                                            <small class="d-block"><strong>Total: {!! getSettings()['currency'] !!}{{ number_format($chargeItems->sum(fn ($item) => (float) data_get($item, 'amount', 0)), 2) }}</strong></small>
+                                                        @else
+                                                            <small>{!! getSettings()['currency'] !!}{{ number_format($transaction->amount_charged, 2) }}</small>
+                                                        @endif
+                                                        <br>
                                                         <span class="title">Charge Rate</span>: 
                                                         <small>{{ number_format($transaction->charge_rate) }}%
                                                         </small> <br>
@@ -167,6 +178,8 @@ use App\Models\Airtime2CashTransactions;
                                                         <small>
                                                             {{ $transaction->transaction_id }}</strong>
                                                         </small> <br>
+                                                        <span class="title">Payout Type</span>:
+                                                        <small>{{ $transaction->payment_method === 'Transfer to Bank Account' ? 'Wallet to Bank' : 'Wallet to Cash' }}</small> <br>
                                                         <span class="title">Payment Method</span>: 
                                                         <small>
                                                             {{ $transaction->payment_method }}</strong>

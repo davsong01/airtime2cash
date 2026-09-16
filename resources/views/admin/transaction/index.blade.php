@@ -453,9 +453,23 @@
                                                     <span class="transaction-date"><i class="bx bx-calendar mr-25"></i>{{ $transaction->created_at->format('M j, Y · g:i A') }}</span>
                                                 </td>
                                                 <td class="transaction-financial-cell">
+                                                    @php
+                                                        $chargeItems = collect(normalizeChargeBreakdown($transaction->charge_breakdown ?? []))
+                                                            ->filter(fn ($charge) => is_array($charge));
+                                                        if ($transaction->airtime2cash) {
+                                                            $chargeItems = $chargeItems->filter(fn ($charge) => in_array(data_get($charge, 'type'), ['airtime_conversion_fee', 'bank_transfer_fee'], true));
+                                                        }
+                                                    @endphp
                                                     <div class="transaction-total"><span>Total</span><strong>{{ $currency }}{{ number_format((float) $transaction->total_amount, 2) }}</strong></div>
                                                     <div class="transaction-financial-row"><span>Amount</span><strong>{{ $currency }}{{ number_format((float) $transaction->amount, 2) }}</strong></div>
-                                                    <div class="transaction-financial-row"><span>Charge</span><strong>{{ $currency }}{{ number_format((float) $transaction->provider_charge, 2) }}</strong></div>
+                                                    @if($chargeItems->isNotEmpty())
+                                                        @foreach($chargeItems as $chargeItem)
+                                                            <div class="transaction-financial-row"><span>{{ data_get($chargeItem, 'label', 'Charge') }}</span><strong>{{ $currency }}{{ number_format((float) data_get($chargeItem, 'amount', 0), 2) }}</strong></div>
+                                                        @endforeach
+                                                        <div class="transaction-financial-row"><span>Total charges</span><strong>{{ $currency }}{{ number_format($chargeItems->sum(fn ($charge) => (float) data_get($charge, 'amount', 0)), 2) }}</strong></div>
+                                                    @else
+                                                        <div class="transaction-financial-row"><span>Charge</span><strong>{{ $currency }}{{ number_format((float) $transaction->provider_charge, 2) }}</strong></div>
+                                                    @endif
                                                     {{-- <div class="transaction-balance-flow">{{ $currency }}{{ number_format((float) $transaction->balance_before, 2) }} <i class="bx bx-right-arrow-alt mx-25"></i> {{ $currency }}{{ number_format((float) $transaction->balance_after, 2) }}</div> --}}
                                                 </td>
                                                 <td class="transaction-service-cell">

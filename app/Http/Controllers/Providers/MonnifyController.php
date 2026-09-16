@@ -133,6 +133,30 @@ class MonnifyController extends BankTransferProviderController
 
     public function verifyBankDetails(array $data)
     {
+        if (env('ENT') === 'local') {
+            $accountNumber = (string) ($data['account_number'] ?? '');
+            $bankCode = (string) ($data['provider_bank_code'] ?? $data['bank_code'] ?? '');
+            $accountName = (string) ($data['account_name'] ?? 'Mock Account Holder');
+            $mockResponse = [
+                'requestSuccessful' => true,
+                'responseCode' => '0',
+                'responseMessage' => 'Account details verified successfully (mocked in local environment).',
+                'responseBody' => [
+                    'accountNumber' => $accountNumber,
+                    'accountName' => $accountName,
+                    'bankCode' => $bankCode,
+                    'bankName' => 'Mock Monnify Bank',
+                ],
+            ];
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Bank details verified successfully (mocked in local environment).',
+                'data' => $mockResponse['responseBody'],
+                'raw_response' => $mockResponse,
+            ]);
+        }
+
         $token = $this->login();
         if (empty($token)) {
             return response()->json([
@@ -272,6 +296,35 @@ class MonnifyController extends BankTransferProviderController
 
     public function transfer(array $data): array
     {
+        if (env('ENT') === 'local') {
+            $reference = (string) ($data['transaction_id'] ?? ('MONNIFY-MOCK-' . now()->format('YmdHisv')));
+            $mockResponse = [
+                'requestSuccessful' => true,
+                'responseCode' => '0',
+                'responseMessage' => 'Transfer successful (mocked in local environment).',
+                'responseBody' => [
+                    'reference' => $reference,
+                    'status' => 'SUCCESS',
+                    'amount' => (float) ($data['amount'] ?? 0),
+                    'destinationBankCode' => $data['provider_bank_code'] ?? $data['bank_code'] ?? null,
+                    'destinationAccountNumber' => $data['account_number'] ?? null,
+                    'destinationAccountName' => $data['account_name'] ?? null,
+                ],
+            ];
+
+            return [
+                'status' => 'success',
+                'provider_status' => 'successful',
+                'requires_authorization' => false,
+                'error' => null,
+                'request_data' => [
+                    ...$data,
+                    'reference' => $reference,
+                ],
+                'api_response' => $mockResponse,
+            ];
+        }
+
         $token = $this->login();
 
         if (empty($token)) {
@@ -405,6 +458,26 @@ class MonnifyController extends BankTransferProviderController
 
     public function singleTransferStatus(string $reference): array
     {
+        if (env('ENT') === 'local') {
+            return [
+                'status' => 'success',
+                'provider_status' => 'successful',
+                'error' => null,
+                'request_data' => [
+                    'reference' => $reference,
+                ],
+                'api_response' => [
+                    'requestSuccessful' => true,
+                    'responseCode' => '0',
+                    'responseMessage' => 'Transfer status loaded successfully (mocked in local environment).',
+                    'responseBody' => [
+                        'reference' => $reference,
+                        'status' => 'SUCCESS',
+                    ],
+                ],
+            ];
+        }
+
         $token = $this->login();
 
         if (empty($token)) {
@@ -538,6 +611,26 @@ class MonnifyController extends BankTransferProviderController
 
     public function verifyTransaction(string $reference): array
     {
+        if (env('ENT') === 'local') {
+            return [
+                'status' => 'success',
+                'provider_status' => 'PAID',
+                'amount' => 0,
+                'api_status' => true,
+                'api_response' => [
+                    'requestSuccessful' => true,
+                    'responseCode' => '0',
+                    'responseMessage' => 'Transaction verified successfully (mocked in local environment).',
+                    'responseBody' => [
+                        'paymentReference' => $reference,
+                        'paymentStatus' => 'PAID',
+                        'amountPaid' => 0,
+                    ],
+                ],
+                'message' => 'Transaction verified successfully (mocked in local environment).',
+            ];
+        }
+
         $token = $this->login();
 
         if (empty($token)) {

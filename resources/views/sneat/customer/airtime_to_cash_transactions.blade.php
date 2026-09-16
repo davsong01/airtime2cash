@@ -106,9 +106,23 @@
                             <td>
                                 <span class="d-block fw-semibold text-heading">{{ $transaction->product->name ?? 'Not set' }}</span>
                                 <small class="d-block text-muted mt-1">{{ $transaction->transaction_id }}</small>
+                                <small class="d-block text-muted">{{ $transaction->payment_method === 'Transfer to Bank Account' ? 'Wallet to Bank' : 'Wallet to Cash' }}</small>
                             </td>
                             <td>{{ getSettings()['currency'] }}{{ number_format($transaction->total_amount, 2) }}</td>
-                            <td>{{ getSettings()['currency'] }}{{ number_format($transaction->amount_charged, 2) }}</td>
+                            <td>
+                                @php
+                                    $chargeItems = collect($transaction->bank_transfer_charge_breakdown ?? $transaction->transactionLog?->charge_breakdown ?? [])
+                                        ->filter(fn ($item) => in_array(data_get($item, 'type'), ['airtime_conversion_fee', 'bank_transfer_fee'], true));
+                                @endphp
+                                @if($chargeItems->isNotEmpty())
+                                    @foreach($chargeItems as $chargeItem)
+                                        <small class="d-block">{{ data_get($chargeItem, 'label', 'Charge') }}: {{ getSettings()['currency'] }}{{ number_format((float) data_get($chargeItem, 'amount', 0), 2) }}</small>
+                                    @endforeach
+                                    <small class="d-block fw-semibold mt-1">Total: {{ getSettings()['currency'] }}{{ number_format($chargeItems->sum(fn ($item) => (float) data_get($item, 'amount', 0)), 2) }}</small>
+                                @else
+                                    {{ getSettings()['currency'] }}{{ number_format($transaction->amount_charged, 2) }}
+                                @endif
+                            </td>
                             <td><span class="badge bg-label-info">{{ $transaction->transfer_mode === 'auto_share' ? 'Auto Transfer' : 'Manual Transfer' }}</span></td>
                             <td>
                                 <span class="badge {{ in_array(strtolower((string) $transaction->status), ['failed', 'declined'], true) ? 'bg-label-danger' : (in_array(strtolower((string) $transaction->status), ['pending', 'processing', 'initiated'], true) ? 'bg-label-warning' : 'bg-label-success') }}">

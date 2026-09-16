@@ -278,10 +278,15 @@
                                                                 <strong>Amount to Transfer: </strong>{!! getSettings()->currency. number_format($transaction->total_amount, 2) !!} <br>
                                                                 <strong>Transfer Method: </strong>{{ $transaction->transfer_mode === 'auto_share' ? 'Auto Share' : 'Manual Transfer' }} <br>
                                                                 <strong>Charge Rate: </strong>{{ $transaction->charge_rate }}% <br>
-                                                                <strong>Profit Percentage: </strong>{{ number_format((float) ($transaction->profit_percentage ?? 0), 2) }}% <br>
-                                                                <strong>Charge Amount: </strong>{!! getSettings()->currency. number_format($transaction->amount_charged, 2) !!} <br>
+                                                                <strong>Profit Percentage: </strong>{{ number_format((float) ($transaction->profit_percentage ?? 0), 2) }}% <br><br>
+                                                                <strong>Airtime Conversion Fee: </strong>{!! getSettings()->currency. number_format($transaction->amount_charged, 2) !!} <br>
                                                                 <strong>Profit: </strong>{!! getSettings()->currency. number_format((float) ($transaction->profit ?? 0), 2) !!} <br>
+                                                                @if($transaction->payment_method === 'Transfer to Bank Account') <br>
+                                                                <strong>Bank Transfer Fee: </strong>{!! getSettings()->currency. number_format((float) ($transaction->bank_transfer_fee ?? 0), 2) !!} <br>
+                                                                <strong>Amount Paid to Bank: </strong>{!! getSettings()->currency. number_format((float) ($transaction->bank_transfer_amount ?? $transaction->amount_paid),2) !!} <br>
+                                                                @else
                                                                 <strong>Amount to Receive: </strong>{!! getSettings()->currency. number_format($transaction->amount_paid,2) !!} <br>
+                                                                @endif
                                                                 <strong>Date: </strong>{{ date("M jS, Y g:iA", strtotime($transaction->created_at)) }}
                                                             </div>
                                                             <div class="col-md-4">
@@ -299,6 +304,9 @@
                                                             <div class="col-md-4">
                                                                 <strong class="heads" style="color:green">Provider Status</strong>  <br>
                                                                 <strong>Provider: </strong>{{ $transaction->provider->name ?? 'Unknown' }} <br>
+                                                                @if($transaction->payment_method === 'Transfer to Bank Account')
+                                                                    <strong>Transfer Provider: </strong>{{ $bankTransferProvider?->name ?? 'Unknown' }} <br>
+                                                                @endif
                                                                 <strong>Status: </strong>
                                                                 <span id="airtime-provider-status">{{ ucfirst($transaction->provider_status ?? $transaction->status) }}</span><br>
                                                                 @if($transaction->payment_method === 'Transfer to Bank Account')

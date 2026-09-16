@@ -51,7 +51,7 @@
     #initialize { padding: 1.25rem; border: 1px solid #e4e9ed; border-radius: 14px; background: rgba(255,255,255,.96); box-shadow: 0 18px 42px rgba(23,65,89,.09); }
     .legacy-auto-flow { padding: 1.5rem; border: 1px solid #dce9e4; border-radius: 14px; background: linear-gradient(145deg, #fff, #f2faf7); box-shadow: 0 16px 34px rgba(23,65,89,.1); }
     .legacy-auto-mark { display:flex; width:52px; height:52px; margin:0 auto 1rem; align-items:center; justify-content:center; border-radius:16px; color:#fff; background:linear-gradient(145deg,#168a67,#0f6c53); font-size:25px; }
-    .legacy-auto-summary { display:grid; grid-template-columns:repeat(3,1fr); gap:.65rem; margin:1rem 0; }
+    .legacy-auto-summary { display:grid; grid-template-columns:repeat(4,1fr); gap:.65rem; margin:1rem 0; }
     .legacy-auto-summary span { padding:.75rem; border:1px solid #e2e9e6; border-radius:9px; background:#fff; }
     .legacy-auto-summary small, .legacy-auto-summary strong { display:block; }
     .legacy-secret-input { height:50px; text-align:center; font-size:18px; font-weight:700; letter-spacing:.25em; }
@@ -201,6 +201,11 @@
                                                                                 </fieldset>
                                                                             </div>
                                                                             <div class="col-md-12" id="bank-details-div" style="display:none">
+                                                                                <div class="alert alert-warning">
+                                                                                    <strong>Bank payout breakdown</strong><br>
+                                                                                    <span id="bank-charge-copy">Select an amount to see the applicable bank transfer fee.</span><br>
+                                                                                    <span id="bank-charge-breakdown" style="display:none">Bank transfer fee: <strong>{!! getSettings()['currency'] !!}<span id="bank-fee-display">0.00</span></strong><br>Amount to be paid to bank: <strong>{!! getSettings()['currency'] !!}<span id="bank-payout-display">0.00</span></strong></span>
+                                                                                </div>
                                                                                 <fieldset class="form-group">
                                                                                     <label for="payment_method">Select Bank </label>
                                                                                     @if(!empty($walletBankAccount))
@@ -264,7 +269,7 @@
                                                                             <span class="legacy-auto-mark"><i class="bx bx-lock-alt"></i></span>
                                                                             <h3 class="text-center">Enter SIM PIN</h3>
                                                                             <p class="text-center text-muted"><strong id="legacy-pin-phone"></strong><br>Enter your airtime share PIN to authorize the transfer.</p>
-                                                                            <div class="legacy-auto-summary"><span><small>Network</small><strong id="legacy-summary-network">-</strong></span><span><small>Airtime</small><strong id="legacy-summary-amount">-</strong></span><span><small>To wallet</small><strong id="legacy-summary-payout">-</strong></span></div>
+                                                                            <div class="legacy-auto-summary"><span><small>Network</small><strong id="legacy-summary-network">-</strong></span><span><small>Airtime</small><strong id="legacy-summary-amount">-</strong></span><span><small>To wallet</small><strong id="legacy-summary-payout">-</strong></span><span><small>To Bank</small><strong id="legacy-summary-bank-payout">-</strong></span></div>
                                                                             <label for="legacy-share-pin">Airtime Share PIN</label>
                                                                             <input type="password" class="form-control legacy-secret-input" id="legacy-share-pin" inputmode="numeric" maxlength="8" autocomplete="off" placeholder="----">
                                                                             <small class="d-block text-center mt-50 text-muted">The PIN you use to share or transfer airtime from your SIM.</small>
@@ -330,6 +335,8 @@
         var allProductOptions = productSelect.find('option').clone();
         var defaultAutoInstruction = @json($autoTransferInstruction);
         var currency = @json(html_entity_decode(strip_tags(getSettings()['currency'])));
+        var bankTransferPricingBands = @json($bankTransferPricingBands ?? []);
+        var bankTransferGlobalExtraCharges = @json($bankTransferGlobalExtraCharges ?? []);
         var csrfToken = @json(csrf_token());
         var autoUrls = {
             initiate: @json(route('airtime2cash.auto.initiate')),
@@ -353,6 +360,37 @@
         }
         var hasLockedBankAccount = @json(!empty($walletBankAccount));
         function bankPayoutBlocked() { return $('#payment_method').val() === 'Transfer to Bank Account' && !hasLockedBankAccount; }
+        function updateBankTransferBreakdown(convertedAmount) {
+            var bankSelected = $('#payment_method').val() === 'Transfer to Bank Account';
+            var breakdown = $('#bank-charge-breakdown');
+            var copy = $('#bank-charge-copy');
+
+            if (!bankSelected) {
+                breakdown.hide();
+                copy.text('Select bank account payout to see the applicable bank transfer fee.');
+                return;
+            }
+
+            var band = bankTransferPricingBands.find(function (item) {
+                var min = item.min_amount === '' || item.min_amount == null ? null : Number(item.min_amount);
+                var max = item.max_amount === '' || item.max_amount == null ? null : Number(item.max_amount);
+                return (!Number.isFinite(min) || convertedAmount >= min) && (!Number.isFinite(max) || convertedAmount <= max);
+            });
+
+            if (!band) {
+                breakdown.hide();
+                copy.text('Bank transfer pricing is not configured for this converted amount.');
+                return;
+            }
+
+            var charges = (bankTransferGlobalExtraCharges || []).concat(band.extra_charges || []);
+            var fee = Number(band.provider_fee || 0) + Number(band.extra_charge || 0) + charges.reduce(function (total, item) { return total + Number(item.value || 0); }, 0);
+            var payout = Math.max(0, convertedAmount - fee);
+            $('#bank-fee-display').text(fee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+            $('#bank-payout-display').text(payout.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+            copy.text('Bank transfer fee based on your converted amount:');
+            breakdown.show();
+        }
         function setLegacyButton(label, disabled) { $('#buy-buttonx').text(label).prop('disabled', disabled || bankPayoutBlocked()); }
         function showLegacyError(message) { $('#legacy-auto-error').text(message).toggle(Boolean(message)); }
         function firstLegacyError(data) {
@@ -395,7 +433,11 @@
             $('#legacy-pin-phone, #legacy-otp-phone').text($('#phone').val());
             $('#legacy-summary-network').text(selected.data('name'));
             $('#legacy-summary-amount').text(currency + Number($('#amount').val()).toLocaleString());
-            $('#legacy-summary-payout').text(currency + Number($('#receive').val()).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}));
+            var convertedAmount = Number($('#receive').val()) || 0;
+            $('#legacy-summary-payout').text(currency + convertedAmount.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}));
+            $('#legacy-summary-bank-payout').text($('#payment_method').val() === 'Transfer to Bank Account'
+                ? currency + Number($('#bank-payout-display').text().replace(/,/g, '') || 0).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})
+                : '-');
             $('#instruction-div').hide();
             $('#legacy-auto-flow, #legacy-pin-stage').show();
             $('#legacy-otp-stage').hide();
@@ -614,6 +656,7 @@
                 $("#account_number").removeAttr('required');
                 $("#account_name").removeAttr('required');
             }
+            updateBankTransferBreakdown(parseFloat($('#receive').val()) || 0);
             $('#buy-buttonx').prop('disabled', bankPayoutBlocked());
             var fixed_price = $('#product').find(':selected').data('fixed_price');
         });
@@ -635,6 +678,7 @@
                 $('#payment-div').hide();
                 $('#receive').val('');
             }
+            updateBankTransferBreakdown(receive);
         });
 
     });

@@ -51,7 +51,7 @@
         .a2c-secure-flow { background: linear-gradient(145deg, rgba(255,255,255,.98), rgba(243,250,248,.94)); }
         .a2c-secure-shell { max-width: 620px; margin: 0 auto; }
         .a2c-stage-mark { display: inline-flex; width: 54px; height: 54px; align-items: center; justify-content: center; border-radius: 18px; color: #fff; background: linear-gradient(145deg, #00a86b, #008c68); box-shadow: 0 .65rem 1.4rem rgba(0,168,107,.24); }
-        .a2c-stage-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: .75rem; padding: 1rem; border: 1px solid rgba(67,89,113,.1); border-radius: 1rem; background: rgba(255,255,255,.78); }
+        .a2c-stage-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: .75rem; padding: 1rem; border: 1px solid rgba(67,89,113,.1); border-radius: 1rem; background: rgba(255,255,255,.78); }
         .a2c-stage-summary small, .a2c-stage-summary strong { display: block; }
         .a2c-stage-summary small { color: var(--bs-secondary-color); margin-bottom: .2rem; }
     .a2c-stage-summary strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -272,6 +272,14 @@
                                     <option value="Transfer to Wallet">Airtime2Cash wallet</option>
                                 </select>
                                 <div id="bank-details-div" class="mt-4" style="display:none">
+                                    <div class="alert alert-warning mb-3">
+                                        <strong><i class="bx bx-info-circle me-1"></i>Bank payout breakdown</strong>
+                                        <div id="bank-charge-copy">Select an amount to see the applicable bank transfer fee.</div>
+                                        <div id="bank-charge-breakdown" class="mt-2" style="display:none">
+                                            Bank transfer fee: <strong>{{ getSettings()['currency'] }}<span id="bank-fee-display">0.00</span></strong><br>
+                                            Amount to be paid to bank: <strong>{{ getSettings()['currency'] }}<span id="bank-payout-display">0.00</span></strong>
+                                        </div>
+                                    </div>
                                     <div class="rounded border bg-body-tertiary p-3 p-md-4">
                                         <div class="d-flex align-items-center gap-2 mb-3"><i class="bx bx-building-house text-primary fs-5"></i><h6 class="mb-0">Bank account details</h6></div>
                                         @if(!empty($walletBankAccount))
@@ -329,6 +337,7 @@
                                     <span><small>Network</small><strong id="auto-summary-network">-</strong></span>
                                     <span><small>Airtime</small><strong id="auto-summary-amount">-</strong></span>
                                     <span><small>To wallet</small><strong id="auto-summary-payout">-</strong></span>
+                                    <span><small>To Bank</small><strong id="auto-summary-bank-payout">-</strong></span>
                                 </div>
                                 <div class="mb-3">
                                     <label for="share-pin" class="form-label">Airtime Share PIN</label>
@@ -462,6 +471,8 @@
             );
 
             const defaultAutoInstruction = @json($autoTransferInstruction);
+            const bankTransferPricingBands = @json($bankTransferPricingBands ?? []);
+            const bankTransferGlobalExtraCharges = @json($bankTransferGlobalExtraCharges ?? []);
             const csrfToken = @json(csrf_token());
             const modeAccess = {
                 manual: @json($a2cManualAccess),
@@ -879,6 +890,7 @@
                     $receive.val('');
                     $receiveDiv.hide();
                     $paymentDiv.hide();
+                    updateBankTransferBreakdown(0);
 
                     $paymentMethod
                         .val('')
@@ -895,7 +907,43 @@
                 $receive.val(payout.toFixed(2));
                 $receiveDiv.show();
                 $paymentDiv.show();
+                updateBankTransferBreakdown(payout);
 
+            }
+
+            function updateBankTransferBreakdown(convertedAmount) {
+                const bankSelected = $paymentMethod.val() === 'Transfer to Bank Account';
+                const $breakdown = $('#bank-charge-breakdown');
+                const $copy = $('#bank-charge-copy');
+
+                if (!bankSelected) {
+                    $breakdown.hide();
+                    $copy.text('Select bank account payout to see the applicable bank transfer fee.');
+                    return;
+                }
+
+                const band = bankTransferPricingBands.find(function (item) {
+                    const min = item.min_amount === '' || item.min_amount == null ? null : Number(item.min_amount);
+                    const max = item.max_amount === '' || item.max_amount == null ? null : Number(item.max_amount);
+                    return (!Number.isFinite(min) || convertedAmount >= min) && (!Number.isFinite(max) || convertedAmount <= max);
+                });
+
+                if (!band) {
+                    $breakdown.hide();
+                    $copy.text('Bank transfer pricing is not configured for this converted amount.');
+                    return;
+                }
+
+                const charges = (bankTransferGlobalExtraCharges || []).concat(band.extra_charges || []);
+                const fee = Number(band.provider_fee || 0)
+                    + Number(band.extra_charge || 0)
+                    + charges.reduce((total, item) => total + Number(item.value || 0), 0);
+                const payout = Math.max(0, convertedAmount - fee);
+
+                $('#bank-fee-display').text(fee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+                $('#bank-payout-display').text(payout.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+                $copy.text('Bank transfer fee based on your converted amount:');
+                $breakdown.show();
             }
 
             /*
@@ -994,6 +1042,12 @@
 
                 $('#auto-summary-payout').text(
                     formatMoney($receive.val())
+                );
+
+                $('#auto-summary-bank-payout').text(
+                    $paymentMethod.val() === 'Transfer to Bank Account'
+                        ? formatMoney($('#bank-payout-display').text().replace(/,/g, ''))
+                        : '-'
                 );
 
                 $sharePin.val('');
@@ -1553,6 +1607,7 @@
                     resetBankDetails();
                 }
 
+                updateBankTransferBreakdown(Number.parseFloat($receive.val()) || 0);
                 $buyButton.prop('disabled', useBank && !@json(!empty($walletBankAccount)));
             });
 

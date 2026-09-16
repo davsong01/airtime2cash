@@ -8,6 +8,9 @@
         $color = 'green';
     }
     $completedAt = $transaction->completed_at ?? $transaction->updated_at ?? null;
+    $isBankPayout = $transaction->payment_method === 'Transfer to Bank Account';
+    $bankTransferFee = (float) ($transaction->bank_transfer_fee ?? 0);
+    $bankPayoutAmount = (float) ($transaction->bank_transfer_amount ?? $transaction->amount_paid);
 ?>
 @extends('layouts.app')
 @section('title', 'Transaction Completed')
@@ -85,7 +88,13 @@
                                                                     </strong></h3></span>
                                                                    
                                                                     <span class="data-details-info"><span style="color:#174159;">Amount Transferred: {!! getSettings()->currency !!}{{ number_format($transaction->total_amount, 2) }}</span></span> <br>
+                                                                    <span class="data-details-info"><span style="color:#174159;">Airtime Conversion Fee: {!! getSettings()->currency !!}{{ number_format($transaction->amount_charged, 2) }}</span></span> <br>
+                                                                    @if($isBankPayout)
+                                                                    <span class="data-details-info"><span style="color:#174159;">Bank Transfer Fee: {!! getSettings()->currency !!}{{ number_format($bankTransferFee, 2) }}</span></span> <br>
+                                                                    <span class="data-details-info"><span style="color:#174159;">Amount Paid to Bank: {!! getSettings()->currency !!}{{ number_format($bankPayoutAmount, 2) }}</span></span> <br>
+                                                                    @else
                                                                     <span class="data-details-info"><span style="color:#174159;">Amount Received: {!! getSettings()->currency !!}{{ number_format($transaction->amount_paid, 2) }}</span></span> <br>
+                                                                    @endif
                                                                     @if($transaction->status == 'approved')
                                                                     <a href="{{ route('airtime2cash.transaction.receipt.download', $transaction->id)}}" target="_blank" class="btn btn-primary mt-1 mb-1" style="color:#fff;width:100%;"><i class="fa fa-download"></i>Download Transaction Receipt</a>
                                                                     @endif

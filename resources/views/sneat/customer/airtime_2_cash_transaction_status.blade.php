@@ -4,6 +4,9 @@
     $status = strtolower($transaction->status ?: 'pending');
     $isSuccessful = in_array($status, ['approved', 'successful', 'success', 'completed'], true);
     $isFailed = in_array($status, ['declined', 'failed', 'rejected', 'cancelled', 'canceled'], true);
+    $isBankPayout = $transaction->payment_method === 'Transfer to Bank Account';
+    $bankTransferFee = (float) ($transaction->bank_transfer_fee ?? 0);
+    $bankPayoutAmount = (float) ($transaction->bank_transfer_amount ?? $transaction->amount_paid);
     $statusClass = match ($status) {
         'approved', 'successful', 'success', 'completed' => 'success',
         'declined', 'failed', 'rejected', 'cancelled', 'canceled' => 'danger',
@@ -184,7 +187,12 @@
                             <div class="a2c-financial-row"><span class="text-muted">Airtime amount</span><strong>{{ $currency }}{{ number_format($transaction->total_amount, 2) }}</strong></div>
                             <div class="a2c-financial-row"><span class="text-muted">Charge rate</span><strong>{{ number_format($transaction->charge_rate, 2) }}%</strong></div>
                             <div class="a2c-financial-row"><span class="text-muted">Conversion charge</span><strong class="text-danger">-{{ $currency }}{{ number_format($transaction->amount_charged, 2) }}</strong></div>
-                            <div class="a2c-financial-row a2c-financial-total"><span>You receive</span><strong class="text-success">{{ $currency }}{{ number_format($transaction->amount_paid, 2) }}</strong></div>
+                            @if($isBankPayout)
+                                <div class="a2c-financial-row"><span class="text-muted">Bank transfer fee</span><strong class="text-danger">-{{ $currency }}{{ number_format($bankTransferFee, 2) }}</strong></div>
+                                <div class="a2c-financial-row a2c-financial-total"><span>Amount paid to bank</span><strong class="text-success">{{ $currency }}{{ number_format($bankPayoutAmount, 2) }}</strong></div>
+                            @else
+                                <div class="a2c-financial-row a2c-financial-total"><span>Amount paid to wallet</span><strong class="text-success">{{ $currency }}{{ number_format($transaction->amount_paid, 2) }}</strong></div>
+                            @endif
                         </div>
                     </div>
                 </div>
