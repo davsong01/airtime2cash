@@ -3277,6 +3277,7 @@ class TransactionController extends Controller
             'failed' => 0,
             'pending' => 0,
             'skipped' => 0,
+            'unchanged' => 0,
         ];
 
         foreach ($transactions as $transaction) {
@@ -3383,7 +3384,6 @@ class TransactionController extends Controller
                 'provider_response' => $providerResponse,
                 'decline_reason' => null,
                 'description' => $settlementMessage,
-                'balance_after' => $balanceAfter,
                 'completed_at' => $locked->completed_at ?? now(),
             ]);
 
@@ -3402,6 +3402,7 @@ class TransactionController extends Controller
                 'message' => $settlementMessage,
             ];
         } catch (\Throwable $e) {
+
             DB::rollBack();
 
             throw $e; // Re-throw the exception or handle/return custom error response as needed
