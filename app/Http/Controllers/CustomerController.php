@@ -776,11 +776,11 @@ class CustomerController extends Controller
         } elseif (array_key_exists('verification_response', $existing)) {
             $next['verification_response'] = $existing['verification_response'];
         }
-        
+
         $customer->forceFill([
             'wallet_bank_account' => array_filter($next, static fn ($value) => ! is_null($value) && $value !== ''),
         ])->save();
-
+        
         return back()->with('message', 'Wallet to bank account details updated successfully.');
     }
 

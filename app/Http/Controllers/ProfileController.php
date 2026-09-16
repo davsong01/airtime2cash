@@ -88,14 +88,16 @@ class ProfileController extends Controller
         }
 
         $bankReference = trim((string) $request->bank);
-        $bank = getWalletToBankBanks()->first(function (Bank $bank) use ($bankReference) {
-            if (is_numeric($bankReference) && (int) $bankReference === (int) $bank->id) {
-                return true;
-            }
+        $bank = getWalletToBankBanks()->where('id', $bankReference)->first();
 
-            return strcasecmp(trim((string) $bank->cbn_code), $bankReference) === 0
-                || strcasecmp(trim((string) $bank->bank_name), $bankReference) === 0;
-        });
+        // $bank = getWalletToBankBanks()->first(function (Bank $bank) use ($bankReference) {
+        //     if (is_numeric($bankReference) && (int) $bankReference === (int) $bank->id) {
+        //         return true;
+        //     }
+
+        //     return strcasecmp(trim((string) $bank->cbn_code), $bankReference) === 0
+        //         || strcasecmp(trim((string) $bank->bank_name), $bankReference) === 0;
+        // });
 
         if (! $bank) {
             return back()->with('error', 'Invalid bank selected.');
