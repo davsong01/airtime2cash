@@ -2,10 +2,12 @@
     $settings = getSettings();
     $currency = $settings->currency ?? 'NGN';
     $status = strtolower($transaction->status ?: 'pending');
+    $isSuccessful = in_array($status, ['approved', 'successful', 'success', 'completed'], true);
+    $isFailed = in_array($status, ['declined', 'failed', 'rejected', 'cancelled', 'canceled'], true);
     $statusClass = match ($status) {
-        'approved' => 'success',
-        'declined' => 'danger',
-        'pending', 'processing' => 'warning',
+        'approved', 'successful', 'success', 'completed' => 'success',
+        'declined', 'failed', 'rejected', 'cancelled', 'canceled' => 'danger',
+        'pending', 'processing', 'initiated' => 'warning',
         default => 'secondary',
     };
     $statusIcon = match ($statusClass) {
@@ -15,13 +17,13 @@
         default => 'bx-info-circle',
     };
     $statusTitle = match ($status) {
-        'approved' => 'Conversion approved',
-        'declined' => 'Conversion declined',
+        'approved', 'successful', 'success', 'completed' => 'Conversion successful',
+        'declined', 'failed', 'rejected', 'cancelled', 'canceled' => 'Conversion failed',
         default => 'Conversion under review',
     };
     $statusMessage = match ($status) {
-        'approved' => 'Your airtime conversion has been reviewed and the payout approved.',
-        'declined' => 'This conversion could not be completed. Review the reason provided below.',
+        'approved', 'successful', 'success', 'completed' => 'Your airtime conversion was completed successfully.',
+        'declined', 'failed', 'rejected', 'cancelled', 'canceled' => 'This conversion could not be completed. Review the reason provided below.',
         default => 'Your request has been received and is awaiting review. You can return here for updates.',
     };
     $productName = $transaction->product?->display_name ?: $transaction->product?->name ?: 'Airtime conversion';
@@ -30,7 +32,10 @@
     $createdAt = $transaction->created_at;
     $completedAt = $transaction->completed_at ?? $transaction->updated_at ?? null;
     $completedLabel = $completedAt ? $completedAt->format('M j, Y · g:i A') : 'Awaiting completion';
-    $isCompleted = filled($transaction->completed_at) || in_array($status, ['approved', 'declined', 'successful', 'failed'], true);
+    // A timestamp can exist when a request is closed as failed or when an
+    // older flow writes it while still pending. Completion is only a
+    // successful terminal state.
+    $isCompleted = $isSuccessful;
 @endphp
 
 @extends('sneat.layouts.app')
@@ -198,17 +203,17 @@
                                 <span class="a2c-timeline-dot"><i class="bx bx-check"></i></span>
                                 <span class="a2c-timeline-copy"><strong>Request submitted</strong><small>We received your {{ strtolower($transferMode) }} request.</small></span>
                             </li>
-                            <li class="a2c-timeline-item {{ $status === 'declined' ? 'is-declined' : ($status === 'approved' ? 'is-complete' : 'is-current') }}">
-                                <span class="a2c-timeline-dot"><i class="bx {{ $status === 'declined' ? 'bx-x' : ($status === 'approved' ? 'bx-check' : 'bx-time-five') }}"></i></span>
-                                <span class="a2c-timeline-copy"><strong>{{ $status === 'declined' ? 'Review declined' : 'Airtime review' }}</strong><small>{{ $status === 'pending' ? 'Your conversion is currently being reviewed.' : ($status === 'approved' ? 'Your airtime transfer was successfully reviewed.' : 'The review could not be completed.') }}</small></span>
+                            <li class="a2c-timeline-item {{ $isFailed ? 'is-declined' : ($isSuccessful ? 'is-complete' : 'is-current') }}">
+                                <span class="a2c-timeline-dot"><i class="bx {{ $isFailed ? 'bx-x' : ($isSuccessful ? 'bx-check' : 'bx-time-five') }}"></i></span>
+                                <span class="a2c-timeline-copy"><strong>{{ $isFailed ? 'Review declined' : 'Airtime review' }}</strong><small>{{ $status === 'pending' ? 'Your conversion is currently being reviewed.' : ($isSuccessful ? 'Your airtime transfer was successfully reviewed.' : 'The review could not be completed.') }}</small></span>
                             </li>
-                            <li class="a2c-timeline-item {{ $status === 'approved' ? 'is-complete' : '' }}">
-                                <span class="a2c-timeline-dot"><i class="bx {{ $status === 'approved' ? 'bx-check' : 'bx-wallet' }}"></i></span>
-                                <span class="a2c-timeline-copy"><strong>Payout approved</strong><small>{{ $status === 'approved' ? 'The payout for this conversion has been approved.' : 'This step follows a successful review.' }}</small></span>
+                            <li class="a2c-timeline-item {{ $isSuccessful ? 'is-complete' : '' }}">
+                                <span class="a2c-timeline-dot"><i class="bx {{ $isSuccessful ? 'bx-check' : 'bx-wallet' }}"></i></span>
+                                <span class="a2c-timeline-copy"><strong>Payout approved</strong><small>{{ $isSuccessful ? 'The payout for this conversion has been approved.' : 'This step follows a successful review.' }}</small></span>
                             </li>
                             <li class="a2c-timeline-item {{ $isCompleted ? 'is-complete' : 'is-current' }}">
                                 <span class="a2c-timeline-dot"><i class="bx {{ $isCompleted ? 'bx-check' : 'bx-time-five' }}"></i></span>
-                                <span class="a2c-timeline-copy"><strong>Completed</strong><small>{{ $completedAt ? 'Completed at ' . $completedLabel : 'The transaction has not been completed yet.' }}</small></span>
+                                <span class="a2c-timeline-copy"><strong>Completed</strong><small>{{ $isCompleted && $completedAt ? 'Completed at ' . $completedLabel : 'The transaction has not been completed yet.' }}</small></span>
                             </li>
                         </ol>
                     </div>

@@ -141,7 +141,7 @@ use App\Models\Airtime2CashTransactions;
                                                         <small>
                                                             <span class="mr-50 text-bold-200">
                                                                 <strong>{{ $transaction->product->name ?? 'NOT SET'}}</strong>
-                                                                (@if($transaction->status == 'declined')
+                                                                (@if(in_array(strtolower((string) $transaction->status), ['failed', 'declined'], true))
                                                                     <span class="text-danger">{{ ucfirst($transaction->status) }}</span>
                                                                 @elseif($transaction->status == 'pending')
                                                                     <span class="text-warning">{{ ucfirst($transaction->status) }}</span>

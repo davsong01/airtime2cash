@@ -11,6 +11,16 @@
     $statusClass = in_array(strtolower((string) ($transaction->status ?? 'pending')), ['approved', 'success', 'successful', 'completed', 'delivered'], true)
         ? 'is-success'
         : (strtolower((string) ($transaction->status ?? 'pending')) === 'pending' ? 'is-warning' : 'is-danger');
+    $bankTransferResponse = is_array($transaction->bank_transfer_api_response ?? null)
+        ? $transaction->bank_transfer_api_response
+        : (json_decode((string) ($transaction->bank_transfer_api_response ?? ''), true) ?: []);
+    $bankTransferStatus = strtolower((string) (
+        data_get($bankTransferResponse, 'provider_status')
+        ?? data_get($bankTransferResponse, 'responseBody.status')
+        ?? data_get($bankTransferResponse, 'data.status')
+        ?? data_get($bankTransferResponse, 'status')
+        ?? 'pending'
+    ));
 ?>
 @php
     $product = $transaction->product;
@@ -289,16 +299,28 @@
                                                             <div class="col-md-4">
                                                                 <strong class="heads" style="color:green">Provider Status</strong>  <br>
                                                                 <strong>Provider: </strong>{{ $transaction->provider->name ?? 'Unknown' }} <br>
-                                                                <strong>Current Status: </strong>
+                                                                <strong>Status: </strong>
                                                                 <span id="airtime-provider-status">{{ ucfirst($transaction->provider_status ?? $transaction->status) }}</span><br>
+                                                                @if($transaction->payment_method === 'Transfer to Bank Account')
+                                                                    <strong>Bank Transfer Status: </strong>
+                                                                    <span id="airtime-bank-transfer-status">{{ ucfirst(str_replace('_', ' ', $bankTransferStatus)) }}</span><br>
+                                                                @endif
                                                                 @if($transaction->transactionLog)
                                                                     <button type="button" class="btn btn-primary btn-sm mt-2" id="query-airtime-status" onclick="queryAirtimeStatus('{{ route('admin.requery.transaction', $transaction->transactionLog->id) }}')">
                                                                         Query Provider Status
                                                                     </button>
                                                                 @endif
+                                                                @if($transaction->payment_method === 'Transfer to Bank Account')
+                                                                    <button type="button" class="btn btn-outline-primary btn-sm mt-2" id="query-bank-transfer-status" onclick="queryBankTransferStatus('{{ route('admin.requery.airtime2cash.bank.transfer', $transaction->id) }}')">
+                                                                        Query Bank Transfer Status
+                                                                    </button>
+                                                                @endif
                                                                 <div class="well mt-2" id="airtime-status-container" style="display:none;">
                                                                     <img src="{{url('/')}}/site/loading.gif" height="70" style="display:none; margin-left: auto; margin-right:auto;height:initial;" id="airtime-status-loading">
                                                                     <div id="airtime-status-response" style="max-height:300px;overflow:scroll;word-wrap: break-word"></div>
+                                                                </div>
+                                                                <div class="well mt-2" id="bank-transfer-status-container" style="display:none;">
+                                                                    <div id="bank-transfer-status-response" style="max-height:300px;overflow:scroll;word-wrap: break-word"></div>
                                                                 </div>
                                                             </div>
 
@@ -550,6 +572,28 @@
                 $('#airtime-status-loading').hide();
                 $('#airtime-status-response').show().html(renderPrettyJsonPanel(payload, 'Provider status response', 'Airtime-to-cash lookup result'));
                 $('#query-airtime-status').prop('disabled', false).text('Query Provider Status');
+            }
+        });
+    }
+
+    function queryBankTransferStatus(url) {
+        $.ajax({
+            url: url,
+            type: 'GET',
+            beforeSend: function () {
+                $('#bank-transfer-status-container').show();
+                $('#bank-transfer-status-response').html('<div class="text-muted">Querying bank transfer provider...</div>');
+                $('#query-bank-transfer-status').prop('disabled', true).text('Querying...');
+            },
+            success: function (data) {
+                $('#airtime-bank-transfer-status').text((data?.provider_status ?? 'unknown').toString().replace(/^./, function (char) { return char.toUpperCase(); }));
+                $('#bank-transfer-status-response').html(renderPrettyJsonPanel(data, 'Bank transfer status response', 'Bank payout lookup result'));
+                $('#query-bank-transfer-status').prop('disabled', false).text('Query Bank Transfer Status');
+            },
+            error: function (xhr) {
+                const payload = xhr.responseJSON ?? { status: false, message: 'Unable to query bank transfer status.' };
+                $('#bank-transfer-status-response').html(renderPrettyJsonPanel(payload, 'Bank transfer status response', 'Bank payout lookup result'));
+                $('#query-bank-transfer-status').prop('disabled', false).text('Query Bank Transfer Status');
             }
         });
     }

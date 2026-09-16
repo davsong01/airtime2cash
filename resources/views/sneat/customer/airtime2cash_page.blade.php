@@ -1074,7 +1074,7 @@
                     .html(
                         '<strong>Transaction pending.</strong> '
                         + message
-                        + ' Please do not submit another request while this transaction is being processed.'
+                        + ' Please contact support for faster resolution.'
                     )
                     .show();
 

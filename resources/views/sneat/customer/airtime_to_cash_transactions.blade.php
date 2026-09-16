@@ -111,7 +111,7 @@
                             <td>{{ getSettings()['currency'] }}{{ number_format($transaction->amount_charged, 2) }}</td>
                             <td><span class="badge bg-label-info">{{ $transaction->transfer_mode === 'auto_share' ? 'Auto Transfer' : 'Manual Transfer' }}</span></td>
                             <td>
-                                <span class="badge {{ $transaction->status == 'declined' ? 'bg-label-danger' : ($transaction->status == 'pending' ? 'bg-label-warning' : 'bg-label-success') }}">
+                                <span class="badge {{ in_array(strtolower((string) $transaction->status), ['failed', 'declined'], true) ? 'bg-label-danger' : (in_array(strtolower((string) $transaction->status), ['pending', 'processing', 'initiated'], true) ? 'bg-label-warning' : 'bg-label-success') }}">
                                     {{ ucfirst($transaction->status) }}
                                 </span>
                             </td>

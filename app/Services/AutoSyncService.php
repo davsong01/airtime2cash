@@ -177,71 +177,77 @@ class AutoSyncService
             'Authorization' => 'Bearer '.$provider->api_key,
         ];
         $startedAt = microtime(true);
-
+        $response = null;
         try {
-            if (env('ENV') === 'local') {
-                $response = new GuzzleResponse(200, [], <<<'JSON'
-                {
-                    "status": "ok",
-                    "message": "Transaction successful | Shared: NGN99,000",
-                    "data": {
-                        "transaction": {
-                            "reference": "ASNA2C20260916185255DHLY5C",
-                            "request_ref": "A2C-2026091618523024679",
-                            "type": "MTN A2C",
-                            "details": "Transaction successful | Shared: NGN99,000",
-                            "amount": 99000,
-                            "status": "successful",
-                            "request_data": {
-                                "request_ref": "A2C-2026091618523024679",
-                                "phone": "07077338563",
-                                "product_id": "mtn",
-                                "amount": 99000,
-                                "sharePin": "1244"
-                            },
-                            "balance_before": "NGN99,000.6",
-                            "balance_after": "NGN0.6",
-                            "created_at": "2026-09-16T17:52:55.000000Z",
-                            "gateway_id": null,
-                            "logs": [],
-                            "wallets": [
-                                {
-                                    "reference": "a2c2ef3a-e7b5-409e-80f7-00edf2c6134f",
-                                    "amount": 185,
-                                    "convenience_fee": 0,
-                                    "balance_before": 3985.89,
-                                    "balance_after": 3785.89,
-                                    "type": "debit",
-                                    "status": "successful",
-                                    "details": "Charges For transaction reference ASNA2C20260916185255DHLY5C",
-                                    "created_at": "2026-09-16T17:53:29.000000Z"
-                                },
-                                {
-                                    "reference": "a2c2ef3b-0026-4aae-b9e8-88c1a62ca21b",
-                                    "amount": 0,
-                                    "convenience_fee": 0,
-                                    "balance_before": 3985.89,
-                                    "balance_after": 3785.89,
-                                    "type": "debit",
-                                    "status": "successful",
-                                    "details": "Balance Checker For transaction reference ASNA2C20260916185255DHLY5C",
-                                    "created_at": "2026-09-16T17:53:29.000000Z"
-                                }
-                            ]
-                        }
-                    }
-                }
-                JSON
-                );
-            }else{
-                $response = Http::withHeaders($headers)
-                ->asJson()
-                ->connectTimeout(10)
-                ->timeout(40)
-                ->post($endpoint, $payload);
-            }
+            if (env('ENT') === 'local') {
+                $data = [
+                    'status' => 'ok',
+                    'message' => 'Transaction successful | Shared: NGN99,000',
+                    'data' => [
+                        'transaction' => [
+                            'reference' => 'ASNA2C20260916185255DHLY5C',
+                            'request_ref' => 'A2C-2026091618523024679',
+                            'type' => 'MTN A2C',
+                            'details' => 'Transaction successful | Shared: NGN99,000',
+                            'amount' => 99000,
+                            'status' => 'successful',
+                            'request_data' => [
+                                'request_ref' => 'A2C-2026091618523024679',
+                                'phone' => '07077338563',
+                                'product_id' => 'mtn',
+                                'amount' => 99000,
+                                'sharePin' => '1244',
+                            ],
+                            'balance_before' => 'NGN99,000.6',
+                            'balance_after' => 'NGN0.6',
+                            'created_at' => '2026-09-16T17:52:55.000000Z',
+                            'gateway_id' => null,
+                            'logs' => [],
+                            'wallets' => [
+                                [
+                                    'reference' => 'a2c2ef3a-e7b5-409e-80f7-00edf2c6134f',
+                                    'amount' => 185,
+                                    'convenience_fee' => 0,
+                                    'balance_before' => 3985.89,
+                                    'balance_after' => 3785.89,
+                                    'type' => 'debit',
+                                    'status' => 'successful',
+                                    'details' => 'Charges For transaction reference ASNA2C20260916185255DHLY5C',
+                                    'created_at' => '2026-09-16T17:53:29.000000Z',
+                                ],
+                                [
+                                    'reference' => 'a2c2ef3b-0026-4aae-b9e8-88c1a62ca21b',
+                                    'amount' => 0,
+                                    'convenience_fee' => 0,
+                                    'balance_before' => 3985.89,
+                                    'balance_after' => 3785.89,
+                                    'type' => 'debit',
+                                    'status' => 'successful',
+                                    'details' => 'Balance Checker For transaction reference ASNA2C20260916185255DHLY5C',
+                                    'created_at' => '2026-09-16T17:53:29.000000Z',
+                                ],
+                            ],
+                        ],
+                    ],
+                ];
 
-            $data = $response->json();
+                // Keep the mock response identical to the real HTTP path.
+                // The completion flow relies on the response object for
+                // status checks and request logging.
+                $response = new Response(new GuzzleResponse(
+                    200,
+                    ['Content-Type' => 'application/json'],
+                    json_encode($data, JSON_THROW_ON_ERROR)
+                ));
+            } else {
+                $response = Http::withHeaders($headers)
+                    ->asJson()
+                    ->connectTimeout(10)
+                    ->timeout(40)
+                    ->post($endpoint, $payload);
+
+                $data = $response->json();
+            }
 
             $this->writeLog(
                 'complete',
@@ -250,7 +256,7 @@ class AutoSyncService
                 $headers,
                 $payload,
                 $response,
-                is_array($data) ? $data : ['raw' => $response->body()],
+                $data,
                 [
                     'customer_id' => $transaction->customer_id,
                     'transaction_id' => $transaction->transaction_id,

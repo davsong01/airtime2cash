@@ -1371,7 +1371,7 @@ class TransactionController extends Controller
                 // $this->referralReward($user->referral, $request['total_amount'], $user->customer->id, $request['transaction_id'], $product->referral_percentage);
                 $res = [
                     'status' => $query['status'],
-                    'message' => 'Transaction Pending!',
+                    'message' => 'Transaction Pending! Please contact support',
                 ];
 
                 $user_status = 'pending';
@@ -1635,8 +1635,7 @@ class TransactionController extends Controller
                 return response()->json([
                     'status' => true,
                     'transaction_status' => 'pending',
-                    'message' => $providerResponse['message']
-                        ?? 'Your airtime conversion is pending. Please do not retry while it is being processed.',
+                    'message' => 'Please do not submit another request while this transaction is being processed.',
                     'reset_flow' => true,
                     'data' => [
                         'transaction_id' => $transaction->transaction_id,
@@ -2025,6 +2024,8 @@ class TransactionController extends Controller
         $customerUser = $customer->relationLoaded('user') ? $customer->user : $customer->user()->first();
         $amount = (float) ($transaction->amount_paid ?? 0);
         $balanceBefore = (float) ($overrides['balance_before'] ?? ($customer->wallet ?? 0));
+
+
         $status = $overrides['status'] ?? 'pending';
         $balanceAfter = array_key_exists('balance_after', $overrides)
             ? (float) $overrides['balance_after']
@@ -2792,6 +2793,61 @@ class TransactionController extends Controller
             'provider_status' => $providerStatus,
             'provider' => $transaction->provider?->name,
             'response' => $providerPayload,
+        ]);
+    }
+
+    public function requeryAirtimeBankTransfer(Airtime2CashTransactions $transaction): JsonResponse
+    {
+        if ($transaction->payment_method !== 'Transfer to Bank Account') {
+            return response()->json([
+                'status' => false,
+                'message' => 'This transaction does not have a bank transfer payout.',
+            ], 422);
+        }
+
+        $bankResponse = is_array($transaction->bank_transfer_api_response ?? null)
+            ? $transaction->bank_transfer_api_response
+            : (json_decode((string) ($transaction->bank_transfer_api_response ?? ''), true) ?: []);
+        $reference = data_get($bankResponse, 'request_data.reference')
+            ?? data_get($bankResponse, 'api_response.responseBody.reference')
+            ?? data_get($bankResponse, 'api_response.responseBody.paymentReference')
+            ?? data_get($bankResponse, 'reference');
+
+        if (blank($reference)) {
+            return response()->json([
+                'status' => false,
+                'message' => 'The bank transfer reference is not available yet.',
+            ], 422);
+        }
+
+        $provider = API::query()
+            ->whereKey(getSettings()->bank_transfer_provider_id)
+            ->where('status', 'active')
+            ->first();
+        $controller = $provider ? resolveProviderController($provider) : null;
+
+        if (! $controller || ! method_exists($controller, 'singleTransferStatus')) {
+            return response()->json([
+                'status' => false,
+                'message' => 'The configured bank-transfer provider does not support status queries.',
+            ], 422);
+        }
+
+        try {
+            $response = $controller->singleTransferStatus((string) $reference);
+        } catch (Throwable $exception) {
+            return response()->json([
+                'status' => false,
+                'message' => $exception->getMessage(),
+            ], 422);
+        }
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Bank transfer status loaded successfully.',
+            'provider' => $provider->name,
+            'provider_status' => data_get($response, 'provider_status', data_get($response, 'status', 'pending')),
+            'response' => $response,
         ]);
     }
 
