@@ -3341,12 +3341,19 @@ class TransactionController extends Controller
             ];
         }
 
-        return DB::transaction(function () use ($transaction, $providerResponse, $providerStatus, $message, $resolutionSource) {
+        DB::beginTransaction();
+
+        try {
             $locked = Airtime2CashTransactions::with(['product', 'customer.user'])
                 ->whereKey($transaction->id)
                 ->lockForUpdate()
                 ->firstOrFail();
-            $customer = Customer::query()->whereKey($locked->customer_id)->lockForUpdate()->firstOrFail();
+
+            $customer = Customer::query()
+                ->whereKey($locked->customer_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
             $balanceBefore = (float) ($customer->wallet ?? 0);
             $balanceAfter = $balanceBefore;
             $status = 'approved';
@@ -3388,11 +3395,17 @@ class TransactionController extends Controller
                 'api_response' => $providerResponse,
             ]);
 
+            DB::commit();
+
             return [
                 'status' => 'successful',
                 'message' => $settlementMessage,
             ];
-        });
+        } catch (\Throwable $e) {
+            DB::rollBack();
+
+            throw $e; // Re-throw the exception or handle/return custom error response as needed
+        }
     }
 
     private function authorizePendingMonnifyTransaction(TransactionLog $transaction, string $authorizationCode)
