@@ -15,7 +15,37 @@
         }
 
         .transaction-ledger-card .table > :not(caption) > * > * {
-            padding: 1rem 1.25rem;
+            padding: .65rem .8rem;
+            vertical-align: middle;
+        }
+
+        .transaction-ledger-card .table {
+            table-layout: fixed;
+            width: 100%;
+        }
+
+        .transaction-ledger-card .table th,
+        .transaction-ledger-card .table td {
+            overflow-wrap: anywhere;
+        }
+
+        .transaction-ledger-card .table th:nth-child(1),
+        .transaction-ledger-card .table td:nth-child(1) { width: 22%; }
+        .transaction-ledger-card .table th:nth-child(2),
+        .transaction-ledger-card .table td:nth-child(2) { width: 17%; }
+        .transaction-ledger-card .table th:nth-child(3),
+        .transaction-ledger-card .table td:nth-child(3) { width: 13%; }
+        .transaction-ledger-card .table th:nth-child(4),
+        .transaction-ledger-card .table td:nth-child(4) { width: 20%; }
+        .transaction-ledger-card .table th:nth-child(5),
+        .transaction-ledger-card .table td:nth-child(5) { width: 11%; }
+        .transaction-ledger-card .table th:nth-child(6),
+        .transaction-ledger-card .table td:nth-child(6) { width: 10%; }
+        .transaction-ledger-card .table th:nth-child(7),
+        .transaction-ledger-card .table td:nth-child(7) { width: 7%; }
+
+        .transaction-ledger-card .table tbody td {
+            font-size: .82rem;
         }
 
         .transaction-ledger-card .table thead th {
@@ -38,8 +68,8 @@
 
         .transaction-service-mark {
             display: inline-flex;
-            width: 42px;
-            height: 42px;
+            width: 34px;
+            height: 34px;
             flex: 0 0 auto;
             align-items: center;
             justify-content: center;
