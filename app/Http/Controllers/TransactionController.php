@@ -116,6 +116,17 @@ class TransactionController extends Controller
         $bankTransferPricingBands = $bankTransferPricingProvider?->pricing_data ?? [];
         $bankTransferGlobalExtraCharges = $bankTransferPricingProvider?->extra_charges ?? [];
         $walletBankAccount = auth()->user()?->customer?->wallet_bank_account ?? null;
+        $settings = getSettings();
+        $airtimeToCashDestinations = [
+            'bank' => [
+                'manual' => ($settings?->bank_transfer_destination_manual_status ?? 'enabled') === 'enabled',
+                'auto_share' => ($settings?->bank_transfer_destination_auto_status ?? 'enabled') === 'enabled',
+            ],
+            'wallet' => [
+                'manual' => ($settings?->wallet_transfer_destination_manual_status ?? 'enabled') === 'enabled',
+                'auto_share' => ($settings?->wallet_transfer_destination_auto_status ?? 'enabled') === 'enabled',
+            ],
+        ];
 
         if (!empty($category) && $category->status == 'active') {
             return view(themeView('customer', 'airtime2cash_page'), compact(
@@ -124,7 +135,8 @@ class TransactionController extends Controller
                 'activeProvider',
                 'walletBankAccount',
                 'bankTransferPricingBands',
-                'bankTransferGlobalExtraCharges'
+                'bankTransferGlobalExtraCharges',
+                'airtimeToCashDestinations'
             ));
         } else {
             return back();
@@ -325,6 +337,21 @@ class TransactionController extends Controller
 
         if (! $this->customerCanAccessService($accessService)) {
             return $this->serviceUnavailableResponse('Airtime 2 Cash', 'a2c');
+        }
+
+        $settings = getSettings();
+        $mode = $request->input('transfer_mode') === 'auto_share' ? 'auto' : 'manual';
+        $bankDestinationEnabled = ($settings?->{'bank_transfer_destination_'.$mode.'_status'} ?? 'enabled') === 'enabled';
+        $walletDestinationEnabled = ($settings?->{'wallet_transfer_destination_'.$mode.'_status'} ?? 'enabled') === 'enabled';
+        $paymentMethod = $request->input('payment_method');
+        if (($paymentMethod === 'Transfer to Bank Account' && ! $bankDestinationEnabled)
+            || ($paymentMethod === 'Transfer to Wallet' && ! $walletDestinationEnabled)
+            || (! in_array($paymentMethod, ['Transfer to Bank Account', 'Transfer to Wallet'], true))) {
+            $message = 'The selected Airtime to Cash payout destination is currently unavailable.';
+
+            return $request->expectsJson()
+                ? response()->json(['status' => false, 'message' => $message], 422)
+                : back()->withInput()->with('error', $message);
         }
 
         $statusColumn = $request->transfer_mode === 'auto_share'

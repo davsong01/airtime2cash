@@ -61,6 +61,10 @@ class SettingsController extends Controller
                 'show_provider_status_on_customer_pages' => true,
                 'wallet_to_bank_transfer_auto_status' => 'enabled',
                 'wallet_to_bank_transfer_manual_status' => 'enabled',
+                'bank_transfer_destination_auto_status' => 'enabled',
+                'bank_transfer_destination_manual_status' => 'enabled',
+                'wallet_transfer_destination_auto_status' => 'enabled',
+                'wallet_transfer_destination_manual_status' => 'enabled',
                 'bvn_verification_mode' => 'manual',
                 'bvn_verification_charge' => '0',
                 'seo_title' => '',
@@ -126,6 +130,10 @@ class SettingsController extends Controller
                 'show_provider_status_on_customer_pages' => ['nullable', 'boolean'],
                 'wallet_to_bank_transfer_auto_status' => ['required', Rule::in(['enabled', 'disabled'])],
                 'wallet_to_bank_transfer_manual_status' => ['required', Rule::in(['enabled', 'disabled'])],
+                'bank_transfer_destination_auto_status' => ['nullable', Rule::in(['enabled', 'disabled'])],
+                'bank_transfer_destination_manual_status' => ['nullable', Rule::in(['enabled', 'disabled'])],
+                'wallet_transfer_destination_auto_status' => ['nullable', Rule::in(['enabled', 'disabled'])],
+                'wallet_transfer_destination_manual_status' => ['nullable', Rule::in(['enabled', 'disabled'])],
 
             ]);
 
@@ -150,6 +158,14 @@ class SettingsController extends Controller
         $data['show_provider_status_on_customer_pages'] = $request->boolean('show_provider_status_on_customer_pages');
         $data['bvn_verification_mode'] = $request->input('bvn_verification_mode', $settings->bvn_verification_mode ?? 'manual');
         $data['bvn_verification_charge'] = (float) $request->input('bvn_verification_charge', $settings->bvn_verification_charge ?? 0);
+        foreach ([
+            'bank_transfer_destination_auto_status',
+            'bank_transfer_destination_manual_status',
+            'wallet_transfer_destination_auto_status',
+            'wallet_transfer_destination_manual_status',
+        ] as $destinationStatus) {
+            $data[$destinationStatus] = $request->input($destinationStatus, $settings->{$destinationStatus} ?? 'enabled');
+        }
 
         foreach ($colorFields as $field) {
             $data[$field] = strtoupper($request->string($field)->toString());

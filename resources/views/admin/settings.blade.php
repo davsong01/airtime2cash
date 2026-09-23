@@ -240,6 +240,61 @@
 
                                                             <div class="card">
                                                                 <div class="card-header">
+                                                                    <h4 class="card-title mb-25">Airtime 2 Cash Destination Availability</h4>
+                                                                    <small class="text-muted">Control which payout destinations are available for manual and auto Airtime 2 Cash.</small>
+                                                                </div>
+
+                                                                <div class="card-body">
+                                                                    <div class="row">
+                                                                        <div class="col-md-6">
+                                                                            <fieldset class="form-group">
+                                                                                <label for="bank_transfer_destination_auto_status">Bank Account Destination - Auto</label>
+                                                                                <select name="bank_transfer_destination_auto_status" class="form-control" id="bank_transfer_destination_auto_status">
+                                                                                    <option value="enabled" @selected(old('bank_transfer_destination_auto_status', $settings->bank_transfer_destination_auto_status ?? 'enabled') === 'enabled')>Enabled</option>
+                                                                                    <option value="disabled" @selected(old('bank_transfer_destination_auto_status', $settings->bank_transfer_destination_auto_status ?? 'enabled') === 'disabled')>Disabled</option>
+                                                                                </select>
+                                                                                <small class="text-muted d-block mt-50">Controls the Bank Account destination for Auto Airtime to Cash.</small>
+                                                                            </fieldset>
+                                                                        </div>
+
+                                                                        <div class="col-md-6">
+                                                                            <fieldset class="form-group">
+                                                                                <label for="bank_transfer_destination_manual_status">Bank Account Destination - Manual</label>
+                                                                                <select name="bank_transfer_destination_manual_status" class="form-control" id="bank_transfer_destination_manual_status">
+                                                                                    <option value="enabled" @selected(old('bank_transfer_destination_manual_status', $settings->bank_transfer_destination_manual_status ?? 'enabled') === 'enabled')>Enabled</option>
+                                                                                    <option value="disabled" @selected(old('bank_transfer_destination_manual_status', $settings->bank_transfer_destination_manual_status ?? 'enabled') === 'disabled')>Disabled</option>
+                                                                                </select>
+                                                                                <small class="text-muted d-block mt-50">Controls the Bank Account destination for Manual Airtime to Cash.</small>
+                                                                            </fieldset>
+                                                                        </div>
+
+                                                                        <div class="col-md-6">
+                                                                            <fieldset class="form-group">
+                                                                                <label for="wallet_transfer_destination_auto_status">Airtime2Cash Wallet Destination - Auto</label>
+                                                                                <select name="wallet_transfer_destination_auto_status" class="form-control" id="wallet_transfer_destination_auto_status">
+                                                                                    <option value="enabled" @selected(old('wallet_transfer_destination_auto_status', $settings->wallet_transfer_destination_auto_status ?? 'enabled') === 'enabled')>Enabled</option>
+                                                                                    <option value="disabled" @selected(old('wallet_transfer_destination_auto_status', $settings->wallet_transfer_destination_auto_status ?? 'enabled') === 'disabled')>Disabled</option>
+                                                                                </select>
+                                                                                <small class="text-muted d-block mt-50">Controls the Airtime2Cash Wallet destination for Auto Airtime to Cash.</small>
+                                                                            </fieldset>
+                                                                        </div>
+
+                                                                        <div class="col-md-6">
+                                                                            <fieldset class="form-group">
+                                                                                <label for="wallet_transfer_destination_manual_status">Airtime2Cash Wallet Destination - Manual</label>
+                                                                                <select name="wallet_transfer_destination_manual_status" class="form-control" id="wallet_transfer_destination_manual_status">
+                                                                                    <option value="enabled" @selected(old('wallet_transfer_destination_manual_status', $settings->wallet_transfer_destination_manual_status ?? 'enabled') === 'enabled')>Enabled</option>
+                                                                                    <option value="disabled" @selected(old('wallet_transfer_destination_manual_status', $settings->wallet_transfer_destination_manual_status ?? 'enabled') === 'disabled')>Disabled</option>
+                                                                                </select>
+                                                                                <small class="text-muted d-block mt-50">Controls the Airtime2Cash Wallet destination for Manual Airtime to Cash.</small>
+                                                                            </fieldset>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            <div class="card">
+                                                                <div class="card-header">
                                                                     <h4 class="card-title mb-25">Provider Configuration</h4>
                                                                     <small class="text-muted">Select the providers used for automated platform operations.</small>
                                                                 </div>

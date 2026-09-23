@@ -57,6 +57,11 @@ class SettingsConfigurationTest extends TestCase
         $response->assertOk();
         $response->assertSee('BVN Verification Provider');
         $response->assertSee('BVN Verification Mode');
+        $response->assertSee('Airtime 2 Cash Destination Availability');
+        $response->assertSee('Bank Account Destination - Auto');
+        $response->assertSee('Bank Account Destination - Manual');
+        $response->assertSee('Airtime2Cash Wallet Destination - Auto');
+        $response->assertSee('Airtime2Cash Wallet Destination - Manual');
         $response->assertSee('Manual');
         $response->assertSee('Auto');
     }
@@ -118,6 +123,10 @@ class SettingsConfigurationTest extends TestCase
                 'bvn_verification_charge' => '250.00',
                 'wallet_to_bank_transfer_auto_status' => 'enabled',
                 'wallet_to_bank_transfer_manual_status' => 'enabled',
+                'bank_transfer_destination_auto_status' => 'disabled',
+                'bank_transfer_destination_manual_status' => 'enabled',
+                'wallet_transfer_destination_auto_status' => 'enabled',
+                'wallet_transfer_destination_manual_status' => 'disabled',
                 'show_provider_status_on_customer_pages' => 1,
                 'google_dashboard_ad_enabled' => 1,
                 'customer_layout' => 'legacy',
@@ -131,6 +140,10 @@ class SettingsConfigurationTest extends TestCase
             'bvn_verification_mode' => 'auto',
             'bvn_verification_charge' => 250,
             'bvn_verification_provider_id' => $provider->id,
+            'bank_transfer_destination_auto_status' => 'disabled',
+            'bank_transfer_destination_manual_status' => 'enabled',
+            'wallet_transfer_destination_auto_status' => 'enabled',
+            'wallet_transfer_destination_manual_status' => 'disabled',
         ]);
     }
 }

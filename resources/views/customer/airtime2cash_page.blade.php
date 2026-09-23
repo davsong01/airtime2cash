@@ -19,6 +19,10 @@
             ? 'https://api.whatsapp.com/send?phone=' . $adminWhatsappNumber . '&text=' . urlencode('Auto Airtime 2 Cash access request from ' . (auth()->user()?->email ?? 'customer') . '. Please enable this service for my account.')
             : null,
     ];
+    $airtimeToCashDestinations = $airtimeToCashDestinations ?? [
+        'bank' => ['manual' => true, 'auto_share' => true],
+        'wallet' => ['manual' => true, 'auto_share' => true],
+    ];
 ?>
 @extends('layouts.app')
 @section('title', $category->seo_title)
@@ -192,9 +196,12 @@
                                                                                     <label for="payment_method">Select Payment Method </label>
                                                                                     <select class="form-control" name="payment_method" id="payment_method" required>
                                                                                         <option value="">Select</option>
-                                                                                        <option value="Transfer to Bank Account">PAYMENT TO MY BANK ACCOUNT</option>
-                                                                                        <option value="Transfer to Wallet">PAYMENT TO MY AIRTIME2CASH WALLET</option>
+                                                                                        <option value="Transfer to Bank Account" data-destination="bank" data-manual-enabled="{{ $airtimeToCashDestinations['bank']['manual'] ? 1 : 0 }}" data-auto-enabled="{{ $airtimeToCashDestinations['bank']['auto_share'] ? 1 : 0 }}">PAYMENT TO MY BANK ACCOUNT</option>
+                                                                                        <option value="Transfer to Wallet" data-destination="wallet" data-manual-enabled="{{ $airtimeToCashDestinations['wallet']['manual'] ? 1 : 0 }}" data-auto-enabled="{{ $airtimeToCashDestinations['wallet']['auto_share'] ? 1 : 0 }}">PAYMENT TO MY AIRTIME2CASH WALLET</option>
                                                                                     </select>
+                                                                                    @if(!($airtimeToCashDestinations['bank']['manual'] || $airtimeToCashDestinations['bank']['auto_share'] || $airtimeToCashDestinations['wallet']['manual'] || $airtimeToCashDestinations['wallet']['auto_share']))
+                                                                                        <small class="text-danger d-block mt-1">No payout destinations are currently available. Please contact support.</small>
+                                                                                    @endif
                                                                                     <div class="footnote">
                                                                                         <small>Where should your payment go to. If you select bank transfer, please ensure that you have entered your bank account details here</small>
                                                                                     </div>
@@ -553,12 +560,33 @@
             productSelect.val('').trigger('change');
         }
 
+        function refreshPayoutDestinations() {
+            var transferMode = $('input[name="transfer_mode"]:checked').val();
+            var enabledKey = transferMode === 'auto_share' ? 'autoEnabled' : 'manualEnabled';
+            var paymentMethod = $('#payment_method');
+            var currentValue = paymentMethod.val();
+
+            paymentMethod.find('option[data-destination]').each(function () {
+                var option = $(this);
+                var enabled = option.data(enabledKey) === 1 || option.data(enabledKey) === '1';
+                option.prop('disabled', !enabled).toggle(enabled);
+            });
+
+            if (currentValue && paymentMethod.find('option[value="' + currentValue + '"]:enabled').length) {
+                paymentMethod.val(currentValue);
+            } else {
+                paymentMethod.val('');
+            }
+            paymentMethod.trigger('change');
+        }
+
         $('input[name="transfer_mode"]').on('change', function () {
             var auto = this.value === 'auto_share';
             autoStage = 'details'; autoTransactionId = null;
             $('#legacy-auto-flow').hide();
             setLegacyButton(auto ? 'INITIATE AUTO TRANSFER' : 'PROCEED', false);
             refreshNetworks();
+            refreshPayoutDestinations();
             refreshModeAccess();
         });
         refreshModeAccess();

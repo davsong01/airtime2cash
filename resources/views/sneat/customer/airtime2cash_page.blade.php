@@ -4,6 +4,13 @@
 @section('keywords', $category->seo_keywords)
 @section('description', $category->seo_description)
 
+@php
+    $airtimeToCashDestinations = $airtimeToCashDestinations ?? [
+        'bank' => ['manual' => true, 'auto_share' => true],
+        'wallet' => ['manual' => true, 'auto_share' => true],
+    ];
+@endphp
+
 @section('page-css')
     <link rel="stylesheet" href="{{ asset('modern-assets/vendor/libs/select2/select2.css') }}" />
     <style>
@@ -268,8 +275,8 @@
                                 <label for="payment_method" class="form-label">Payout destination</label>
                                 <select class="form-select modern-select2" name="payment_method" id="payment_method" data-placeholder="Select payout destination" required>
                                     <option value="">Select payout destination</option>
-                                    <option value="Transfer to Bank Account">Bank account</option>
-                                    <option value="Transfer to Wallet">Airtime2Cash wallet</option>
+                                    <option value="Transfer to Bank Account" data-destination="bank" data-manual-enabled="{{ $airtimeToCashDestinations['bank']['manual'] ? 1 : 0 }}" data-auto-enabled="{{ $airtimeToCashDestinations['bank']['auto_share'] ? 1 : 0 }}">Bank account</option>
+                                    <option value="Transfer to Wallet" data-destination="wallet" data-manual-enabled="{{ $airtimeToCashDestinations['wallet']['manual'] ? 1 : 0 }}" data-auto-enabled="{{ $airtimeToCashDestinations['wallet']['auto_share'] ? 1 : 0 }}">Airtime2Cash wallet</option>
                                 </select>
                                 <div id="bank-details-div" class="mt-4" style="display:none">
                                     <div class="alert alert-warning mb-3">
@@ -478,6 +485,7 @@
                 manual: @json($a2cManualAccess),
                 auto_share: @json($a2cAutoAccess)
             };
+            const payoutDestinationAvailability = @json($airtimeToCashDestinations);
 
             const endpoints = {
                 initiate: @json(route('initialize.airtime2cashtransaction')),
@@ -542,6 +550,28 @@
                 $autoSecureFlow.toggle(hasAccess && isAutoTransfer() && autoStage !== AUTO_STAGE_DETAILS);
                 $('#a2c-manual-locked').toggle(transferMode === 'manual' && !hasAccess);
                 $('#a2c-auto-locked').toggle(transferMode === 'auto_share' && !hasAccess);
+            }
+
+            function refreshPayoutDestinations() {
+                const transferMode = $('input[name="transfer_mode"]:checked').val() === 'auto_share'
+                    ? 'auto_share'
+                    : 'manual';
+                const currentValue = $paymentMethod.val();
+
+                $paymentMethod.find('option[data-destination]').each(function () {
+                    const $option = $(this);
+                    const destination = $option.data('destination');
+                    const enabled = Boolean(payoutDestinationAvailability[destination]?.[transferMode]);
+
+                    $option.prop('disabled', !enabled);
+                });
+
+                if (currentValue && $paymentMethod.find('option[value="' + currentValue + '"]:enabled').length) {
+                    $paymentMethod.val(currentValue);
+                } else {
+                    $paymentMethod.val('').trigger('change');
+                }
+                $paymentMethod.trigger('change.select2');
             }
 
             function normalizePhone(value) {
@@ -1526,6 +1556,7 @@
 
                 resetAutoFlow();
                 refreshAvailableNetworks();
+                refreshPayoutDestinations();
 
                 $product.val('');
                 resetSelectedProductDetails();
