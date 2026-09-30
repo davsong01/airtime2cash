@@ -562,6 +562,7 @@ if (!function_exists("resolveProviderController")) {
             'kora' => 'App\\Http\\Controllers\\Providers\\KoraController',
             'sagecloud' => 'App\\Http\\Controllers\\Providers\\SageController',
             'autosync' => 'App\\Http\\Controllers\\Providers\\AutoSyncController',
+            'airtimetocash' => 'App\\Http\\Controllers\\Providers\\AirtimeToCashAutomationController',
             'squad' => 'App\\Http\\Controllers\\PaymentProcessors\\SquadController',
         ];
 

@@ -270,9 +270,13 @@
                                                                         <p style="background-color: rgb(220, 227, 231);padding: 15px;border-radius: 5px;margin-bottom: 15px;color: rgb(40, 83, 107);">Instructions</p>
                                                                         <p id="instruction"></p>
                                                                     </div>
+                                                                    <div id="legacy-quota-option" class="form-check mb-2" style="display:none">
+                                                                        <input class="form-check-input" type="checkbox" id="legacy-check-quota">
+                                                                        <label class="form-check-label small" for="legacy-check-quota">Check recipient availability before sending OTP</label>
+                                                                    </div>
                                                                     <div id="legacy-auto-flow" class="legacy-auto-flow" style="display:none">
-                                                                        <div class="alert alert-danger" id="legacy-auto-error" style="display:none"></div>
-                                                                        <div id="legacy-pin-stage">
+                                                                            <div class="alert alert-danger" id="legacy-auto-error" style="display:none"></div>
+                                                                            <div id="legacy-pin-stage">
                                                                             <span class="legacy-auto-mark"><i class="bx bx-lock-alt"></i></span>
                                                                             <h3 class="text-center">Enter SIM PIN</h3>
                                                                             <p class="text-center text-muted"><strong id="legacy-pin-phone"></strong><br>Enter your airtime share PIN to authorize the transfer.</p>
@@ -352,6 +356,8 @@
         };
         var autoStage = 'details';
         var autoTransactionId = null;
+        var autoProviderSlug = @json(strtolower((string) ($activeProvider?->slug ?? '')));
+        var isAirtimeToCashAutomation = autoProviderSlug === 'airtimetocash';
         var modeAccess = {
             manual: @json($a2cManualAccess),
             auto_share: @json($a2cAutoAccess)
@@ -454,13 +460,25 @@
             setLegacyButton('SUBMIT PIN AND ENTER OTP', true);
             document.getElementById('legacy-auto-flow').scrollIntoView({behavior:'smooth', block:'center'});
         }
+        function openAirtimeToCashPin() {
+            autoStage = 'provider_pin';
+            $('#legacy-otp-stage').hide();
+            $('#legacy-pin-stage').show();
+            $('#legacy-share-pin').val('').focus();
+            $('#legacy-pin-phone').text($('#phone').val());
+            $('#legacy-quota-option').hide();
+            setLegacyButton('TRANSFER AIRTIME', true);
+        }
         function openLegacyOtp(data) {
-            autoTransactionId = data.transaction_id;
+            autoTransactionId = data.transaction_id || (data.data && data.data.transaction_id);
             autoStage = 'otp';
+            $('#instruction-div').hide();
+            $('#legacy-auto-flow').show();
+            $('#legacy-quota-option').hide();
             $('#legacy-pin-stage').hide();
             $('#legacy-otp-stage').show();
-            $('#legacy-otp-phone').text(data.phone || $('#phone').val());
-            setLegacyButton('SHARE AIRTIME', true);
+            $('#legacy-otp-phone').text(data.phone || (data.data && data.data.phone) || $('#phone').val());
+            setLegacyButton(isAirtimeToCashAutomation ? 'VERIFY OTP' : 'SHARE AIRTIME', true);
             $('#legacy-auto-otp').focus();
         }
         window.handleLegacyAirtimeToCashSubmit = function () {
@@ -471,7 +489,24 @@
                 document.getElementById('initialize').submit();
                 return false;
             }
-            if (autoStage === 'details') { if (validateLegacyDetails()) openLegacyPin(); return false; }
+            if (autoStage === 'details') {
+                if (!validateLegacyDetails()) return false;
+
+                if (isAirtimeToCashAutomation) {
+                    setLegacyButton('GENERATING OTP...', true); showLegacyError('');
+                    postLegacyAuto(autoUrls.initiate, Object.assign(legacyAutoPayload(), {
+                        check_quota: $('#legacy-check-quota').prop('checked') ? 1 : 0
+                    }))
+                        .then(openLegacyOtp)
+                        .catch(function (error) {
+                            showLegacyError(error.message);
+                            setLegacyButton('INITIATE AUTO TRANSFER', false);
+                        });
+                } else {
+                    openLegacyPin();
+                }
+                return false;
+            }
             if (autoStage === 'pin') {
                 var pin = $('#legacy-share-pin').val();
                 if (!/^\d{4,8}$/.test(pin)) return false;
@@ -495,11 +530,47 @@
                     });
                 return false;
             }
+            if (autoStage === 'provider_pin') {
+                var providerPin = $('#legacy-share-pin').val();
+                if (!/^\d{4,8}$/.test(providerPin)) return false;
+                setLegacyButton('TRANSFERRING AIRTIME...', true); showLegacyError('');
+                postLegacyAuto(autoUrls.complete, {transaction_id:autoTransactionId, stage:'pin', pin:providerPin})
+                    .then(function (data) {
+                        if (data.transaction_status === 'pending' || data.reset_flow) {
+                            showLegacyError(data.message || 'Your transfer is still being processed.');
+                            setLegacyButton('TRANSFER PROCESSING', true);
+                            return;
+                        }
+                        window.location.href = data.redirect;
+                    })
+                    .catch(function (error) {
+                        if (error.responseData && error.responseData.session_expired) {
+                            openLegacyOtp({transaction_id:autoTransactionId, phone:$('#phone').val()});
+                            showLegacyError(error.message || 'Your provider session expired. Request a new OTP.');
+                            return;
+                        }
+                        if (error.responseData && (error.responseData.terminal === true || error.responseData.reload === true)) {
+                            showLegacyError(error.message || 'The Airtime2Cash transaction failed.');
+                            setLegacyButton('TRANSACTION FAILED', true);
+                            window.setTimeout(function () { window.location.reload(); }, 3500);
+                            return;
+                        }
+                        showLegacyError(error.message);
+                        setLegacyButton('TRANSFER AIRTIME', false);
+                    });
+                return false;
+            }
             var otp = $('#legacy-auto-otp').val();
             if (!/^\d{4,10}$/.test(otp)) return false;
-            setLegacyButton('SHARING AIRTIME...', true); showLegacyError('');
-            postLegacyAuto(autoUrls.complete, {transaction_id:autoTransactionId, otp:otp})
-                .then(function (data) { window.location.href = data.redirect; })
+            setLegacyButton(isAirtimeToCashAutomation ? 'VERIFYING OTP...' : 'SHARING AIRTIME...', true); showLegacyError('');
+            postLegacyAuto(autoUrls.complete, Object.assign({transaction_id:autoTransactionId, otp:otp}, isAirtimeToCashAutomation ? {stage:'otp'} : {}))
+                .then(function (data) {
+                    if (isAirtimeToCashAutomation && data.stage === 'pin') {
+                        openAirtimeToCashPin();
+                        return;
+                    }
+                    window.location.href = data.redirect;
+                })
                 .catch(function (error) {
                     if (error.responseData && (error.responseData.terminal === true || error.responseData.reload === true)) {
                         showLegacyError(error.message || 'The Airtime2Cash transaction failed.');
@@ -510,12 +581,19 @@
                         return;
                     }
                     showLegacyError(error.message);
-                    setLegacyButton('SHARE AIRTIME', false);
+                    setLegacyButton(isAirtimeToCashAutomation ? 'VERIFY OTP' : 'SHARE AIRTIME', false);
                 });
             return false;
         };
-        $('#legacy-share-pin').on('input', function () { this.value=this.value.replace(/\D/g,'').slice(0,8); if(autoStage==='pin') setLegacyButton('SUBMIT PIN AND ENTER OTP', !/^\d{4,8}$/.test(this.value)); });
-        $('#legacy-auto-otp').on('input', function () { this.value=this.value.replace(/\D/g,'').slice(0,10); if(autoStage==='otp') setLegacyButton('SHARE AIRTIME', !/^\d{4,10}$/.test(this.value)); });
+        $('#legacy-share-pin').on('input', function () {
+            this.value=this.value.replace(/\D/g,'').slice(0,8);
+            if(autoStage==='pin') setLegacyButton('SUBMIT PIN AND ENTER OTP', !/^\d{4,8}$/.test(this.value));
+            if(autoStage==='provider_pin') setLegacyButton('TRANSFER AIRTIME', !/^\d{4,8}$/.test(this.value));
+        });
+        $('#legacy-auto-otp').on('input', function () {
+            this.value=this.value.replace(/\D/g,'').slice(0,10);
+            if(autoStage==='otp') setLegacyButton(isAirtimeToCashAutomation ? 'VERIFY OTP' : 'SHARE AIRTIME', !/^\d{4,10}$/.test(this.value));
+        });
         $('#legacy-edit-details').on('click', function () { autoStage='details'; $('#legacy-auto-flow').hide(); showInstruction(defaultAutoInstruction); setLegacyButton('INITIATE AUTO TRANSFER', false); });
         $('#legacy-resend-otp').on('click', function () {
             var button=$(this).prop('disabled',true).text('Sending...'); showLegacyError('');
@@ -584,6 +662,7 @@
             var auto = this.value === 'auto_share';
             autoStage = 'details'; autoTransactionId = null;
             $('#legacy-auto-flow').hide();
+            $('#legacy-quota-option').toggle(auto && isAirtimeToCashAutomation);
             setLegacyButton(auto ? 'INITIATE AUTO TRANSFER' : 'PROCEED', false);
             refreshNetworks();
             refreshPayoutDestinations();

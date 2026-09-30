@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\PaymentProcessors\SquadController;
 use App\Http\Controllers\Providers\MonnifyController;
 use App\Http\Controllers\Providers\AutoSyncController;
+use App\Http\Controllers\Providers\AirtimeToCashAutomationController;
 use App\Http\Controllers\WalletController;
 use App\Models\Airtime2CashTransactions;
 use App\Models\API;
@@ -543,6 +544,40 @@ class TransactionController extends Controller
                 TransactionLog::where('transaction_id', $log->transaction_id)
                     ->update(['api_id' => $providerId]);
 
+                if (strtolower((string) $provider->slug) === 'airtimetocash') {
+                    try {
+                        $providerResponse = app(AirtimeToCashAutomationController::class)->initiate(
+                            transaction: $log,
+                            provider: $provider,
+                            checkQuota: $request->boolean('check_quota'),
+                        );
+
+                        return response()->json($providerResponse);
+                    } catch (RuntimeException $exception) {
+                        $failureMessage = $exception->getMessage();
+
+                        $log->update([
+                            'status' => 'failed',
+                            'provider_status' => 'failed',
+                            'decline_reason' => $failureMessage,
+                            'completed_at' => now(),
+                        ]);
+
+                        $this->upsertAirtime2CashTransactionLog($log, $customer, [
+                            'status' => 'failed',
+                            'descr' => $failureMessage,
+                            'balance_before' => $currentBalance,
+                            'balance_after' => $currentBalance,
+                        ]);
+
+                        return response()->json([
+                            'status' => false,
+                            'terminal' => true,
+                            'message' => $failureMessage,
+                        ], 422);
+                    }
+                }
+
                 if ($provider->slug == 'autosync') {
                     $response = (new AutoSyncService())->initiate(
                         $log,
@@ -731,13 +766,6 @@ class TransactionController extends Controller
             ], 422);
         }
 
-        if (blank($transaction->provider_reference) && blank($transaction->provider_request_ref)) {
-            return response()->json([
-                'status' => false,
-                'message' => 'The provider transaction reference is missing.',
-            ], 422);
-        }
-
         try {
             $provider = API::query()->find(
                 $transaction->provider_id ?: getSettings()?->auto_share_provider_id
@@ -750,8 +778,12 @@ class TransactionController extends Controller
                 ], 422);
             }
 
-            $response = match ($provider->slug) {
+            $response = match (strtolower((string) $provider->slug)) {
                 'autosync' => app(AutoSyncService::class)->resendOtp(
+                    $transaction,
+                    $provider
+                ),
+                'airtimetocash' => app(AirtimeToCashAutomationController::class)->resendOtp(
                     $transaction,
                     $provider
                 ),
@@ -1583,8 +1615,9 @@ class TransactionController extends Controller
             ], 422);
         }
 
-        $providerController = match ($provider->slug) {
+        $providerController = match (strtolower((string) $provider->slug)) {
             'autosync' => app(AutoSyncController::class),
+            'airtimetocash' => app(AirtimeToCashAutomationController::class),
             default => null,
         };
 
@@ -1596,17 +1629,77 @@ class TransactionController extends Controller
         }
 
         try {
-            $providerResponse = $providerController->query(
-                transaction: $transaction,
-                otp: $request->string('otp')->toString(),
-                provider: $provider
-            );
+            if (strtolower((string) $provider->slug) === 'airtimetocash') {
+                $stage = strtolower((string) $request->input('stage', 'otp'));
+
+                if ($stage === 'otp') {
+                    $providerResponse = $providerController->verifyOtp(
+                        transaction: $transaction,
+                        otp: $request->string('otp')->toString(),
+                        provider: $provider,
+                    );
+
+                    if (($providerResponse['stage'] ?? null) === 'pin') {
+                        return response()->json($providerResponse);
+                    }
+
+                    return response()->json($providerResponse, 422);
+                }
+
+                if ($stage !== 'pin') {
+                    return response()->json([
+                        'status' => false,
+                        'message' => 'Invalid Airtime to Cash transfer stage.',
+                    ], 422);
+                }
+
+                $pin = $request->string('pin')->toString();
+                if (! preg_match('/^\d{4,8}$/', $pin)) {
+                    return response()->json([
+                        'status' => false,
+                        'message' => 'Please enter a valid airtime share PIN.',
+                    ], 422);
+                }
+
+                $providerResponse = $providerController->transfer(
+                    transaction: $transaction,
+                    pin: $pin,
+                    provider: $provider,
+                );
+            } else {
+                $providerResponse = $providerController->query(
+                    transaction: $transaction,
+                    otp: $request->string('otp')->toString(),
+                    provider: $provider
+                );
+            }
 
             $providerStatus = strtolower((string) data_get(
                 $providerResponse,
                 'data.transaction.status',
                 'failed'
             ));
+
+            if (strtolower((string) $provider->slug) === 'airtimetocash'
+                && $providerStatus === 'session_expired') {
+                $transaction->update([
+                    'status' => 'pending',
+                    'provider_status' => 'session_expired',
+                    'provider_response' => $providerResponse['provider_response'] ?? $providerResponse,
+                    'decline_reason' => null,
+                    'completed_at' => null,
+                ]);
+
+                return response()->json([
+                    'status' => false,
+                    'stage' => 'otp',
+                    'session_expired' => true,
+                    'message' => $providerResponse['message'] ?? 'Your provider session expired. Please request a new OTP.',
+                    'data' => [
+                        'transaction_id' => $transaction->transaction_id,
+                    ],
+                ], 422);
+            }
 
             $statusCode = match ($providerStatus) {
                 'successful' => 1,
@@ -2853,7 +2946,7 @@ class TransactionController extends Controller
 
         $providerPayload = $transaction->provider_response;
 
-        if ($transaction->provider?->slug === 'autosync') {
+        if (strtolower((string) $transaction->provider?->slug) === 'autosync') {
             try {
                 $providerPayload = app(AutoSyncService::class)->queryTransaction(
                     $transaction,
@@ -2869,6 +2962,11 @@ class TransactionController extends Controller
                     'response' => $providerPayload,
                 ], 422);
             }
+        } elseif (strtolower((string) $transaction->provider?->slug) === 'airtimetocash') {
+            $providerPayload = app(AirtimeToCashAutomationController::class)->query(
+                $transaction,
+                $transaction->provider,
+            );
         } elseif (! is_array($providerPayload) && filled($transaction->bank_transfer_api_response)) {
             $decodedBankResponse = json_decode((string) $transaction->bank_transfer_api_response, true);
             $providerPayload = is_array($decodedBankResponse) ? $decodedBankResponse : $providerPayload;
@@ -3434,15 +3532,14 @@ class TransactionController extends Controller
             try {
                 $provider = $transaction->provider;
 
-                if (! $provider || strtolower((string) $provider->slug) !== 'autosync') {
+                if (! $provider || ! in_array(strtolower((string) $provider->slug), ['autosync', 'airtimetocash'], true)) {
                     $summary['skipped']++;
                     continue;
                 }
 
-                $providerResponse = app(AutoSyncService::class)->queryTransaction(
-                    $transaction,
-                    $provider
-                );
+                $providerResponse = strtolower((string) $provider->slug) === 'autosync'
+                    ? app(AutoSyncService::class)->queryTransaction($transaction, $provider)
+                    : app(AirtimeToCashAutomationController::class)->query($transaction, $provider);
 
                 $result = $this->applyAirtime2CashRequeryResult($transaction, $providerResponse, 'CRON/System');
                 $summary['processed']++;

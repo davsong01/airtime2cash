@@ -21,7 +21,7 @@ class WebhookProcessor
 
         return match ($providerSlug) {
             'autosync' => app(AutoSyncService::class)->process($webhook, $resolvedBy, $force),
-            'sagecloud', 'paystack', 'monnify', 'kora' => $this->processGenericWebhook($webhook, $resolvedBy, $force),
+            'airtimetocash', 'sagecloud', 'paystack', 'monnify', 'kora' => $this->processGenericWebhook($webhook, $resolvedBy, $force),
             default => $this->processGenericWebhook($webhook, $resolvedBy, $force),
         };
     }
