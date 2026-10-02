@@ -23,6 +23,8 @@ class RouteProtectionMiddleware
             'admin.webhooks.index' => ['admin.webhooks.index', 'admin.autosync.index'],
             'admin.autosync.webhooks.resolve' => ['admin.autosync.webhooks.resolve', 'admin.webhooks.index', 'admin.autosync.index'],
             'admin.api-logs.index' => ['admin.api-logs.index', 'admin.autosync.index'],
+            'api.airtimetocash.availability',
+            'api.airtimetocash.availability.check' => ['api.edit'],
             'customers.wallet-report' => ['customers.edit'],
             'customers.wallet-variance-report' => ['customers.edit'],
             default => [$curRouteName],

@@ -159,6 +159,10 @@ Route::middleware(['auth', 'verified', 'admin', 'ipcheck', 'adminRoute'])->prefi
     Route::resource('api', APIController::class);
     Route::get('api-balance/{api}', [APIController::class, 'getBalance'])->name('api.balance');
     Route::post('api/{api}/pull-banks', [APIController::class, 'pullBanks'])->name('api.pull.banks');
+    Route::get('api/{api}/airtime-to-cash-availability', [APIController::class, 'airtimeToCashAvailability'])
+        ->name('api.airtimetocash.availability');
+    Route::post('api/{api}/airtime-to-cash-availability', [APIController::class, 'checkAirtimeToCashAvailability'])
+        ->name('api.airtimetocash.availability.check');
     Route::resource('banks', BankController::class);
 
     Route::resource('category', CategoryController::class);

@@ -6,6 +6,7 @@ use App\Http\Controllers\Providers\KingsVtuController;
 use App\Models\API;
 use App\Models\Bank;
 use App\Services\ApiAvailabilityMonitorService;
+use App\Services\AirtimeToCashAutomationService;
 use App\Services\AutoSyncService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -112,6 +113,39 @@ class APIController extends Controller
     public function edit(API $api)
     {
         return view('admin.api.edit', compact('api'));
+    }
+
+    public function airtimeToCashAvailability(API $api)
+    {
+        abort_unless(strtolower((string) $api->slug) === 'airtimetocash', 404);
+
+        return view('admin.api.airtimetocash-availability', compact('api'));
+    }
+
+    public function checkAirtimeToCashAvailability(Request $request, API $api)
+    {
+        abort_unless(strtolower((string) $api->slug) === 'airtimetocash', 404);
+
+        $validated = $request->validate([
+            'network' => ['required', 'string', 'in:MTN,AIRTEL,GLO,9MOBILE'],
+            'amount' => ['required', 'integer', 'min:50'],
+        ]);
+
+        try {
+            $providerResponse = app(AirtimeToCashAutomationService::class)->checkQuota(
+                networkName: $validated['network'],
+                amount: $validated['amount'],
+                provider: $api,
+            );
+
+            return response()->json($providerResponse);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return response()->json([
+                'message' => $exception->getMessage(),
+            ], 422);
+        }
     }
 
     public function update(Request $request, API $api)

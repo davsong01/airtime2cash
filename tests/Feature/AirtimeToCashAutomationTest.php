@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\APIController;
 use App\Http\Controllers\Providers\AirtimeToCashAutomationController;
 use App\Models\API;
 use App\Models\Airtime2CashTransactions;
@@ -9,6 +10,7 @@ use App\Models\Product;
 use App\Services\AirtimeToCashAutomationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request as HttpRequest;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
@@ -183,6 +185,43 @@ class AirtimeToCashAutomationTest extends TestCase
         $this->assertFalse($response['otp_invalid']);
         $this->assertNull($transaction->fresh()->provider_session_id);
         $this->assertSame('otp_pending', $transaction->fresh()->provider_status);
+    }
+
+    public function test_admin_can_check_recipient_availability(): void
+    {
+        [$provider] = $this->makeTransaction('MTN Nigeria');
+
+        Http::fake([
+            '*api/v1/check/quota/availability*' => Http::response([
+                'code' => 5030,
+                'message' => 'Recipient(s) Available',
+            ], 200),
+        ]);
+
+        $request = Request::create(
+            route('api.airtimetocash.availability.check', $provider),
+            'POST',
+            [
+                'network' => 'MTN',
+                'amount' => 1000,
+            ],
+        );
+
+        $response = app(APIController::class)->checkAirtimeToCashAvailability(
+            $request,
+            $provider,
+        );
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame(5030, $response->getData(true)['code']);
+        $this->assertSame('Recipient(s) Available', $response->getData(true)['message']);
+
+        Http::assertSent(function (HttpRequest $request) {
+            return str_ends_with($request->url(), '/api/v1/check/quota/availability')
+                && $request->data()['networkName'] === 'MTN'
+                && $request->data()['amount'] === 1000
+                && $request->hasHeader('Authorization', 'Bearer test-api-key');
+        });
     }
 
     private function makeTransaction(string $productName): array

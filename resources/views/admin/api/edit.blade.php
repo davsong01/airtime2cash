@@ -236,10 +236,18 @@
                                             <h4 class="card-title mb-1">{{ $cardTitle }}</h4>
                                             <p class="text-muted mb-0">Manage provider credentials, routing details, and fee bands from one place.</p>
                                         </div>
-                                        <span class="badge badge-{{ $isEdit && $api->status === 'active' ? 'light-success' : 'light-secondary' }} pricing-band-state">
-                                            <i class="bx bx-shield-quarter font-medium-1"></i>
-                                            {{ $isEdit && $api->status === 'active' ? 'Active provider' : 'Draft / inactive' }}
-                                        </span>
+                                        <div class="d-flex align-items-center flex-wrap">
+                                            @if($isEdit && strtolower((string) $api->slug) === 'airtimetocash')
+                                                <a href="{{ route('api.airtimetocash.availability', $api) }}" class="btn btn-sm btn-outline-primary mr-1">
+                                                    <i class="bx bx-search-alt mr-25"></i>
+                                                    Check recipient availability
+                                                </a>
+                                            @endif
+                                            <span class="badge badge-{{ $isEdit && $api->status === 'active' ? 'light-success' : 'light-secondary' }} pricing-band-state">
+                                                <i class="bx bx-shield-quarter font-medium-1"></i>
+                                                {{ $isEdit && $api->status === 'active' ? 'Active provider' : 'Draft / inactive' }}
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="card-content">
