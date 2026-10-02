@@ -486,6 +486,8 @@
                 auto_share: @json($a2cAutoAccess)
             };
             const payoutDestinationAvailability = @json($airtimeToCashDestinations);
+            const autoProviderSlug = @json(strtolower((string) ($activeProvider?->slug ?? '')));
+            const isAirtimeToCashAutomation = autoProviderSlug === 'airtimetocash';
 
             const endpoints = {
                 initiate: @json(route('initialize.airtime2cashtransaction')),
@@ -502,6 +504,7 @@
             const AUTO_STAGE_DETAILS = 'details';
             const AUTO_STAGE_PIN = 'pin';
             const AUTO_STAGE_OTP = 'otp';
+            const AUTO_STAGE_PROVIDER_PIN = 'provider_pin';
 
             let autoStage = AUTO_STAGE_DETAILS;
             let autoTransactionId = null;
@@ -1106,6 +1109,35 @@
                 }, 250);
             }
 
+            function openProviderPinStage() {
+                const $selected = $product.find(':selected');
+
+                autoStage = AUTO_STAGE_PROVIDER_PIN;
+
+                $('#auto-pin-phone').text($phone.val());
+                $('#auto-summary-network').text(
+                    $selected.attr('data-name') || $selected.text()
+                );
+                $('#auto-summary-amount').text(formatMoney($amount.val()));
+                $('#auto-summary-payout').text(formatMoney($receive.val()));
+                $('#auto-summary-bank-payout').text(
+                    $paymentMethod.val() === 'Transfer to Bank Account'
+                        ? formatMoney($('#bank-payout-display').text().replace(/,/g, ''))
+                        : '-'
+                );
+
+                $sharePin.val('');
+                clearAutoError();
+                $autoOtpStage.hide();
+                $autoPinStage.show();
+
+                setActionButton('Transfer airtime', true, 'bx-transfer-alt');
+
+                window.setTimeout(function () {
+                    $sharePin.trigger('focus');
+                }, 250);
+            }
+
             function openOtpStage(response) {
                 const data = getResponseData(response);
                 const transactionId = extractTransactionId(response);
@@ -1140,6 +1172,32 @@
                 window.setTimeout(function () {
                     $autoOtp.trigger('focus');
                 }, 250);
+            }
+
+            async function initiateAirtimeToCashOtp() {
+                if (requestInProgress) {
+                    return;
+                }
+
+                setRequestInProgress(true);
+                clearAutoError();
+                setActionButton('Generating OTP...', true, 'bx-loader-alt bx-spin');
+
+                try {
+                    const response = await postJson(
+                        endpoints.initiate,
+                        buildAutoInitiationPayload()
+                    );
+
+                    $conversionDetailsPanel.hide();
+                    $autoSecureFlow.show();
+                    openOtpStage(response);
+                } catch (error) {
+                    showAutoError(error.message || 'The OTP could not be generated.');
+                    setActionButton('Continue to secure transfer', false, 'bx-bolt-circle');
+                } finally {
+                    setRequestInProgress(false);
+                }
             }
 
             function resetPendingFlow(message) {
@@ -1363,8 +1421,18 @@
                 try {
                     const response = await postJson(endpoints.complete, {
                         transaction_id: autoTransactionId,
-                        otp: otp
+                        otp: otp,
+                        ...(isAirtimeToCashAutomation ? { stage: 'otp' } : {})
                     });
+
+                    const nextStage = String(
+                        response.stage || response.data?.stage || ''
+                    ).toLowerCase();
+
+                    if (isAirtimeToCashAutomation && nextStage === 'pin') {
+                        openProviderPinStage();
+                        return;
+                    }
 
                     if (response.transaction_status === 'successful') {
                         window.location.href = response.redirect
@@ -1406,6 +1474,67 @@
                         false,
                         'bx-bolt-circle'
                     );
+                } finally {
+                    setRequestInProgress(false);
+                }
+            }
+
+            async function submitProviderPin() {
+                const pin = String($sharePin.val() || '');
+
+                if (!/^\d{4,8}$/.test(pin)) {
+                    showAutoError('Enter a valid airtime share PIN containing 4 to 8 digits.');
+                    $sharePin.trigger('focus');
+                    return;
+                }
+
+                if (!autoTransactionId || requestInProgress) {
+                    return;
+                }
+
+                setRequestInProgress(true);
+                clearAutoError();
+                setActionButton('Transferring airtime...', true, 'bx-loader-alt bx-spin');
+
+                try {
+                    const response = await postJson(endpoints.complete, {
+                        transaction_id: autoTransactionId,
+                        stage: 'pin',
+                        pin: pin
+                    });
+
+                    if (response.transaction_status === 'successful') {
+                        window.location.href = response.redirect
+                            || '{{ route('customer.airtime2cash.transaction.history') }}';
+                        return;
+                    }
+
+                    if (response.transaction_status === 'pending' || response.reset_flow) {
+                        resetPendingFlow(
+                            response.message || 'Your transaction is pending. Please do not retry.'
+                        );
+                        return;
+                    }
+
+                    throw new Error(response.message || 'The airtime transfer could not be completed.');
+                } catch (error) {
+                    if (error.responseData?.session_expired === true) {
+                        openOtpStage({
+                            transaction_id: autoTransactionId,
+                            phone: $phone.val()
+                        });
+                        showAutoError(error.message || 'Your provider session expired. Request a new OTP.');
+                        return;
+                    }
+
+                    if (error.responseData?.terminal === true || error.responseData?.reload === true) {
+                        showAutoError(error.message || 'The Airtime2Cash transaction failed.');
+                        setActionButton('Transaction failed', true, 'bx-x-circle');
+                        return;
+                    }
+
+                    showAutoError(error.message || 'The airtime transfer could not be completed.');
+                    setActionButton('Transfer airtime', false, 'bx-transfer-alt');
                 } finally {
                     setRequestInProgress(false);
                 }
@@ -1523,7 +1652,11 @@
                  */
                 if (autoStage === AUTO_STAGE_DETAILS) {
                     if (validateConversionDetails()) {
-                        openPinStage();
+                        if (isAirtimeToCashAutomation) {
+                            initiateAirtimeToCashOtp();
+                        } else {
+                            openPinStage();
+                        }
                     }
 
                     return;
@@ -1537,6 +1670,12 @@
                  */
                 if (autoStage === AUTO_STAGE_PIN) {
                     submitSharePin();
+
+                    return;
+                }
+
+                if (autoStage === AUTO_STAGE_PROVIDER_PIN) {
+                    submitProviderPin();
 
                     return;
                 }
@@ -1656,6 +1795,16 @@
                         'Submit PIN and send OTP',
                         !valid || requestInProgress,
                         'bx-lock-open-alt'
+                    );
+                }
+
+                if (autoStage === AUTO_STAGE_PROVIDER_PIN) {
+                    const valid = /^\d{4,8}$/.test(this.value);
+
+                    setActionButton(
+                        'Transfer airtime',
+                        !valid || requestInProgress,
+                        'bx-transfer-alt'
                     );
                 }
 

@@ -52,7 +52,7 @@ class AirtimeToCashAutomationService
                 'networkName' => $networkName,
                 'sender' => $sender,
             ],
-            authenticated: false,
+            authenticated: true,
             context: $context,
         );
     }
@@ -74,7 +74,7 @@ class AirtimeToCashAutomationService
                 'sender' => $sender,
                 'otp' => $otp,
             ],
-            authenticated: false,
+            authenticated: true,
             context: $context,
         );
     }
@@ -261,6 +261,11 @@ class AirtimeToCashAutomationService
         if (! is_array($data)) {
             throw new RuntimeException('Airtime to Cash Automation returned an invalid response.');
         }
+
+        $data['_meta'] = [
+            'http_status' => $response->status(),
+            'http_success' => $response->successful(),
+        ];
 
         return $data;
     }

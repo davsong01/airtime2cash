@@ -209,11 +209,12 @@
                 </div>
                 <div class="table-responsive">
                     <table class="table table-hover mb-0">
-                        <thead><tr><th>#</th><th>Operation</th><th>Transaction</th><th>HTTP</th><th>Duration</th><th>Created</th><th></th></tr></thead>
+                        <thead><tr><th>#</th><th>API</th><th>Operation</th><th>Transaction</th><th>HTTP</th><th>Duration</th><th>Created</th><th></th></tr></thead>
                         <tbody>
                             @forelse($apiLogs as $log)
                                 <tr>
                                     <td>{{ $apiLogs->firstItem() + $loop->index }}</td>
+                                    <td>{{ $log->provider?->name ?: ($log->provider?->slug ?: '-') }}</td>
                                     <td><strong>{{ str($log->operation)->replace('_', ' ')->title() }}</strong><small class="d-block text-muted text-truncate" style="max-width:300px">{{ $log->method }} {{ $log->endpoint }}</small></td>
                                     <td>{{ $log->transaction_id ?: '-' }}<small class="d-block text-muted">{{ $log->customer?->user?->email }}</small></td>
                                     @php
@@ -221,13 +222,24 @@
                                             ? $log->response_body
                                             : json_decode($log->response_body ?? '{}', true);
 
-                                        $providerStatus = strtolower(
-                                            (string) data_get($body, 'data.transaction.status', 'failed')
-                                        );
+                                        $providerStatus = strtolower((string) data_get($body, 'data.transaction.status', ''));
+                                        $providerCode = (int) data_get($body, 'code', 0);
+
+                                        if ($providerStatus === '') {
+                                            $providerStatus = match ($providerCode) {
+                                                2000 => 'successful',
+                                                4000 => 'pending',
+                                                4010 => 'session_expired',
+                                                default => ((int) $log->response_status >= 200 && (int) $log->response_status < 300)
+                                                    ? 'successful'
+                                                    : 'failed',
+                                            };
+                                        }
 
                                         [$badge, $label] = match ($providerStatus) {
                                             'successful' => ['success', 'Successful'],
                                             'pending', 'processing', 'initiated' => ['warning', 'Pending'],
+                                            'session_expired' => ['warning', 'Session expired'],
                                             default => ['danger', 'Failed'],
                                         };
                                     @endphp

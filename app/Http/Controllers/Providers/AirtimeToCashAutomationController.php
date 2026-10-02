@@ -47,7 +47,7 @@ class AirtimeToCashAutomationController extends Controller
             context: $context,
         );
 
-        if ((int) ($response['code'] ?? 0) !== 2000) {
+        if (! $this->httpResponseSucceeded($response) || (int) ($response['code'] ?? 0) !== 2000) {
             throw new RuntimeException((string) ($response['message'] ?? 'OTP could not be generated.'));
         }
 
@@ -83,7 +83,7 @@ class AirtimeToCashAutomationController extends Controller
         $code = (int) ($response['code'] ?? 0);
         $sessionId = data_get($response, 'data.sessionId');
 
-        if ($code === 2000 && filled($sessionId)) {
+        if ($this->httpResponseSucceeded($response) && $code === 2000 && filled($sessionId)) {
             $loginResponse = $this->service->loginWithSessionId(
                 networkName: $this->service->networkNameForTransaction($transaction),
                 sender: $this->senderForTransaction($transaction),
@@ -93,7 +93,7 @@ class AirtimeToCashAutomationController extends Controller
             );
 
             $loginCode = (int) ($loginResponse['code'] ?? 0);
-            if ($loginCode !== 2000) {
+            if (! $this->httpResponseSucceeded($loginResponse) || $loginCode !== 2000) {
                 $transaction->update([
                     'provider_status' => $loginCode === 4010 ? 'session_expired' : 'otp_pending',
                     'provider_response' => [
@@ -167,12 +167,14 @@ class AirtimeToCashAutomationController extends Controller
         );
 
         $code = (int) ($response['code'] ?? 0);
-        $providerStatus = match ($code) {
-            2000 => 'successful',
-            4000 => 'pending',
-            4010 => 'session_expired',
-            default => 'failed',
-        };
+        $providerStatus = ! $this->httpResponseSucceeded($response)
+            ? 'failed'
+            : match ($code) {
+                2000 => 'successful',
+                4000 => 'pending',
+                4010 => 'session_expired',
+                default => 'failed',
+            };
 
         $transaction->update([
             'provider_status' => $providerStatus,
@@ -239,6 +241,11 @@ class AirtimeToCashAutomationController extends Controller
             'customer_id' => $transaction->customer_id,
             'transaction_id' => $transaction->transaction_id,
         ];
+    }
+
+    private function httpResponseSucceeded(array $response): bool
+    {
+        return (bool) data_get($response, '_meta.http_success', true);
     }
 
     private function senderForTransaction(Airtime2CashTransactions $transaction): string

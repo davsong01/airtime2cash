@@ -82,7 +82,7 @@ class AirtimeToCashAutomationTest extends TestCase
         Http::assertSent(function (HttpRequest $request) {
             return str_ends_with($request->url(), '/api/v1/generate/otp')
                 && $request->data()['networkName'] === 'MTN'
-                && ! $request->hasHeader('Authorization');
+                && $request->hasHeader('Authorization', 'Bearer test-api-key');
         });
 
         Http::assertSent(function (HttpRequest $request) {
@@ -147,6 +147,42 @@ class AirtimeToCashAutomationTest extends TestCase
 
         $this->assertSame('pending', $response['provider_status']);
         $this->assertSame('pending', $transaction->fresh()->provider_status);
+    }
+
+    public function test_failed_session_login_does_not_advance_to_pin_stage(): void
+    {
+        [$provider, $transaction] = $this->makeTransaction('MTN Nigeria');
+
+        Http::fake(function (HttpRequest $request) {
+            if (str_ends_with($request->url(), '/api/v1/verify/otp')) {
+                return Http::response([
+                    'code' => 2000,
+                    'message' => 'Otp verified.',
+                    'data' => ['sessionId' => 'session-login-fails'],
+                ], 200);
+            }
+
+            if (str_ends_with($request->url(), '/api/v1/login/with/session/id')) {
+                return Http::response([
+                    'code' => 2000,
+                    'message' => 'Unauthenticated',
+                ], 401);
+            }
+
+            return Http::response(['code' => 3000, 'message' => 'Unexpected endpoint'], 500);
+        });
+
+        $response = app(AirtimeToCashAutomationController::class)->verifyOtp(
+            $transaction,
+            '123456',
+            $provider,
+        );
+
+        $this->assertFalse($response['status']);
+        $this->assertSame('otp', $response['stage']);
+        $this->assertFalse($response['otp_invalid']);
+        $this->assertNull($transaction->fresh()->provider_session_id);
+        $this->assertSame('otp_pending', $transaction->fresh()->provider_status);
     }
 
     private function makeTransaction(string $productName): array

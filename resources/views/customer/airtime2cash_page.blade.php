@@ -462,6 +462,7 @@
         }
         function openAirtimeToCashPin() {
             autoStage = 'provider_pin';
+            showLegacyError('');
             $('#legacy-otp-stage').hide();
             $('#legacy-pin-stage').show();
             $('#legacy-share-pin').val('').focus();
@@ -565,7 +566,20 @@
             setLegacyButton(isAirtimeToCashAutomation ? 'VERIFYING OTP...' : 'SHARING AIRTIME...', true); showLegacyError('');
             postLegacyAuto(autoUrls.complete, Object.assign({transaction_id:autoTransactionId, otp:otp}, isAirtimeToCashAutomation ? {stage:'otp'} : {}))
                 .then(function (data) {
-                    if (isAirtimeToCashAutomation && data.stage === 'pin') {
+                    var nextStage = String(
+                        data.stage || (data.data && data.data.stage) || ''
+                    ).toLowerCase();
+
+                    // AirtimeToCash returns stage=pin after OTP verification.
+                    // Keep the successful response fallback for deployments that
+                    // wrap the response payload while preserving the provider
+                    // session confirmation.
+                    var otpVerified = data.status === true
+                        && data.provider_response
+                        && data.provider_response.login
+                        && Number(data.provider_response.login.code) === 2000;
+
+                    if (isAirtimeToCashAutomation && (nextStage === 'pin' || otpVerified)) {
                         openAirtimeToCashPin();
                         return;
                     }
