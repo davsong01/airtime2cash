@@ -2,10 +2,11 @@
 
 namespace App\Http\Controllers\Providers;
 
-use App\Models\ReservedAccountNumber;
 use App\Models\Customer;
+use App\Models\ReservedAccountNumber;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
 
 class MonnifyController extends BankTransferProviderController
 {
@@ -103,6 +104,7 @@ class MonnifyController extends BankTransferProviderController
     public function balance(): array
     {
         $token = $this->login();
+
         if (empty($token)) {
             return ['status' => 'failed', 'message' => 'Could not authenticate with Monnify.'];
         }
@@ -326,7 +328,8 @@ class MonnifyController extends BankTransferProviderController
         }
 
         $token = $this->login();
-
+        Log::info('Monnify transfer login token: ' . $token);
+        
         if (empty($token)) {
             return [
                 'status' => 'failed',
