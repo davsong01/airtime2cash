@@ -32,7 +32,7 @@ class BvnVerificationBillingService
             ];
         }
 
-        return DB::transaction(function () use ($customer, $amount, $context) {
+        $charge = DB::transaction(function () use ($customer, $amount, $context) {
             $customer = Customer::query()
                 ->with('user')
                 ->whereKey($customer->id)
@@ -44,16 +44,19 @@ class BvnVerificationBillingService
             $referenceId = (string) ($context['reference_id'] ?? $transactionId);
 
             $transaction = TransactionLog::query()
-                ->where('transaction_id', $transactionId)
+                ->where('customer_id', $customer->id)
+                ->where('reason', self::REASON)
+                ->where('unique_element', self::UNIQUE_ELEMENT)
+                ->whereIn('status', ['pending', 'success', 'successful', 'completed', 'approved', 'delivered'])
                 ->lockForUpdate()
                 ->first();
 
-            if ($transaction && in_array(strtolower((string) $transaction->status), $transaction->terminalStatuses(), true)) {
+            if ($transaction && in_array(strtolower((string) $transaction->status), ['pending', ...$transaction->successfulStatuses()], true)) {
                 return [
                     'status' => $transaction->status,
-                    'settled' => true,
+                    'settled' => in_array(strtolower((string) $transaction->status), $transaction->successfulStatuses(), true),
                     'transaction' => $transaction->fresh(),
-                    'amount' => $amount,
+                    'amount' => (float) ($transaction->total_amount ?? $amount),
                 ];
             }
 
@@ -77,6 +80,103 @@ class BvnVerificationBillingService
                 'settled' => false,
                 'transaction' => $transaction->fresh(),
                 'amount' => $amount,
+            ];
+        });
+
+        if (($charge['status'] ?? null) !== 'pending') {
+            return $charge;
+        }
+
+        $settlement = $this->settlePendingChargeFromWalletBalance(
+            $customer,
+            $context,
+        );
+
+        if (! ($settlement['applied'] ?? false)) {
+            return $charge;
+        }
+
+        $transaction = ($charge['transaction'] ?? null)?->fresh();
+
+        return [
+            'status' => $transaction?->status ?? 'success',
+            'settled' => true,
+            'transaction' => $transaction,
+            'amount' => $amount,
+        ];
+    }
+
+    /**
+     * Settle the single pending BVN fee after a credit enters the customer's
+     * primary wallet. The wallet credit itself is recorded by its caller;
+     * this method records only the fee debit.
+     */
+    public function settlePendingChargeFromWalletBalance(Customer $customer, array $context = []): array
+    {
+        return DB::transaction(function () use ($customer, $context) {
+            $customer = Customer::query()
+                ->whereKey($customer->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $pendingCharge = TransactionLog::query()
+                ->where('customer_id', $customer->id)
+                ->where('reason', self::REASON)
+                ->where('unique_element', self::UNIQUE_ELEMENT)
+                ->where('status', 'pending')
+                ->orderBy('created_at')
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->first();
+
+            if (! $pendingCharge) {
+                return [
+                    'applied' => false,
+                    'fee_amount' => 0,
+                    'fee_transaction_id' => null,
+                ];
+            }
+
+            $feeAmount = (float) ($pendingCharge->total_amount ?? $pendingCharge->amount ?? 0);
+            if ($feeAmount <= 0 || (float) ($customer->wallet ?? 0) < $feeAmount) {
+                return [
+                    'applied' => false,
+                    'fee_amount' => 0,
+                    'fee_transaction_id' => $pendingCharge->transaction_id,
+                ];
+            }
+
+            $feeChange = $this->walletController->applyCustomerBalanceChange(
+                $customer,
+                'wallet',
+                $feeAmount,
+                'debit',
+                false,
+            );
+
+            $this->walletController->logWallet([
+                'customer_id' => $customer->id,
+                'amount' => $feeAmount,
+                'total_amount' => $feeAmount,
+                'balance_before' => $feeChange['before'],
+                'balance_after' => $feeChange['after'],
+                'type' => 'debit',
+                'transaction_id' => $pendingCharge->transaction_id,
+                'reason' => self::REASON,
+                'payment_method' => 'wallet',
+            ]);
+
+            $pendingCharge->update([
+                'status' => 'success',
+                'balance_before' => $feeChange['before'],
+                'balance_after' => $feeChange['after'],
+                'descr' => $context['fee_description'] ?? 'BVN verification fee was collected from wallet funding.',
+            ]);
+
+            return [
+                'applied' => true,
+                'fee_amount' => $feeAmount,
+                'fee_transaction_id' => $pendingCharge->transaction_id,
             ];
         });
     }

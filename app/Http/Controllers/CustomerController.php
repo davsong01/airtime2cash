@@ -1084,6 +1084,34 @@ class CustomerController extends Controller
             }
         });
 
+        if ($action === 'approve' && $field === 'BVN') {
+            $bvnCharge = (float) (getSettings()?->bvn_verification_charge ?? 0);
+
+            if ($bvnCharge > 0) {
+                try {
+                    app(BvnVerificationBillingService::class)->recordCharge(
+                        $customer->fresh(['user']),
+                        $bvnCharge,
+                        [
+                            'bvn' => $storedValue,
+                            'customer_id' => $customer->id,
+                            'verification_mode' => 'manual',
+                            'status' => 'verified',
+                            'verified_at' => now()->toDateTimeString(),
+                            'pending_description' => 'BVN verification fee is pending wallet funding.',
+                        ],
+                    );
+                } catch (\Throwable $throwable) {
+                    \Log::error('Unable to record manual BVN verification billing charge.', [
+                        'customer_id' => $customer->id,
+                        'message' => $throwable->getMessage(),
+                        'file' => $throwable->getFile(),
+                        'line' => $throwable->getLine(),
+                    ]);
+                }
+            }
+        }
+
         if ($action === 'approve' && $this->kycFieldsAreFullyVerified($customer->id)) {
             $this->finalizeCustomerKycApproval($customer);
         }

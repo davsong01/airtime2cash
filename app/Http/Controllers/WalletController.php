@@ -95,9 +95,14 @@ class WalletController extends Controller
         ]);
         $customer->setAttribute($column, $nextBalance);
 
+        if ($settlePendingBvnCharges && $column === 'wallet' && $type === 'credit') {
+            app(\App\Services\BvnVerificationBillingService::class)
+                ->settlePendingChargeFromWalletBalance($customer);
+        }
+
         return [
             'before' => $currentBalance,
-            'after' => $nextBalance,
+            'after' => (float) ($customer->fresh()->{$column} ?? $nextBalance),
         ];
     }
 }
