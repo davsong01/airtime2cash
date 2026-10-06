@@ -304,6 +304,9 @@
                                                             <div class="col-md-4">
                                                                 <strong class="heads" style="color:green">Provider Status</strong>  <br>
                                                                 <strong>Provider: </strong>{{ $transaction->provider->name ?? 'Unknown' }} <br>
+                                                                @if($transaction->transfer_mode === 'auto_share' && filled($transaction->provider_selection_reason))
+                                                                    <strong>Routing Reason: </strong>{{ $transaction->provider_selection_reason }} <br>
+                                                                @endif
                                                                 @if($transaction->payment_method === 'Transfer to Bank Account')
                                                                     <strong>Transfer Provider: </strong>{{ $bankTransferProvider?->name ?? 'Unknown' }} <br>
                                                                 @endif

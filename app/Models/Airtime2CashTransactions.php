@@ -20,6 +20,7 @@ class Airtime2CashTransactions extends Model
         'profit_percentage' => 'decimal:2',
         'profit' => 'decimal:2',
         'bank_transfer_charge_breakdown' => 'array',
+        'provider_selection_meta' => 'array',
     ];
     use HasFactory;
 

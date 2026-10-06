@@ -102,6 +102,229 @@
             margin-right: .35rem;
         }
 
+        .settings-page {
+            --settings-ink: #162235;
+            --settings-muted: #728096;
+            --settings-line: #e7edf4;
+            --settings-soft: #f6f8fb;
+            background: #f4f7fb;
+        }
+
+        .settings-page .content-wrapper {
+            max-width: 1480px;
+            margin: 0 auto;
+            padding-top: 1.25rem;
+        }
+
+        .settings-page > .content-overlay,
+        .settings-page .content-overlay {
+            background: transparent;
+        }
+
+        .settings-page .settings-shell,
+        .settings-page .settings-frame {
+            border: 0;
+            background: transparent;
+            box-shadow: none;
+        }
+
+        .settings-page .settings-frame > .card-header {
+            padding: 0;
+            border: 0;
+            background: transparent;
+        }
+
+        .settings-hero {
+            position: relative;
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 1.5rem;
+            overflow: hidden;
+            margin-bottom: 1.25rem;
+            padding: 1.75rem 2rem;
+            color: #fff;
+            border-radius: 20px;
+            background:
+                radial-gradient(circle at 90% 10%, rgba(68, 214, 180, .2), transparent 30%),
+                linear-gradient(135deg, #17253b 0%, #253d5b 58%, #1b6b72 125%);
+            box-shadow: 0 16px 36px rgba(25, 44, 70, .16);
+        }
+
+        .settings-hero::after {
+            position: absolute;
+            right: -80px;
+            bottom: -120px;
+            width: 300px;
+            height: 300px;
+            content: '';
+            border: 1px solid rgba(255, 255, 255, .12);
+            border-radius: 50%;
+            box-shadow: 0 0 0 28px rgba(255, 255, 255, .035), 0 0 0 56px rgba(255, 255, 255, .025);
+        }
+
+        .settings-hero__content,
+        .settings-hero__badge {
+            position: relative;
+            z-index: 1;
+        }
+
+        .settings-hero__eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: .45rem;
+            margin-bottom: .55rem;
+            color: #8ce8d1;
+            font-size: .72rem;
+            font-weight: 800;
+            letter-spacing: .14em;
+            text-transform: uppercase;
+        }
+
+        .settings-hero h1 {
+            margin: 0;
+            color: #fff;
+            font-size: clamp(1.55rem, 2.4vw, 2.25rem);
+            font-weight: 800;
+            letter-spacing: -.035em;
+        }
+
+        .settings-hero p {
+            max-width: 680px;
+            margin: .55rem 0 0;
+            color: rgba(255, 255, 255, .75);
+            font-size: .94rem;
+        }
+
+        .settings-hero__badge {
+            display: inline-flex;
+            align-items: center;
+            gap: .5rem;
+            flex: 0 0 auto;
+            padding: .65rem .85rem;
+            color: #d7fff3;
+            font-size: .78rem;
+            font-weight: 700;
+            border: 1px solid rgba(140, 232, 209, .26);
+            border-radius: 999px;
+            background: rgba(255, 255, 255, .08);
+        }
+
+        .settings-page .settings-section-stack > .card {
+            overflow: hidden;
+            border: 1px solid var(--settings-line);
+            border-radius: 16px;
+            background: #fff;
+            box-shadow: 0 7px 20px rgba(31, 52, 77, .055);
+        }
+
+        .settings-page .settings-section-stack > .card::before {
+            display: block;
+            height: 4px;
+            content: '';
+            background: #dce5ef;
+        }
+
+        .settings-page .settings-section-stack > .card:nth-child(1)::before { background: #5d7cf2; }
+        .settings-page .settings-section-stack > .card:nth-child(2)::before { background: #36b99a; }
+        .settings-page .settings-section-stack > .card:nth-child(3)::before { background: #e5a53a; }
+        .settings-page .settings-section-stack > .card:nth-child(4)::before { background: #8d70d8; }
+        .settings-page .settings-section-stack > .card:nth-child(5)::before { background: #e46f82; }
+
+        .settings-page .settings-section-stack > .card > .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: 1.15rem 1.35rem .9rem;
+            border-bottom: 1px solid var(--settings-line);
+            background: #fff;
+        }
+
+        .settings-page .settings-section-stack > .card > .card-header .card-title {
+            color: var(--settings-ink);
+            font-size: 1.02rem;
+            font-weight: 800;
+            letter-spacing: -.015em;
+        }
+
+        .settings-page .settings-section-stack > .card > .card-header small {
+            color: var(--settings-muted);
+        }
+
+        .settings-page .settings-section-stack > .card > .card-body {
+            padding: 1.35rem;
+        }
+
+        .settings-page .form-group {
+            margin-bottom: 1.15rem;
+        }
+
+        .settings-page .form-group label {
+            margin-bottom: .45rem;
+            color: #35445b;
+            font-size: .78rem;
+            font-weight: 800;
+            letter-spacing: .01em;
+        }
+
+        .settings-page .form-control {
+            min-height: 42px;
+            color: var(--settings-ink);
+            border-color: #dbe3ed;
+            border-radius: 9px;
+            background: #fbfcfe;
+            box-shadow: none;
+        }
+
+        .settings-page .form-control:focus {
+            border-color: #6b84e9;
+            background: #fff;
+            box-shadow: 0 0 0 3px rgba(93, 124, 242, .12);
+        }
+
+        .settings-page .form-group small {
+            color: var(--settings-muted) !important;
+            line-height: 1.45;
+        }
+
+        .settings-page .settings-save-card {
+            position: sticky;
+            bottom: 1rem;
+            z-index: 4;
+            border: 1px solid #dce5ef !important;
+            background: rgba(255, 255, 255, .92) !important;
+            backdrop-filter: blur(12px);
+        }
+
+        .settings-page .settings-save-card .card-body {
+            padding: .75rem 1rem;
+        }
+
+        .settings-page .settings-save-card .btn {
+            min-width: 170px;
+            border: 0;
+            border-radius: 9px;
+            background: #3558d8;
+            box-shadow: 0 8px 18px rgba(53, 88, 216, .2);
+        }
+
+        @media (max-width: 767.98px) {
+            .settings-hero {
+                align-items: flex-start;
+                flex-direction: column;
+                padding: 1.35rem;
+            }
+
+            .settings-hero__badge {
+                align-self: flex-start;
+            }
+
+            .settings-page .settings-section-stack > .card > .card-body {
+                padding: 1rem;
+            }
+        }
+
         @media (max-width: 767.98px) {
             .settings-image-preview {
                 margin-bottom: 1rem;
@@ -111,7 +334,7 @@
 @endsection
 @section('content')
 <!-- Content wrapper -->
-<div class="app-content content">
+<div class="app-content content settings-page">
     <div class="content-overlay"></div>
     <div class="content-wrapper">
         <div class="content-body">
@@ -119,15 +342,22 @@
             <section id="basic-input">
                 <div class="row">
                     <div class="col-md-12">
-                        <div class="card">
+                        <div class="card settings-shell">
                             <div class="content-body">
                                 <!-- Nav Filled Starts -->
                                 <section id="nav-filled">
                                     <div class="row">
                                         <div class="col-sm-12">
-                                            <div class="card">
+                                            <div class="card settings-frame">
                                                 <div class="card-header">
-                                                    <h4 class="card-title">App Settings</h4>
+                                                    <div class="settings-hero">
+                                                        <div class="settings-hero__content">
+                                                            {{-- <div class="settings-hero__eyebrow"><i class="bx bx-slider-alt"></i> Control center</div> --}}
+                                                            <h1>Application settings</h1>
+                                                            <p>Configure platform behavior, provider routing, customer access, and the visual identity of your admin experience.</p>
+                                                        </div>
+                                                        {{-- <div class="settings-hero__badge"><i class="bx bx-check-circle"></i> Changes apply platform-wide</div> --}}
+                                                    </div>
                                                     @include('layouts.alerts')
                                                 </div>
                                                 <div class="card-content">
@@ -316,6 +546,20 @@
                                                                                     <div class="invalid-feedback">{{ $message }}</div>
                                                                                 @enderror
                                                                                 <small class="text-muted d-block mt-50">Provider used for automatic airtime transfers.</small>
+                                                                            </fieldset>
+                                                                        </div>
+
+                                                                        <div class="col-md-6">
+                                                                            <fieldset class="form-group">
+                                                                                <label for="auto_share_routing_mode">Auto Share Provider Routing Mode</label>
+                                                                                <select name="auto_share_routing_mode" class="form-control @error('auto_share_routing_mode') is-invalid @enderror" id="auto_share_routing_mode">
+                                                                                    <option value="manual" @selected(old('auto_share_routing_mode', $settings->auto_share_routing_mode ?? 'manual') === 'manual')>Manual</option>
+                                                                                    <option value="auto" @selected(old('auto_share_routing_mode', $settings->auto_share_routing_mode ?? 'manual') === 'auto')>Auto</option>
+                                                                                </select>
+                                                                                @error('auto_share_routing_mode')
+                                                                                    <div class="invalid-feedback">{{ $message }}</div>
+                                                                                @enderror
+                                                                                <small class="text-muted d-block mt-50">Manual uses the selected provider. Auto chooses from eligible Auto Share providers.</small>
                                                                             </fieldset>
                                                                         </div>
 

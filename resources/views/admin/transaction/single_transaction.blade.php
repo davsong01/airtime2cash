@@ -302,6 +302,13 @@
                                                                 'auto_share' => 'Auto',
                                                                 default => null,
                                                             };
+                                                            $routingMode = strtolower((string) ($airtime2Cash?->transfer_mode ?? $transaction->transfer_mode ?? ''));
+                                                            $routingModeLabel = match ($routingMode) {
+                                                                'manual' => 'Manual',
+                                                                'auto_share' => 'Auto',
+                                                                default => null,
+                                                            };
+                                                            $routingReason = $airtime2Cash?->provider_selection_reason;
                                                             $isMonnifyPendingAuthorization = $transactionProviderSlug === 'monnify'
                                                                 && $transactionProviderStatus === 'pending_authorization'
                                                                 && strtolower((string) ($transaction->status ?? '')) === 'pending';
@@ -432,9 +439,16 @@
                                                                         <strong>Variation:</strong>{{ $transaction->category->system_name }}
                                                                         @endif
                                                                     @endif
-                                                                    @if(!empty($transaction->api))
-                                                                    <br>
-                                                                    <strong>Provider:</strong>{{ $transaction->api->name }} <br>
+                                                                   @if(!empty($transaction->api))
+                                                                   <br>
+                                                                   <strong>Provider:</strong>{{ $transaction->api->name }} <br>
+                                                                   @endif
+                                                                    @if($routingModeLabel)
+                                                                        <strong>Routing Mode:</strong> {{ $routingModeLabel }} <br>
+                                                                        @if($routingMode === 'auto_share')
+                                                                            <strong>Routing Reason:</strong>
+                                                                            {{ filled($routingReason) ? $routingReason : 'Not recorded for this transaction' }} <br>
+                                                                        @endif
                                                                     @endif
                                                                 </div>
                                                                 @if(!in_array($transaction->reason, ['LEVEL-UPGRADE','WALLET-FUNDING']))

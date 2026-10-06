@@ -24,6 +24,7 @@ use App\Models\User;
 use App\Models\Variation;
 use App\Models\Wallet;
 use App\Services\AutoSyncService;
+use App\Services\AutoShareRoutingService;
 use App\Services\ExcelService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Contracts\Database\Query\Builder;
@@ -468,6 +469,19 @@ class TransactionController extends Controller
             $bankTransferAmount = max(0, $amount_paid - $bankTransferFee);
         }
 
+        $autoShareRoute = null;
+        if ($request->input('transfer_mode') === 'auto_share') {
+            try {
+                $autoShareRoute = app(AutoShareRoutingService::class)->selectProvider($airtimeAmount);
+            } catch (RuntimeException $exception) {
+                $message = $exception->getMessage();
+
+                return $request->expectsJson()
+                    ? response()->json(['status' => false, 'message' => $message], 422)
+                    : back()->withInput()->with('error', $message);
+            }
+        }
+
         $chargeBreakdown = [
             ['label' => 'Airtime Amount', 'amount' => $airtimeAmount, 'type' => 'airtime_amount'],
             ['label' => 'Airtime Conversion Fee', 'amount' => (float) $amount_charged, 'type' => 'airtime_conversion_fee'],
@@ -498,6 +512,9 @@ class TransactionController extends Controller
             'total_amount' => $amount_charged + $amount_paid,
             'phone_numbers' => $request->phone,
             'payment_method' => $request->payment_method,
+            'provider_id' => $autoShareRoute['provider_id'] ?? null,
+            'provider_selection_reason' => $autoShareRoute['reason'] ?? null,
+            'provider_selection_meta' => $autoShareRoute['meta'] ?? null,
             'bank_code' => $request->bank,
             'bank_name' => $bank_name,
             'account_number' => $request->account_number,
@@ -525,8 +542,8 @@ class TransactionController extends Controller
         try {
 
             if ($request->input('transfer_mode') === 'auto_share') {
-                $providerId = getSettings()?->auto_share_provider_id;
-                $provider = API::query()->find($providerId);
+                $providerId = $autoShareRoute['provider_id'] ?? null;
+                $provider = $autoShareRoute['provider'] ?? null;
 
                 if (! $provider) {
                     return response()->json([
@@ -2913,7 +2930,7 @@ class TransactionController extends Controller
 
     public function singleTransactionView(TransactionLog $transaction)
     {
-        $transaction->loadMissing(['bank', 'api', 'customer', 'airtime2cash']);
+        $transaction->loadMissing(['bank', 'api', 'customer', 'airtime2cash.provider']);
 
         return view('admin.transaction.single_transaction', compact('transaction'));
     }
