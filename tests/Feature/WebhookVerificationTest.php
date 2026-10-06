@@ -11,8 +11,11 @@ use App\Http\Controllers\APIController;
 use App\Http\Controllers\TransactionController;
 use App\Models\Admin;
 use App\Models\API;
+use App\Models\Airtime2CashTransactions;
 use App\Models\Bank;
+use App\Models\Category;
 use App\Models\Customer;
+use App\Models\Product;
 use App\Models\TransactionLog;
 use App\Models\Webhook;
 use App\Models\User;
@@ -20,6 +23,7 @@ use App\Services\WebhookService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
@@ -1100,6 +1104,85 @@ class WebhookVerificationTest extends TestCase
 
         $this->assertTrue($response['status']);
         $this->assertStringEndsWith('/api/v2/disbursements/single/summary?reference=W2B-MONNIFY-REQUERY-001', $controller->capturedUrl);
+    }
+
+    public function test_admin_bank_transfer_requery_persists_terminal_status_without_changing_parent_status(): void
+    {
+        $provider = API::create([
+            'name' => 'Monnify',
+            'slug' => 'monnify',
+            'status' => 'active',
+            'live_base_url' => 'https://api.monnify.com',
+            'sandbox_base_url' => 'https://sandbox.monnify.com',
+            'is_bank_transfer' => true,
+        ]);
+
+        DB::table('settings')->insert([
+            'currency' => '₦',
+            'logo' => 'site/upgrade.jpg',
+            'dashboard_logo' => 'site/upgrade.jpg',
+            'favicon' => 'site/upgrade.jpg',
+            'bank_transfer_provider_id' => $provider->id,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $user = User::factory()->create();
+        $customer = Customer::create(['user_id' => $user->id, 'wallet' => 1000]);
+        $category = Category::create([
+            'name' => 'Bank Requery Test',
+            'slug' => 'bank-requery-test',
+            'type' => 'airtime2cash',
+            'status' => 'active',
+        ]);
+        $product = Product::create([
+            'name' => 'Bank Requery Product',
+            'slug' => 'bank-requery-product',
+            'category_id' => $category->id,
+            'type' => 'airtime2cash',
+            'api_id' => $provider->id,
+            'image' => 'site/upgrade.jpg',
+            'status' => 'active',
+        ]);
+        $transaction = Airtime2CashTransactions::create([
+            'transaction_id' => 'A2C-BANK-REQUERY-PERSIST-001',
+            'product_id' => $product->id,
+            'customer_id' => $customer->id,
+            'payment_method' => 'Transfer to Bank Account',
+            'status' => 'approved',
+            'provider_status' => 'successful',
+            'bank_transfer_api_response' => json_encode([
+                'provider_status' => 'pending',
+                'request_data' => ['reference' => 'BANK-REQUERY-PERSIST-001'],
+            ]),
+        ]);
+
+        $response = app(TransactionController::class)->requeryAirtimeBankTransfer($transaction);
+
+        $this->assertTrue($response->getData(true)['status']);
+        $this->assertSame('successful', $response->getData(true)['provider_status']);
+        $this->assertDatabaseHas('airtime2_cash_transactions', [
+            'id' => $transaction->id,
+            'status' => 'approved',
+        ]);
+        $stored = Airtime2CashTransactions::findOrFail($transaction->id);
+        $this->assertSame('successful', data_get(json_decode($stored->bank_transfer_api_response, true), 'provider_status'));
+
+        $cronTransaction = $transaction->replicate();
+        $cronTransaction->transaction_id = 'A2C-BANK-CRON-PERSIST-001';
+        $cronTransaction->bank_transfer_api_response = json_encode([
+            'provider_status' => 'pending',
+            'request_data' => ['reference' => 'BANK-CRON-PERSIST-001'],
+        ]);
+        $cronTransaction->save();
+
+        app(TransactionController::class)->requeryPendingAirtime2CashTransactions(
+            Request::create('/cron/requery-pending-airtime2cash-transactions', 'GET')
+        );
+
+        $cronStored = Airtime2CashTransactions::findOrFail($cronTransaction->id);
+        $this->assertSame('approved', $cronStored->status);
+        $this->assertSame('successful', data_get(json_decode($cronStored->bank_transfer_api_response, true), 'provider_status'));
     }
 
     public static function webhookControllersProvider(): array

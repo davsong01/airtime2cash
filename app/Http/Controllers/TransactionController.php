@@ -2990,11 +2990,36 @@ class TransactionController extends Controller
 
     public function requeryAirtimeBankTransfer(Airtime2CashTransactions $transaction): JsonResponse
     {
-        if ($transaction->payment_method !== 'Transfer to Bank Account') {
+        try {
+            $result = $this->syncAirtimeBankTransferStatus($transaction);
+        } catch (Throwable $exception) {
             return response()->json([
                 'status' => false,
-                'message' => 'This transaction does not have a bank transfer payout.',
+                'message' => $exception->getMessage(),
             ], 422);
+        }
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Bank transfer status loaded successfully.',
+            'provider' => $result['provider'],
+            'provider_status' => $result['provider_status'],
+            'terminal' => $result['terminal'],
+            'response' => $result['response'],
+        ]);
+    }
+
+    /**
+     * Query and persist the separate bank-payout status. This intentionally
+     * does not change the Airtime2Cash status/provider_status or touch wallets:
+     * those belong to the airtime provider settlement flow.
+     */
+    private function syncAirtimeBankTransferStatus(
+        Airtime2CashTransactions $transaction,
+        ?API $configuredProvider = null
+    ): array {
+        if ($transaction->payment_method !== 'Transfer to Bank Account') {
+            throw new RuntimeException('This transaction does not have a bank transfer payout.');
         }
 
         $bankResponse = is_array($transaction->bank_transfer_api_response ?? null)
@@ -3006,41 +3031,56 @@ class TransactionController extends Controller
             ?? data_get($bankResponse, 'reference');
 
         if (blank($reference)) {
-            return response()->json([
-                'status' => false,
-                'message' => 'The bank transfer reference is not available yet.',
-            ], 422);
+            throw new RuntimeException('The bank transfer reference is not available yet.');
         }
 
-        $provider = API::query()
+        $provider = $configuredProvider ?: API::query()
             ->whereKey(getSettings()->bank_transfer_provider_id)
             ->where('status', 'active')
             ->first();
         $controller = $provider ? resolveProviderController($provider) : null;
 
-        if (! $controller || ! method_exists($controller, 'singleTransferStatus')) {
-            return response()->json([
-                'status' => false,
-                'message' => 'The configured bank-transfer provider does not support status queries.',
-            ], 422);
+        if (! $provider || ! $controller || ! method_exists($controller, 'singleTransferStatus')) {
+            throw new RuntimeException('The configured bank-transfer provider does not support status queries.');
         }
 
-        try {
-            $response = $controller->singleTransferStatus((string) $reference);
-        } catch (Throwable $exception) {
-            return response()->json([
-                'status' => false,
-                'message' => $exception->getMessage(),
-            ], 422);
-        }
+        $response = $controller->singleTransferStatus((string) $reference);
+        $providerStatus = strtolower(trim((string) data_get(
+            $response,
+            'provider_status',
+            data_get($response, 'status', 'pending')
+        )));
+        $successfulStatuses = ['successful', 'success', 'completed', 'paid'];
+        $failedStatuses = ['failed', 'declined', 'rejected', 'cancelled', 'canceled', 'reversed', 'error', 'expired'];
+        $terminal = in_array($providerStatus, [...$successfulStatuses, ...$failedStatuses], true);
 
-        return response()->json([
-            'status' => true,
-            'message' => 'Bank transfer status loaded successfully.',
-            'provider' => $provider->name,
-            'provider_status' => data_get($response, 'provider_status', data_get($response, 'status', 'pending')),
-            'response' => $response,
+        $persistedResponse = array_merge($bankResponse, [
+            'provider_status' => $providerStatus ?: 'pending',
+            'requery_response' => $response,
+            'last_queried_at' => now()->toISOString(),
         ]);
+
+        // The bank status is represented by bank_transfer_api_response today.
+        // Keep the original request/reference data and make the normalized
+        // status available to the existing admin/customer views.
+        $persistedResponse['status'] = $providerStatus ?: 'pending';
+
+        DB::transaction(function () use ($transaction, $persistedResponse): void {
+            Airtime2CashTransactions::query()
+                ->whereKey($transaction->getKey())
+                ->lockForUpdate()
+                ->firstOrFail()
+                ->update([
+                    'bank_transfer_api_response' => json_encode($persistedResponse, JSON_THROW_ON_ERROR),
+                ]);
+        });
+
+        return [
+            'provider' => $provider->name,
+            'provider_status' => $providerStatus ?: 'pending',
+            'terminal' => $terminal,
+            'response' => $response,
+        ];
     }
 
     function debitCustomerPage()
@@ -3528,6 +3568,65 @@ class TransactionController extends Controller
             'unchanged' => 0,
         ];
 
+        $bankSummary = [
+            'processed' => 0,
+            'successful' => 0,
+            'failed' => 0,
+            'pending' => 0,
+            'skipped' => 0,
+        ];
+
+        // Bank payout status is independent from the Airtime2Cash/AutoSync
+        // status. Approved parent transactions must still be polled until the
+        // bank provider reaches a terminal state.
+        $bankTransactions = Airtime2CashTransactions::query()
+            ->where('payment_method', 'Transfer to Bank Account')
+            ->whereNotNull('bank_transfer_api_response')
+            ->orderBy('id');
+
+        if ($limit !== null) {
+            $bankTransactions->take($limit);
+        }
+
+        foreach ($bankTransactions->get() as $transaction) {
+            $bankResponse = is_array($transaction->bank_transfer_api_response ?? null)
+                ? $transaction->bank_transfer_api_response
+                : (json_decode((string) ($transaction->bank_transfer_api_response ?? ''), true) ?: []);
+            $storedStatus = strtolower((string) (
+                data_get($bankResponse, 'provider_status')
+                ?? data_get($bankResponse, 'responseBody.status')
+                ?? data_get($bankResponse, 'api_response.responseBody.status')
+                ?? data_get($bankResponse, 'status', 'pending')
+            ));
+
+            if (in_array($storedStatus, [
+                'successful', 'success', 'completed', 'paid',
+                'failed', 'declined', 'rejected', 'cancelled', 'canceled', 'reversed', 'error', 'expired',
+            ], true)) {
+                $bankSummary['skipped']++;
+                continue;
+            }
+
+            try {
+                $result = $this->syncAirtimeBankTransferStatus($transaction);
+                $bankSummary['processed']++;
+                $bankStatus = $result['provider_status'];
+                if (in_array($bankStatus, ['successful', 'success', 'completed', 'paid'], true)) {
+                    $bankSummary['successful']++;
+                } elseif (in_array($bankStatus, ['failed', 'declined', 'rejected', 'cancelled', 'canceled', 'reversed', 'error', 'expired'], true)) {
+                    $bankSummary['failed']++;
+                } else {
+                    $bankSummary['pending']++;
+                }
+            } catch (Throwable $exception) {
+                $bankSummary['skipped']++;
+                Log::warning('Bank payout status requery failed.', [
+                    'transaction_id' => $transaction->transaction_id,
+                    'message' => $exception->getMessage(),
+                ]);
+            }
+        }
+
         foreach ($transactions as $transaction) {
             try {
                 $provider = $transaction->provider;
@@ -3555,12 +3654,17 @@ class TransactionController extends Controller
         }
 
         return back()->with('message', sprintf(
-            'Airtime2Cash requery completed%s. Processed: %d, Successful: %d, Unchanged: %d, Skipped: %d.',
+            'Airtime2Cash requery completed%s. Processed: %d, Successful: %d, Unchanged: %d, Skipped: %d. Bank payouts — Processed: %d, Successful: %d, Failed: %d, Pending: %d, Skipped: %d.',
             $api ? ' for ' . $api->name : '',
             $summary['processed'],
             $summary['successful'],
             $summary['unchanged'],
             $summary['skipped'],
+            $bankSummary['processed'],
+            $bankSummary['successful'],
+            $bankSummary['failed'],
+            $bankSummary['pending'],
+            $bankSummary['skipped'],
         ));
     }
 
