@@ -427,6 +427,26 @@
                                                     in_array($status, ['pending', 'initiated', 'attention-required'], true) => 'is-warning',
                                                     default => 'is-neutral',
                                                 };
+                                                $bankTransferStatus = null;
+                                                $bankTransferStatusClass = 'is-neutral';
+                                                if ($transaction->airtime2cash?->payment_method === 'Transfer to Bank Account') {
+                                                    $bankTransferResponse = is_array($transaction->airtime2cash->bank_transfer_api_response ?? null)
+                                                        ? $transaction->airtime2cash->bank_transfer_api_response
+                                                        : (json_decode((string) ($transaction->airtime2cash->bank_transfer_api_response ?? ''), true) ?: []);
+                                                    $bankTransferStatus = strtolower((string) (
+                                                        data_get($bankTransferResponse, 'provider_status')
+                                                        ?? data_get($bankTransferResponse, 'responseBody.status')
+                                                        ?? data_get($bankTransferResponse, 'data.status')
+                                                        ?? data_get($bankTransferResponse, 'status')
+                                                        ?? 'pending'
+                                                    ));
+                                                    $bankTransferStatusClass = match (true) {
+                                                        in_array($bankTransferStatus, ['success', 'successful', 'delivered', 'completed', 'approved'], true) => 'is-success',
+                                                        in_array($bankTransferStatus, ['failed', 'declined', 'rejected', 'cancelled', 'canceled'], true) => 'is-danger',
+                                                        in_array($bankTransferStatus, ['pending', 'initiated', 'attention-required'], true) => 'is-warning',
+                                                        default => 'is-neutral',
+                                                    };
+                                                }
                                                 $detailUrl = ($transaction->product?->type ?? null) === 'airtime2cash' && $transaction->airtime2cash
                                                     ? route('admin.single.airtime2cash.transaction.view', $transaction->airtime2cash->id)
                                                     : route('admin.single.transaction.view', $transaction->id);
@@ -453,6 +473,9 @@
                                                         <span class="transaction-reference-secondary"><span class="badge" style="font-size:.65rem;padding:.2rem .4rem;line-height:1.1;background-color:{{ $transaction->airtime2cash->payment_method === 'Transfer to Bank Account' ? '#dbeafe' : '#dcfce7' }};color:{{ $transaction->airtime2cash->payment_method === 'Transfer to Bank Account' ? '#1d4ed8' : '#15803d' }};">{{ $transaction->airtime2cash->payment_method === 'Transfer to Bank Account' ? 'Wallet to Bank' : 'Wallet to Cash' }}</span></span>
                                                     @endif
                                                     <span class="transaction-status-chip {{ $statusClass }} mt-50"><i class="bx bx-circle"></i>{{ ucfirst(str_replace('-', ' ', $status)) }}</span>
+                                                    @if($bankTransferStatus !== null)
+                                                        <span class="transaction-status-chip {{ $bankTransferStatusClass }} mt-50"><i class="bx bx-transfer-alt"></i>Bank: {{ ucfirst(str_replace(['_', '-'], ' ', $bankTransferStatus)) }}</span>
+                                                    @endif
                                                     <span class="transaction-date"><i class="bx bx-calendar mr-25"></i>{{ $transaction->created_at->format('M j, Y · g:i A') }}</span>
                                                 </td>
                                                 <td class="transaction-financial-cell">
