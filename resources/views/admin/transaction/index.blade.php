@@ -435,11 +435,11 @@
                                                     $bankRequeryResponse = data_get($bankTransferResponse, 'requery_response', []);
                                                     $hasBankRequeryResponse = is_array($bankRequeryResponse) && ! empty($bankRequeryResponse);
                                                     $bankTransferStatus = strtolower((string) (
-                                                        data_get($bankRequeryResponse, 'provider_status')
+                                                        data_get($bankTransferResponse, 'settlement_status')
+                                                        ?? data_get($bankRequeryResponse, 'provider_status')
                                                         ?? data_get($bankRequeryResponse, 'responseBody.status')
                                                         ?? data_get($bankRequeryResponse, 'data.status')
                                                         ?? data_get($bankRequeryResponse, 'status')
-                                                        ?? data_get($bankTransferResponse, 'settlement_status')
                                                         ?? data_get($bankTransferResponse, 'provider_status')
                                                         ?? data_get($bankTransferResponse, 'responseBody.status')
                                                         ?? data_get($bankTransferResponse, 'api_response.responseBody.status')

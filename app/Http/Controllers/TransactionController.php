@@ -3815,11 +3815,14 @@ class TransactionController extends Controller
             $requeryResponse = data_get($bankResponse, 'requery_response', []);
             $hasRequeryResponse = is_array($requeryResponse) && ! empty($requeryResponse);
             $storedStatus = strtolower((string) (
-                data_get($requeryResponse, 'provider_status')
+                // This is the normalized status returned by the status
+                // requery method and must take precedence over provider
+                // payload fields that may describe request acceptance.
+                data_get($bankResponse, 'settlement_status')
+                ?? data_get($requeryResponse, 'provider_status')
                 ?? data_get($requeryResponse, 'responseBody.status')
                 ?? data_get($requeryResponse, 'data.status')
                 ?? data_get($requeryResponse, 'status')
-                ?? data_get($bankResponse, 'settlement_status')
                 ?? data_get($bankResponse, 'provider_status')
                 ?? data_get($bankResponse, 'responseBody.status')
                 ?? data_get($bankResponse, 'api_response.responseBody.status')
