@@ -43,11 +43,20 @@ class AutoShareRoutingController extends Controller
         }
 
         try {
+            $conversionRate = (float) ($network->auto_share_rate ?? $network->rate ?? 0);
+            $conversionCharge = round(((float) $validated['amount'] * $conversionRate) / 100, 2);
             $decision = $this->routingService->selectProvider(
                 (float) $validated['amount'],
                 $network->auto_share_product_code ?: $network->slug,
-                true
+                true,
+                $conversionCharge
             );
+
+            $providerCharges = collect(data_get($decision, 'meta.selected_charges', []))
+                ->filter(fn ($charge) => is_array($charge))
+                ->values()
+                ->all();
+            $providerRoutingFee = round(collect($providerCharges)->sum(fn ($charge) => (float) ($charge['amount'] ?? 0)), 2);
 
             $result = [
                 'request' => [
@@ -65,6 +74,16 @@ class AutoShareRoutingController extends Controller
                 ],
                 'reason' => $decision['reason'],
                 'routing' => $decision['meta'],
+                'charges' => [
+                    'product' => [
+                        'label' => 'Airtime conversion charge',
+                        'rate' => $conversionRate,
+                        'amount' => $conversionCharge,
+                    ],
+                    'provider' => $providerCharges,
+                    'provider_routing_fee' => $providerRoutingFee,
+                    'visible_charge_total' => round($conversionCharge + $providerRoutingFee, 2),
+                ],
             ];
 
             return view('admin.auto-share-routing.verify', [

@@ -63,6 +63,7 @@ class AutoShareRoutingTest extends TestCase
         $this->assertSame('Cheap Healthy Provider', $decision['provider']->name);
         $this->assertSame(9.0, $decision['meta']['selected_fee']);
         $this->assertSame(91, $decision['meta']['selected_availability_score']);
+        $this->assertSame(9.0, collect($decision['meta']['selected_charges'])->sum('amount'));
         $this->assertCount(4, $decision['meta']['candidates']);
     }
 
@@ -84,11 +85,13 @@ class AutoShareRoutingTest extends TestCase
         $selected = $this->provider('Diagnostic Winner', 2, 0, 80);
         $this->configure($configured, 'manual');
 
-        $decision = app(AutoShareRoutingService::class)->selectProvider(1000, 'mtn', true);
+        $decision = app(AutoShareRoutingService::class)->selectProvider(1000, 'mtn', true, 100);
 
         $this->assertSame($selected->id, $decision['provider_id']);
         $this->assertSame('auto', $decision['mode']);
         $this->assertSame('mtn', $decision['meta']['network']);
+        $this->assertSame(102.0, $decision['meta']['selected_total_customer_charge']);
+        $this->assertSame(100.0, $decision['meta']['conversion_charge']);
         $this->assertSame('manual', DB::table('settings')->value('auto_share_routing_mode'));
     }
 

@@ -472,7 +472,12 @@ class TransactionController extends Controller
         $autoShareRoute = null;
         if ($request->input('transfer_mode') === 'auto_share') {
             try {
-                $autoShareRoute = app(AutoShareRoutingService::class)->selectProvider($airtimeAmount);
+                $autoShareRoute = app(AutoShareRoutingService::class)->selectProvider(
+                    $airtimeAmount,
+                    null,
+                    false,
+                    (float) $amount_charged
+                );
             } catch (RuntimeException $exception) {
                 $message = $exception->getMessage();
 

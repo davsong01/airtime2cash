@@ -135,12 +135,12 @@
                             <div class="d-flex justify-content-between align-items-center mb-1"><div><div class="routing-panel-title">Candidate comparison</div><div class="routing-panel-subtitle">Every eligible provider considered for this amount.</div></div><span class="badge badge-light-primary">{{ count($result['routing']['candidates'] ?? []) }} candidates</span></div>
                             <div class="table-responsive">
                                 <table class="table candidate-table mb-0">
-                                    <thead><tr><th>Provider</th><th>Effective fee</th><th>Health</th><th>Band</th></tr></thead>
+                                    <thead><tr><th>Provider</th><th>Total customer charge</th><th>Health</th><th>Band</th></tr></thead>
                                     <tbody>
                                     @forelse(($result['routing']['candidates'] ?? []) as $candidate)
                                         <tr class="{{ (int) ($candidate['provider_id'] ?? 0) === (int) $result['selected_provider']['id'] ? 'winner-row' : '' }}">
                                             <td><strong>{{ $candidate['provider'] }}</strong>@if((int) ($candidate['provider_id'] ?? 0) === (int) $result['selected_provider']['id']) <span class="badge badge-light-success ml-25">Winner</span>@endif</td>
-                                            <td>{{ getSettings()->currency }}{{ number_format((float) ($candidate['fee'] ?? 0), 2) }}</td>
+                                            <td>{{ getSettings()->currency }}{{ number_format((float) ($candidate['effective_total_charge'] ?? $candidate['fee'] ?? 0), 2) }}</td>
                                             <td><span class="health-dot {{ (int) ($candidate['availability_score'] ?? 0) >= 70 ? 'health-good' : 'health-muted' }}"></span>{{ $candidate['availability_score'] ?? 0 }}%</td>
                                             <td>{{ $candidate['band'] ?? '—' }}</td>
                                         </tr>
@@ -152,6 +152,47 @@
                             </div>
                         </div>
                     </div>
+                </div>
+                <div class="routing-panel p-2 mb-2">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <div><div class="routing-panel-title">Complete charge view</div><div class="routing-panel-subtitle">Product conversion charges and selected-provider pricing are shown separately.</div></div>
+                        <i class="bx bx-receipt text-primary font-medium-5"></i>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4 mb-1 mb-md-0">
+                            <div class="stat-tile h-100">
+                                <small>Product conversion charge · {{ number_format((float) ($result['charges']['product']['rate'] ?? 0), 2) }}%</small>
+                                <strong>{{ getSettings()->currency }}{{ number_format((float) ($result['charges']['product']['amount'] ?? 0), 2) }}</strong>
+                                <div class="text-muted small mt-25">Attached to the selected network product</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-1 mb-md-0">
+                            <div class="stat-tile h-100">
+                                <small>Selected provider pricing</small>
+                                <strong>{{ getSettings()->currency }}{{ number_format((float) ($result['charges']['provider_routing_fee'] ?? 0), 2) }}</strong>
+                                <div class="text-muted small mt-25">Fee, our charge, band and global extras</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="stat-tile h-100">
+                                <small>Combined visible charges</small>
+                                <strong>{{ getSettings()->currency }}{{ number_format((float) ($result['charges']['visible_charge_total'] ?? 0), 2) }}</strong>
+                                <div class="text-muted small mt-25">Diagnostic total; not a new transaction debit</div>
+                            </div>
+                        </div>
+                    </div>
+                    @if(!empty($result['charges']['provider']))
+                        <div class="table-responsive mt-1">
+                            <table class="table candidate-table mb-0">
+                                <thead><tr><th>Selected provider charge</th><th>Type</th><th>Amount</th></tr></thead>
+                                <tbody>
+                                @foreach($result['charges']['provider'] as $charge)
+                                    <tr><td>{{ $charge['label'] ?? 'Charge' }}</td><td>{{ ucfirst(str_replace('_', ' ', $charge['type'] ?? 'provider')) }}</td><td>{{ getSettings()->currency }}{{ number_format((float) ($charge['amount'] ?? 0), 2) }}</td></tr>
+                                @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    @endif
                 </div>
                 {{-- <div class="routing-panel p-2 mb-2">
                     <div class="d-flex justify-content-between align-items-center mb-1"><div><div class="routing-panel-title">Decision payload</div><div class="routing-panel-subtitle">Sanitized JSON returned by the routing engine.</div></div><i class="bx bx-code-alt text-primary font-medium-5"></i></div>
