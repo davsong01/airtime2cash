@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\AutoSyncOperationsController;
 use App\Http\Controllers\Admin\CallbackOperationsController;
+use App\Http\Controllers\Admin\AutoShareRoutingController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\Airtime2CashController;
 use App\Http\Controllers\AnnouncementController;
@@ -150,6 +151,12 @@ Route::middleware('auth')->group(function () {
 Route::middleware(['auth', 'verified', 'admin', 'ipcheck', 'adminRoute'])->prefix('admin')->group(function () {
     Route::resource('product', ProductController::class);
     Route::resource('airtime2cash', Airtime2CashController::class);
+    Route::get('verify-auto-share-provider', [AutoShareRoutingController::class, 'index'])
+        ->name('admin.auto-share.routing.verify');
+    Route::post('verify-auto-share-provider', [AutoShareRoutingController::class, 'check'])
+        ->name('admin.auto-share.routing.verify.check');
+    Route::post('verify-auto-share-provider/switch-to-auto', [AutoShareRoutingController::class, 'switchToAuto'])
+        ->name('admin.auto-share.routing.switch-to-auto');
 
     Route::get('pull-product', [ProductController::class, 'pullProducts'])->name('product.pull');
     Route::get('repull-product', [ProductController::class, 'pullProducts'])->name('product.repull');

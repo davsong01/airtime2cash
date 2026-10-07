@@ -78,6 +78,20 @@ class AutoShareRoutingTest extends TestCase
         app(AutoShareRoutingService::class)->selectProvider(1000);
     }
 
+    public function test_diagnostic_can_force_auto_routing_without_changing_live_mode(): void
+    {
+        $configured = $this->provider('Configured Provider', 5, 0, 40);
+        $selected = $this->provider('Diagnostic Winner', 2, 0, 80);
+        $this->configure($configured, 'manual');
+
+        $decision = app(AutoShareRoutingService::class)->selectProvider(1000, 'mtn', true);
+
+        $this->assertSame($selected->id, $decision['provider_id']);
+        $this->assertSame('auto', $decision['mode']);
+        $this->assertSame('mtn', $decision['meta']['network']);
+        $this->assertSame('manual', DB::table('settings')->value('auto_share_routing_mode'));
+    }
+
     private function configure(API $provider, string $mode): void
     {
         DB::table('settings')->insert([

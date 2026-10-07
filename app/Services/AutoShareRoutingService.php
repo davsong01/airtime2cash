@@ -7,11 +7,11 @@ use RuntimeException;
 
 class AutoShareRoutingService
 {
-    public function selectProvider(float $amount): array
+    public function selectProvider(float $amount, ?string $network = null, bool $forceAuto = false): array
     {
         $settings = getSettings();
         $configuredProviderId = $settings?->auto_share_provider_id;
-        $routingMode = $settings?->auto_share_routing_mode ?? 'manual';
+        $routingMode = $forceAuto ? 'auto' : ($settings?->auto_share_routing_mode ?? 'manual');
 
         if ($routingMode !== 'auto') {
             $provider = $configuredProviderId ? API::query()->find($configuredProviderId) : null;
@@ -24,7 +24,8 @@ class AutoShareRoutingService
                 $provider,
                 'Manual routing: administrator-configured Auto Share provider.',
                 null,
-                $routingMode
+                $routingMode,
+                $network
             );
         }
 
@@ -58,7 +59,8 @@ class AutoShareRoutingService
                     'amount' => $amount,
                     'candidates' => [],
                 ],
-                'auto'
+                'auto',
+                $network
             );
         }
 
@@ -97,7 +99,7 @@ class AutoShareRoutingService
             'selected_availability_score' => $selected['availability_score'],
             'selected_availability_status' => $selected['availability_status'],
             'candidates' => $candidateSummary,
-        ], 'auto');
+        ], 'auto', $network);
     }
 
     private function evaluateCandidate(API $provider, float $amount): ?array
@@ -159,18 +161,24 @@ class AutoShareRoutingService
         return round($fee, 2);
     }
 
-    private function decision(API $provider, string $reason, ?array $meta, string $mode): array
+    private function decision(API $provider, string $reason, ?array $meta, string $mode, ?string $network = null): array
     {
+        $meta ??= [
+            'fallback' => false,
+            'provider_id' => $provider->id,
+            'provider' => $provider->name,
+        ];
+
+        if ($network !== null) {
+            $meta['network'] = $network;
+        }
+
         return [
             'provider' => $provider,
             'provider_id' => $provider->id,
             'reason' => $reason,
             'mode' => $mode,
-            'meta' => $meta ?? [
-                'fallback' => false,
-                'provider_id' => $provider->id,
-                'provider' => $provider->name,
-            ],
+            'meta' => $meta,
         ];
     }
 

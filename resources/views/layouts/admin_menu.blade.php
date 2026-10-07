@@ -68,6 +68,11 @@
                                         class="menu-item" data-i18n="Input">Airtime to Cash</span></a>
                             </li>
                         @endif
+                        @if (in_array('admin.auto-share.routing.verify', $allowedRoutes) || in_array(1, auth()->user()->admin->roleIds()))
+                            <li class="{{ Route::is('admin.auto-share.routing.*') ? 'active' : '' }} svg"><a
+                                    href="{{ route('admin.auto-share.routing.verify') }}"><i class="bx bx-right-arrow-alt"></i><span
+                                        class="menu-item">Routing Check</span></a></li>
+                        @endif
                     </ul>
                 </li>
             @endif
