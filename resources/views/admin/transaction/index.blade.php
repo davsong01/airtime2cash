@@ -410,7 +410,6 @@
                                             <th>Transaction</th>
                                             <th>Financials</th>
                                             <th>Service</th>
-                                            <th>Identifier</th>
                                             @if(hasAccess('admin.single.transaction.view'))
                                             <th class="text-right">Action</th>
                                             @endif
@@ -433,13 +432,24 @@
                                                     $bankTransferResponse = is_array($transaction->airtime2cash->bank_transfer_api_response ?? null)
                                                         ? $transaction->airtime2cash->bank_transfer_api_response
                                                         : (json_decode((string) ($transaction->airtime2cash->bank_transfer_api_response ?? ''), true) ?: []);
+                                                    $bankRequeryResponse = data_get($bankTransferResponse, 'requery_response', []);
+                                                    $hasBankRequeryResponse = is_array($bankRequeryResponse) && ! empty($bankRequeryResponse);
                                                     $bankTransferStatus = strtolower((string) (
-                                                        data_get($bankTransferResponse, 'provider_status')
+                                                        data_get($bankRequeryResponse, 'provider_status')
+                                                        ?? data_get($bankRequeryResponse, 'responseBody.status')
+                                                        ?? data_get($bankRequeryResponse, 'data.status')
+                                                        ?? data_get($bankRequeryResponse, 'status')
+                                                        ?? data_get($bankTransferResponse, 'settlement_status')
+                                                        ?? data_get($bankTransferResponse, 'provider_status')
                                                         ?? data_get($bankTransferResponse, 'responseBody.status')
+                                                        ?? data_get($bankTransferResponse, 'api_response.responseBody.status')
                                                         ?? data_get($bankTransferResponse, 'data.status')
                                                         ?? data_get($bankTransferResponse, 'status')
                                                         ?? 'pending'
                                                     ));
+                                                    if (! $hasBankRequeryResponse && in_array($bankTransferStatus, ['success', 'successful', 'accepted', 'initiated'], true)) {
+                                                        $bankTransferStatus = 'pending';
+                                                    }
                                                     $bankTransferStatusClass = match (true) {
                                                         in_array($bankTransferStatus, ['success', 'successful', 'delivered', 'completed', 'approved'], true) => 'is-success',
                                                         in_array($bankTransferStatus, ['failed', 'declined', 'rejected', 'cancelled', 'canceled'], true) => 'is-danger',
@@ -463,6 +473,7 @@
                                                                 <span class="transaction-meta-line text-truncate"><i class="bx bx-envelope"></i>{{ $transaction->customer_email ?: 'No email' }}</span>
                                                             @endif
                                                             <span class="transaction-meta-line"><i class="bx bx-phone"></i>{{ $transaction->customer_phone ?: 'No phone' }}</span>
+                                                            <span class="transaction-meta-line text-truncate"><i class="bx bx-target-lock"></i>{{ $transaction->unique_element ?: 'No identifier' }}</span>
                                                         </div>
                                                     </div>
                                                 </td>
@@ -516,8 +527,6 @@
                                                         @endif
                                                     </div>
                                                 </td>
-                                                <td><span class="transaction-identifier-chip"><i class="bx bx-target-lock"></i>{{ $transaction->unique_element ?: 'Not provided' }}</span></td>
-
                                                 @if(hasAccess('admin.single.transaction.view'))
                                                 <td class="text-right">
                                                     <a class="btn btn-outline-primary transaction-action-button" href="{{ $detailUrl }}" title="View transaction" aria-label="View transaction"><i class="bx bx-show"></i></a>

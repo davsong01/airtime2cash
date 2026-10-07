@@ -1923,9 +1923,29 @@ class TransactionController extends Controller
                 'api_response' => $providerResponse,
             ]);
 
+            $bankTransferResponseToStore = $bankPayoutResponse ?? $providerResponse;
+            if ($transaction->payment_method === 'Transfer to Bank Account' && is_array($bankTransferResponseToStore)) {
+                $initialBankStatus = strtolower((string) (
+                    data_get($bankTransferResponseToStore, 'provider_status')
+                    ?? data_get($bankTransferResponseToStore, 'responseBody.status')
+                    ?? data_get($bankTransferResponseToStore, 'data.status')
+                    ?? data_get($bankTransferResponseToStore, 'status')
+                    ?? ''
+                ));
+
+                // Preserve the provider's initiation response exactly. The
+                // bank's settlement status is tracked separately and comes
+                // from a later status requery.
+                if (in_array($initialBankStatus, ['success', 'successful', 'accepted', 'initiated'], true)) {
+                    $bankTransferResponseToStore['initial_transfer_status'] = $initialBankStatus;
+                    $bankTransferResponseToStore['settlement_status'] = 'pending';
+                    $bankTransferResponseToStore['settlement_status_source'] = 'initial_transfer';
+                }
+            }
+
             $transaction->update([
                 'provider_status' => $providerStatus,
-                'bank_transfer_api_response' => json_encode($bankPayoutResponse ?? $providerResponse, JSON_THROW_ON_ERROR),
+                'bank_transfer_api_response' => json_encode($bankTransferResponseToStore, JSON_THROW_ON_ERROR),
                 'status' => match ($statusCode) {
                     1 => 'successful',
                     2 => 'pending',
@@ -3202,16 +3222,15 @@ class TransactionController extends Controller
         $failedStatuses = ['failed', 'declined', 'rejected', 'cancelled', 'canceled', 'reversed', 'error', 'expired'];
         $terminal = in_array($providerStatus, [...$successfulStatuses, ...$failedStatuses], true);
 
+        // Keep the original transfer response untouched. It describes whether
+        // the bank accepted the transfer request, not whether settlement has
+        // completed. The requery result is the source of the bank status.
         $persistedResponse = array_merge($bankResponse, [
-            'provider_status' => $providerStatus ?: 'pending',
             'requery_response' => $response,
+            'settlement_status' => $providerStatus ?: 'pending',
+            'settlement_status_source' => 'status_requery',
             'last_queried_at' => now()->toISOString(),
         ]);
-
-        // The bank status is represented by bank_transfer_api_response today.
-        // Keep the original request/reference data and make the normalized
-        // status available to the existing admin/customer views.
-        $persistedResponse['status'] = $providerStatus ?: 'pending';
 
         DB::transaction(function () use ($transaction, $persistedResponse): void {
             Airtime2CashTransactions::query()
@@ -3729,31 +3748,50 @@ class TransactionController extends Controller
         // bank provider reaches a terminal state.
         $bankTransactions = Airtime2CashTransactions::query()
             ->where('payment_method', 'Transfer to Bank Account')
+            ->whereIn('status', ['approved', 'success', 'successful', 'completed', 'delivered'])
             ->whereNotNull('bank_transfer_api_response')
             ->orderBy('id');
 
-        if ($limit !== null) {
-            $bankTransactions->take($limit);
-        }
-
-        foreach ($bankTransactions->get() as $transaction) {
+        // Apply the limit after filtering out already-settled payouts. A
+        // limit on the raw query could consume the whole batch with terminal
+        // rows and never reach an actually pending bank payout.
+        $pendingBankTransactions = $bankTransactions->get()->filter(function ($transaction): bool {
             $bankResponse = is_array($transaction->bank_transfer_api_response ?? null)
                 ? $transaction->bank_transfer_api_response
                 : (json_decode((string) ($transaction->bank_transfer_api_response ?? ''), true) ?: []);
+            $requeryResponse = data_get($bankResponse, 'requery_response', []);
+            $hasRequeryResponse = is_array($requeryResponse) && ! empty($requeryResponse);
             $storedStatus = strtolower((string) (
-                data_get($bankResponse, 'provider_status')
+                data_get($requeryResponse, 'provider_status')
+                ?? data_get($requeryResponse, 'responseBody.status')
+                ?? data_get($requeryResponse, 'data.status')
+                ?? data_get($requeryResponse, 'status')
+                ?? data_get($bankResponse, 'settlement_status')
+                ?? data_get($bankResponse, 'provider_status')
                 ?? data_get($bankResponse, 'responseBody.status')
                 ?? data_get($bankResponse, 'api_response.responseBody.status')
+                ?? data_get($bankResponse, 'data.status')
                 ?? data_get($bankResponse, 'status', 'pending')
             ));
 
-            if (in_array($storedStatus, [
+            // The initial transfer response is an acceptance/creation result,
+            // not a bank settlement result. Keep it pending for polling,
+            // without changing the original response payload.
+            if (! $hasRequeryResponse && in_array($storedStatus, ['success', 'successful', 'accepted', 'initiated'], true)) {
+                $storedStatus = 'pending';
+            }
+
+            return ! in_array($storedStatus, [
                 'successful', 'success', 'completed', 'paid',
                 'failed', 'declined', 'rejected', 'cancelled', 'canceled', 'reversed', 'error', 'expired',
-            ], true)) {
-                $bankSummary['skipped']++;
-                continue;
-            }
+            ], true);
+        });
+
+        if ($limit !== null) {
+            $pendingBankTransactions = $pendingBankTransactions->take($limit);
+        }
+
+        foreach ($pendingBankTransactions as $transaction) {
 
             try {
                 $result = $this->syncAirtimeBankTransferStatus($transaction);

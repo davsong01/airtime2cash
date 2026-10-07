@@ -328,8 +328,8 @@ class MonnifyController extends BankTransferProviderController
         }
 
         $token = $this->login();
-        Log::info('Monnify transfer login token: ' . $token);
-        
+        // Log::info('Monnify transfer login token: ' . $token);
+
         if (empty($token)) {
             return [
                 'status' => 'failed',

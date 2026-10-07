@@ -327,11 +327,11 @@ class AutoSyncService
             'Authorization' => 'Bearer '.$provider->api_key,
         ];
         $startedAt = microtime(true);
-        Log::info('Querying AutoSync transaction', [
-            'transaction_id' => $transaction->transaction_id,
-            'provider_reference' => $reference,
-            'endpoint' => $endpoint,
-        ]);
+        // Log::info('Querying AutoSync transaction', [
+        //     'transaction_id' => $transaction->transaction_id,
+        //     'provider_reference' => $reference,
+        //     'endpoint' => $endpoint,
+        // ]);
         try {
             $response = Http::withHeaders($headers)
                 ->asJson()

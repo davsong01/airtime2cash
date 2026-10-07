@@ -262,12 +262,21 @@
                                                                 ? $airtime2Cash->bank_transfer_api_response
                                                                 : (json_decode((string) ($airtime2Cash?->bank_transfer_api_response ?? ''), true) ?: []);
                                                             $bankTransferStatus = strtolower((string) (
-                                                                data_get($bankTransferResponse, 'provider_status')
+                                                                data_get($bankTransferResponse, 'requery_response.provider_status')
+                                                                ?? data_get($bankTransferResponse, 'requery_response.responseBody.status')
+                                                                ?? data_get($bankTransferResponse, 'requery_response.data.status')
+                                                                ?? data_get($bankTransferResponse, 'requery_response.status')
+                                                                ?? data_get($bankTransferResponse, 'settlement_status')
+                                                                ?? data_get($bankTransferResponse, 'provider_status')
                                                                 ?? data_get($bankTransferResponse, 'responseBody.status')
                                                                 ?? data_get($bankTransferResponse, 'data.status')
                                                                 ?? data_get($bankTransferResponse, 'status')
                                                                 ?? 'pending'
                                                             ));
+                                                            if (blank(data_get($bankTransferResponse, 'requery_response'))
+                                                                && in_array($bankTransferStatus, ['success', 'successful', 'accepted', 'initiated'], true)) {
+                                                                $bankTransferStatus = 'pending';
+                                                            }
                                                             $legacyBankCode = $transaction->bank_code ?? data_get($requestData, 'bank_code') ?? data_get($requestData, 'bank') ?? null;
                                                             $bankName = $transaction->bank?->bank_name
                                                                 ?: $transaction->bank_name
