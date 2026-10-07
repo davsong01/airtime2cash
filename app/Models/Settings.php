@@ -13,5 +13,6 @@ class Settings extends Model
         'captcha_settings' => 'array',
         'google_dashboard_ad_enabled' => 'boolean',
         'show_provider_status_on_customer_pages' => 'boolean',
+        'customer_display_use_auto_share_routing' => 'boolean',
     ];
 }

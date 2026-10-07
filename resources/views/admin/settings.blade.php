@@ -565,6 +565,20 @@
 
                                                                         <div class="col-md-6">
                                                                             <fieldset class="form-group">
+                                                                                <label for="customer_display_use_auto_share_routing">Make Customer Display Use Routing Engine</label>
+                                                                                <select name="customer_display_use_auto_share_routing" class="form-control @error('customer_display_use_auto_share_routing') is-invalid @enderror" id="customer_display_use_auto_share_routing">
+                                                                                    <option value="0" @selected((string) old('customer_display_use_auto_share_routing', ($settings->customer_display_use_auto_share_routing ?? false) ? '1' : '0') === '0')>No — use current display behaviour</option>
+                                                                                    <option value="1" @selected((string) old('customer_display_use_auto_share_routing', ($settings->customer_display_use_auto_share_routing ?? false) ? '1' : '0') === '1')>Yes — use routing quote</option>
+                                                                                </select>
+                                                                                @error('customer_display_use_auto_share_routing')
+                                                                                    <div class="invalid-feedback">{{ $message }}</div>
+                                                                                @enderror
+                                                                                <small class="text-muted d-block mt-50">When enabled, Auto Share charge previews use the routing engine before showing customer charges.</small>
+                                                                            </fieldset>
+                                                                        </div>
+
+                                                                        <div class="col-md-6">
+                                                                            <fieldset class="form-group">
                                                                                 <label for="bank_transfer_provider_id">Bank Transfer Provider</label>
                                                                                 <select name="bank_transfer_provider_id" class="form-control @error('bank_transfer_provider_id') is-invalid @enderror" id="bank_transfer_provider_id">
                                                                                     <option value="">Select provider</option>

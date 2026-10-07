@@ -400,6 +400,28 @@ class TransactionController extends Controller
             return back()->with('error', 'Invalid amount entered');
         }
 
+        $autoShareRoute = null;
+        $providerRoutingFee = 0.0;
+        if ($request->input('transfer_mode') === 'auto_share') {
+            try {
+                $autoShareRoute = app(AutoShareRoutingService::class)->selectProvider(
+                    $airtimeAmount,
+                    null,
+                    false,
+                    (float) $amount_charged
+                );
+                $providerRoutingFee = round((float) data_get($autoShareRoute, 'meta.selected_fee', 0), 2);
+                $amount_paid = max(0, $amount_paid - $providerRoutingFee);
+                $bankTransferAmount = $amount_paid;
+            } catch (RuntimeException $exception) {
+                $message = $exception->getMessage();
+
+                return $request->expectsJson()
+                    ? response()->json(['status' => false, 'message' => $message], 422)
+                    : back()->withInput()->with('error', $message);
+            }
+        }
+
         $transaction_id = 'A2C-' . $this->generateRequestId();
         $verificationProviderId = getSettings()?->bank_verification_provider_id ?: getSettings()?->bank_transfer_provider_id;
         $verificationProvider = API::query()
@@ -469,28 +491,20 @@ class TransactionController extends Controller
             $bankTransferAmount = max(0, $amount_paid - $bankTransferFee);
         }
 
-        $autoShareRoute = null;
-        if ($request->input('transfer_mode') === 'auto_share') {
-            try {
-                $autoShareRoute = app(AutoShareRoutingService::class)->selectProvider(
-                    $airtimeAmount,
-                    null,
-                    false,
-                    (float) $amount_charged
-                );
-            } catch (RuntimeException $exception) {
-                $message = $exception->getMessage();
-
-                return $request->expectsJson()
-                    ? response()->json(['status' => false, 'message' => $message], 422)
-                    : back()->withInput()->with('error', $message);
-            }
-        }
-
         $chargeBreakdown = [
             ['label' => 'Airtime Amount', 'amount' => $airtimeAmount, 'type' => 'airtime_amount'],
             ['label' => 'Airtime Conversion Fee', 'amount' => (float) $amount_charged, 'type' => 'airtime_conversion_fee'],
         ];
+
+        foreach (data_get($autoShareRoute, 'meta.selected_charges', []) as $charge) {
+            if (is_array($charge)) {
+                $chargeBreakdown[] = [
+                    'label' => $charge['label'] ?? 'Auto Share Provider Charge',
+                    'amount' => (float) ($charge['amount'] ?? 0),
+                    'type' => $charge['type'] ?? 'auto_share_provider_charge',
+                ];
+            }
+        }
 
         if ($request->input('payment_method') === 'Transfer to Bank Account') {
             $chargeBreakdown[] = ['label' => 'Bank Transfer Fee', 'amount' => $bankTransferFee, 'type' => 'bank_transfer_fee'];
@@ -514,7 +528,9 @@ class TransactionController extends Controller
             'type' => 'credit',
             'transaction_id' => $transaction_id,
             'status' => 'pending',
-            'total_amount' => $amount_charged + $amount_paid,
+            // Keep the original airtime amount as the provider transaction
+            // amount; product/provider charges are reflected in amount_paid.
+            'total_amount' => $airtimeAmount,
             'phone_numbers' => $request->phone,
             'payment_method' => $request->payment_method,
             'provider_id' => $autoShareRoute['provider_id'] ?? null,
@@ -750,6 +766,116 @@ class TransactionController extends Controller
                 ->withInput()
                 ->with('error', 'The transaction could not be completed. Please try again later.');
         }
+    }
+
+    public function airtimeToCashQuote(Request $request)
+    {
+        $request->validate([
+            'product' => ['required', 'integer'],
+            'amount' => ['required', 'numeric', 'gt:0'],
+            'transfer_mode' => ['required', 'in:manual,auto_share'],
+            'payment_method' => ['nullable', 'in:Transfer to Bank Account,Transfer to Wallet'],
+        ]);
+
+        $settings = getSettings();
+        $routingEnabled = (bool) ($settings?->customer_display_use_auto_share_routing ?? false);
+        $product = Product::query()
+            ->whereKey($request->integer('product'))
+            ->where('type', 'airtime2cash')
+            ->where('status', 'active')
+            ->where($request->transfer_mode === 'auto_share' ? 'auto_share_status' : 'manual_status', 'active')
+            ->first();
+
+        if (! $product) {
+            return response()->json(['status' => false, 'message' => 'The selected network is not available.'], 422);
+        }
+
+        $levelId = $this->activeCustomerLevelId(auth()->user());
+        $discountedRate = $levelId
+            ? $product->customer_level_transfer_price($levelId, $request->transfer_mode)
+            : null;
+        $rate = ((float) ($discountedRate ?? 0) >= 1)
+            ? (float) $discountedRate
+            : (float) ($request->transfer_mode === 'auto_share' ? ($product->auto_share_rate ?? $product->rate) : $product->rate);
+        $amount = (float) $request->input('amount');
+        $minimum = $product->effectiveTransferMin($request->transfer_mode) ?? (float) ($product->min ?? 0);
+        $maximum = $product->effectiveTransferMax($request->transfer_mode) ?? (float) ($product->max ?? 0);
+
+        if ($amount < $minimum || ($maximum > 0 && $amount > $maximum)) {
+            return response()->json(['status' => false, 'message' => 'The amount is outside the allowed range.'], 422);
+        }
+
+        $conversionCharge = round(($rate / 100) * $amount, 2);
+        $convertedAmount = round(max(0, $amount - $conversionCharge), 2);
+        $route = null;
+
+        if ($routingEnabled && $request->transfer_mode === 'auto_share') {
+            try {
+                $route = app(AutoShareRoutingService::class)->selectProvider(
+                    $amount,
+                    $product->auto_share_product_code ?: $product->slug,
+                    false,
+                    $conversionCharge
+                );
+            } catch (RuntimeException $exception) {
+                return response()->json(['status' => false, 'message' => $exception->getMessage()], 422);
+            }
+        }
+
+        $providerCharges = collect(data_get($route, 'meta.selected_charges', []))
+            ->filter(fn ($charge) => is_array($charge))
+            ->values()
+            ->all();
+        $providerRoutingFee = round(collect($providerCharges)->sum(fn ($charge) => (float) ($charge['amount'] ?? 0)), 2);
+        $amountAfterRouting = round(max(0, $convertedAmount - $providerRoutingFee), 2);
+        $bankTransfer = null;
+
+        if ($request->input('payment_method') === 'Transfer to Bank Account') {
+            $bankDetails = getBankTransferChargeDetails($amountAfterRouting);
+            $bankTransfer = [
+                'matched' => (bool) ($bankDetails['matched'] ?? false),
+                'fee' => (float) ($bankDetails['transfer_fee'] ?? 0),
+                'payout' => round(max(0, $amountAfterRouting - (float) ($bankDetails['transfer_fee'] ?? 0)), 2),
+                'band' => $bankDetails['band_name'] ?? null,
+                'charges' => $bankDetails['charge_breakdown'] ?? [],
+            ];
+        }
+
+        $bankFee = (float) ($bankTransfer['fee'] ?? 0);
+
+        return response()->json([
+            'status' => true,
+            'routing_enabled' => $routingEnabled,
+            'request' => [
+                'product_id' => $product->id,
+                'network' => $product->name,
+                'amount' => $amount,
+                'transfer_mode' => $request->transfer_mode,
+            ],
+            'conversion' => [
+                'rate' => $rate,
+                'charge' => $conversionCharge,
+                'amount_after_conversion' => $convertedAmount,
+            ],
+            'routing' => $route ? [
+                'mode' => $route['mode'],
+                'provider' => [
+                    'id' => $route['provider_id'],
+                    'name' => $route['provider']->name,
+                    'slug' => $route['provider']->slug,
+                ],
+                'reason' => $route['reason'],
+                'meta' => $route['meta'],
+            ] : null,
+            'auto_share_provider_charges' => $providerCharges,
+            'auto_share_provider_fee' => $providerRoutingFee,
+            'bank_transfer_charges' => $bankTransfer,
+            'total_charges' => round($conversionCharge + $providerRoutingFee + $bankFee, 2),
+            'amount_after_routing' => $amountAfterRouting,
+            'amount_to_receive' => $bankTransfer
+                ? (float) $bankTransfer['payout']
+                : $amountAfterRouting,
+        ]);
     }
 
     public function resendOtp(Request $request): JsonResponse

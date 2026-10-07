@@ -20,10 +20,36 @@ class AutoShareRoutingService
                 throw new RuntimeException('The configured Auto Share provider is not available.');
             }
 
+            $candidate = $this->evaluateCandidate($provider, $amount, $conversionCharge);
+            $meta = [
+                'fallback' => false,
+                'amount' => $amount,
+                'candidates' => [],
+            ];
+
+            if ($candidate) {
+                $meta['selected_fee'] = $candidate['fee'];
+                $meta['conversion_charge'] = $candidate['conversion_charge'];
+                $meta['selected_total_customer_charge'] = $candidate['effective_total_charge'];
+                $meta['selected_band'] = $candidate['band_name'];
+                $meta['selected_charges'] = $candidate['charges'];
+                $meta['candidates'] = [[
+                    'provider_id' => $provider->id,
+                    'provider' => $provider->name,
+                    'fee' => $candidate['fee'],
+                    'conversion_charge' => $candidate['conversion_charge'],
+                    'effective_total_charge' => $candidate['effective_total_charge'],
+                    'charges' => $candidate['charges'],
+                    'availability_score' => $candidate['availability_score'],
+                    'availability_status' => $candidate['availability_status'],
+                    'band' => $candidate['band_name'],
+                ]];
+            }
+
             return $this->decision(
                 $provider,
                 'Manual routing: administrator-configured Auto Share provider.',
-                null,
+                $meta,
                 $routingMode,
                 $network
             );
@@ -155,14 +181,14 @@ class AutoShareRoutingService
     private function chargeBreakdown(API $provider, array $band): array
     {
         $charges = [[
-            'label' => 'Provider Fee',
+            'label' => 'Auto Share Provider Fee',
             'amount' => (float) ($band['provider_fee'] ?? 0),
             'type' => 'provider_fee',
         ]];
 
         if ((float) ($band['extra_charge'] ?? 0) > 0) {
             $charges[] = [
-                'label' => 'Our Charge',
+                'label' => 'Auto Share Our Charge',
                 'amount' => (float) $band['extra_charge'],
                 'type' => 'our_charge',
             ];
@@ -171,7 +197,7 @@ class AutoShareRoutingService
         foreach (($band['extra_charges'] ?? $band['charges'] ?? []) as $charge) {
             if (is_array($charge)) {
                 $charges[] = [
-                    'label' => $charge['charge_name'] ?? $charge['name'] ?? 'Band Extra Charge',
+                    'label' => $charge['charge_name'] ?? $charge['name'] ?? 'Auto Share Band Extra Charge',
                     'amount' => (float) ($charge['value'] ?? 0),
                     'type' => 'band_extra_charge',
                 ];
@@ -181,7 +207,7 @@ class AutoShareRoutingService
         foreach (($provider->extra_charges ?? []) as $charge) {
             if (is_array($charge)) {
                 $charges[] = [
-                    'label' => $charge['charge_name'] ?? $charge['name'] ?? 'Provider Extra Charge',
+                    'label' => $charge['charge_name'] ?? $charge['name'] ?? 'Auto Share Global Extra Charge',
                     'amount' => (float) ($charge['value'] ?? 0),
                     'type' => 'global_extra_charge',
                 ];

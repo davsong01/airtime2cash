@@ -488,9 +488,11 @@
             const payoutDestinationAvailability = @json($airtimeToCashDestinations);
             const autoProviderSlug = @json(strtolower((string) ($activeProvider?->slug ?? '')));
             const isAirtimeToCashAutomation = autoProviderSlug === 'airtimetocash';
+            const useRoutingQuote = @json((bool) (getSettings()?->customer_display_use_auto_share_routing ?? false));
 
             const endpoints = {
                 initiate: @json(route('initialize.airtime2cashtransaction')),
+                quote: @json(route('airtime2cash.quote')),
                 complete: @json(route('airtime2cash.auto.complete')),
                 resend: @json(route('airtime2cash.auto.resend-otp'))
             };
@@ -509,6 +511,8 @@
             let autoStage = AUTO_STAGE_DETAILS;
             let autoTransactionId = null;
             let requestInProgress = false;
+            let routingQuoteTimer = null;
+            let routingQuoteSequence = 0;
 
             const originalProductOptions = $product
                 .find('option')
@@ -893,6 +897,7 @@
 
                 $rateText.show();
                 $amountDiv.show();
+                recalculatePayout();
             }
 
             /*
@@ -901,7 +906,84 @@
             |--------------------------------------------------------------------------
             */
 
+            function hideRoutingQuote() {
+            }
+
+            function applyRoutingQuote(quote) {
+                const conversion = quote.conversion || {};
+                const bankTransfer = quote.bank_transfer_charges || null;
+
+                $rate.val(Number(conversion.rate || 0));
+                $rateDisplay.text(Number(conversion.rate || 0).toFixed(2));
+                $receive.val(Number(quote.amount_after_routing ?? conversion.amount_after_conversion ?? 0).toFixed(2));
+                $receiveDiv.show();
+                $paymentDiv.show();
+
+                if (bankTransfer) {
+                    $('#bank-fee-display').text(Number(bankTransfer.fee || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+                    $('#bank-payout-display').text(Number(bankTransfer.payout || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+                    $('#bank-charge-copy').text(bankTransfer.matched ? 'Bank transfer fee based on your converted amount:' : 'Bank transfer pricing is not configured for this converted amount.');
+                    $('#bank-charge-breakdown').toggle(Boolean(bankTransfer.matched));
+                } else {
+                    updateBankTransferBreakdown(Number(conversion.amount_after_conversion || 0));
+                }
+            }
+
+            function requestRoutingQuote() {
+                if (!useRoutingQuote || !isAutoTransfer()) {
+                    return false;
+                }
+
+                const amount = Number.parseFloat($amount.val());
+                const minimum = Number.parseFloat($amount.attr('min'));
+                const maximum = Number.parseFloat($amount.attr('max'));
+
+                if (!$product.val() || !Number.isFinite(amount) || amount <= 0
+                    || (Number.isFinite(minimum) && amount < minimum)
+                    || (Number.isFinite(maximum) && amount > maximum)) {
+                    hideRoutingQuote();
+                    return true;
+                }
+
+                window.clearTimeout(routingQuoteTimer);
+                const sequence = ++routingQuoteSequence;
+                routingQuoteTimer = window.setTimeout(function () {
+                    fetch(endpoints.quote, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
+                        body: JSON.stringify({
+                            product: $product.val(),
+                            amount: amount,
+                            transfer_mode: 'auto_share',
+                            payment_method: $paymentMethod.val() || null
+                        })
+                    }).then(function (response) {
+                        return response.json().then(function (data) {
+                            if (!response.ok || !data.status) {
+                                throw new Error(data.message || 'Unable to calculate routing-aware charges.');
+                            }
+                            return data;
+                        });
+                    }).then(function (data) {
+                        if (sequence === routingQuoteSequence) {
+                            applyRoutingQuote(data);
+                        }
+                    }).catch(function (error) {
+                        if (sequence !== routingQuoteSequence) return;
+                        hideRoutingQuote();
+                        showAutoError('Unable to calculate your payout at the moment. Please try again.');
+                    });
+                }, 250);
+
+                return true;
+            }
+
             function recalculatePayout() {
+                if (requestRoutingQuote()) {
+                    return;
+                }
+
                 const amount = Number.parseFloat($amount.val());
                 const rate = Number.parseFloat($rate.val());
                 const minimum = Number.parseFloat($amount.attr('min'));
@@ -1775,6 +1857,10 @@
 
                 if (!useBank) {
                     resetBankDetails();
+                }
+
+                if (requestRoutingQuote()) {
+                    return;
                 }
 
                 updateBankTransferBreakdown(Number.parseFloat($receive.val()) || 0);

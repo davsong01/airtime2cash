@@ -155,7 +155,7 @@
                 </div>
                 <div class="routing-panel p-2 mb-2">
                     <div class="d-flex justify-content-between align-items-center mb-1">
-                        <div><div class="routing-panel-title">Complete charge view</div><div class="routing-panel-subtitle">Product conversion charges and selected-provider pricing are shown separately.</div></div>
+                        <div><div class="routing-panel-title">Complete charge view</div><div class="routing-panel-subtitle">Product conversion charges and Auto Share provider pricing are shown separately from bank API charges.</div></div>
                         <i class="bx bx-receipt text-primary font-medium-5"></i>
                     </div>
                     <div class="row">
@@ -168,9 +168,9 @@
                         </div>
                         <div class="col-md-4 mb-1 mb-md-0">
                             <div class="stat-tile h-100">
-                                <small>Selected provider pricing</small>
+                                <small>Auto Share provider pricing</small>
                                 <strong>{{ getSettings()->currency }}{{ number_format((float) ($result['charges']['provider_routing_fee'] ?? 0), 2) }}</strong>
-                                <div class="text-muted small mt-25">Fee, our charge, band and global extras</div>
+                                <div class="text-muted small mt-25">Auto Share fee, band and global extras</div>
                             </div>
                         </div>
                         <div class="col-md-4">
@@ -184,7 +184,7 @@
                     @if(!empty($result['charges']['provider']))
                         <div class="table-responsive mt-1">
                             <table class="table candidate-table mb-0">
-                                <thead><tr><th>Selected provider charge</th><th>Type</th><th>Amount</th></tr></thead>
+                                <thead><tr><th>Auto Share provider charge</th><th>Type</th><th>Amount</th></tr></thead>
                                 <tbody>
                                 @foreach($result['charges']['provider'] as $charge)
                                     <tr><td>{{ $charge['label'] ?? 'Charge' }}</td><td>{{ ucfirst(str_replace('_', ' ', $charge['type'] ?? 'provider')) }}</td><td>{{ getSettings()->currency }}{{ number_format((float) ($charge['amount'] ?? 0), 2) }}</td></tr>
