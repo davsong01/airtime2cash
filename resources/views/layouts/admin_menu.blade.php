@@ -221,6 +221,12 @@
                                         Log</span></a>
                             </li>
                         @endif
+                        @if (in_array('admin.bvn.verification.debits', $allowedRoutes) || in_array(1, auth()->user()->admin->roleIds()))
+                            <li class="svg {{ Route::is('admin.bvn.verification.debits') ? 'active' : '' }}"><a
+                                    href="{{ route('admin.bvn.verification.debits') }}"><i class="bx bx-right-arrow-alt"></i><span
+                                        class="menu-item">BVN Debit Log</span></a>
+                            </li>
+                        @endif
                         @if (in_array('admin.earninglog', $allowedRoutes) || in_array(1, auth()->user()->admin->roleIds()))
                             <li class="svg {{ Route::is('admin.earninglog') ? 'active' : '' }}"><a
                                     href="{{ route('admin.earninglog') }}"><i class="bx bx-right-arrow-alt"></i><span

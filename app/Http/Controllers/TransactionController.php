@@ -2828,6 +2828,50 @@ class TransactionController extends Controller
         ]);
     }
 
+    public function bvnVerificationDebitView(Request $request)
+    {
+        $request->validate([
+            'email' => ['nullable', 'email'],
+            'transaction_id' => ['nullable', 'string', 'max:255'],
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date', 'after_or_equal:from'],
+        ]);
+
+        $baseQuery = Wallet::query()
+            ->where('type', 'debit')
+            ->where('reason', \App\Services\BvnVerificationBillingService::REASON)
+            ->whereHas('transaction_log', function ($query) {
+                $query->where('unique_element', \App\Services\BvnVerificationBillingService::UNIQUE_ELEMENT);
+            });
+
+        $metrics = (clone $baseQuery)
+            ->selectRaw('COUNT(*) AS count')
+            ->selectRaw('COALESCE(SUM(amount), 0) AS total')
+            ->first();
+
+        $transactions = $baseQuery
+            ->with([
+                'customer.user:id,firstname,middlename,lastname,email,phone',
+                'transaction_log:id,transaction_id,status,descr,completed_at',
+            ])
+            ->when($request->email, function ($query, $email) {
+                $query->whereHas('customer.user', fn ($userQuery) => $userQuery->where('email', 'like', '%' . trim($email) . '%'));
+            })
+            ->when($request->transaction_id, fn ($query, $transactionId) => $query->where('transaction_id', 'like', '%' . trim($transactionId) . '%'))
+            ->when($request->from, fn ($query, $from) => $query->where('created_at', '>=', $from . ' 00:00:00'))
+            ->when($request->to, fn ($query, $to) => $query->where('created_at', '<=', $to . ' 23:59:59'))
+            ->latest()
+            ->paginate(20)
+            ->withQueryString();
+
+        return view('admin.transaction.bvn_verification_debits', [
+            'transactions' => $transactions,
+            'total' => $metrics->total,
+            'count' => $metrics->count,
+            'query' => $request->query(),
+        ]);
+    }
+
     public function walletLedgerAuditView(Request $request)
     {
         $request->validate([
@@ -3748,7 +3792,16 @@ class TransactionController extends Controller
         // bank provider reaches a terminal state.
         $bankTransactions = Airtime2CashTransactions::query()
             ->where('payment_method', 'Transfer to Bank Account')
-            ->whereIn('status', ['approved', 'success', 'successful', 'completed', 'delivered'])
+            ->where(function ($query): void {
+                // The parent Airtime2Cash row and its transaction log are
+                // written by different resolution paths. Treat either
+                // terminal approval source as eligible for bank settlement
+                // polling so a status mismatch cannot hide the payout.
+                $query->whereIn('status', ['approved', 'success', 'successful', 'completed', 'delivered'])
+                    ->orWhereHas('transactionLog', function ($logQuery): void {
+                        $logQuery->whereIn('status', ['approved', 'success', 'successful', 'completed', 'delivered']);
+                    });
+            })
             ->whereNotNull('bank_transfer_api_response')
             ->orderBy('id');
 
@@ -3771,7 +3824,7 @@ class TransactionController extends Controller
                 ?? data_get($bankResponse, 'responseBody.status')
                 ?? data_get($bankResponse, 'api_response.responseBody.status')
                 ?? data_get($bankResponse, 'data.status')
-                ?? data_get($bankResponse, 'status', 'pending')
+                ?? data_get($bankResponse, 'status')
             ));
 
             // The initial transfer response is an acceptance/creation result,
@@ -3781,9 +3834,8 @@ class TransactionController extends Controller
                 $storedStatus = 'pending';
             }
 
-            return ! in_array($storedStatus, [
-                'successful', 'success', 'completed', 'paid',
-                'failed', 'declined', 'rejected', 'cancelled', 'canceled', 'reversed', 'error', 'expired',
+            return in_array($storedStatus, [
+                'pending', 'initiated', 'processing', 'queued', 'in_progress', 'in-progress',
             ], true);
         });
 
