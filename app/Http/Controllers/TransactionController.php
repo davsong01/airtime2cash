@@ -829,6 +829,7 @@ class TransactionController extends Controller
                 'name' => $provider->name,
             ],
             'stage' => strtolower((string) $provider->slug) === 'airtimetocash' ? 'otp' : 'pin',
+            'routing_mode' => $decision['mode'],
             'routing' => $decision['meta'],
         ]);
     }

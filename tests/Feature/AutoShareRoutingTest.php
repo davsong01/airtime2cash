@@ -7,6 +7,7 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Services\AutoShareRoutingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class AutoShareRoutingTest extends TestCase
@@ -18,6 +19,7 @@ class AutoShareRoutingTest extends TestCase
         $configured = $this->provider('Configured Provider', 1, 10, 10);
         $other = $this->provider('Cheaper Provider', 1, 1, 99);
         $product = $this->product([$configured]);
+        $this->configure($configured, 'manual');
 
         $decision = app(AutoShareRoutingService::class)->selectProvider(1000, product: $product);
 
@@ -40,6 +42,7 @@ class AutoShareRoutingTest extends TestCase
             $selected,
             $configured,
         ]);
+        $this->configure($configured, 'auto');
 
         $decision = app(AutoShareRoutingService::class)->selectProvider(1000, product: $product);
 
@@ -94,7 +97,7 @@ class AutoShareRoutingTest extends TestCase
         $decision = app(AutoShareRoutingService::class)->selectProvider(1000, 'mtn', true, 100, $product);
 
         $this->assertSame($selected->id, $decision['provider_id']);
-        $this->assertSame('mapped', $decision['mode']);
+        $this->assertSame('auto', $decision['mode']);
         $this->assertSame('mtn', $decision['meta']['network']);
         $this->assertSame(102.0, $decision['meta']['selected_total_customer_charge']);
         $this->assertSame(100.0, $decision['meta']['conversion_charge']);
@@ -104,6 +107,7 @@ class AutoShareRoutingTest extends TestCase
     {
         $global = $this->provider('Global Provider', 1, 0, 90);
         $mapped = $this->provider('Product Provider', 10, 0, 90);
+        $this->configure($mapped, 'manual');
         $category = Category::create([
             'name' => 'Airtime to Cash',
             'slug' => 'airtime-to-cash',
@@ -128,7 +132,7 @@ class AutoShareRoutingTest extends TestCase
 
         $this->assertSame($mapped->id, $decision['provider_id']);
         $this->assertTrue($decision['meta']['product_mapping']);
-        $this->assertStringContainsString('Product routing', $decision['reason']);
+        $this->assertStringContainsString('Manual routing', $decision['reason']);
     }
 
     public function test_glo_never_routes_to_an_unmapped_airtimetocash_provider(): void
@@ -137,6 +141,7 @@ class AutoShareRoutingTest extends TestCase
         $automation = $this->provider('AirtimeToCash Automation', 0, 0, 100);
         $automation->update(['slug' => 'airtimetocash']);
         $glo = $this->product([$autosync]);
+        $this->configure($autosync, 'auto');
 
         $decision = app(AutoShareRoutingService::class)->selectProvider(
             amount: 1000,
@@ -147,6 +152,51 @@ class AutoShareRoutingTest extends TestCase
         $this->assertNotSame($automation->id, $decision['provider_id']);
         $this->assertCount(1, $decision['meta']['candidates']);
         $this->assertSame($autosync->id, $decision['meta']['candidates'][0]['provider_id']);
+    }
+
+    public function test_provider_without_a_matching_band_is_excluded_before_fee_comparison(): void
+    {
+        $autosync = $this->provider('AutoSync', 20, 0, 80);
+        $automation = $this->provider('AirtimeToCash Automation', 0, 0, 100);
+        $automation->update(['slug' => 'airtimetocash', 'pricing_data' => [[
+            'band_name' => 'Large amount only',
+            'min_amount' => 5000,
+            'max_amount' => 10000,
+            'provider_fee' => 0,
+        ]]]);
+        $product = $this->product([$autosync, $automation]);
+        $this->configure($autosync, 'auto');
+
+        $decision = app(AutoShareRoutingService::class)->selectProvider(
+            amount: 2000,
+            product: $product,
+        );
+
+        $this->assertSame($autosync->id, $decision['provider_id']);
+        $this->assertCount(1, $decision['meta']['candidates']);
+    }
+
+    public function test_manual_mode_uses_the_mapped_provider_without_a_matching_band(): void
+    {
+        $configured = $this->provider('Configured Provider', 20, 0, 80);
+        $configured->update(['pricing_data' => [[
+            'band_name' => 'Large amount only',
+            'min_amount' => 5000,
+            'max_amount' => 10000,
+            'provider_fee' => 20,
+        ]]]);
+        $product = $this->product([$configured]);
+        $this->configure($configured, 'manual');
+
+        $decision = app(AutoShareRoutingService::class)->selectProvider(
+            amount: 2000,
+            conversionCharge: 200,
+            product: $product,
+        );
+
+        $this->assertSame($configured->id, $decision['provider_id']);
+        $this->assertSame('manual', $decision['mode']);
+        $this->assertSame(0.0, $decision['meta']['selected_fee']);
     }
 
     private function product(array $providers): Product
@@ -170,6 +220,18 @@ class AutoShareRoutingTest extends TestCase
         $product->autoShareProviders()->attach(collect($providers)->pluck('id')->all());
 
         return $product;
+    }
+
+    private function configure(API $provider, string $mode): void
+    {
+        DB::table('settings')->delete();
+        DB::table('settings')->insert([
+            'currency' => '₦',
+            'auto_share_provider_id' => $provider->id,
+            'auto_share_routing_mode' => $mode,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
     }
 
     private function provider(

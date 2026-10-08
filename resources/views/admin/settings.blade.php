@@ -470,6 +470,53 @@
 
                                                             <div class="card">
                                                                 <div class="card-header">
+                                                                    <h4 class="card-title mb-25">Provider Routing Engine Configuration</h4>
+                                                                    <small class="text-muted">Control how mapped Auto Share providers are selected and displayed to customers.</small>
+                                                                </div>
+                                                                <div class="card-body">
+                                                                    <div class="row">
+                                                                        <div class="col-md-6">
+                                                                            <fieldset class="form-group">
+                                                                                <label for="auto_share_provider_id">Auto Share Provider</label>
+                                                                                <select name="auto_share_provider_id" class="form-control @error('auto_share_provider_id') is-invalid @enderror" id="auto_share_provider_id">
+                                                                                    <option value="">Select provider</option>
+                                                                                    @foreach($autoShareProviders as $provider)
+                                                                                        <option value="{{ $provider->id }}" @selected((string) old('auto_share_provider_id', $settings->auto_share_provider_id) === (string) $provider->id)>
+                                                                                            {{ $provider->name }}{{ $provider->status !== 'active' ? ' (Inactive)' : '' }}
+                                                                                        </option>
+                                                                                    @endforeach
+                                                                                </select>
+                                                                                @error('auto_share_provider_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                                                                <small class="text-muted d-block mt-50">Provider used when Auto Share routing is set to Manual.</small>
+                                                                            </fieldset>
+                                                                        </div>
+                                                                        <div class="col-md-6">
+                                                                            <fieldset class="form-group">
+                                                                                <label for="auto_share_routing_mode">Auto Share Provider Routing Mode</label>
+                                                                                <select name="auto_share_routing_mode" class="form-control @error('auto_share_routing_mode') is-invalid @enderror" id="auto_share_routing_mode">
+                                                                                    <option value="manual" @selected(old('auto_share_routing_mode', $settings->auto_share_routing_mode ?? 'manual') === 'manual')>Manual</option>
+                                                                                    <option value="auto" @selected(old('auto_share_routing_mode', $settings->auto_share_routing_mode ?? 'manual') === 'auto')>Auto</option>
+                                                                                </select>
+                                                                                @error('auto_share_routing_mode')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                                                                <small class="text-muted d-block mt-50">Manual uses the selected mapped provider. Auto compares mapped providers with matching bands.</small>
+                                                                            </fieldset>
+                                                                        </div>
+                                                                        <div class="col-md-6">
+                                                                            <fieldset class="form-group">
+                                                                                <label for="customer_display_use_auto_share_routing">Make Customer Display Use Routing Engine</label>
+                                                                                <select name="customer_display_use_auto_share_routing" class="form-control @error('customer_display_use_auto_share_routing') is-invalid @enderror" id="customer_display_use_auto_share_routing">
+                                                                                    <option value="0" @selected((string) old('customer_display_use_auto_share_routing', ($settings->customer_display_use_auto_share_routing ?? false) ? '1' : '0') === '0')>No — use current display behaviour</option>
+                                                                                    <option value="1" @selected((string) old('customer_display_use_auto_share_routing', ($settings->customer_display_use_auto_share_routing ?? false) ? '1' : '0') === '1')>Yes — use routing quote</option>
+                                                                                </select>
+                                                                                @error('customer_display_use_auto_share_routing')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                                                                <small class="text-muted d-block mt-50">When enabled, Auto Share charge previews use the routing engine before showing customer charges.</small>
+                                                                            </fieldset>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <div class="card">
+                                                                <div class="card-header">
                                                                     <h4 class="card-title mb-25">Airtime 2 Cash Destination Availability</h4>
                                                                     <small class="text-muted">Control which payout destinations are available for manual and auto Airtime 2 Cash.</small>
                                                                 </div>
@@ -531,20 +578,6 @@
 
                                                                 <div class="card-body">
                                                                     <div class="row">
-                                                                        <div class="col-md-6">
-                                                                            <fieldset class="form-group">
-                                                                                <label for="customer_display_use_auto_share_routing">Make Customer Display Use Routing Engine</label>
-                                                                                <select name="customer_display_use_auto_share_routing" class="form-control @error('customer_display_use_auto_share_routing') is-invalid @enderror" id="customer_display_use_auto_share_routing">
-                                                                                    <option value="0" @selected((string) old('customer_display_use_auto_share_routing', ($settings->customer_display_use_auto_share_routing ?? false) ? '1' : '0') === '0')>No — use current display behaviour</option>
-                                                                                    <option value="1" @selected((string) old('customer_display_use_auto_share_routing', ($settings->customer_display_use_auto_share_routing ?? false) ? '1' : '0') === '1')>Yes — use routing quote</option>
-                                                                                </select>
-                                                                                @error('customer_display_use_auto_share_routing')
-                                                                                    <div class="invalid-feedback">{{ $message }}</div>
-                                                                                @enderror
-                                                                                <small class="text-muted d-block mt-50">When enabled, Auto Share charge previews use the routing engine before showing customer charges.</small>
-                                                                            </fieldset>
-                                                                        </div>
-
                                                                         <div class="col-md-6">
                                                                             <fieldset class="form-group">
                                                                                 <label for="bank_transfer_provider_id">Bank Transfer Provider</label>

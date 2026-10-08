@@ -67,8 +67,8 @@
                     <div class="col-lg-4">
                         <div class="routing-live-pill">
                             <div class="label">Live routing mode</div>
-                            <div class="value mb-1">Product mappings</div>
-                            <span class="text-white small"><i class="bx bx-check-circle mr-25"></i>Mapped providers are evaluated for each product</span>
+                            <div class="value mb-1">{{ ucfirst(getSettings()->auto_share_routing_mode ?? 'manual') }}</div>
+                            <span class="text-white small"><i class="bx bx-check-circle mr-25"></i>{{ (getSettings()->auto_share_routing_mode ?? 'manual') === 'auto' ? 'Mapped providers are compared by matching band and charge' : 'The configured provider is used when mapped to the product' }}</span>
                         </div>
                     </div>
                 </div>
