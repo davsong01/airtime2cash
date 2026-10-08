@@ -10,10 +10,23 @@
             var imagePreview = document.getElementById('product-image-preview');
             var nameInput = document.getElementById('name');
             var namePreview = document.getElementById('product-name-preview');
+            var autoShareStatus = document.getElementById('auto_share_status');
+            var autoShareProviderRouting = document.getElementById('auto-share-provider-routing');
 
             if (!form || !editorElement || !autoShareEditorElement) {
                 return;
             }
+
+            function toggleAutoShareProviderRouting() {
+                if (!autoShareProviderRouting || !autoShareStatus) {
+                    return;
+                }
+
+                autoShareProviderRouting.style.display = autoShareStatus.checked ? '' : 'none';
+            }
+
+            autoShareStatus?.addEventListener('change', toggleAutoShareProviderRouting);
+            toggleAutoShareProviderRouting();
 
             var quill = new Quill(editorElement, {
                 theme: 'snow',

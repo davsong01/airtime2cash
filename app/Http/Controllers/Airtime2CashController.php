@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Product;
 use App\Models\Category;
 use App\Models\Discount;
+use App\Models\API;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use App\Models\CustomerLevel;
@@ -21,8 +22,9 @@ class Airtime2CashController extends Controller
     {
         $categories = Category::where('status', 'active')->where('type', 'airtime2cash')->get();
         $customerlevel = CustomerLevel::enabled()->orderBy('order', 'ASC')->get();
-        
-        return view('admin.airtime2cash.create', compact('categories', 'customerlevel'));
+        $autoShareProviders = API::query()->where('is_auto_share', true)->where('status', 'active')->orderBy('name')->get(['id', 'name', 'slug']);
+
+        return view('admin.airtime2cash.create', compact('categories', 'customerlevel', 'autoShareProviders'));
     }
 
     public function store(Request $request)
@@ -53,6 +55,8 @@ class Airtime2CashController extends Controller
             "instruction" => "nullable|string",
             "auto_share_instruction" => "nullable|string",
             "auto_share_product_code" => "nullable|string|max:100|required_if:auto_share_status,active",
+            "auto_share_provider_ids" => "nullable|array",
+            "auto_share_provider_ids.*" => "integer|exists:apis,id",
             "min" => "required|numeric|min:0",
             "max" => "required|numeric|gte:min",
             "image" => "required|mimes:jpeg,png|max:1024",
@@ -71,7 +75,7 @@ class Airtime2CashController extends Controller
         }
 
         $slug = strtolower('airtime2cash-'.Str::slug($request->name));
-    
+
         $product = Product::updateOrCreate(
             [
                 "name" => $request->name,
@@ -99,7 +103,6 @@ class Airtime2CashController extends Controller
                 "manual_status" => $request->manual_status,
                 "auto_share_status" => $request->auto_share_status,
                 "status" => $request->status,
-                "has_variations" => 'no',
                 "seo_description" => $request->seo_description,
                 "image" => $image ?? null,
                 "fixed_price" => $request->fixed_price,
@@ -115,6 +118,7 @@ class Airtime2CashController extends Controller
 
         $this->syncAirtimeCustomerLevelRates($product, $request->manual_level_rate ?? [], 'manual');
         $this->syncAirtimeCustomerLevelRates($product, $request->auto_share_level_rate ?? [], 'auto_share');
+        $this->syncAutoShareProviders($product, $request->input('auto_share_provider_ids', []), true);
 
         return redirect(route('airtime2cash.edit', $product->id))->with('message', 'Product Added Successfully');
     }
@@ -123,10 +127,11 @@ class Airtime2CashController extends Controller
     {
         $product = Product::where('id', $id)->first();
         $categories = Category::where('status', 'active')->where('type', 'airtime2cash')->get();
+        $autoShareProviders = API::query()->where('is_auto_share', true)->where('status', 'active')->orderBy('name')->get(['id', 'name', 'slug']);
 
         $customerlevel = CustomerLevel::enabled()->orderBy('order', 'ASC')->get();
 
-        return view('admin.airtime2cash.edit', compact('categories', 'product', 'customerlevel'));
+        return view('admin.airtime2cash.edit', compact('categories', 'product', 'customerlevel', 'autoShareProviders'));
     }
 
     public function update(Request $request, $id){
@@ -151,13 +156,15 @@ class Airtime2CashController extends Controller
             "instruction" => "nullable|string",
             "auto_share_instruction" => "nullable|string",
             "auto_share_product_code" => "nullable|string|max:100|required_if:auto_share_status,active",
+            "auto_share_provider_ids" => "nullable|array",
+            "auto_share_provider_ids.*" => "integer|exists:apis,id",
             "min" => "required|numeric|min:0",
             "max" => "required|numeric|gte:min",
             "image" => "nullable|mimes:jpeg,png|max:1024",
         ]);
 
         $product = Product::where('id', $id)->first();
-        
+
         if (!empty($request->image)) {
             $image = $this->uploadFile($request->image, 'products');
         }else{
@@ -173,7 +180,7 @@ class Airtime2CashController extends Controller
         }
 
         $slug = strtolower('airtime2cash-' . Str::slug($request->name));
-        
+
         $product->update(
             [
                 "name" => $request->name,
@@ -196,7 +203,6 @@ class Airtime2CashController extends Controller
                 "manual_status" => $request->manual_status,
                 "auto_share_status" => $request->auto_share_status,
                 "status" => $request->status,
-                "has_variations" => 'no',
                 "seo_description" => $request->seo_description,
                 "image" => $image ?? null,
                 "fixed_price" => $request->fixed_price,
@@ -212,7 +218,8 @@ class Airtime2CashController extends Controller
 
         $this->syncAirtimeCustomerLevelRates($product, $request->manual_level_rate ?? [], 'manual');
         $this->syncAirtimeCustomerLevelRates($product, $request->auto_share_level_rate ?? [], 'auto_share');
-        
+        $this->syncAutoShareProviders($product, $request->input('auto_share_provider_ids', []));
+
         return back()->with('message', 'Update Successfull');
     }
 
@@ -230,6 +237,22 @@ class Airtime2CashController extends Controller
         }
 
         return $max < $min;
+    }
+
+    private function syncAutoShareProviders(Product $product, array $providerIds, bool $defaultAutosync = false): void
+    {
+        if ($defaultAutosync && empty($providerIds)) {
+            $providerIds = API::query()
+                ->where('slug', 'autosync')
+                ->where('is_auto_share', true)
+                ->where('status', 'active')
+                ->pluck('id')
+                ->all();
+        }
+
+        $product->autoShareProviders()->sync(
+            API::query()->where('is_auto_share', true)->where('status', 'active')->whereIn('id', $providerIds)->pluck('id')->all()
+        );
     }
 
     private function syncAirtimeCustomerLevelRates(Product $product, array $rates, string $transferMode): void

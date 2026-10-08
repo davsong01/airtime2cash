@@ -98,6 +98,7 @@ Route::middleware(['auth', 'verified', 'tpin', 'ipcheck'])->group(function () {
         Route::post('customer-initialize-transaction', [TransactionController::class, 'initializeTransaction'])->name('initialize.transaction');
         Route::post('customer-initialize-airtime2cash-transaction', [TransactionController::class, 'initializeAirtime2CashTransaction'])->name('initialize.airtime2cashtransaction');
         Route::post('airtime-to-cash/quote', [TransactionController::class, 'airtimeToCashQuote'])->name('airtime2cash.quote');
+        Route::post('airtime-to-cash/auto/resolve-provider', [TransactionController::class, 'resolveAirtime2CashProvider'])->middleware('throttle:10,1')->name('airtime2cash.auto.resolve-provider');
         Route::post('airtime-to-cash/auto/initiate', [TransactionController::class, 'initializeAirtime2CashTransaction'])->middleware('throttle:5,1')->name('airtime2cash.auto.initiate');
         Route::post('airtime-to-cash/auto/complete', [TransactionController::class, 'processAirtime2CashTransaction'])->middleware('throttle:10,1')->name('airtime2cash.auto.complete');
         Route::post('airtime-to-cash/auto/resend-otp', [TransactionController::class, 'resendOtp'])->middleware('throttle:3,1')->name('airtime2cash.auto.resend-otp');
@@ -156,8 +157,6 @@ Route::middleware(['auth', 'verified', 'admin', 'ipcheck', 'adminRoute'])->prefi
         ->name('admin.auto-share.routing.verify');
     Route::post('verify-auto-share-provider', [AutoShareRoutingController::class, 'check'])
         ->name('admin.auto-share.routing.verify.check');
-    Route::post('verify-auto-share-provider/switch-to-auto', [AutoShareRoutingController::class, 'switchToAuto'])
-        ->name('admin.auto-share.routing.switch-to-auto');
 
     Route::get('pull-product', [ProductController::class, 'pullProducts'])->name('product.pull');
     Route::get('repull-product', [ProductController::class, 'pullProducts'])->name('product.repull');

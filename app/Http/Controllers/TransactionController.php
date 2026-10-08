@@ -78,7 +78,8 @@ class TransactionController extends Controller
         }
         $category = Category::with([
             'products' => function ($query) {
-                return $query->where('status', 'active')
+                return $query->with('autoShareProviders')
+                    ->where('status', 'active')
                     ->where('type', 'airtime2cash')
                     ->where(function ($query) {
                         $query->where('manual_status', 'active')
@@ -107,10 +108,16 @@ class TransactionController extends Controller
             ->where('status', 'active')
             ->first();
         $banks = getWalletToBankBanks($verificationProvider);
-        $activeProvider = API::query()
-            ->whereKey(getSettings()?->auto_share_provider_id)
-            ->where('status', 'active')
-            ->first();
+        $activeProvider = null;
+        $autoShareProviderSlugsByProduct = $category->products->mapWithKeys(function ($product) {
+            return [$product->id => $product->autoShareProviders
+                ->where('status', 'active')
+                ->where('is_auto_share', true)
+                ->pluck('slug')
+                ->map(fn ($slug) => strtolower((string) $slug))
+                ->values()
+                ->all()];
+        })->all();
         $bankTransferPricingProvider = API::query()
             ->whereKey(getSettings()?->bank_transfer_provider_id)
             ->where('status', 'active')
@@ -135,6 +142,7 @@ class TransactionController extends Controller
                 'category',
                 'banks',
                 'activeProvider',
+                'autoShareProviderSlugsByProduct',
                 'walletBankAccount',
                 'bankTransferPricingBands',
                 'bankTransferGlobalExtraCharges',
@@ -405,10 +413,11 @@ class TransactionController extends Controller
         if ($request->input('transfer_mode') === 'auto_share') {
             try {
                 $autoShareRoute = app(AutoShareRoutingService::class)->selectProvider(
-                    $airtimeAmount,
-                    null,
-                    false,
-                    (float) $amount_charged
+                    amount: $airtimeAmount,
+                    network: null,
+                    forceAuto: false,
+                    conversionCharge: (float) $amount_charged,
+                    product: $product,
                 );
                 $providerRoutingFee = round((float) data_get($autoShareRoute, 'meta.selected_fee', 0), 2);
                 $amount_paid = max(0, $amount_paid - $providerRoutingFee);
@@ -768,6 +777,62 @@ class TransactionController extends Controller
         }
     }
 
+    public function resolveAirtime2CashProvider(Request $request): JsonResponse
+    {
+        $request->validate([
+            'product' => ['required', 'integer'],
+            'amount' => ['required', 'numeric', 'gt:0'],
+        ]);
+
+        $product = Product::query()
+            ->whereKey($request->integer('product'))
+            ->where('type', 'airtime2cash')
+            ->where('status', 'active')
+            ->where('auto_share_status', 'active')
+            ->first();
+
+        if (! $product) {
+            return response()->json(['status' => false, 'message' => 'The selected network is not available for Auto Share.'], 422);
+        }
+
+        $levelId = $this->activeCustomerLevelId(auth()->user());
+        $discountedRate = $levelId ? $product->customer_level_transfer_price($levelId, 'auto_share') : null;
+        $rate = ((float) ($discountedRate ?? 0) >= 1)
+            ? (float) $discountedRate
+            : (float) ($product->auto_share_rate ?? $product->rate);
+        $amount = (float) $request->input('amount');
+        $minimum = $product->effectiveTransferMin('auto_share') ?? (float) ($product->min ?? 0);
+        $maximum = $product->effectiveTransferMax('auto_share') ?? (float) ($product->max ?? 0);
+
+        if ($amount < $minimum || ($maximum > 0 && $amount > $maximum)) {
+            return response()->json(['status' => false, 'message' => 'The amount is outside the allowed range.'], 422);
+        }
+
+        try {
+            $decision = app(AutoShareRoutingService::class)->selectProvider(
+                amount: $amount,
+                network: $product->auto_share_product_code ?: $product->slug,
+                conversionCharge: round(($rate / 100) * $amount, 2),
+                product: $product,
+            );
+        } catch (RuntimeException $exception) {
+            return response()->json(['status' => false, 'message' => $exception->getMessage()], 422);
+        }
+
+        $provider = $decision['provider'];
+
+        return response()->json([
+            'status' => true,
+            'provider' => [
+                'id' => $provider->id,
+                'slug' => strtolower((string) $provider->slug),
+                'name' => $provider->name,
+            ],
+            'stage' => strtolower((string) $provider->slug) === 'airtimetocash' ? 'otp' : 'pin',
+            'routing' => $decision['meta'],
+        ]);
+    }
+
     public function airtimeToCashQuote(Request $request)
     {
         $request->validate([
@@ -812,10 +877,11 @@ class TransactionController extends Controller
         if ($routingEnabled && $request->transfer_mode === 'auto_share') {
             try {
                 $route = app(AutoShareRoutingService::class)->selectProvider(
-                    $amount,
-                    $product->auto_share_product_code ?: $product->slug,
-                    false,
-                    $conversionCharge
+                    amount: $amount,
+                    network: $product->auto_share_product_code ?: $product->slug,
+                    forceAuto: false,
+                    conversionCharge: $conversionCharge,
+                    product: $product,
                 );
             } catch (RuntimeException $exception) {
                 return response()->json(['status' => false, 'message' => $exception->getMessage()], 422);
@@ -915,9 +981,7 @@ class TransactionController extends Controller
         }
 
         try {
-            $provider = API::query()->find(
-                $transaction->provider_id ?: getSettings()?->auto_share_provider_id
-            );
+            $provider = API::query()->find($transaction->provider_id);
 
             if (! $provider) {
                 return response()->json([
@@ -2723,7 +2787,7 @@ class TransactionController extends Controller
     {
         $request->validate([
             'api' => ['nullable', 'integer'],
-            'service' => ['nullable', 'integer'],
+            'service' => ['nullable', 'string', 'regex:/^(type:(airtime2cash|wallet2bank)|[0-9]+)$/'],
             'status' => ['nullable', 'in:delivered,success,failed,attention-required'],
             'from' => ['nullable', 'date'],
             'to' => ['nullable', 'date', 'after_or_equal:from'],
@@ -2749,7 +2813,12 @@ class TransactionController extends Controller
         }
 
         if ($request->service) {
-            $transactions->where('product_id', $request->service);
+            if (str_starts_with((string) $request->service, 'type:')) {
+                $serviceType = substr((string) $request->service, 5);
+                $transactions->whereHas('product', fn ($query) => $query->where('type', $serviceType));
+            } else {
+                $transactions->where('product_id', $request->service);
+            }
         }
         if ($request->api) {
             $transactions->where('api_id', $request->api);

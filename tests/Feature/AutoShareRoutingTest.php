@@ -3,9 +3,10 @@
 namespace Tests\Feature;
 
 use App\Models\API;
+use App\Models\Category;
+use App\Models\Product;
 use App\Services\AutoShareRoutingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class AutoShareRoutingTest extends TestCase
@@ -16,12 +17,12 @@ class AutoShareRoutingTest extends TestCase
     {
         $configured = $this->provider('Configured Provider', 1, 10, 10);
         $other = $this->provider('Cheaper Provider', 1, 1, 99);
-        $this->configure($configured, 'manual');
+        $product = $this->product([$configured]);
 
-        $decision = app(AutoShareRoutingService::class)->selectProvider(1000);
+        $decision = app(AutoShareRoutingService::class)->selectProvider(1000, product: $product);
 
         $this->assertSame($configured->id, $decision['provider_id']);
-        $this->assertStringContainsString('Manual routing', $decision['reason']);
+        $this->assertTrue($decision['meta']['product_mapping']);
         $this->assertNotSame($other->id, $decision['provider_id']);
     }
 
@@ -33,9 +34,14 @@ class AutoShareRoutingTest extends TestCase
             ['charge_name' => 'Stamp', 'value' => 1],
         ]);
         $configured = $this->provider('Configured Fallback', 100, 0, 1);
-        $this->configure($configured, 'auto');
+        $product = $this->product([
+            $this->provider('Expensive Healthy Provider', 20, 0, 98),
+            $this->provider('Cheap Less Healthy Provider', 10, 0, 55),
+            $selected,
+            $configured,
+        ]);
 
-        $decision = app(AutoShareRoutingService::class)->selectProvider(1000);
+        $decision = app(AutoShareRoutingService::class)->selectProvider(1000, product: $product);
 
         // Cheap Healthy Provider: provider fee 8 + band charge 2 + stamp 1
         // = 11, beating the other candidate at 10? No: Cheap Less Healthy
@@ -58,7 +64,7 @@ class AutoShareRoutingTest extends TestCase
             'extra_charge' => 1,
         ]]]);
 
-        $decision = app(AutoShareRoutingService::class)->selectProvider(1000);
+        $decision = app(AutoShareRoutingService::class)->selectProvider(1000, product: $product);
 
         $this->assertSame('Cheap Healthy Provider', $decision['provider']->name);
         $this->assertSame(9.0, $decision['meta']['selected_fee']);
@@ -67,43 +73,103 @@ class AutoShareRoutingTest extends TestCase
         $this->assertCount(4, $decision['meta']['candidates']);
     }
 
-    public function test_auto_mode_does_not_fall_back_to_an_inactive_configured_provider(): void
+    public function test_inactive_mapped_provider_is_not_used(): void
     {
         $configured = $this->provider('Inactive Configured Provider', 10, 0, 90);
         $configured->update(['status' => 'inactive']);
-        $this->configure($configured, 'auto');
+        $product = $this->product([$configured]);
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('configured fallback is not active');
+        $this->expectExceptionMessage('No active Auto Share provider is mapped');
 
-        app(AutoShareRoutingService::class)->selectProvider(1000);
+        app(AutoShareRoutingService::class)->selectProvider(1000, product: $product);
     }
 
     public function test_diagnostic_can_force_auto_routing_without_changing_live_mode(): void
     {
         $configured = $this->provider('Configured Provider', 5, 0, 40);
         $selected = $this->provider('Diagnostic Winner', 2, 0, 80);
-        $this->configure($configured, 'manual');
+        $product = $this->product([$configured, $selected]);
 
-        $decision = app(AutoShareRoutingService::class)->selectProvider(1000, 'mtn', true, 100);
+        $decision = app(AutoShareRoutingService::class)->selectProvider(1000, 'mtn', true, 100, $product);
 
         $this->assertSame($selected->id, $decision['provider_id']);
-        $this->assertSame('auto', $decision['mode']);
+        $this->assertSame('mapped', $decision['mode']);
         $this->assertSame('mtn', $decision['meta']['network']);
         $this->assertSame(102.0, $decision['meta']['selected_total_customer_charge']);
         $this->assertSame(100.0, $decision['meta']['conversion_charge']);
-        $this->assertSame('manual', DB::table('settings')->value('auto_share_routing_mode'));
     }
 
-    private function configure(API $provider, string $mode): void
+    public function test_product_mapping_takes_priority_over_global_provider_routing(): void
     {
-        DB::table('settings')->insert([
-            'currency' => '₦',
-            'auto_share_provider_id' => $provider->id,
-            'auto_share_routing_mode' => $mode,
-            'created_at' => now(),
-            'updated_at' => now(),
+        $global = $this->provider('Global Provider', 1, 0, 90);
+        $mapped = $this->provider('Product Provider', 10, 0, 90);
+        $category = Category::create([
+            'name' => 'Airtime to Cash',
+            'slug' => 'airtime-to-cash',
+            'type' => 'airtime2cash',
+            'status' => 'active',
         ]);
+
+        $product = Product::create([
+            'name' => 'MTN Airtime to Cash',
+            'slug' => 'mtn-airtime-to-cash',
+            'category_id' => $category->id,
+            'type' => 'airtime2cash',
+            'status' => 'active',
+            'api_id' => $global->id,
+        ]);
+        $product->autoShareProviders()->attach($mapped->id);
+
+        $decision = app(AutoShareRoutingService::class)->selectProvider(
+            amount: 1000,
+            product: $product,
+        );
+
+        $this->assertSame($mapped->id, $decision['provider_id']);
+        $this->assertTrue($decision['meta']['product_mapping']);
+        $this->assertStringContainsString('Product routing', $decision['reason']);
+    }
+
+    public function test_glo_never_routes_to_an_unmapped_airtimetocash_provider(): void
+    {
+        $autosync = $this->provider('AutoSync', 20, 0, 80);
+        $automation = $this->provider('AirtimeToCash Automation', 0, 0, 100);
+        $automation->update(['slug' => 'airtimetocash']);
+        $glo = $this->product([$autosync]);
+
+        $decision = app(AutoShareRoutingService::class)->selectProvider(
+            amount: 1000,
+            product: $glo,
+        );
+
+        $this->assertSame($autosync->id, $decision['provider_id']);
+        $this->assertNotSame($automation->id, $decision['provider_id']);
+        $this->assertCount(1, $decision['meta']['candidates']);
+        $this->assertSame($autosync->id, $decision['meta']['candidates'][0]['provider_id']);
+    }
+
+    private function product(array $providers): Product
+    {
+        $category = Category::create([
+            'name' => 'Airtime to Cash '.uniqid(),
+            'slug' => 'airtime-to-cash-'.uniqid(),
+            'type' => 'airtime2cash',
+            'status' => 'active',
+        ]);
+
+        $product = Product::create([
+            'name' => 'Mapped Airtime Product '.uniqid(),
+            'slug' => 'mapped-airtime-product-'.uniqid(),
+            'category_id' => $category->id,
+            'type' => 'airtime2cash',
+            'status' => 'active',
+            'api_id' => $providers[0]->id,
+        ]);
+
+        $product->autoShareProviders()->attach(collect($providers)->pluck('id')->all());
+
+        return $product;
     }
 
     private function provider(

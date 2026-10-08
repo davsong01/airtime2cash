@@ -71,6 +71,16 @@ class API extends Model
         return $this->hasMany(Product::class, 'api_id');
     }
 
+    public function autoShareProducts()
+    {
+        return $this->belongsToMany(
+            Product::class,
+            'auto_share_product_providers',
+            'api_id',
+            'product_id',
+        );
+    }
+
     public function variations()
     {
         return $this->hasMany(Variation::class);

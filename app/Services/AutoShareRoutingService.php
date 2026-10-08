@@ -3,91 +3,40 @@
 namespace App\Services;
 
 use App\Models\API;
+use App\Models\Product;
 use RuntimeException;
 
 class AutoShareRoutingService
 {
-    public function selectProvider(float $amount, ?string $network = null, bool $forceAuto = false, float $conversionCharge = 0): array
+    public function selectProvider(
+        float $amount,
+        ?string $network = null,
+        bool $forceAuto = false,
+        float $conversionCharge = 0,
+        ?Product $product = null
+    ): array
     {
-        $settings = getSettings();
-        $configuredProviderId = $settings?->auto_share_provider_id;
-        $routingMode = $forceAuto ? 'auto' : ($settings?->auto_share_routing_mode ?? 'manual');
-
-        if ($routingMode !== 'auto') {
-            $provider = $configuredProviderId ? API::query()->find($configuredProviderId) : null;
-
-            if (! $provider) {
-                throw new RuntimeException('The configured Auto Share provider is not available.');
-            }
-
-            $candidate = $this->evaluateCandidate($provider, $amount, $conversionCharge);
-            $meta = [
-                'fallback' => false,
-                'amount' => $amount,
-                'candidates' => [],
-            ];
-
-            if ($candidate) {
-                $meta['selected_fee'] = $candidate['fee'];
-                $meta['conversion_charge'] = $candidate['conversion_charge'];
-                $meta['selected_total_customer_charge'] = $candidate['effective_total_charge'];
-                $meta['selected_band'] = $candidate['band_name'];
-                $meta['selected_charges'] = $candidate['charges'];
-                $meta['candidates'] = [[
-                    'provider_id' => $provider->id,
-                    'provider' => $provider->name,
-                    'fee' => $candidate['fee'],
-                    'conversion_charge' => $candidate['conversion_charge'],
-                    'effective_total_charge' => $candidate['effective_total_charge'],
-                    'charges' => $candidate['charges'],
-                    'availability_score' => $candidate['availability_score'],
-                    'availability_status' => $candidate['availability_status'],
-                    'band' => $candidate['band_name'],
-                ]];
-            }
-
-            return $this->decision(
-                $provider,
-                'Manual routing: administrator-configured Auto Share provider.',
-                $meta,
-                $routingMode,
-                $network
-            );
+        if (! $product) {
+            throw new RuntimeException('An Airtime to Cash product is required to select an Auto Share provider.');
         }
 
-        $candidates = API::query()
-            ->where('status', 'active')
-            ->where('is_auto_share', true)
-            ->orderBy('name')
-            ->get()
-            ->map(fn (API $provider) => $this->evaluateCandidate($provider, $amount, $conversionCharge))
-            ->filter()
+        $providers = $product->autoShareProviders()
+            ->where('apis.status', 'active')
+            ->where('apis.is_auto_share', true)
+            ->orderBy('apis.name')
+            ->get();
+
+        if ($providers->isEmpty()) {
+            throw new RuntimeException("No active Auto Share provider is mapped to {$product->name}.");
+        }
+
+        $candidates = $providers
+            ->map(fn (API $provider) => $this->evaluateCandidate($provider, $amount, $conversionCharge)
+                ?? $this->providerWithoutPricing($provider, $conversionCharge))
             ->values();
 
         if ($candidates->isEmpty()) {
-            $fallback = $configuredProviderId
-                ? API::query()
-                    ->whereKey($configuredProviderId)
-                    ->where('status', 'active')
-                    ->where('is_auto_share', true)
-                    ->first()
-                : null;
-
-            if (! $fallback) {
-                throw new RuntimeException('No active Auto Share provider has a pricing band for this amount, and the configured fallback is not active.');
-            }
-
-            return $this->decision(
-                $fallback,
-                'Auto routing fallback: no eligible provider had a matching pricing band; configured provider used.',
-                [
-                    'fallback' => true,
-                    'amount' => $amount,
-                    'candidates' => [],
-                ],
-                'auto',
-                $network
-            );
+            throw new RuntimeException("No mapped Auto Share provider has pricing available for {$product->name}.");
         }
 
         // Initial policy: lowest effective fee wins; availability is the
@@ -114,7 +63,7 @@ class AutoShareRoutingService
         ])->values()->all();
 
         $reason = sprintf(
-            'Auto routing: %s selected with total customer charge %s and availability score %d%%.',
+            'Product routing: %s selected with total customer charge %s and availability score %d%%.',
             $selected['provider']->name,
             $this->formatAmount($selected['effective_total_charge']),
             $selected['availability_score']
@@ -122,6 +71,7 @@ class AutoShareRoutingService
 
         return $this->decision($selected['provider'], $reason, [
             'fallback' => false,
+            'product_mapping' => true,
             'amount' => $amount,
             'selected_fee' => $selected['fee'],
             'conversion_charge' => $selected['conversion_charge'],
@@ -131,7 +81,21 @@ class AutoShareRoutingService
             'selected_availability_status' => $selected['availability_status'],
             'selected_charges' => $selected['charges'],
             'candidates' => $candidateSummary,
-        ], 'auto', $network);
+        ], 'mapped', $network);
+    }
+
+    private function providerWithoutPricing(API $provider, float $conversionCharge): array
+    {
+        return [
+            'provider' => $provider,
+            'fee' => 0.0,
+            'conversion_charge' => round($conversionCharge, 2),
+            'effective_total_charge' => round($conversionCharge, 2),
+            'charges' => [],
+            'availability_score' => max(0, min(100, (int) ($provider->availability_score ?? 0))),
+            'availability_status' => $provider->availability_status,
+            'band_name' => null,
+        ];
     }
 
     private function evaluateCandidate(API $provider, float $amount, float $conversionCharge = 0): ?array

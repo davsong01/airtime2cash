@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Product;
-use App\Models\Settings;
 use App\Services\AutoShareRoutingService;
 use Illuminate\Http\Request;
 use RuntimeException;
@@ -46,10 +45,11 @@ class AutoShareRoutingController extends Controller
             $conversionRate = (float) ($network->auto_share_rate ?? $network->rate ?? 0);
             $conversionCharge = round(((float) $validated['amount'] * $conversionRate) / 100, 2);
             $decision = $this->routingService->selectProvider(
-                (float) $validated['amount'],
-                $network->auto_share_product_code ?: $network->slug,
-                true,
-                $conversionCharge
+                amount: (float) $validated['amount'],
+                network: $network->auto_share_product_code ?: $network->slug,
+                forceAuto: true,
+                conversionCharge: $conversionCharge,
+                product: $network,
             );
 
             $providerCharges = collect(data_get($decision, 'meta.selected_charges', []))
@@ -95,21 +95,6 @@ class AutoShareRoutingController extends Controller
                 'amount' => $exception->getMessage(),
             ]);
         }
-    }
-
-    public function switchToAuto()
-    {
-        $settings = Settings::first();
-
-        if (! $settings) {
-            return back()->with('error', 'Application settings could not be found.');
-        }
-
-        $settings->update(['auto_share_routing_mode' => 'auto']);
-
-        return redirect()
-            ->route('admin.auto-share.routing.verify')
-            ->with('message', 'Auto Share routing mode is now set to Auto.');
     }
 
     private function networks()

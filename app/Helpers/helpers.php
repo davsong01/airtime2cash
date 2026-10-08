@@ -16,7 +16,6 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\View;
-use Log;
 
 if (!function_exists("bounceBlacklist")) {
     function bounceBlacklist($phone, $user, $mail = null): bool
@@ -594,7 +593,7 @@ if (!function_exists("sendEmails")) {
             Mail::to($email_to)->send(new EmailMessages($data));
             return true;
         } catch (\Exception $e) {
-            Log::info($e->getMessage());
+            \Log::info($e->getMessage());
         }
     }
 }

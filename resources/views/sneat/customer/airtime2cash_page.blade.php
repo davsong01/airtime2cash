@@ -486,12 +486,13 @@
                 auto_share: @json($a2cAutoAccess)
             };
             const payoutDestinationAvailability = @json($airtimeToCashDestinations);
-            const autoProviderSlug = @json(strtolower((string) ($activeProvider?->slug ?? '')));
-            const isAirtimeToCashAutomation = autoProviderSlug === 'airtimetocash';
+            const autoShareProviderSlugsByProduct = @json($autoShareProviderSlugsByProduct ?? []);
+            let isAirtimeToCashAutomation = false;
             const useRoutingQuote = @json((bool) (getSettings()?->customer_display_use_auto_share_routing ?? false));
 
             const endpoints = {
                 initiate: @json(route('initialize.airtime2cashtransaction')),
+                resolveProvider: @json(route('airtime2cash.auto.resolve-provider')),
                 quote: @json(route('airtime2cash.quote')),
                 complete: @json(route('airtime2cash.auto.complete')),
                 resend: @json(route('airtime2cash.auto.resend-otp'))
@@ -513,6 +514,11 @@
             let requestInProgress = false;
             let routingQuoteTimer = null;
             let routingQuoteSequence = 0;
+
+            function updateAutoShareProviderFlow(productId) {
+                const slugs = autoShareProviderSlugsByProduct[String(productId)] || [];
+                isAirtimeToCashAutomation = slugs.includes('airtimetocash') && !slugs.includes('autosync');
+            }
 
             const originalProductOptions = $product
                 .find('option')
@@ -820,6 +826,8 @@
             function updateSelectedProduct() {
                 const $selected = $product.find(':selected');
                 const productId = String($selected.val() || '');
+
+                updateAutoShareProviderFlow(productId);
 
                 resetSelectedProductDetails();
 
@@ -1282,6 +1290,38 @@
                 }
             }
 
+            async function resolveAndOpenAutoShareStage() {
+                if (requestInProgress) {
+                    return;
+                }
+
+                setRequestInProgress(true);
+                clearAutoError();
+                setActionButton('Selecting provider...', true, 'bx-loader-alt bx-spin');
+
+                try {
+                    const response = await postJson(endpoints.resolveProvider, {
+                        product: $product.val(),
+                        amount: $amount.val(),
+                    });
+                    const providerSlug = String(response.provider?.slug || '').toLowerCase();
+
+                    isAirtimeToCashAutomation = providerSlug === 'airtimetocash';
+
+                    if (isAirtimeToCashAutomation) {
+                        setRequestInProgress(false);
+                        await initiateAirtimeToCashOtp();
+                    } else {
+                        openPinStage();
+                    }
+                } catch (error) {
+                    showAutoError(error.message || 'The Auto Share provider could not be selected.');
+                    setActionButton('Continue to secure transfer', false, 'bx-bolt-circle');
+                } finally {
+                    setRequestInProgress(false);
+                }
+            }
+
             function resetPendingFlow(message) {
                 autoStage = AUTO_STAGE_DETAILS;
                 autoTransactionId = null;
@@ -1734,11 +1774,7 @@
                  */
                 if (autoStage === AUTO_STAGE_DETAILS) {
                     if (validateConversionDetails()) {
-                        if (isAirtimeToCashAutomation) {
-                            initiateAirtimeToCashOtp();
-                        } else {
-                            openPinStage();
-                        }
+                        resolveAndOpenAutoShareStage();
                     }
 
                     return;

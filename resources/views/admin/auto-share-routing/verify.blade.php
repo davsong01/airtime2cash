@@ -67,15 +67,8 @@
                     <div class="col-lg-4">
                         <div class="routing-live-pill">
                             <div class="label">Live routing mode</div>
-                            <div class="value mb-1">{{ ucfirst(getSettings()->auto_share_routing_mode ?? 'manual') }}</div>
-                            @if(getSettings()->auto_share_routing_mode !== 'auto')
-                                <form method="POST" action="{{ route('admin.auto-share.routing.switch-to-auto') }}" onsubmit="return confirm('Switch live Auto Share routing to Auto mode?')">
-                                    @csrf
-                                    <button type="submit" class="btn btn-dark btn-sm text-white font-weight-bold"><i class="bx bx-toggle-right mr-25"></i>Switch live mode to Auto</button>
-                                </form>
-                            @else
-                                <span class="text-white small"><i class="bx bx-check-circle mr-25"></i>Auto routing is active</span>
-                            @endif
+                            <div class="value mb-1">Product mappings</div>
+                            <span class="text-white small"><i class="bx bx-check-circle mr-25"></i>Mapped providers are evaluated for each product</span>
                         </div>
                     </div>
                 </div>

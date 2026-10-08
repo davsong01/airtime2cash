@@ -20,7 +20,34 @@
 @section('title', 'Transaction Log')
 @section('page-css')
     <link rel="stylesheet" href="{{ asset('app-assets/css/admin-operations.css') }}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css">
     <style>
+        .transaction-filter-panel {
+            border: 1px solid #e9edf5;
+            border-radius: 16px;
+            background: linear-gradient(145deg, #fbfcff 0%, #f5f7ff 100%);
+        }
+
+        .transaction-filter-panel .card-body { padding: 1.25rem; }
+        .transaction-filter-heading { display:flex; align-items:center; gap:.7rem; margin-bottom:1.1rem; }
+        .transaction-filter-heading-icon { display:grid; place-items:center; width:38px; height:38px; border-radius:11px; color:#4d5fe8; background:#e9edff; font-size:1.1rem; }
+        .transaction-filter-heading h6 { margin:0; color:#273247; font-size:.95rem; font-weight:800; }
+        .transaction-filter-heading p { margin:.15rem 0 0; color:#8993a5; font-size:.72rem; }
+        .transaction-filter-panel label { margin-bottom:.4rem; color:#68758a; font-size:.68rem; font-weight:800; letter-spacing:.04em; text-transform:uppercase; }
+        .transaction-filter-panel .form-control { height:42px; border-color:#e1e6f0; border-radius:10px; background:#fff; box-shadow:none; }
+        .transaction-filter-panel .form-control:focus { border-color:#6575eb; box-shadow:0 0 0 .16rem rgba(101,117,235,.12); }
+        .transaction-filter-panel .select2-container { width:100% !important; }
+        .transaction-filter-panel .select2-container--default .select2-selection--single { height:42px; border:1px solid #e1e6f0; border-radius:10px; background:#fff; }
+        .transaction-filter-panel .select2-container--default .select2-selection--single .select2-selection__rendered { padding:6px 34px 6px 12px; color:#4e5b70; line-height:28px; font-size:.8rem; }
+        .transaction-filter-panel .select2-container--default .select2-selection--single .select2-selection__arrow { top:7px; right:8px; }
+        .transaction-filter-actions { display:flex; flex-direction:column; justify-content:flex-end; gap:.5rem; min-height:100%; }
+        .transaction-filter-actions .btn { height:42px; border-radius:10px; font-weight:700; white-space:nowrap; }
+        .transaction-filter-actions .btn-primary { width:100%; }
+        .transaction-filter-actions .btn-reset { width:100%; }
+        .transaction-filter-actions .btn-reset { color:#697386; background:#fff; border:1px solid #e1e6f0; }
+        .transaction-filter-date-stack { display:flex; flex-direction:column; gap:.15rem; }
+        @media (max-width: 767.98px) { .transaction-filter-actions { align-items:stretch; } }
+
         .transaction-directory-table thead th {
             border-top: 0;
             color: #697386;
@@ -322,83 +349,96 @@
                     </div>
                     <div class="card-body">
                         <div class="col-md-12">
-                            <form action="{{ route('admin.trans') }}" method="GET">
+                            <div class="transaction-filter-panel">
+                            <form action="{{ route('admin.trans') }}" method="GET" class="card-body">
                                 {{-- @csrf --}}
+                                <div class="transaction-filter-heading">
+                                    <span class="transaction-filter-heading-icon"><i class="bx bx-filter-alt"></i></span>
+                                    <div><h6>Filter transactions</h6><p>Search by customer, service, provider, status, or date.</p></div>
+                                </div>
                                 <div class="row">
-                                    <div class="col-md-3">
-                                        <fieldset class="form-group">
+                                    <div class="col-lg-3 col-md-6"><fieldset class="form-group">
                                             <label for="email">Transaction Email</label>
                                             <input type="email" class="form-control" id="email" name="email" placeholder="Enter customer email address" value="{{ \Request::get('email')}}">
-                                        </fieldset>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <fieldset class="form-group">
+                                        </fieldset></div>
+                                    <div class="col-lg-3 col-md-6"><fieldset class="form-group">
                                             <label for="phone">Transaction Phone</label>
                                             <input type="phone" class="form-control" id="phone" name="phone" placeholder="Enter customer phone number" value="{{ \Request::get('phone')}}">
-                                        </fieldset>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <fieldset class="form-group">
+                                        </fieldset></div>
+                                    <div class="col-lg-3 col-md-6"><fieldset class="form-group">
                                             <label for="service">Service</label>
-                                            <select class="form-control" name="service" id="service">
-                                                <option value="">Select</option>
-                                                @foreach ($products as $product)
-                                                    <option value="{{ $product->id }}" {{ \Request::get('service') == $product->id ? 'selected' : ''}}>{{ $product->display_name }}</option>
+                                            <select class="form-control js-transaction-select2" name="service" id="service" data-placeholder="Search service">
+                                                <option value=""></option>
+                                                <option value="type:airtime2cash" {{ \Request::get('service') === 'type:airtime2cash' ? 'selected' : '' }}>Airtime to Cash</option>
+                                                <option value="type:wallet2bank" {{ \Request::get('service') === 'type:wallet2bank' ? 'selected' : '' }}>Wallet to Bank</option>
+                                                @foreach ($products->where('type', 'airtime2cash') as $product)
+                                                    <option value="{{ $product->id }}" {{ \Request::get('service') == $product->id ? 'selected' : ''}}>Airtime to Cash — {{ $product->display_name ?: $product->name }}</option>
+                                                @endforeach
+                                                @foreach ($products->where('type', 'wallet2bank') as $product)
+                                                    <option value="{{ $product->id }}" {{ \Request::get('service') == $product->id ? 'selected' : ''}}>Wallet to Bank — {{ $product->display_name ?: $product->name }}</option>
+                                                @endforeach
+                                                @foreach ($products->whereNotIn('type', ['airtime2cash', 'wallet2bank']) as $product)
+                                                    <option value="{{ $product->id }}" {{ \Request::get('service') == $product->id ? 'selected' : ''}}>{{ $product->display_name ?: $product->name }}</option>
                                                 @endforeach
                                             </select>
-                                        </fieldset>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <fieldset class="form-group">
+                                        </fieldset></div>
+                                    <div class="col-lg-3 col-md-6"><fieldset class="form-group">
                                             <label for="api">API</label>
-                                            <select class="form-control" name="api" id="api">
-                                                <option value="">Select</option>
+                                            <select class="form-control js-transaction-select2" name="api" id="api" data-placeholder="Search API">
+                                                <option value=""></option>
                                                 @foreach ($apis as $api)
                                                     <option value="{{ $api->id }}" {{ \Request::get('api') == $api->id ? 'selected' : ''}}>{{ $api->name }}</option>
                                                 @endforeach
                                             </select>
-                                        </fieldset>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <fieldset class="form-group">
+                                        </fieldset></div>
+                                    <div class="col-lg-2 col-md-6"><fieldset class="form-group">
                                             <label for="transaction_id">Transaction ID</label>
                                             <input type="text" class="form-control" id="transaction_id" name="transaction_id" placeholder="Enter transaction ID" value="{{ \Request::get('transaction_id')}}">
-                                        </fieldset>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <fieldset class="form-group">
+                                        </fieldset></div>
+                                    <div class="col-lg-2 col-md-6"><fieldset class="form-group">
                                             <label for="unique_element">Unique Element</label>
                                             <input type="text" class="form-control" id="unique_element" name="unique_element" placeholder="Enter unique element" value="{{ \Request::get('unique_element') }}">
-                                        </fieldset>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <fieldset class="form-group">
+                                        </fieldset></div>
+                                    <div class="col-lg-2 col-md-6"><fieldset class="form-group">
                                             <label for="status">Status</label>
-                                            <select class="form-control" name="status" id="status">
-                                                <option value="">Select</option>
+                                            <select class="form-control js-transaction-select2" name="status" id="status" data-placeholder="Search status">
+                                                <option value=""></option>
                                                 <option value="delivered" {{ \Request::get('status') == 'delivered' ? 'selected' : ''}}>Delivered</option>
                                                 <option value="failed" {{ \Request::get('status') == 'failed' ? 'selected' : ''}}>Failed</option>
                                                 <option value="attention-required" {{ \Request::get('status') == 'attention-required' ? 'selected' : ''}}>Attention Required</option>
                                             </select>
-                                        </fieldset>
+                                        </fieldset></div>
+                                    <div class="col-lg-3 col-md-6">
+                                        <div class="transaction-filter-date-stack">
+                                            <fieldset class="form-group mb-2">
+                                                <label for="from">From date</label>
+                                                <input type="date" class="form-control" value="{{ \Request::get('from')}}" name="from" id="from">
+                                            </fieldset>
+
+                                        </div>
                                     </div>
-                                    <div class="col-md-2">
-                                        <fieldset class="form-group">
-                                            <label for="from">From</label>
-                                            <input type="date" class="form-control" value="{{ \Request::get('from')}}" name="from">
-                                        </fieldset>
+                                    <div class="col-lg-3 col-md-6">
+                                        <div class="transaction-filter-date-stack">
+
+                                            <fieldset class="form-group mb-0">
+                                                <label for="to">To date</label>
+                                                <input type="date" class="form-control" value="{{ \Request::get('to')}}" name="to" id="to">
+                                            </fieldset>
+                                        </div>
                                     </div>
-                                    <div class="col-md-2">
-                                        <fieldset class="form-group">
-                                            <label for="to">To</label>
-                                            <input type="date" class="form-control" value="{{ \Request::get('to')}}" name="to">
-                                        </fieldset>
+                                    <div class="col-lg-3 col-md-6">
+                                        <div class="transaction-filter-actions mt-1 mt-lg-0">
+                                            <button type="submit" class="btn btn-primary"><i class="bx bx-search-alt mr-25"></i>Apply filters</button>
+                                        </div>
                                     </div>
-                                    <div class="col-md-2">
-                                        <input type="submit" class="form-control btn btn-primary mt-2" value="Search">
+                                    <div class="col-lg-3 col-md-6">
+                                        <div class="transaction-filter-actions mt-1 mt-lg-0">
+                                            <a href="{{ route('admin.trans') }}" class="btn btn-reset"><i class="bx bx-reset mr-25"></i>Reset filters</a>
+                                        </div>
                                     </div>
                                 </div>
                             </form>
+                            </div>
                             <hr>
                         </div>
                         <div class="table-responsive">
@@ -481,7 +521,7 @@
                                                     <a href="{{ $detailUrl }}" class="transaction-reference-primary">{{ $transaction->transaction_id }}</a>
                                                     <span class="transaction-reference-secondary">Request: {{ $transaction->reference_id ?: '—' }}</span>
                                                     @if($transaction->airtime2cash)
-                                                        <span class="transaction-reference-secondary"><span class="badge" style="font-size:.65rem;padding:.2rem .4rem;line-height:1.1;background-color:{{ $transaction->airtime2cash->payment_method === 'Transfer to Bank Account' ? '#dbeafe' : '#dcfce7' }};color:{{ $transaction->airtime2cash->payment_method === 'Transfer to Bank Account' ? '#1d4ed8' : '#15803d' }};">{{ $transaction->airtime2cash->payment_method === 'Transfer to Bank Account' ? 'Wallet to Bank' : 'Wallet to Cash' }}</span></span>
+                                                        <span class="transaction-reference-secondary"><span class="badge" style="font-size:.65rem;padding:.2rem .4rem;line-height:1.1;background-color:{{ $transaction->airtime2cash->payment_method === 'Transfer to Bank Account' ? '#dbeafe' : '#dcfce7' }};color:{{ $transaction->airtime2cash->payment_method === 'Transfer to Bank Account' ? '#1d4ed8' : '#15803d' }};">{{ $transaction->airtime2cash->payment_method === 'Transfer to Bank Account' ? 'Airtime to Bank' : 'Airtime to Wallet' }}</span></span>
                                                     @endif
                                                     <span class="transaction-status-chip {{ $statusClass }} mt-50"><i class="bx bx-circle"></i>{{ ucfirst(str_replace('-', ' ', $status)) }}</span>
                                                     @if($bankTransferStatus !== null)
@@ -554,7 +594,11 @@
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script>
         $(document).ready(function() {
-            $('.js-example-basic-single').select2();
+            $('.js-transaction-select2').select2({
+                width: '100%',
+                allowClear: true,
+                placeholder: function () { return $(this).data('placeholder') || 'Select'; }
+            });
         });
     </script>
 @endsection

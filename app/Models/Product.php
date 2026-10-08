@@ -29,6 +29,16 @@ class Product extends Model
         return $this->belongsTo(API::class);
     }
 
+    public function autoShareProviders()
+    {
+        return $this->belongsToMany(
+            API::class,
+            'auto_share_product_providers',
+            'product_id',
+            'api_id',
+        );
+    }
+
     public function category()
     {
         return $this->belongsTo(Category::class);

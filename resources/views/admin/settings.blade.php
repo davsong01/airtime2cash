@@ -533,38 +533,6 @@
                                                                     <div class="row">
                                                                         <div class="col-md-6">
                                                                             <fieldset class="form-group">
-                                                                                <label for="auto_share_provider_id">Auto Share Provider</label>
-                                                                                <select name="auto_share_provider_id" class="form-control @error('auto_share_provider_id') is-invalid @enderror" id="auto_share_provider_id">
-                                                                                    <option value="">Disable Auto Share integration</option>
-                                                                                    @foreach($autoShareProviders as $provider)
-                                                                                        <option value="{{ $provider->id }}" @selected((string) old('auto_share_provider_id', $settings->auto_share_provider_id) === (string) $provider->id)>
-                                                                                            {{ $provider->name }}{{ $provider->status !== 'active' ? ' (Inactive)' : '' }}
-                                                                                        </option>
-                                                                                    @endforeach
-                                                                                </select>
-                                                                                @error('auto_share_provider_id')
-                                                                                    <div class="invalid-feedback">{{ $message }}</div>
-                                                                                @enderror
-                                                                                <small class="text-muted d-block mt-50">Provider used for automatic airtime transfers.</small>
-                                                                            </fieldset>
-                                                                        </div>
-
-                                                                        <div class="col-md-6">
-                                                                            <fieldset class="form-group">
-                                                                                <label for="auto_share_routing_mode">Auto Share Provider Routing Mode</label>
-                                                                                <select name="auto_share_routing_mode" class="form-control @error('auto_share_routing_mode') is-invalid @enderror" id="auto_share_routing_mode">
-                                                                                    <option value="manual" @selected(old('auto_share_routing_mode', $settings->auto_share_routing_mode ?? 'manual') === 'manual')>Manual</option>
-                                                                                    <option value="auto" @selected(old('auto_share_routing_mode', $settings->auto_share_routing_mode ?? 'manual') === 'auto')>Auto</option>
-                                                                                </select>
-                                                                                @error('auto_share_routing_mode')
-                                                                                    <div class="invalid-feedback">{{ $message }}</div>
-                                                                                @enderror
-                                                                                <small class="text-muted d-block mt-50">Manual uses the selected provider. Auto chooses from eligible Auto Share providers.</small>
-                                                                            </fieldset>
-                                                                        </div>
-
-                                                                        <div class="col-md-6">
-                                                                            <fieldset class="form-group">
                                                                                 <label for="customer_display_use_auto_share_routing">Make Customer Display Use Routing Engine</label>
                                                                                 <select name="customer_display_use_auto_share_routing" class="form-control @error('customer_display_use_auto_share_routing') is-invalid @enderror" id="customer_display_use_auto_share_routing">
                                                                                     <option value="0" @selected((string) old('customer_display_use_auto_share_routing', ($settings->customer_display_use_auto_share_routing ?? false) ? '1' : '0') === '0')>No — use current display behaviour</option>

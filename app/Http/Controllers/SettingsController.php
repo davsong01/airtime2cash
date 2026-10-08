@@ -84,10 +84,6 @@ class SettingsController extends Controller
             ->where('is_payment_gateway', true)
             ->orderBy('name')
             ->get(['id', 'name', 'status', 'slug']);
-        $autoShareProviders = API::query()
-            ->where('is_auto_share', true)
-            ->orderBy('name')
-            ->get(['id', 'name', 'status', 'slug']);
         $bankTransferProviders = API::query()
             ->where('is_bank_transfer', true)
             ->orderBy('name')
@@ -101,7 +97,7 @@ class SettingsController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'status', 'slug']);
 
-        return view('admin.settings', compact('settings', 'currencies', 'paymentGatewayProviders', 'autoShareProviders', 'bankTransferProviders', 'bankVerificationProviders', 'bvnVerificationProviders'));
+        return view('admin.settings', compact('settings', 'currencies', 'paymentGatewayProviders', 'bankTransferProviders', 'bankVerificationProviders', 'bvnVerificationProviders'));
     }
 
     /**
@@ -121,8 +117,6 @@ class SettingsController extends Controller
         $request->validate(collect($colorFields)
             ->mapWithKeys(fn (string $field) => [$field => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/']])
             ->all() + [
-                'auto_share_provider_id' => ['nullable', 'integer', 'exists:apis,id'],
-                'auto_share_routing_mode' => ['required', Rule::in(['manual', 'auto'])],
                 'customer_display_use_auto_share_routing' => ['nullable', 'boolean'],
                 'bank_transfer_provider_id' => ['required', 'integer', 'exists:apis,id'],
                 'bank_verification_provider_id' => ['nullable', 'integer', 'exists:apis,id'],
@@ -158,10 +152,6 @@ class SettingsController extends Controller
         $data['customer_layout'] = in_array($customerLayout, ['legacy', 'modern'], true) ? $customerLayout : 'legacy';
         $data['google_dashboard_ad_enabled'] = $request->boolean('google_dashboard_ad_enabled');
         $data['show_provider_status_on_customer_pages'] = $request->boolean('show_provider_status_on_customer_pages');
-        $data['auto_share_routing_mode'] = $request->input(
-            'auto_share_routing_mode',
-            $settings->auto_share_routing_mode ?? 'manual'
-        );
         $data['customer_display_use_auto_share_routing'] = $request->boolean('customer_display_use_auto_share_routing');
         $data['bvn_verification_mode'] = $request->input('bvn_verification_mode', $settings->bvn_verification_mode ?? 'manual');
         $data['bvn_verification_charge'] = (float) $request->input('bvn_verification_charge', $settings->bvn_verification_charge ?? 0);

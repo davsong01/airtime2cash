@@ -351,19 +351,24 @@
         var csrfToken = @json(csrf_token());
         var autoUrls = {
             initiate: @json(route('airtime2cash.auto.initiate')),
+            resolveProvider: @json(route('airtime2cash.auto.resolve-provider')),
             complete: @json(route('airtime2cash.auto.complete')),
             resend: @json(route('airtime2cash.auto.resend-otp'))
         };
         var autoStage = 'details';
         var autoTransactionId = null;
-        var autoProviderSlug = @json(strtolower((string) ($activeProvider?->slug ?? '')));
-        var isAirtimeToCashAutomation = autoProviderSlug === 'airtimetocash';
+        var autoShareProviderSlugsByProduct = @json($autoShareProviderSlugsByProduct ?? []);
+        var isAirtimeToCashAutomation = false;
         var modeAccess = {
             manual: @json($a2cManualAccess),
             auto_share: @json($a2cAutoAccess)
         };
 
         function isAutoTransfer() { return $('input[name="transfer_mode"]:checked').val() === 'auto_share'; }
+        function updateAutoShareProviderFlow(productId) {
+            var slugs = autoShareProviderSlugsByProduct[String(productId)] || [];
+            isAirtimeToCashAutomation = slugs.indexOf('airtimetocash') !== -1 && slugs.indexOf('autosync') === -1;
+        }
         function refreshModeAccess() {
             var transferMode = $('input[name="transfer_mode"]:checked').val();
             var hasAccess = Boolean(modeAccess[transferMode]);
@@ -492,20 +497,28 @@
             }
             if (autoStage === 'details') {
                 if (!validateLegacyDetails()) return false;
+                setLegacyButton('SELECTING PROVIDER...', true); showLegacyError('');
+                postLegacyAuto(autoUrls.resolveProvider, {
+                    product: $('#product').val(),
+                    amount: $('#amount').val()
+                })
+                    .then(function (response) {
+                        var providerSlug = String((response.provider && response.provider.slug) || '').toLowerCase();
+                        isAirtimeToCashAutomation = providerSlug === 'airtimetocash';
 
-                if (isAirtimeToCashAutomation) {
-                    setLegacyButton('GENERATING OTP...', true); showLegacyError('');
-                    postLegacyAuto(autoUrls.initiate, Object.assign(legacyAutoPayload(), {
-                        check_quota: $('#legacy-check-quota').prop('checked') ? 1 : 0
-                    }))
-                        .then(openLegacyOtp)
-                        .catch(function (error) {
-                            showLegacyError(error.message);
-                            setLegacyButton('INITIATE AUTO TRANSFER', false);
-                        });
-                } else {
-                    openLegacyPin();
-                }
+                        if (isAirtimeToCashAutomation) {
+                            setLegacyButton('GENERATING OTP...', true);
+                            return postLegacyAuto(autoUrls.initiate, Object.assign(legacyAutoPayload(), {
+                                check_quota: $('#legacy-check-quota').prop('checked') ? 1 : 0
+                            })).then(openLegacyOtp);
+                        }
+
+                        openLegacyPin();
+                    })
+                    .catch(function (error) {
+                        showLegacyError(error.message);
+                        setLegacyButton('INITIATE AUTO TRANSFER', false);
+                    });
                 return false;
             }
             if (autoStage === 'pin') {
@@ -688,6 +701,7 @@
         $('#payment_method').val('');
 
         $('#product').on('change', function () {
+            updateAutoShareProviderFlow($(this).val());
             $('#agreement').prop('checked', false);
             var fixed_price = $('#product').find(':selected').data('fixed_price');
             var system_price = $('#product').find(':selected').data('system_price');

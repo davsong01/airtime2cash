@@ -73,6 +73,43 @@
                 </div>
             </section>
 
+            @php
+                $mappedProviderIds = old('auto_share_provider_ids', $editing
+                    ? $product->autoShareProviders->pluck('id')->all()
+                    : $autoShareProviders->where('slug', 'autosync')->pluck('id')->all());
+                $mappedProviderIds = array_map('intval', (array) $mappedProviderIds);
+            @endphp
+            <section class="card a2c-form-section">
+                <div class="card-header a2c-section-heading">
+                    <span class="a2c-section-icon is-purple"><i class="bx bx-git-branch"></i></span>
+                    <div>
+                        <h4>Auto Share providers</h4>
+                        <p>Check every active provider that supports this product. A product can use multiple providers.</p>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        @forelse($autoShareProviders as $provider)
+                            <div class="col-md-6 mb-2">
+                                <div class="custom-control custom-checkbox">
+                                    <input type="checkbox"
+                                           class="custom-control-input"
+                                           id="auto-share-provider-{{ $provider->id }}"
+                                           name="auto_share_provider_ids[]"
+                                           value="{{ $provider->id }}"
+                                           @checked(in_array((int) $provider->id, $mappedProviderIds, true))>
+                                    <label class="custom-control-label" for="auto-share-provider-{{ $provider->id }}">
+                                        {{ $provider->name }} <small class="text-muted">({{ $provider->slug }})</small>
+                                    </label>
+                                </div>
+                            </div>
+                        @empty
+                            <div class="col-12"><div class="alert alert-light mb-0">No active Auto Share providers are available.</div></div>
+                        @endforelse
+                    </div>
+                </div>
+            </section>
+
             <section class="card a2c-form-section">
                 <div class="card-header a2c-section-heading">
                     <span class="a2c-section-icon is-gold"><i class="bx bx-slider-alt"></i></span>
@@ -125,7 +162,7 @@
                                         <div class="input-group-append"><span class="input-group-text">%</span></div>
                                         @error('manual_profit_percentage')<div class="invalid-feedback">{{ $message }}</div>@enderror
                                     </div>
-                                    <small class="form-text text-muted">Manual income recorded in admin logs uses this percentage.</small>
+                                    {{-- <small class="form-text text-muted">Manual income recorded in admin logs uses this percentage.</small> --}}
                                 </div>
                             </div>
                             <div class="row mt-3">
@@ -197,7 +234,7 @@
                                         <div class="input-group-append"><span class="input-group-text">%</span></div>
                                         @error('auto_share_profit_percentage')<div class="invalid-feedback">{{ $message }}</div>@enderror
                                     </div>
-                                    <small class="form-text text-muted">Auto share income recorded in admin logs uses this percentage.</small>
+                                    {{-- <small class="form-text text-muted">Auto share income recorded in admin logs uses this percentage.</small> --}}
                                 </div>
                             </div>
                             <div class="row mt-3">
