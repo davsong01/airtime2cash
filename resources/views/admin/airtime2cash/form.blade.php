@@ -78,6 +78,9 @@
                     ? $product->autoShareProviders->pluck('id')->all()
                     : $autoShareProviders->where('slug', 'autosync')->pluck('id')->all());
                 $mappedProviderIds = array_map('intval', (array) $mappedProviderIds);
+                $providerOverrides = $editing ? $product->autoShareProviders->keyBy('id') : collect();
+                $providerMinimums = old('auto_share_provider_min', []);
+                $providerMaximums = old('auto_share_provider_max', []);
             @endphp
             <section class="card a2c-form-section">
                 <div class="card-header a2c-section-heading">
@@ -90,17 +93,33 @@
                 <div class="card-body">
                     <div class="row">
                         @forelse($autoShareProviders as $provider)
-                            <div class="col-md-6 mb-2">
+                            @php
+                                $mapped = in_array((int) $provider->id, $mappedProviderIds, true);
+                                $pivot = $providerOverrides->get($provider->id)?->pivot;
+                                $minimum = array_key_exists($provider->id, $providerMinimums) ? $providerMinimums[$provider->id] : $pivot?->min_amount_override;
+                                $maximum = array_key_exists($provider->id, $providerMaximums) ? $providerMaximums[$provider->id] : $pivot?->max_amount_override;
+                            @endphp
+                            <div class="col-md-6 mb-3 auto-share-provider-option" data-provider-option="{{ $provider->id }}">
                                 <div class="custom-control custom-checkbox">
                                     <input type="checkbox"
                                            class="custom-control-input"
                                            id="auto-share-provider-{{ $provider->id }}"
                                            name="auto_share_provider_ids[]"
                                            value="{{ $provider->id }}"
-                                           @checked(in_array((int) $provider->id, $mappedProviderIds, true))>
+                                           @checked($mapped)>
                                     <label class="custom-control-label" for="auto-share-provider-{{ $provider->id }}">
                                         {{ $provider->name }} <small class="text-muted">({{ $provider->slug }})</small>
                                     </label>
+                                </div>
+                                <div class="row mt-2 provider-limit-fields" style="{{ $mapped ? '' : 'display:none' }}">
+                                    <div class="col-6">
+                                        <label class="small text-muted" for="auto-share-provider-min-{{ $provider->id }}">Minimum amount</label>
+                                        <input type="number" step="0.01" min="0" class="form-control form-control-sm" id="auto-share-provider-min-{{ $provider->id }}" name="auto_share_provider_min[{{ $provider->id }}]" value="{{ $minimum }}" placeholder="No override">
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="small text-muted" for="auto-share-provider-max-{{ $provider->id }}">Maximum amount</label>
+                                        <input type="number" step="0.01" min="0" class="form-control form-control-sm" id="auto-share-provider-max-{{ $provider->id }}" name="auto_share_provider_max[{{ $provider->id }}]" value="{{ $maximum }}" placeholder="No override">
+                                    </div>
                                 </div>
                             </div>
                         @empty

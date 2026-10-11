@@ -358,6 +358,7 @@
         var autoStage = 'details';
         var autoTransactionId = null;
         var autoShareProviderSlugsByProduct = @json($autoShareProviderSlugsByProduct ?? []);
+        var autoShareProviderRulesByProduct = @json($autoShareProviderRulesByProduct ?? []);
         var isAirtimeToCashAutomation = false;
         var modeAccess = {
             manual: @json($a2cManualAccess),
@@ -368,6 +369,25 @@
         function updateAutoShareProviderFlow(productId) {
             var slugs = autoShareProviderSlugsByProduct[String(productId)] || [];
             isAirtimeToCashAutomation = slugs.indexOf('airtimetocash') !== -1 && slugs.indexOf('autosync') === -1;
+        }
+        function selectedProductRange(selected) {
+            var globalMin = Number(isAutoTransfer() ? selected.data('auto_share_min') : selected.data('manual_min'));
+            var globalMax = Number(isAutoTransfer() ? selected.data('auto_share_max') : selected.data('manual_max'));
+            if (!isAutoTransfer()) return { min: globalMin, max: globalMax };
+
+            // The provider is unknown until routing runs, so use the product
+            // range initially. Routing replaces it with the selected provider
+            // range after the amount is submitted.
+            return { min: globalMin, max: globalMax };
+        }
+        function applyResolvedProductRange(range) {
+            var min = Number(range && range.min);
+            var max = Number(range && range.max);
+            if (Number.isFinite(min)) $('#amount').attr('min', min);
+            if (Number.isFinite(max)) $('#amount').attr('max', max);
+            if (Number.isFinite(min) && Number.isFinite(max)) {
+                $('#airtime-range').html('Allowed range: ' + currency + min.toLocaleString() + ' - ' + currency + max.toLocaleString()).show();
+            }
         }
         function refreshModeAccess() {
             var transferMode = $('input[name="transfer_mode"]:checked').val();
@@ -505,6 +525,7 @@
                     .then(function (response) {
                         var providerSlug = String((response.provider && response.provider.slug) || '').toLowerCase();
                         isAirtimeToCashAutomation = providerSlug === 'airtimetocash';
+                        applyResolvedProductRange(response.allowed_range);
 
                         if (isAirtimeToCashAutomation) {
                             setLegacyButton('GENERATING OTP...', true);
@@ -709,12 +730,9 @@
             var discounted_rate = transferMode === 'auto_share'
                 ? $('#product').find(':selected').data('auto_share_rate')
                 : $('#product').find(':selected').data('manual_rate');
-            var min = transferMode === 'auto_share'
-                ? $('#product').find(':selected').data('auto_share_min')
-                : $('#product').find(':selected').data('manual_min');
-            var max = transferMode === 'auto_share'
-                ? $('#product').find(':selected').data('auto_share_max')
-                : $('#product').find(':selected').data('manual_max');
+            var range = selectedProductRange($('#product').find(':selected'));
+            var min = range.min;
+            var max = range.max;
             var product = $('#product').val();
             var instruction = transferMode === 'auto_share'
                 ? $('#product').find(':selected').data('auto_share_instruction') || defaultAutoInstruction

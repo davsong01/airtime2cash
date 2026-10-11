@@ -199,6 +199,45 @@ class AutoShareRoutingTest extends TestCase
         $this->assertSame(0.0, $decision['meta']['selected_fee']);
     }
 
+    public function test_auto_mode_excludes_provider_outside_product_provider_range(): void
+    {
+        $autosync = $this->provider('AutoSync', 20, 0, 80);
+        $automation = $this->provider('AirtimeToCash Automation', 0, 0, 100);
+        $automation->update(['slug' => 'airtimetocash']);
+        $product = $this->product([$autosync, $automation]);
+        $product->autoShareProviders()->updateExistingPivot($automation->id, [
+            'max_amount_override' => 3000,
+        ]);
+        $this->configure($autosync, 'auto');
+
+        $decision = app(AutoShareRoutingService::class)->selectProvider(
+            amount: 4000,
+            product: $product,
+        );
+
+        $this->assertSame($autosync->id, $decision['provider_id']);
+        $this->assertCount(1, $decision['meta']['candidates']);
+    }
+
+    public function test_manual_mode_enforces_the_product_provider_amount_override(): void
+    {
+        $automation = $this->provider('AirtimeToCash Automation', 0, 0, 100);
+        $automation->update(['slug' => 'airtimetocash']);
+        $product = $this->product([$automation]);
+        $product->autoShareProviders()->updateExistingPivot($automation->id, [
+            'max_amount_override' => 10000,
+        ]);
+        $this->configure($automation, 'manual');
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('does not support');
+
+        app(AutoShareRoutingService::class)->selectProvider(
+            amount: 15000,
+            product: $product,
+        );
+    }
+
     private function product(array $providers): Product
     {
         $category = Category::create([

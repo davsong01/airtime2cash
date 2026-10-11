@@ -40,6 +40,14 @@ class AutoShareRoutingService
                 throw new RuntimeException("The configured Auto Share provider is not mapped to {$product->name}.");
             }
 
+            $productMinimum = $configuredProvider->pivot?->min_amount_override;
+            $productMaximum = $configuredProvider->pivot?->max_amount_override;
+
+            if (($productMinimum !== null && $amount < (float) $productMinimum)
+                || ($productMaximum !== null && $amount > (float) $productMaximum)) {
+                throw new RuntimeException("The configured Auto Share provider does not support {$product->name} at this amount.");
+            }
+
             // Manual mode deliberately does not require a matching pricing
             // band. The administrator has explicitly selected this mapped
             // provider, so band-based eligibility only applies in Auto mode.
@@ -99,6 +107,9 @@ class AutoShareRoutingService
                 : ($right['availability_score'] <=> $left['availability_score']);
         })->first();
 
+        $selectedMinimum = $selected['provider']->pivot?->min_amount_override;
+        $selectedMaximum = $selected['provider']->pivot?->max_amount_override;
+
         $candidateSummary = $candidates->map(fn (array $candidate) => [
             'provider_id' => $candidate['provider']->id,
             'provider' => $candidate['provider']->name,
@@ -129,6 +140,8 @@ class AutoShareRoutingService
             'selected_availability_score' => $selected['availability_score'],
             'selected_availability_status' => $selected['availability_status'],
             'selected_charges' => $selected['charges'],
+            'selected_product_minimum' => $selectedMinimum,
+            'selected_product_maximum' => $selectedMaximum,
             'candidates' => $candidateSummary,
         ], 'auto', $network);
     }
@@ -142,6 +155,17 @@ class AutoShareRoutingService
         $bands = collect($provider->pricing_data ?? [])
             ->filter(fn ($band) => is_array($band))
             ->values();
+
+        $productMinimum = $provider->pivot?->min_amount_override;
+        $productMaximum = $provider->pivot?->max_amount_override;
+
+        // Product/provider limits determine eligibility first. Pricing bands
+        // only choose between providers that can actually process the amount.
+        if (($productMinimum !== null && $amount < (float) $productMinimum)
+            || ($productMaximum !== null && $amount > (float) $productMaximum)) {
+            return null;
+        }
+
         $band = $bands->first(fn (array $candidate) => $this->matchesAmount($candidate, $amount));
 
         if (! $band) {

@@ -36,7 +36,7 @@ class Product extends Model
             'auto_share_product_providers',
             'product_id',
             'api_id',
-        );
+        )->withPivot(['min_amount_override', 'max_amount_override']);
     }
 
     public function category()

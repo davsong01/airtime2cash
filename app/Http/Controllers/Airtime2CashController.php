@@ -57,6 +57,10 @@ class Airtime2CashController extends Controller
             "auto_share_product_code" => "nullable|string|max:100|required_if:auto_share_status,active",
             "auto_share_provider_ids" => "nullable|array",
             "auto_share_provider_ids.*" => "integer|exists:apis,id",
+            "auto_share_provider_min" => "nullable|array",
+            "auto_share_provider_min.*" => "nullable|numeric|min:0",
+            "auto_share_provider_max" => "nullable|array",
+            "auto_share_provider_max.*" => "nullable|numeric|min:0",
             "min" => "required|numeric|min:0",
             "max" => "required|numeric|gte:min",
             "image" => "required|mimes:jpeg,png|max:1024",
@@ -118,7 +122,13 @@ class Airtime2CashController extends Controller
 
         $this->syncAirtimeCustomerLevelRates($product, $request->manual_level_rate ?? [], 'manual');
         $this->syncAirtimeCustomerLevelRates($product, $request->auto_share_level_rate ?? [], 'auto_share');
-        $this->syncAutoShareProviders($product, $request->input('auto_share_provider_ids', []), true);
+        $this->syncAutoShareProviders(
+            $product,
+            $request->input('auto_share_provider_ids', []),
+            $request->input('auto_share_provider_min', []),
+            $request->input('auto_share_provider_max', []),
+            true,
+        );
 
         return redirect(route('airtime2cash.edit', $product->id))->with('message', 'Product Added Successfully');
     }
@@ -158,6 +168,10 @@ class Airtime2CashController extends Controller
             "auto_share_product_code" => "nullable|string|max:100|required_if:auto_share_status,active",
             "auto_share_provider_ids" => "nullable|array",
             "auto_share_provider_ids.*" => "integer|exists:apis,id",
+            "auto_share_provider_min" => "nullable|array",
+            "auto_share_provider_min.*" => "nullable|numeric|min:0",
+            "auto_share_provider_max" => "nullable|array",
+            "auto_share_provider_max.*" => "nullable|numeric|min:0",
             "min" => "required|numeric|min:0",
             "max" => "required|numeric|gte:min",
             "image" => "nullable|mimes:jpeg,png|max:1024",
@@ -218,7 +232,12 @@ class Airtime2CashController extends Controller
 
         $this->syncAirtimeCustomerLevelRates($product, $request->manual_level_rate ?? [], 'manual');
         $this->syncAirtimeCustomerLevelRates($product, $request->auto_share_level_rate ?? [], 'auto_share');
-        $this->syncAutoShareProviders($product, $request->input('auto_share_provider_ids', []));
+        $this->syncAutoShareProviders(
+            $product,
+            $request->input('auto_share_provider_ids', []),
+            $request->input('auto_share_provider_min', []),
+            $request->input('auto_share_provider_max', []),
+        );
 
         return back()->with('message', 'Update Successfull');
     }
@@ -239,7 +258,13 @@ class Airtime2CashController extends Controller
         return $max < $min;
     }
 
-    private function syncAutoShareProviders(Product $product, array $providerIds, bool $defaultAutosync = false): void
+    private function syncAutoShareProviders(
+        Product $product,
+        array $providerIds,
+        array $minimums = [],
+        array $maximums = [],
+        bool $defaultAutosync = false,
+    ): void
     {
         if ($defaultAutosync && empty($providerIds)) {
             $providerIds = API::query()
@@ -250,9 +275,29 @@ class Airtime2CashController extends Controller
                 ->all();
         }
 
-        $product->autoShareProviders()->sync(
-            API::query()->where('is_auto_share', true)->where('status', 'active')->whereIn('id', $providerIds)->pluck('id')->all()
-        );
+        $providerIds = API::query()
+            ->where('is_auto_share', true)
+            ->where('status', 'active')
+            ->whereIn('id', $providerIds)
+            ->pluck('id')
+            ->all();
+
+        $mapping = [];
+        foreach ($providerIds as $providerId) {
+            $min = $minimums[$providerId] ?? null;
+            $max = $maximums[$providerId] ?? null;
+
+            if (filled($min) && filled($max) && (float) $max < (float) $min) {
+                throw new \InvalidArgumentException('A provider maximum amount cannot be lower than its minimum amount.');
+            }
+
+            $mapping[$providerId] = [
+                'min_amount_override' => filled($min) ? (float) $min : null,
+                'max_amount_override' => filled($max) ? (float) $max : null,
+            ];
+        }
+
+        $product->autoShareProviders()->sync($mapping);
     }
 
     private function syncAirtimeCustomerLevelRates(Product $product, array $rates, string $transferMode): void

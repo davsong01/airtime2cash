@@ -28,6 +28,15 @@
             autoShareStatus?.addEventListener('change', toggleAutoShareProviderRouting);
             toggleAutoShareProviderRouting();
 
+            form.querySelectorAll('.auto-share-provider-option input[type="checkbox"]').forEach(function (checkbox) {
+                checkbox.addEventListener('change', function () {
+                    var fields = this.closest('.auto-share-provider-option')?.querySelector('.provider-limit-fields');
+                    if (fields) {
+                        fields.style.display = this.checked ? '' : 'none';
+                    }
+                });
+            });
+
             var quill = new Quill(editorElement, {
                 theme: 'snow',
                 placeholder: 'Enter the steps customers should follow...',

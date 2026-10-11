@@ -212,7 +212,7 @@ class AirtimeToCashAutomationController extends Controller
         return [
             'status' => 'pending',
             'provider_status' => $transaction->provider_status ?: 'pending',
-            'message' => 'This provider does not expose a transaction status endpoint. The transaction remains pending until the transfer response is received.',
+            'message' => '',
             'api_response' => $transaction->provider_response ?: [],
         ];
     }

@@ -238,6 +238,7 @@
                                             <input class="form-control" id="amount" name="amount" placeholder="0.00" type="number" required>
                                         </div>
                                         <div class="form-text" id="airtime-range"></div>
+                                        <div class="alert alert-danger mt-2 mb-0" id="routing-quote-error" style="display:none"></div>
                                     </div>
                                     <div class="col-md-6" id="receive-div" style="display:none">
                                         <label for="receive" class="form-label">You will receive</label>
@@ -487,6 +488,7 @@
             };
             const payoutDestinationAvailability = @json($airtimeToCashDestinations);
             const autoShareProviderSlugsByProduct = @json($autoShareProviderSlugsByProduct ?? []);
+            const autoShareProviderRulesByProduct = @json($autoShareProviderRulesByProduct ?? []);
             let isAirtimeToCashAutomation = false;
             const useRoutingQuote = @json((bool) (getSettings()?->customer_display_use_auto_share_routing ?? false));
 
@@ -518,6 +520,46 @@
             function updateAutoShareProviderFlow(productId) {
                 const slugs = autoShareProviderSlugsByProduct[String(productId)] || [];
                 isAirtimeToCashAutomation = slugs.includes('airtimetocash') && !slugs.includes('autosync');
+            }
+
+            function selectedProductRange($selected) {
+                const globalMinimum = Number.parseFloat(
+                    isAutoTransfer()
+                        ? ($selected.attr('data-auto-share-min') ?? $selected.attr('data-auto_share_min'))
+                        : ($selected.attr('data-manual-min') ?? $selected.attr('data-manual_min'))
+                );
+                const globalMaximum = Number.parseFloat(
+                    isAutoTransfer()
+                        ? ($selected.attr('data-auto-share-max') ?? $selected.attr('data-auto_share_max'))
+                        : ($selected.attr('data-manual-max') ?? $selected.attr('data-manual_max'))
+                );
+
+                if (!isAutoTransfer()) {
+                    return { minimum: globalMinimum, maximum: globalMaximum };
+                }
+
+                // In auto mode the provider is not known until the amount is
+                // routed, so show the product's original range first. The
+                // selected provider's range replaces it after resolution.
+                return { minimum: globalMinimum, maximum: globalMaximum };
+            }
+
+            function applyResolvedProductRange(range) {
+                const minimum = Number.parseFloat(range?.min);
+                const maximum = Number.parseFloat(range?.max);
+
+                if (Number.isFinite(minimum)) {
+                    $amount.attr('min', minimum);
+                }
+                if (Number.isFinite(maximum)) {
+                    $amount.attr('max', maximum);
+                }
+                if (Number.isFinite(minimum) && Number.isFinite(maximum)) {
+                    $airtimeRange.text(
+                        `Allowed range: ${currency}${minimum.toLocaleString()} - ` +
+                        `${currency}${maximum.toLocaleString()}`
+                    ).show();
+                }
             }
 
             const originalProductOptions = $product
@@ -862,16 +904,7 @@
                     : rawInstruction;
 
                 const discountedRate = Number.parseFloat(rawRate);
-                const minimum = Number.parseFloat(
-                    isAutoTransfer()
-                        ? ($selected.attr('data-auto-share-min') ?? $selected.attr('data-auto_share_min'))
-                        : ($selected.attr('data-manual-min') ?? $selected.attr('data-manual_min'))
-                );
-                const maximum = Number.parseFloat(
-                    isAutoTransfer()
-                        ? ($selected.attr('data-auto-share-max') ?? $selected.attr('data-auto_share_max'))
-                        : ($selected.attr('data-manual-max') ?? $selected.attr('data-manual_max'))
-                );
+                const { minimum, maximum } = selectedProductRange($selected);
 
                 const normalizedRate = Number.isFinite(discountedRate)
                     ? discountedRate
@@ -915,9 +948,20 @@
             */
 
             function hideRoutingQuote() {
+                $receive.val('');
+                $receiveDiv.hide();
+                $paymentDiv.hide();
+                $('#routing-quote-error').hide().text('');
+            }
+
+            function showRoutingQuoteError(message) {
+                $receive.val('');
+                $receiveDiv.hide();
+                $('#routing-quote-error').text(message).show();
             }
 
             function applyRoutingQuote(quote) {
+                $('#routing-quote-error').hide().text('');
                 const conversion = quote.conversion || {};
                 const bankTransfer = quote.bank_transfer_charges || null;
 
@@ -980,7 +1024,7 @@
                     }).catch(function (error) {
                         if (sequence !== routingQuoteSequence) return;
                         hideRoutingQuote();
-                        showAutoError('Unable to calculate your payout at the moment. Please try again.');
+                        showRoutingQuoteError(error.message || 'Unable to calculate your payout for this amount.');
                     });
                 }, 250);
 
@@ -1307,6 +1351,7 @@
                     const providerSlug = String(response.provider?.slug || '').toLowerCase();
 
                     isAirtimeToCashAutomation = providerSlug === 'airtimetocash';
+                    applyResolvedProductRange(response.allowed_range);
 
                     if (isAirtimeToCashAutomation) {
                         setRequestInProgress(false);

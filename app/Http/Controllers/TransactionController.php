@@ -102,7 +102,8 @@ class TransactionController extends Controller
             $product->auto_share_discounted_rate = ((float) ($autoShareRate ?? 0) >= 1) ? $autoShareRate : ($product->auto_share_rate ?? $product->rate);
         }
 
-        $verificationProviderId = getSettings()?->bank_verification_provider_id ?: getSettings()?->bank_transfer_provider_id;
+        $settings = getSettings();
+        $verificationProviderId = $settings?->bank_verification_provider_id ?: $settings?->bank_transfer_provider_id;
         $verificationProvider = API::query()
             ->whereKey($verificationProviderId)
             ->where('status', 'active')
@@ -118,6 +119,25 @@ class TransactionController extends Controller
                 ->values()
                 ->all()];
         })->all();
+        $autoShareProviderRulesByProduct = $category->products->mapWithKeys(function ($product) use ($settings) {
+            return [$product->id => [
+                'configured_provider_id' => (int) ($settings?->auto_share_provider_id ?? 0),
+                'routing_mode' => $settings?->auto_share_routing_mode ?? 'manual',
+                'providers' => $product->autoShareProviders
+                    ->where('status', 'active')
+                    ->where('is_auto_share', true)
+                    ->map(function ($provider) {
+                        return [
+                            'id' => (int) $provider->id,
+                            'slug' => strtolower((string) $provider->slug),
+                            'min' => $provider->pivot?->min_amount_override,
+                            'max' => $provider->pivot?->max_amount_override,
+                        ];
+                    })
+                    ->values()
+                    ->all(),
+            ]];
+        })->all();
         $bankTransferPricingProvider = API::query()
             ->whereKey(getSettings()?->bank_transfer_provider_id)
             ->where('status', 'active')
@@ -125,7 +145,6 @@ class TransactionController extends Controller
         $bankTransferPricingBands = $bankTransferPricingProvider?->pricing_data ?? [];
         $bankTransferGlobalExtraCharges = $bankTransferPricingProvider?->extra_charges ?? [];
         $walletBankAccount = auth()->user()?->customer?->wallet_bank_account ?? null;
-        $settings = getSettings();
         $airtimeToCashDestinations = [
             'bank' => [
                 'manual' => ($settings?->bank_transfer_destination_manual_status ?? 'enabled') === 'enabled',
@@ -143,6 +162,7 @@ class TransactionController extends Controller
                 'banks',
                 'activeProvider',
                 'autoShareProviderSlugsByProduct',
+                'autoShareProviderRulesByProduct',
                 'walletBankAccount',
                 'bankTransferPricingBands',
                 'bankTransferGlobalExtraCharges',
@@ -830,6 +850,12 @@ class TransactionController extends Controller
             ],
             'stage' => strtolower((string) $provider->slug) === 'airtimetocash' ? 'otp' : 'pin',
             'routing_mode' => $decision['mode'],
+            'allowed_range' => [
+                'min' => $decision['meta']['selected_product_minimum']
+                    ?? $minimum,
+                'max' => $decision['meta']['selected_product_maximum']
+                    ?? $maximum,
+            ],
             'routing' => $decision['meta'],
         ]);
     }
