@@ -96,15 +96,19 @@ class AutoShareRoutingService
             throw new RuntimeException("No mapped Auto Share provider has a pricing band for {$product->name} at this amount.");
         }
 
-        // Initial policy: lowest effective fee wins; availability is the
-        // deterministic tie-breaker. More routing factors can be added here
-        // without changing transaction creation.
+        // Initial policy: lowest effective fee wins. Availability scoring is
+        // intentionally disabled for now while newer providers establish
+        // enough history for a meaningful score.
         $selected = $candidates->sort(function (array $left, array $right): int {
             $feeComparison = $left['effective_total_charge'] <=> $right['effective_total_charge'];
 
-            return $feeComparison !== 0
-                ? $feeComparison
-                : ($right['availability_score'] <=> $left['availability_score']);
+            if ($feeComparison !== 0) {
+                return $feeComparison;
+            }
+
+            // Availability score tie-breaker intentionally disabled for now:
+            // return $right['availability_score'] <=> $left['availability_score'];
+            return 0;
         })->first();
 
         $selectedMinimum = $selected['provider']->pivot?->min_amount_override;

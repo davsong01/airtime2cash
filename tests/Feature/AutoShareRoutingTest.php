@@ -28,7 +28,7 @@ class AutoShareRoutingTest extends TestCase
         $this->assertNotSame($other->id, $decision['provider_id']);
     }
 
-    public function test_auto_mode_selects_lowest_effective_fee_and_uses_health_as_tie_breaker(): void
+    public function test_auto_mode_selects_lowest_effective_fee_without_health_tie_breaker(): void
     {
         $this->provider('Expensive Healthy Provider', 20, 0, 98);
         $this->provider('Cheap Less Healthy Provider', 10, 0, 55);
@@ -51,7 +51,7 @@ class AutoShareRoutingTest extends TestCase
         // Provider is 10, so this asserts fee remains the primary rule.
         $this->assertSame('Cheap Less Healthy Provider', $decision['provider']->name);
 
-        // Equalize the competing fee and confirm health becomes the tie-breaker.
+        // Equalize the competing fee; availability is intentionally ignored.
         $selected->update(['pricing_data' => [[
             'band_name' => 'Default',
             'min_amount' => 200,
