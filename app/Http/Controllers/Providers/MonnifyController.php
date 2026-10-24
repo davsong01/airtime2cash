@@ -835,7 +835,6 @@ class MonnifyController extends BankTransferProviderController
             'paymentMethods' => ['CARD', 'ACCOUNT_TRANSFER'],
         ]);
 
-
         $response = $this->basicApiCall(
             rtrim((string) $this->baseUrl(), '/') . '/api/v1/merchant/transactions/init-transaction',
             $payload,

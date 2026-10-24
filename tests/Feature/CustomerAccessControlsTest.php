@@ -12,10 +12,12 @@ use App\Models\Admin;
 use App\Models\Category;
 use App\Models\Customer;
 use App\Models\Bank;
+use App\Models\KycData;
 use App\Models\Product;
 use App\Models\TransactionLog;
 use App\Models\User;
 use App\Models\Wallet;
+use App\Models\BvnVerificationRequest;
 use App\Http\Controllers\Providers\MonnifyController;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -26,6 +28,77 @@ use Tests\TestCase;
 class CustomerAccessControlsTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_admin_cannot_approve_kyc_before_bvn_is_verified(): void
+    {
+        $admin = $this->createAdminUser();
+        $customerUser = $this->createCustomerUser('Pending', 'BVN');
+
+        $response = $this->withoutMiddleware()
+            ->actingAs($admin)
+            ->get(route('admin.customer.approve.kyc', $customerUser->customer));
+
+        $response->assertRedirect();
+        $response->assertSessionHas('error', 'Verify the customer BVN before approving KYC.');
+        $this->assertDatabaseHas('customers', [
+            'id' => $customerUser->customer->id,
+            'kyc_status' => 'unverified',
+        ]);
+    }
+
+    public function test_admin_approve_kyc_button_is_only_visible_after_bvn_verification(): void
+    {
+        $admin = $this->createAdminUser();
+        $customerUser = $this->createCustomerUser('Pending', 'BVN');
+
+        DB::table('settings')->insert([
+            'currency' => '₦',
+            'logo' => 'site/upgrade.jpg',
+            'dashboard_logo' => 'site/upgrade.jpg',
+            'favicon' => 'site/upgrade.jpg',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        KycData::create([
+            'customer_id' => $customerUser->customer->id,
+            'key' => 'BVN',
+            'value' => '12345678901',
+            'status' => 'unverified',
+        ]);
+
+        BvnVerificationRequest::create([
+            'customer_id' => $customerUser->customer->id,
+            'bvn' => '12345678901',
+            'mode' => 'auto',
+            'status' => 'completed',
+            'verification_status' => 'declined',
+            'message' => 'BVN verification completed, but the BVN name does not match the profile name.',
+        ]);
+
+        $profileUrl = route('customers.edit', ['id' => $customerUser->id, 'tab' => 'kyc']);
+        $response = $this->withoutMiddleware()
+            ->actingAs($admin)
+            ->withViewErrors([])
+            ->get($profileUrl);
+
+        $response->assertOk();
+        $response->assertDontSee('Approve this KYC and create reserved accounts?');
+        $response->assertSee('id="bvnVerificationResultModal"', false);
+        $response->assertSee('BVN requests (1)');
+        $response->assertSee('Names do not match');
+
+        KycData::where('customer_id', $customerUser->customer->id)
+            ->where('key', 'BVN')
+            ->update(['status' => 'verified']);
+
+        $response = $this->withoutMiddleware()
+            ->actingAs($admin)
+            ->withViewErrors([])
+            ->get($profileUrl);
+
+        $response->assertSee('Approve this KYC and create reserved accounts?');
+    }
 
     public function test_admin_customers_page_shows_service_access_badges(): void
     {

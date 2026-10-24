@@ -18,6 +18,8 @@
     $fullKycVerified = getFinalKycStatus(auth()->user()->customer->id) === 'verified' && $allKycFieldsVerified;
     $kycSubmitLabel = $hasKycHistory ? 'Review and resubmit KYC' : 'Submit KYC';
     $canFundWallet = $fullKycVerified;
+    $showBvnBillingNotice = (getSettings()?->bvn_verification_mode ?? 'manual') === 'auto'
+        && $kycFieldStatus('BVN') !== 'verified';
 @endphp
 
 @section('page-css')
@@ -79,6 +81,7 @@
                                                         @include('layouts.alerts')
                                                         @include('shared.kyc-rejection-alert')
                                                     </div>
+                                                    @if($showBvnBillingNotice)
                                                     <div class="px-3">
                                                         <div class="alert mb-3" style="background: linear-gradient(135deg, #fff4db 0%, #fffaf0 100%); border-left: 6px solid #f59e0b;">
                                                             <div class="d-flex align-items-start">
@@ -95,6 +98,7 @@
                                                             </div>
                                                         </div>
                                                     </div>
+                                                    @endif
                                                 </div>
                                                 <div class="card-content">
                                                     <div class="card-body">

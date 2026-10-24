@@ -22,6 +22,8 @@
         $kycSubmitLabel = $hasKycHistory ? 'Review and resubmit KYC' : 'Submit KYC';
         $canFundWallet = $fullKycVerified;
         $settings = getSettings();
+        $showBvnBillingNotice = ($settings?->bvn_verification_mode ?? 'manual') === 'auto'
+            && $kycFieldStatus('BVN') !== 'verified';
         $adminWhatsappNumber = preg_replace('/\D+/', '', (string) $settings->whatsapp_number);
         $submittedIdType = data_get(kycStatus('IDCARDTYPE', $customer->id), 'value', 'Not provided');
         $customerFullName = trim(auth()->user()->name) ?: auth()->user()->username;
@@ -47,6 +49,7 @@
     @include('sneat.layouts.alerts')
     @include('shared.kyc-rejection-alert')
 
+    @if($showBvnBillingNotice)
     <div class="alert border-0 shadow-sm mb-4" style="background: linear-gradient(135deg, rgba(245, 158, 11, .16), rgba(251, 191, 36, .10)); border-left: 6px solid #f59e0b !important; color: #92400e;">
         <div class="d-flex align-items-start gap-3">
             <span class="d-inline-flex align-items-center justify-content-center rounded-circle" style="width: 42px; height: 42px; background: rgba(245, 158, 11, .18); color: #b45309; flex: 0 0 auto;">
@@ -61,6 +64,7 @@
             </div>
         </div>
     </div>
+    @endif
 
     <div class="row g-4">
         <div class="col-lg-4">

@@ -300,7 +300,7 @@
                         </div>
                         <div class="col-lg-4 text-lg-right mt-2 mt-lg-0">
                             <a href="{{ route('admin.walletlog') }}" class="btn btn-light"><i class="bx bx-wallet mr-50"></i> Wallet log</a>
-                            <a href="{{ route('admin.airtime.2.cash.log') }}" class="btn btn-outline-primary ml-50"><i class="bx bx-transfer-alt mr-50"></i> Airtime to cash</a>
+                            <a style="color:white !important" href="{{ route('admin.airtime.2.cash.log') }}" class="btn btn-outline-light ml-50"><i class="bx bx-transfer-alt mr-50"></i> Airtime to cash</a>
                         </div>
                     </div>
                 </section>
@@ -404,6 +404,10 @@
                                             <select class="form-control js-transaction-select2" name="status" id="status" data-placeholder="Search status">
                                                 <option value=""></option>
                                                 <option value="delivered" {{ \Request::get('status') == 'delivered' ? 'selected' : ''}}>Delivered</option>
+                                                <option value="success" {{ \Request::get('status') == 'success' ? 'selected' : ''}}>Success</option>
+                                                <option value="pending" {{ \Request::get('status') == 'pending' ? 'selected' : ''}}>Pending</option>
+                                                <option value="initiated" {{ \Request::get('status') == 'initiated' ? 'selected' : ''}}>Initiated</option>
+                                                <option value="processing" {{ \Request::get('status') == 'processing' ? 'selected' : ''}}>Processing</option>
                                                 <option value="failed" {{ \Request::get('status') == 'failed' ? 'selected' : ''}}>Failed</option>
                                                 <option value="attention-required" {{ \Request::get('status') == 'attention-required' ? 'selected' : ''}}>Attention Required</option>
                                             </select>
@@ -550,7 +554,7 @@
                                                     {{-- <div class="transaction-balance-flow">{{ $currency }}{{ number_format((float) $transaction->balance_before, 2) }} <i class="bx bx-right-arrow-alt mx-25"></i> {{ $currency }}{{ number_format((float) $transaction->balance_after, 2) }}</div> --}}
                                                 </td>
                                                 <td class="transaction-service-cell">
-                                                    <span class="transaction-service-name">{{ $transaction->product_name ?: 'Unspecified service' }}</span>
+                                                    <span class="transaction-service-name">{{ $transaction->product_name ?: $transaction->reason ?: $transaction->unique_element ?: 'Unspecified transaction' }}</span>
                                                     <span class="transaction-service-meta">{{ $transaction->category->name ?? 'No category' }}</span>
                                                     @if($transaction->variation)
                                                         <span class="transaction-service-meta">{{ $transaction->variation->system_name ?? 'Unknown variation' }}</span>

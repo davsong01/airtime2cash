@@ -52,9 +52,33 @@ class BvnVerificationBillingService
                 ->first();
 
             if ($transaction && in_array(strtolower((string) $transaction->status), ['pending', ...$transaction->successfulStatuses()], true)) {
+                $isSettled = in_array(strtolower((string) $transaction->status), $transaction->successfulStatuses(), true);
+                $walletLog = Wallet::query()
+                    ->where('customer_id', $customer->id)
+                    ->where('transaction_id', $transaction->transaction_id)
+                    ->where('type', 'debit')
+                    ->where('reason', self::REASON)
+                    ->first();
+
+                if (! $walletLog) {
+                    Wallet::create([
+                        'customer_id' => $customer->id,
+                        'amount' => (float) ($transaction->total_amount ?? $amount),
+                        'balance_before' => $transaction->balance_before,
+                        'balance_after' => $transaction->balance_after,
+                        'type' => 'debit',
+                        'status' => $isSettled ? 'success' : 'pending',
+                        'transaction_id' => $transaction->transaction_id,
+                        'reason' => self::REASON,
+                        'payment_method' => 'wallet',
+                    ]);
+                } elseif ($isSettled && $walletLog->status !== 'success') {
+                    $walletLog->update(['status' => 'success']);
+                }
+
                 return [
                     'status' => $transaction->status,
-                    'settled' => in_array(strtolower((string) $transaction->status), $transaction->successfulStatuses(), true),
+                    'settled' => $isSettled,
                     'transaction' => $transaction->fresh(),
                     'amount' => (float) ($transaction->total_amount ?? $amount),
                 ];
@@ -74,6 +98,22 @@ class BvnVerificationBillingService
                 'balance_after' => $balanceBefore,
                 'descr' => $context['pending_description'] ?? 'BVN verification fee is pending wallet funding.',
             ]);
+
+            Wallet::updateOrCreate(
+                [
+                    'customer_id' => $customer->id,
+                    'transaction_id' => $transaction->transaction_id,
+                    'type' => 'debit',
+                    'reason' => self::REASON,
+                ],
+                [
+                    'amount' => $amount,
+                    'balance_before' => $balanceBefore,
+                    'balance_after' => $balanceBefore,
+                    'status' => 'pending',
+                    'payment_method' => 'wallet',
+                ],
+            );
 
             return [
                 'status' => 'pending',
@@ -154,17 +194,21 @@ class BvnVerificationBillingService
                 false,
             );
 
-            $this->walletController->logWallet([
-                'customer_id' => $customer->id,
-                'amount' => $feeAmount,
-                'total_amount' => $feeAmount,
-                'balance_before' => $feeChange['before'],
-                'balance_after' => $feeChange['after'],
-                'type' => 'debit',
-                'transaction_id' => $pendingCharge->transaction_id,
-                'reason' => self::REASON,
-                'payment_method' => 'wallet',
-            ]);
+            Wallet::updateOrCreate(
+                [
+                    'customer_id' => $customer->id,
+                    'transaction_id' => $pendingCharge->transaction_id,
+                    'type' => 'debit',
+                    'reason' => self::REASON,
+                ],
+                [
+                    'amount' => $feeAmount,
+                    'balance_before' => $feeChange['before'],
+                    'balance_after' => $feeChange['after'],
+                    'status' => 'success',
+                    'payment_method' => 'wallet',
+                ],
+            );
 
             $pendingCharge->update([
                 'status' => 'success',
@@ -266,17 +310,21 @@ class BvnVerificationBillingService
                     $netAmount = $grossAmount - $feeAmount;
                     $feeApplied = true;
 
-                    $this->walletController->logWallet([
-                        'customer_id' => $customer->id,
-                        'amount' => $feeAmount,
-                        'total_amount' => $feeAmount,
-                        'balance_before' => $feeChange['before'],
-                        'balance_after' => $feeChange['after'],
-                        'type' => 'debit',
-                        'transaction_id' => $feeTransactionId,
-                        'reason' => self::REASON,
-                        'payment_method' => 'wallet',
-                    ]);
+                    Wallet::updateOrCreate(
+                        [
+                            'customer_id' => $customer->id,
+                            'transaction_id' => $feeTransactionId,
+                            'type' => 'debit',
+                            'reason' => self::REASON,
+                        ],
+                        [
+                            'amount' => $feeAmount,
+                            'balance_before' => $feeChange['before'],
+                            'balance_after' => $feeChange['after'],
+                            'status' => 'success',
+                            'payment_method' => 'wallet',
+                        ],
+                    );
 
                     $pendingCharge->update([
                         'status' => 'success',

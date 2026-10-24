@@ -70,7 +70,7 @@ class PaymentController extends Controller
         }
 
         $redirect_url = $gatewayController->redirectToGateway($request, $transaction);
-
+        
         if (isset($redirect_url) && $redirect_url['status'] == 'success') {
             return redirect()->away($redirect_url['url']);
         } else {

@@ -2815,12 +2815,12 @@ class TransactionController extends Controller
         $request->validate([
             'api' => ['nullable', 'integer'],
             'service' => ['nullable', 'string', 'regex:/^(type:(airtime2cash|wallet2bank)|[0-9]+)$/'],
-            'status' => ['nullable', 'in:delivered,success,failed,attention-required'],
+            'status' => ['nullable', 'in:delivered,success,pending,initiated,processing,failed,attention-required'],
             'from' => ['nullable', 'date'],
             'to' => ['nullable', 'date', 'after_or_equal:from'],
         ]);
 
-        $baseQuery = TransactionLog::whereNotNull('product_id');
+        $baseQuery = TransactionLog::query();
         $metrics = (clone $baseQuery)
             ->selectRaw("COALESCE(SUM(CASE WHEN status IN ('delivered', 'success') THEN amount ELSE 0 END), 0) AS successful")
             ->selectRaw("COALESCE(SUM(CASE WHEN status = 'failed' THEN amount ELSE 0 END), 0) AS failed")

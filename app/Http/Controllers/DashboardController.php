@@ -543,8 +543,13 @@ class DashboardController extends Controller
             $this->updateKycData($field, $input[$field], $customer->id, 'in-review');
         }
 
-        // verify BVN automatically
-        // $this->updateKycData('BVN', $request->BVN, auth()->user()->customer->id, 'verified');
+        $bvnVerificationResult = null;
+        if (($settings = getSettings())?->bvn_verification_mode === 'auto' && filled($input['BVN'] ?? null)) {
+            $bvnVerificationResult = app(CustomerController::class)->runBvnVerificationForCustomer(
+                $customer->fresh(['user']),
+                (string) $input['BVN'],
+            );
+        }
 
         $customer->update([
             "kyc_status" => 'awaiting-approval',
@@ -571,6 +576,10 @@ class DashboardController extends Controller
         //     $error = $reserved['data'] ?? 'Please refresh this page';
         //     return back()->with('error', 'Error: ' . $error);
         // }
+        if (($bvnVerificationResult['processed'] ?? true) === false) {
+            return back()->with('error', $bvnVerificationResult['message'] ?? 'BVN verification could not be completed.');
+        }
+
         return back()->with('message', 'KYC Info Update. Awaiting Admin approval');
 
     }

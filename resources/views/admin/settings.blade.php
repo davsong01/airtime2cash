@@ -464,6 +464,20 @@
                                                                                 <small class="text-muted d-block mt-50">This is the amount to charge the customer for BVN verification after approval or first wallet funding, depending on your flow.</small>
                                                                             </fieldset>
                                                                         </div>
+
+                                                                        <div class="col-md-6">
+                                                                            <fieldset class="form-group">
+                                                                                <label for="bvn_verification_mode">BVN Verification Mode</label>
+                                                                                <select name="bvn_verification_mode" class="form-control @error('bvn_verification_mode') is-invalid @enderror" id="bvn_verification_mode">
+                                                                                    <option value="manual" @selected(old('bvn_verification_mode', $settings->bvn_verification_mode ?? 'manual') === 'manual')>Manual</option>
+                                                                                    <option value="auto" @selected(old('bvn_verification_mode', $settings->bvn_verification_mode ?? 'manual') === 'auto')>Auto</option>
+                                                                                </select>
+                                                                                @error('bvn_verification_mode')
+                                                                                    <div class="invalid-feedback">{{ $message }}</div>
+                                                                                @enderror
+                                                                                <small class="text-muted d-block mt-50">Manual keeps BVN verification on the admin button. Auto lets the system trigger it during KYC processing.</small>
+                                                                            </fieldset>
+                                                                        </div>
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -632,19 +646,6 @@
                                                                             </fieldset>
                                                                         </div>
 
-                                                                        <div class="col-md-6">
-                                                                            <fieldset class="form-group">
-                                                                                <label for="bvn_verification_mode">BVN Verification Mode</label>
-                                                                                <select name="bvn_verification_mode" class="form-control @error('bvn_verification_mode') is-invalid @enderror" id="bvn_verification_mode">
-                                                                                    <option value="manual" @selected(old('bvn_verification_mode', $settings->bvn_verification_mode ?? 'manual') === 'manual')>Manual</option>
-                                                                                    <option value="auto" @selected(old('bvn_verification_mode', $settings->bvn_verification_mode ?? 'manual') === 'auto')>Auto</option>
-                                                                                </select>
-                                                                                @error('bvn_verification_mode')
-                                                                                    <div class="invalid-feedback">{{ $message }}</div>
-                                                                                @enderror
-                                                                                <small class="text-muted d-block mt-50">Manual keeps BVN verification on the admin button. Auto lets the system trigger it during KYC processing.</small>
-                                                                            </fieldset>
-                                                                        </div>
                                                                     </div>
 
                                                                     <div class="row mt-1">

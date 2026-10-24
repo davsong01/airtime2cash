@@ -156,8 +156,7 @@
         </div>
     </div>
 
-    @if($kycBvnHasSavedData)
-        <div class="modal fade" id="bvnVerificationResultModal" tabindex="-1" role="dialog" aria-labelledby="bvnVerificationResultTitle" aria-hidden="true">
+    <div class="modal fade" id="bvnVerificationResultModal" tabindex="-1" role="dialog" aria-labelledby="bvnVerificationResultTitle" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered modal-xl" role="document">
                 <div class="modal-content">
                     <div class="modal-header">
@@ -165,6 +164,11 @@
                         <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
                     </div>
                     <div class="modal-body">
+                        <div id="bvn-verification-feedback" class="alert d-none mb-1" role="alert"></div>
+                        <div id="bvn-verification-loading" class="d-none text-center py-3">
+                            <div class="spinner-border text-primary mb-1" role="status" aria-hidden="true"></div>
+                            <div class="text-muted">Verifying BVN details, please wait...</div>
+                        </div>
                         <div id="bvn-verification-result">
                             <div class="row">
                                 <div class="col-md-4 mb-1">
@@ -203,18 +207,92 @@
                     </div>
                 </div>
             </div>
-        </div>
+    </div>
 
-        <script>
-            window.adminBvnVerificationState = {
-                profileName: @json($kycBvnProfileName ?: ''),
-                verifiedName: @json($kycBvnVerifiedName ?: ''),
-                nameMatch: @json($kycBvnNameMatch),
-                response: @json($kycBvnResponse),
-                hasSavedData: @json($kycBvnHasSavedData),
-                status: @json(data_get($kycBvnData, 'status', $customer->bvn_verification_status ?: 'unverified')),
-                verifiedAt: @json(data_get($kycBvnData, 'verified_at', '')),
-            };
-        </script>
-    @endif
+    <div class="modal fade" id="bvnVerificationRequestsModal" tabindex="-1" role="dialog" aria-labelledby="bvnVerificationRequestsTitle" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-xl" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div>
+                        <h5 class="modal-title" id="bvnVerificationRequestsTitle">BVN verification requests</h5>
+                        <small class="text-muted">Every BVN verification attempt for this customer.</small>
+                    </div>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                </div>
+                <div class="modal-body">
+                    @if($bvnVerificationRequests->isEmpty())
+                        <div class="alert alert-light mb-0">No BVN verification requests have been recorded.</div>
+                    @else
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Mode</th>
+                                        <th>Verification status</th>
+                                        <th>Billing</th>
+                                        <th>Message</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($bvnVerificationRequests as $request)
+                                        @php
+                                            $requestVerificationStatus = match ($request->verification_status) {
+                                                'verified' => 'Verified',
+                                                'declined' => 'Names do not match',
+                                                default => 'Unverified',
+                                            };
+                                            $requestVerificationClass = match ($request->verification_status) {
+                                                'verified' => 'text-success',
+                                                'declined' => 'text-danger',
+                                                default => 'text-warning',
+                                            };
+                                        @endphp
+                                        <tr>
+                                            <td class="text-nowrap">{{ optional($request->created_at)->format('d M Y, h:i A') }}</td>
+                                            <td>{{ ucfirst($request->mode ?: 'manual') }}</td>
+                                            <td><strong class="{{ $requestVerificationClass }}">{{ $requestVerificationStatus }}</strong></td>
+                                            <td>
+                                                {{ ucfirst(str_replace('_', ' ', $request->billing_status ?: 'not recorded')) }}
+                                                @if((float) $request->billing_amount > 0)
+                                                    <small class="text-muted d-block">{{ number_format((float) $request->billing_amount, 2) }}</small>
+                                                @endif
+                                                @if($request->billing_transaction_id)
+                                                    <small class="text-muted d-block">{{ $request->billing_transaction_id }}</small>
+                                                @endif
+                                            </td>
+                                            <td>
+                                                <span>{{ $request->message ?: '—' }}</span>
+                                                @if($request->provider_name)
+                                                    <small class="text-muted d-block">Provider: {{ $request->provider_name }}</small>
+                                                @endif
+                                                @if(!empty($request->provider_response))
+                                                    <details class="mt-50">
+                                                        <summary class="text-primary" style="cursor: pointer;">View provider report</summary>
+                                                        <pre class="small mt-50 mb-0" style="white-space: pre-wrap; word-break: break-word;">{!! json_encode($request->provider_response, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) !!}</pre>
+                                                    </details>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    @endif
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        window.adminBvnVerificationState = {
+            profileName: @json($kycBvnProfileName ?: ''),
+            verifiedName: @json($kycBvnVerifiedName ?: ''),
+            nameMatch: @json($kycBvnNameMatch),
+            response: @json($kycBvnResponse),
+            hasSavedData: @json($kycBvnHasSavedData),
+            status: @json(data_get($kycBvnData, 'status', $customer->bvn_verification_status ?: 'unverified')),
+            verifiedAt: @json(data_get($kycBvnData, 'verified_at', '')),
+        };
+    </script>
 @endif

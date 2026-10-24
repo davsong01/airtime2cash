@@ -203,7 +203,7 @@
                         @if (in_array('admin.trans', $allowedRoutes) || in_array(1, auth()->user()->admin->roleIds()))
                             <li class="svg {{ Route::is('admin.trans') ? 'active' : '' }}"><a
                                     href="{{ route('admin.trans') }}"><i class="bx bx-right-arrow-alt"></i><span
-                                        class="menu-item">Product Purchase Log</span></a>
+                                        class="menu-item">Transaction Log</span></a>
                             </li>
                         @endif
                         @if (in_array('admin.walletfundinglog', $allowedRoutes) || in_array(1, auth()->user()->admin->roleIds()))

@@ -13,6 +13,7 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Foundation\Validation\ValidatesRequests;
 use Illuminate\Routing\Controller as BaseController;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Image;
 use InvalidArgumentException;
@@ -28,6 +29,8 @@ class Controller extends BaseController
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
         if ($method == "GET") {
             curl_setopt($ch, CURLOPT_HTTPGET, true);
         } elseif ($method == "POST") {
@@ -39,16 +42,27 @@ class Controller extends BaseController
         } elseif ($method == "DELETE") {
             curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'DELETE');
             curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
-        } elseif (!empty($timeout)) {
-            curl_setopt($ch, CURLOPT_TIMEOUT, $timeout);
         }
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 
         $response = curl_exec($ch);
 
-        // \Log::info(['response' => $response, 'url' => $url, 'method' => $method, 'headers'=> $headers]);
-        return json_decode($response, true);
+        if ($response === false) {
+            Log::warning('External API request failed.', [
+                'url' => $url,
+                'method' => $method,
+                'error' => curl_error($ch),
+            ]);
+
+            curl_close($ch);
+
+            return [];
+        }
+
+        curl_close($ch);
+
+        return json_decode($response, true) ?? [];
     }
 
 

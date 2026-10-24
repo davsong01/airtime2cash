@@ -43,7 +43,12 @@ class BvnVerificationBillingTest extends TestCase
             'customer_id' => $customer->id,
             'transaction_id' => $charge['transaction']->transaction_id,
             'type' => 'debit',
+            'status' => 'success',
             'reason' => BvnVerificationBillingService::REASON,
+        ]);
+        $this->assertDatabaseHas('transaction_logs', [
+            'transaction_id' => $charge['transaction']->transaction_id,
+            'status' => 'success',
         ]);
     }
 
@@ -72,6 +77,13 @@ class BvnVerificationBillingTest extends TestCase
             $secondCharge['transaction']->transaction_id,
         );
         $this->assertSame(1, TransactionLog::where('reason', BvnVerificationBillingService::REASON)->count());
+        $this->assertDatabaseHas('wallets', [
+            'customer_id' => $customer->id,
+            'transaction_id' => $firstCharge['transaction']->transaction_id,
+            'type' => 'debit',
+            'status' => 'pending',
+            'reason' => BvnVerificationBillingService::REASON,
+        ]);
 
         app(WalletController::class)->updateCustomerWallet($user->fresh(), 100, 'credit');
 
@@ -82,6 +94,7 @@ class BvnVerificationBillingTest extends TestCase
             'customer_id' => $customer->id,
             'transaction_id' => $fee->transaction_id,
             'type' => 'debit',
+            'status' => 'success',
             'reason' => BvnVerificationBillingService::REASON,
         ]);
 
@@ -95,5 +108,40 @@ class BvnVerificationBillingTest extends TestCase
                 ->where('type', 'debit')
                 ->count(),
         );
+    }
+
+    public function test_pending_bvn_reconciliation_only_settles_the_debit_without_calling_provider(): void
+    {
+        $user = User::factory()->create([
+            'firstname' => 'Reconcile',
+            'lastname' => 'Customer',
+            'status' => 'active',
+        ]);
+
+        $customer = Customer::create([
+            'user_id' => $user->id,
+            'wallet' => 0,
+            'referal_wallet' => 0,
+            'a2cashwallet' => 0,
+        ]);
+
+        $charge = app(BvnVerificationBillingService::class)->recordCharge($customer, 20, [
+            'bvn' => '12345678901',
+        ]);
+        $customer->update(['wallet' => 100]);
+
+        $response = $this->get(route('cron.verify.pending.bvn'));
+
+        $response->assertOk()
+            ->assertJsonPath('settled', 1)
+            ->assertJsonPath('still_pending', 0);
+        $this->assertDatabaseHas('transaction_logs', [
+            'transaction_id' => $charge['transaction']->transaction_id,
+            'status' => 'success',
+        ]);
+        $this->assertDatabaseHas('wallets', [
+            'transaction_id' => $charge['transaction']->transaction_id,
+            'status' => 'success',
+        ]);
     }
 }

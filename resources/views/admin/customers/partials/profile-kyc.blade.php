@@ -1,5 +1,6 @@
 @php
     $kycField = fn (string $key) => $kycData->get($key) ?? (object) ['value' => '', 'status' => 'unverified', 'review_note' => null];
+    $bvnField = $kycField('BVN');
     $kycFields = [
         'FIRST_NAME' => 'First name',
         'MIDDLE_NAME' => 'Middle name',
@@ -30,7 +31,14 @@
         <p>Review submitted identity details, correct data where necessary, and make the final verification decision.</p>
     </div>
     <div class="d-flex flex-wrap">
-        <a href="{{ route('admin.customer.approve.kyc', $customer->id) }}" onclick="return confirm('Approve this KYC and create reserved accounts?')" class="btn btn-success btn-sm mr-50"><i class="bx bx-check mr-25"></i> Approve KYC</a>
+        @if($bvnVerificationRequests->isNotEmpty())
+            <button type="button" class="btn btn-outline-info btn-sm mr-50" data-toggle="modal" data-target="#bvnVerificationRequestsModal">
+                <i class="bx bx-history mr-25"></i> BVN requests ({{ $bvnVerificationRequests->count() }})
+            </button>
+        @endif
+        @if($bvnField->status === 'verified')
+            <a href="{{ route('admin.customer.approve.kyc', $customer->id) }}" onclick="return confirm('Approve this KYC and create reserved accounts?')" class="btn btn-success btn-sm mr-50"><i class="bx bx-check mr-25"></i> Approve KYC</a>
+        @endif
         <button type="button" class="btn btn-outline-danger btn-sm" data-toggle="modal" data-target="#rejectKycModal"><i class="bx bx-x mr-25"></i> Reject KYC</button>
     </div>
 </div>
@@ -138,16 +146,6 @@
                         <span class="kyc-field-status {{ $fieldClass }}">{{ ucfirst(str_replace('-', ' ', $field->status ?: 'pending')) }}</span>
                     </label>
                     <div class="d-flex align-items-center flex-wrap">
-                        @if($key === 'BVN' && $bvnMode === 'auto' && $field->status !== 'verified')
-                            <button
-                                type="button"
-                                class="btn btn-outline-primary btn-sm mr-25 js-bvn-verify-btn"
-                                data-verify-url="{{ route('customers.verify-bvn', $customer->id) }}"
-                                data-bvn-field="#BVN"
-                                data-bvn-charge="{{ $bvnVerificationCharge }}">
-                                Verify BVN
-                            </button>
-                        @endif
                         @if($key === 'BVN')
                             <button
                                 type="button"
@@ -165,7 +163,7 @@
                             data-action="approve"
                             data-review-url="{{ $kycReviewUrl }}"
                             data-value="{{ e($fieldValue) }}">
-                            Approve
+                            {{ $key === 'BVN' && $bvnMode === 'manual' ? 'Verify BVN' : 'Approve' }}
                         </button>
                         <button
                             type="button"

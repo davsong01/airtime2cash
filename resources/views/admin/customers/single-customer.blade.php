@@ -266,6 +266,7 @@
                 $.ajax({
                     url: verifyUrl,
                     method: 'POST',
+                    timeout: 45000,
                     data: {
                         _token: $('meta[name="csrf-token"]').attr('content'),
                         bank_id: bankId,
@@ -301,6 +302,7 @@
             const $modal = $('#bvnVerificationResultModal');
             const $loading = $('#bvn-verification-loading');
             const $result = $('#bvn-verification-result');
+            const $feedback = $('#bvn-verification-feedback');
             const $title = $('#bvnVerificationResultTitle');
             const $showResultBtn = $('.js-bvn-show-result-btn');
             const state = window.adminBvnVerificationState || {};
@@ -337,15 +339,27 @@
 
             const showLoading = () => {
                 $title.text('Verifying BVN details...');
+                $feedback.addClass('d-none').removeClass('alert-danger alert-success').text('');
                 $loading.removeClass('d-none');
                 $result.addClass('d-none');
             };
 
             const showResult = () => {
+                $feedback.addClass('d-none').removeClass('alert-danger alert-success').text('');
                 syncModal();
                 $title.text('BVN verification result');
                 $loading.addClass('d-none');
                 $result.removeClass('d-none');
+            };
+
+            const showError = (message) => {
+                $title.text('BVN verification could not start');
+                $loading.addClass('d-none');
+                $result.removeClass('d-none');
+                $feedback
+                    .removeClass('d-none alert-success')
+                    .addClass('alert-danger')
+                    .text(message || 'Unable to verify BVN right now.');
             };
 
             $modal.on('show.bs.modal', function () {
@@ -363,6 +377,11 @@
             window.adminBvnVerificationUi = {
                 setLoading: showLoading,
                 setResult: function (payload) {
+                        if (payload?.status === false || payload?.verification_status === 'unverified') {
+                            showError(payload.message || 'BVN verification failed.');
+                            return;
+                        }
+
                     state.profileName = payload.profile_name || state.profileName || '';
                     state.verifiedName = payload.verified_name || state.verifiedName || '';
                     state.nameMatch = !!payload.name_match;
@@ -408,6 +427,7 @@
                     }
                     showResult();
                 },
+                    showError: showError,
                 open: function () {
                     $modal.modal('show');
                 }
@@ -443,11 +463,13 @@
 
                 if (!verifyUrl) {
                     window.adminBvnVerificationUi?.open();
+                    window.adminBvnVerificationUi?.showError('The BVN verification route is unavailable. Please refresh the page and try again.');
                     return;
                 }
 
                 if (!bvn) {
                     window.adminBvnVerificationUi?.open();
+                    window.adminBvnVerificationUi?.showError('Enter the customer’s 11-digit BVN before verifying.');
                     return;
                 }
 
@@ -468,7 +490,9 @@
                         window.adminBvnVerificationUi?.setResult(response || {});
                     },
                     error: function (xhr) {
-                        const payload = xhr.responseJSON || { status: false, message: 'Unable to verify BVN right now.' };
+                        const payload = xhr.statusText === 'timeout'
+                            ? { status: false, message: 'BVN verification timed out. Please try again.' }
+                            : (xhr.responseJSON || { status: false, message: 'Unable to verify BVN right now.' });
                         window.adminBvnVerificationUi?.setResult(payload);
                     },
                     complete: function () {

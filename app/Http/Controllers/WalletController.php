@@ -31,6 +31,7 @@ class WalletController extends Controller
             'balance_before' => $data['balance_before'] ?? null,
             'balance_after' => $data['balance_after'] ?? null,
             'type' => $data['type'],
+            'status' => $data['status'] ?? 'success',
             'transaction_id' => $data['transaction_id'] ?? null,
             'reason' => $data['reason'] ?? null,
             'payment_method' => $data['payment_method'] ?? null,
