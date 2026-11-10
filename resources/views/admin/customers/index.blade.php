@@ -369,6 +369,9 @@
                                             <option value="activate">Activate</option>
                                             <option value="suspend">Suspend</option>
                                             <option value="delete">Delete</option>
+                                            @if($selectedStatus === 'delete')
+                                                <option value="permanent_delete">Permanently delete</option>
+                                            @endif
                                             <option value="enable_w2bank_manual_access">Enable Manual Wallet 2 Bank</option>
                                             <option value="disable_w2bank_manual_access">Disable Manual Wallet 2 Bank</option>
                                             <option value="enable_w2bank_auto_access">Enable Auto Wallet 2 Bank</option>
@@ -579,6 +582,7 @@
                 deactivate: 'Deactivate the selected customer(s)?',
                 suspend: 'Suspend the selected customer(s)?',
                 delete: 'Delete the selected customer(s)? This will mark them as deleted.',
+                permanent_delete: 'Permanently remove the selected deleted customer account(s), including their KYC and reserved-account data? This cannot be undone. Transaction and wallet history will be retained.',
                 enable_w2bank_manual_access: 'Enable Manual Wallet 2 Bank access for the selected customer(s)?',
                 disable_w2bank_manual_access: 'Disable Manual Wallet 2 Bank access for the selected customer(s)?',
                 enable_w2bank_auto_access: 'Enable Auto Wallet 2 Bank access for the selected customer(s)?',

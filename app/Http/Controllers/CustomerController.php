@@ -261,7 +261,7 @@ class CustomerController extends Controller
     public function bulkActions(Request $request)
     {
         $this->validate($request, [
-            'action' => ['required', 'in:activate,deactivate,suspend,delete,move_level,enable_w2bank_manual_access,disable_w2bank_manual_access,enable_w2bank_auto_access,disable_w2bank_auto_access,enable_a2c_access,disable_a2c_access,enable_a2c_manual_access,disable_a2c_manual_access,enable_a2c_auto_access,disable_a2c_auto_access'],
+            'action' => ['required', 'in:activate,deactivate,suspend,delete,permanent_delete,move_level,enable_w2bank_manual_access,disable_w2bank_manual_access,enable_w2bank_auto_access,disable_w2bank_auto_access,enable_a2c_access,disable_a2c_access,enable_a2c_manual_access,disable_a2c_manual_access,enable_a2c_auto_access,disable_a2c_auto_access'],
             'customer_ids' => ['required', 'string'],
             'level_id' => ['nullable', 'integer'],
         ]);
@@ -275,6 +275,44 @@ class CustomerController extends Controller
 
         if (empty($customerIds)) {
             return back()->with('error', 'Please select at least one customer');
+        }
+
+        if ($request->action === 'permanent_delete') {
+            abort_unless(hasAccess('customers.edit'), 403);
+
+            $deletedCount = DB::transaction(function () use ($customerIds) {
+                $users = User::query()
+                    ->whereIn('id', $customerIds)
+                    ->where('type', '!=', 'admin')
+                    ->where('status', 'delete')
+                    ->lockForUpdate()
+                    ->get();
+
+                if ($users->isEmpty()) {
+                    return 0;
+                }
+
+                $userIds = $users->modelKeys();
+                $customerIds = Customer::query()
+                    ->whereIn('user_id', $userIds)
+                    ->lockForUpdate()
+                    ->pluck('id');
+
+                if ($customerIds->isNotEmpty()) {
+                    ReservedAccountNumber::query()->whereIn('customer_id', $customerIds)->delete();
+                    KycData::query()->whereIn('customer_id', $customerIds)->delete();
+                    BvnVerificationRequest::query()->whereIn('customer_id', $customerIds)->delete();
+                    Customer::query()->whereIn('id', $customerIds)->delete();
+                }
+
+                User::query()->whereIn('id', $userIds)->delete();
+
+                return $users->count();
+            });
+
+            return $deletedCount > 0
+                ? back()->with('message', $deletedCount . ' deleted customer account(s) permanently removed. Transaction and wallet history is retained.')
+                : back()->with('error', 'Select customer accounts marked as deleted to permanently remove them.');
         }
 
         if ($request->action === 'move_level') {
