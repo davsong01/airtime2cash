@@ -18,6 +18,7 @@
     $bvnDisplayMode = filled($bvnStoredMode) ? $bvnStoredMode : $bvnMode;
     $bvnVerificationCharge = (float) ($settings->bvn_verification_charge ?? 0);
     $bvnNameMatch = (bool) data_get($bvnData, 'name_match', false);
+    $bvnProviderSuccess = data_get($bvnData, 'provider_success', true);
     $bvnVerifiedName = data_get($bvnData, 'verified_name');
     $bvnProfileName = data_get($bvnData, 'profile_name');
     $bvnResponse = data_get($bvnData, 'response', []);
@@ -119,12 +120,12 @@
                 $bvnFieldClass = '';
                 if ($key === 'BVN' && $bvnHasVerification) {
                     $bvnFieldClass = $bvnDisplayMode === 'auto'
-                        ? ($bvnNameMatch ? 'is-valid' : 'is-invalid')
+                        ? (! $bvnProviderSuccess ? '' : ($bvnNameMatch ? 'is-valid' : 'is-invalid'))
                         : ($field->status === 'verified' ? 'is-valid' : '');
                 }
                 $bvnVerificationStatusText = $bvnDisplayMode === 'auto'
                     ? ($bvnHasVerification
-                        ? ($bvnNameMatch ? 'Names match profile' : 'Names do not match')
+                        ? (! $bvnProviderSuccess ? 'Provider verification failed' : ($bvnNameMatch ? 'Names match profile' : 'Names do not match'))
                         : 'Not verified yet')
                     : ($field->status === 'verified'
                         ? 'Verified manually'
@@ -134,7 +135,7 @@
                 <div class="d-flex align-items-center justify-content-between flex-wrap mb-50">
                     <label for="{{ $key }}" class="mb-0">
                         {{ $label }}
-                        @if($key === 'BVN' && $bvnHasVerification && ! $bvnNameMatch)
+                        @if($key === 'BVN' && $bvnHasVerification && $bvnProviderSuccess && ! $bvnNameMatch)
                             <i
                                 class="bx bx-info-circle text-danger ml-25"
                                 data-toggle="tooltip"

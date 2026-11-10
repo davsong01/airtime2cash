@@ -100,7 +100,9 @@
         $kycBvnProfileName = data_get($kycBvnData, 'profile_name');
         $kycBvnVerifiedName = data_get($kycBvnData, 'verified_name');
         $kycBvnNameMatch = (bool) data_get($kycBvnData, 'name_match', false);
+        $kycBvnProviderSuccess = data_get($kycBvnData, 'provider_success', true);
         $kycBvnResponse = data_get($kycBvnData, 'response', []);
+        $kycBvnProviderMessage = data_get($kycBvnResponse, 'responseMessage');
         $kycBvnHasSavedData = (
             filled($kycBvnRawData)
             && $kycBvnRawData !== 'null'
@@ -192,8 +194,8 @@
                                 <div class="col-md-4 mb-1">
                                     <div class="border rounded p-1 h-100">
                                         <small class="text-muted d-block">Verification status</small>
-                                        <strong id="bvn-result-match-status" class="{{ $kycBvnMode === 'auto' ? ($kycBvnNameMatch ? 'text-success' : 'text-danger') : 'text-warning' }}">
-                                            {{ $kycBvnMode === 'auto' ? ($kycBvnNameMatch ? 'Names match' : 'Names do not match') : 'Manual verification' }}
+                                        <strong id="bvn-result-match-status" class="{{ ! $kycBvnProviderSuccess ? 'text-danger' : ($kycBvnMode === 'auto' ? ($kycBvnNameMatch ? 'text-success' : 'text-danger') : 'text-warning') }}">
+                                            {{ ! $kycBvnProviderSuccess ? ($kycBvnProviderMessage ? 'Provider response: ' . $kycBvnProviderMessage : 'Provider verification failed') : ($kycBvnMode === 'auto' ? ($kycBvnNameMatch ? 'Names match' : 'Names do not match') : 'Manual verification') }}
                                         </strong>
                                     </div>
                                 </div>
@@ -289,6 +291,8 @@
             profileName: @json($kycBvnProfileName ?: ''),
             verifiedName: @json($kycBvnVerifiedName ?: ''),
             nameMatch: @json($kycBvnNameMatch),
+            providerSuccess: @json($kycBvnProviderSuccess),
+            providerMessage: @json($kycBvnProviderMessage ?: ''),
             response: @json($kycBvnResponse),
             hasSavedData: @json($kycBvnHasSavedData),
             status: @json(data_get($kycBvnData, 'status', $customer->bvn_verification_status ?: 'unverified')),

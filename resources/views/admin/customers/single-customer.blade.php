@@ -331,9 +331,12 @@
                 $('#bvn-result-profile-name').text(state.profileName || 'N/A');
                 $('#bvn-result-verified-name').text(state.verifiedName || 'N/A');
                 $('#bvn-result-match-status')
-                    .text(state.nameMatch ? 'Names match' : 'Names do not match')
+                    .text(state.providerSuccess === false
+                        ? (state.providerMessage ? `Provider response: ${state.providerMessage}` : 'Provider verification failed')
+                        : (state.nameMatch ? 'Names match' : 'Names do not match'))
                     .toggleClass('text-success', !!state.nameMatch)
-                    .toggleClass('text-danger', !state.nameMatch);
+                    .toggleClass('text-danger', state.providerSuccess === false || !state.nameMatch)
+                    .toggleClass('text-warning', state.providerSuccess !== false && state.status === 'manual');
                 $('#bvn-result-json').text(JSON.stringify(getResponsePayload(), null, 2));
             };
 
@@ -377,15 +380,12 @@
             window.adminBvnVerificationUi = {
                 setLoading: showLoading,
                 setResult: function (payload) {
-                        if (payload?.status === false || payload?.verification_status === 'unverified') {
-                            showError(payload.message || 'BVN verification failed.');
-                            return;
-                        }
-
                     state.profileName = payload.profile_name || state.profileName || '';
                     state.verifiedName = payload.verified_name || state.verifiedName || '';
                     state.nameMatch = !!payload.name_match;
+                    state.providerSuccess = payload.provider_success ?? state.providerSuccess ?? true;
                     state.response = payload.provider_response || payload.response || payload.stored_data?.response || payload;
+                    state.providerMessage = state.response?.responseMessage || '';
                     state.status = payload.verification_status || payload.status || state.status || '';
                     state.verifiedAt = payload.stored_data?.verified_at || state.verifiedAt || '';
                     $showResultBtn.removeClass('d-none');

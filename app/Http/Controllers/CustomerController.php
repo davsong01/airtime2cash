@@ -1418,14 +1418,14 @@ class CustomerController extends Controller
         $providerResponse = data_get($verificationData, 'api_response', $verificationData);
         $payload = data_get($verificationData, 'payload', []);
         $verifiedName = $this->extractBvnVerifiedName($providerResponse);
-        $providerNameMatch = filter_var(data_get($providerResponse, 'responseBody.bvnInformationMatch', false), FILTER_VALIDATE_BOOL);
-        $nameMatch = $providerNameMatch || ($verifiedName !== '' && $this->namesMatch($profileName, $verifiedName));
         $providerSuccess = (($verificationData['status'] ?? null) === 'success');
+        $providerNameMatch = filter_var(data_get($providerResponse, 'responseBody.bvnInformationMatch', false), FILTER_VALIDATE_BOOL);
+        $nameMatch = $providerSuccess && ($providerNameMatch || ($verifiedName !== '' && $this->namesMatch($profileName, $verifiedName)));
         $fieldStatus = $providerSuccess ? ($nameMatch ? 'verified' : 'declined') : 'unverified';
         $reviewNote = $providerSuccess && ! $nameMatch ? 'BVN name does not match profile name.' : null;
         $verificationMode = getSettings()?->bvn_verification_mode ?? 'manual';
 
-        DB::transaction(function () use ($customer, $resolvedBvn, $fieldStatus, $verificationData, $provider, $providerResponse, $payload, $verifiedName, $profileName, $nameMatch, $reviewedBy, $reviewNote, $verificationMode) {
+        DB::transaction(function () use ($customer, $resolvedBvn, $fieldStatus, $verificationData, $provider, $providerResponse, $payload, $verifiedName, $profileName, $nameMatch, $providerSuccess, $reviewedBy, $reviewNote, $verificationMode) {
             $customer->forceFill([
                 'bvn' => $resolvedBvn,
                 'bvn_verification_status' => $fieldStatus,
@@ -1436,6 +1436,7 @@ class CustomerController extends Controller
                     'provider_name' => $provider->name,
                     'status' => $fieldStatus,
                     'name_match' => $nameMatch,
+                    'provider_success' => $providerSuccess,
                     'profile_name' => $profileName,
                     'verified_name' => $verifiedName,
                     'verified_at' => now()->toDateTimeString(),
@@ -1486,6 +1487,7 @@ class CustomerController extends Controller
         return [
             'processed' => true,
             'provider_success' => $providerSuccess,
+            'verification_status' => $fieldStatus,
             'field_status' => $fieldStatus,
             'name_match' => $nameMatch,
             'profile_name' => $profileName,
