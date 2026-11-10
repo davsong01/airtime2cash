@@ -4560,7 +4560,7 @@ class TransactionController extends Controller
             ] + $providerUpdate);
 
             $subject = "Airtime2Cash Transaction Update";
-            $body = '<p>Hello! ' . $transaction->customer->user->name . ',</p>';
+            $body = '<p>Hello! ' . e($transaction->customer->user->name) . ',</p>';
             $body .= '<p style="line-height: 2.0;">Your Transaction with transaction ID : <strong>' . $transaction->transaction_id . '</strong> has been updated to: ' . ucfirst($transaction->status) . '<br><strong>Date Updated:</strong> ' . date("M jS, Y g:iA", strtotime($transaction->updated_at)) . '<br><br>
             Warm Regards. (' . config('app.name') . ')<br/>
             </p>';
@@ -4686,7 +4686,7 @@ class TransactionController extends Controller
         ]);
 
         $subject = "Airtime2Cash Transaction Update";
-        $body = '<p>Hello! ' . $transaction->customer->user->name . ',</p>';
+        $body = '<p>Hello! ' . e($transaction->customer->user->name) . ',</p>';
         $body .= '<p style="line-height: 2.0;">Your Transaction with transaction ID : <strong>' . $transaction->transaction_id . '</strong> has been updated to: ' . ucfirst($transaction->status) . '<br><strong>Date Updated:</strong> ' . date("M jS, Y g:iA", strtotime($transaction->updated_at)) . '<br>
         Decline Reason: ' . $transaction->decline_reason . '<br><br>
             Warm Regards. (' . config('app.name') . ')<br/>

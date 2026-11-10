@@ -158,7 +158,7 @@ class Controller extends BaseController
             $extras = isset($transaction->extras) ? $transaction->extras : '';
             $name = $user->firstname ?? 'Customer';
             $subject = "Transaction Alert";
-            $body = '<p>Hello! ' . $name . ',</p>';
+            $body = '<p>Hello! ' . e($name) . ',</p>';
             $body .= '<p style="line-height: 2.0;">A transaction has just occured on your account on ' . config('app.name') . ' <br>Please find below the details of the transaction: <br>
             <strong>Transaction Purpose:</strong> ' . $transaction->reason . '<br>
             <strong>Transaction Status:</strong> ' . ucfirst($transaction->user_status) . '<br>

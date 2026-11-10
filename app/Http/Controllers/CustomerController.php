@@ -612,8 +612,8 @@ class CustomerController extends Controller
     {
         $validated = $request->validate([
             'status' => 'required',
-            'firstname' => 'required',
-            'lastname' => 'required',
+            'firstname' => ['required', 'string', 'max:100', 'not_regex:/[<>]/'],
+            'lastname' => ['required', 'string', 'max:100', 'not_regex:/[<>]/'],
             'email' => ['required', 'email', Rule::unique('users', 'email')->ignore($id)],
             'can_access_w2bank' => ['nullable', 'in:0,1'],
             'can_access_w2bank_auto' => ['nullable', 'in:0,1'],
@@ -906,7 +906,7 @@ class CustomerController extends Controller
 
         // Send email
         $subject = "New Transaction Pin";
-        $body = '<p>Hello! ' . $user->firstname . '</p>';
+        $body = '<p>Hello! ' . e($user->firstname) . '</p>';
         $body .= '<p style="line-height: 2.0;">Your transaction PIN has been reset by ADMIN on ' . config('app.name') . ' at ' . Carbon::now()->format('jS F, Y, h:iA') . '.</strong><br><br>Your new transaction PIN is <br><strong>'.$request->new_transaction_pin. '</strong><br>. If you did not request a Transaction PIN change, Kindly notify us via WhatsApp us via whatsapp( ' . $settings->whatsapp_no . ') immediately.<b><hr/><br>Warm Regards. (' . config('app.name') . ')<br/></p>';
 
         logEmails($user->email, $subject, $body);
@@ -928,7 +928,7 @@ class CustomerController extends Controller
 
         // Send email
         $subject = "New Password";
-        $body = '<p>Hello! ' . $user->firstname . '</p>';
+        $body = '<p>Hello! ' . e($user->firstname) . '</p>';
         $body .= '<p style="line-height: 2.0;">Your password has been reset by ADMIN on ' . config('app.name') . ' at ' . Carbon::now()->format('jS F, Y, h:iA') . '.</strong><br><br>Your new password is <br><strong>' . $request->new_password . '</strong><br>. If you did not request a password reset, Kindly notify us via WhatsApp us via whatsapp( ' . $settings->whatsapp_no . ') immediately.<b><hr/><br>Warm Regards. (' . config('app.name') . ')<br/></p>';
 
         logEmails($user->email, $subject, $body);
@@ -939,9 +939,9 @@ class CustomerController extends Controller
     public function processCustomerUpdateKycInfo(Request $request, Customer $customer)
     {
         $input = $this->validate($request, [
-            "FIRST_NAME" => "nullable",
-            "MIDDLE_NAME" => "nullable",
-            "LAST_NAME" => "nullable",
+            "FIRST_NAME" => ['nullable', 'string', 'max:100', 'not_regex:/[<>]/'],
+            "MIDDLE_NAME" => ['nullable', 'string', 'max:100', 'not_regex:/[<>]/'],
+            "LAST_NAME" => ['nullable', 'string', 'max:100', 'not_regex:/[<>]/'],
             "PHONE_NUMBER" => "nullable",
             "BVN" => "nullable",
             "IDCARDTYPE" => "nullable",
@@ -995,7 +995,15 @@ class CustomerController extends Controller
                 'IDCARD',
             ])],
             'action' => ['required', Rule::in(['approve', 'reject'])],
-            'value' => ['nullable', 'string', 'max:5000'],
+            'value' => [
+                'nullable',
+                'string',
+                Rule::when(
+                    in_array($request->input('field'), ['FIRST_NAME', 'MIDDLE_NAME', 'LAST_NAME'], true),
+                    ['max:100', 'not_regex:/[<>]/'],
+                    ['max:5000'],
+                ),
+            ],
             'reason' => ['nullable', 'string', 'max:2000'],
         ]);
 
@@ -1533,7 +1541,7 @@ class CustomerController extends Controller
         ];
 
         $subject = "KYC Info Update";
-        $body = '<p>Hello! ' . $customer->user->firstname . '</p>';
+        $body = '<p>Hello! ' . e($customer->user->firstname) . '</p>';
         $body .= '<p style="line-height: 2.0;">Your KYC Information has been approved ' . config('app.name') . '<br><br> You can now carry out transactions<br/></p>';
 
         logEmails($customer->user->email, $subject, $body);
@@ -1564,7 +1572,7 @@ class CustomerController extends Controller
         ]);
 
         $subject = "KYC Info Update";
-        $body = '<p>Hello! ' . $customer->user->firstname . '</p>';
+        $body = '<p>Hello! ' . e($customer->user->firstname) . '</p>';
         $body .= '<p style="line-height: 2.0;">Your KYC Information was declined on ' . config('app.name') . '.<br><br>';
         $body .= '<strong>Reason:</strong><br>' . nl2br(e($reason)) . '<br><br>Please revisit the KYC page, correct the information, and submit it again.<br/></p>';
 

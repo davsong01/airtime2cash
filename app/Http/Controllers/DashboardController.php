@@ -331,7 +331,7 @@ class DashboardController extends Controller
         auth()->user()->save();
         // Send email
         $subject = "New Transaction PIN set";
-        $body = '<p>Hello! ' . auth()->user()->firstname . '</p>';
+        $body = '<p>Hello! ' . e(auth()->user()->firstname) . '</p>';
         $body .= '<p style="line-height: 2.0;">You have successfully created a transaction PIN on account ' . config('app.name') . ' Please use your PIN when carrying out transactions.<b><hr/><br>Warm Regards. (' . config('app.name') . ')<br/></p>';
 
         logEmails(auth()->user()->email, $subject, $body);
@@ -383,7 +383,7 @@ class DashboardController extends Controller
 
         // Send email
         $subject = "You requested a Transaction PIN Reset Link";
-        $body = '<p>Hello! ' . $user->firstname . '</p>';
+        $body = '<p>Hello! ' . e($user->firstname) . '</p>';
         $reset_link = url('/') . "/confirm_reset_pin?token=" . $hashedToken;
         $body .= '<p style="line-height: 2.0;">Please <strong>login</strong> to your account on ' . config('app.name') . ' and click the button below to reset your transaction pin. <br> <a class="btn btn-info" target="_blank" href="' . $reset_link . '" style="position: margin:5px; relative;margin-bottom:50px;color: #fff;font-weight: 500;padding: 8px 20px;font-size: 13px;line-height: 24px;letter-spacing: 0.01em;border-radius: 4px;border: 1px solid;transition: all .4s ease;background:#950eb3;text-align: center;white-space: nowrap;vertical-align: middle;text-decoration:none">RESET PIN</a><br/><br><strong>Please note that this link expires after ' . $expiry->format('jS F, Y, h:iA') . '.</strong><br><br>If you did not request a Transaction PIN change, Kindly notify us via WhatsApp us via whatsapp( ' . $settings->whatsapp_no . ') immediately.<b><hr/><br>Warm Regards. (' . config('app.name') . ')<br/></p>';
 
@@ -434,7 +434,7 @@ class DashboardController extends Controller
 
         // Send email
         $subject = "New Transaction Pin";
-        $body = '<p>Hello! ' . auth()->user()->firstname . '</p>';
+        $body = '<p>Hello! ' . e(auth()->user()->firstname) . '</p>';
         $body .= '<p style="line-height: 2.0;">You have successfully changed your Transaction PIN on ' . config('app.name') . ' on ' . Carbon::now()->format('jS F, Y, h:iA') . '.</strong><br><br>If you did not request a Transaction PIN change, Kindly notify us via WhatsApp us via whatsapp( ' . $settings->whatsapp_no . ') immediately.<b><hr/><br>Warm Regards. (' . config('app.name') . ')<br/></p>';
 
         logEmails(auth()->user()->email, $subject, $body);
