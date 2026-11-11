@@ -259,7 +259,8 @@
                                                                         </a>
                                                                         <span class="unverified"><i class="fa fa-times"></i> Not Verified</span>
                                                                         @endif
-                                                                        <input type="text" id="BVN" name="BVN" class="form-control" value="{{ filled($bvnValue) ? $bvnValue : '' }}" autocomplete="off" inputmode="numeric" pattern="[0-9]{11}" placeholder="Enter your 11-digit BVN" required maxlength="11" minlength="11">
+                                                                        <input type="text" id="BVN" name="BVN" class="form-control" value="{{ filled($bvnValue) ? $bvnValue : '' }}" autocomplete="off" inputmode="numeric" pattern="[0-9]{11}" placeholder="Enter your 11-digit BVN" required maxlength="11" minlength="11" data-bvn-input aria-describedby="bvn-length-help">
+                                                                        <small id="bvn-length-help" class="form-text text-muted">Enter exactly 11 digits.</small>
                                                                         @endif
                                                                     </fieldset>
                                                                 </div>
@@ -408,6 +409,16 @@
 @section('page-script')
 <script src="{{ asset('app-assets/js/scripts/pages/dashboard-analytics.js') }}"></script>
 <script>
+    document.querySelectorAll('[data-bvn-input]').forEach(function (input) {
+        const validateBvnLength = function () {
+            input.value = input.value.replace(/\D/g, '').slice(0, 11);
+            input.setCustomValidity(input.value.length === 11 ? '' : 'Enter exactly 11 digits.');
+        };
+
+        input.addEventListener('input', validateBvnLength);
+        validateBvnLength();
+    });
+
     function zoomKycDocument(image) {
         if (!image || !image.src) {
             return;

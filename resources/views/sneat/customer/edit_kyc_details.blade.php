@@ -168,7 +168,8 @@
                                     @elseif($key === 'DOB')
                                         <input type="date" class="form-control" name="DOB" value="{{ $value }}" required>
                                     @elseif($key === 'BVN')
-                                        <input type="text" class="form-control" name="BVN" value="" autocomplete="off" inputmode="numeric" pattern="[0-9]{11}" placeholder="Enter your 11-digit BVN" minlength="11" maxlength="11" required>
+                                        <input type="text" class="form-control" name="BVN" value="" autocomplete="off" inputmode="numeric" pattern="[0-9]{11}" placeholder="Enter your 11-digit BVN" minlength="11" maxlength="11" required data-bvn-input aria-describedby="bvn-length-help">
+                                        <small id="bvn-length-help" class="form-text text-muted">Enter exactly 11 digits.</small>
                                     @else
                                         <input type="text" class="form-control" name="{{ $key }}" value="{{ filled($value) ? $value : $field['value'] }}" required>
                                     @endif
@@ -323,6 +324,16 @@
 @section('page-script')
     @parent
     <script>
+        document.querySelectorAll('[data-bvn-input]').forEach(function (input) {
+            const validateBvnLength = function () {
+                input.value = input.value.replace(/\D/g, '').slice(0, 11);
+                input.setCustomValidity(input.value.length === 11 ? '' : 'Enter exactly 11 digits.');
+            };
+
+            input.addEventListener('input', validateBvnLength);
+            validateBvnLength();
+        });
+
         function zoomKycDocument(image) {
             if (!image || !image.src) {
                 return;
